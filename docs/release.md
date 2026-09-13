@@ -40,6 +40,28 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ### Local library performance — 2026-09-13
 
+### Corrected Agenda publication — 2026-09-13
+
+The corrected Agenda pipeline was published through Cloudflare gate
+`3b5a999181355cc0b91e232b4092b777913c1da121c7e3230f52f6488fa4cfd6`.
+The exact allowlist contained only the additive D1 migration target,
+the versioned Chrome and Firefox 1.0.25 R2 objects, and
+`worker:tobirink-public-api`. D1 reported no migrations to apply.
+
+Both archives were uploaded successfully and retain immutable caching:
+
+- Chrome: 305469 bytes, SHA-256 `c3bef1105a1b54ae8acf03cdf34d4928b9457af11cf6bc7a8a541dc1bd64cc54`.
+- Firefox: 305509 bytes, SHA-256 `ffe508210a2e13f81b76b791a9cb86ad1b1624f279ab69127cd7d6b44ff1a460`.
+
+Worker version `c1e72fad-1262-4632-8dc5-52326bb1f53a` is deployed at 100 percent
+with the documented five-minute cron. The previous Worker version
+`d498ddc7-55c5-41b0-890a-c1838a1e9dfa` remains listed for rollback.
+
+The installed Chromium 153 smoke reconstructs one anime `INSTANT` entry and
+one manga `DATE` entry. Production pages and API routes return the expected
+statuses, the production Playwright connection-state smoke passes, and the
+Agenda dataflow remains Archify showcase 9/9 with zero errors and warnings.
+
 Candidate `1.0.25` keeps IndexedDB authoritative while replacing per-record
 catalogue reads with bounded `bulkGet` and `anyOf(workIds)` batches. Normal
 browser startup reuses the complete inventory checkpoint; opening Library does

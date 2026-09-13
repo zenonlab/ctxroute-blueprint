@@ -8904,7 +8904,7 @@
       "schemaVersion": 1,
       "id": "goal-restore-agenda-pipeline",
       "title": "Restaurer la pipeline Agenda publique et locale",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -9242,7 +9242,7 @@
         {
           "id": "step-12",
           "title": "Publier separement la pipeline Agenda certifiee",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Une approbation explicite distincte autorise le plan Cloudflare exact",
             "La migration D1 additive le cron le Worker et les deux ZIP seulement sont allowlistes",
@@ -9261,7 +9261,13 @@
             "git commit -m chore(release): publish agenda pipeline",
             "git push origin main"
           ],
-          "evidence": []
+          "evidence": [
+            "Cloudflare gate 3b5a999181355cc0b91e232b4092b777913c1da121c7e3230f52f6488fa4cfd6 applied with the exact allowlist: D1 migration target, two versioned R2 ZIP objects, and Worker tobirink-public-api.",
+            "D1 reported no migrations to apply; both 1.0.25 ZIP uploads completed; Worker deployed at 100 percent as version c1e72fad-1262-4632-8dc5-52326bb1f53a with cron */5 * * * *.",
+            "Remote SHA-256 matches local manifest: Chrome c3bef1105a1b54ae8acf03cdf34d4928b9457af11cf6bc7a8a541dc1bd64cc54 and Firefox ffe508210a2e13f81b76b791a9cb86ad1b1624f279ab69127cd7d6b44ff1a460; both return HTTP 200 with immutable caching.",
+            "Installed Chromium 153 reconstructs a non-empty Agenda with one anime INSTANT and one manga DATE; production route smoke and Playwright connection-state smoke pass; previous Worker d498ddc7-55c5-41b0-890a-c1838a1e9dfa remains listed for rollback.",
+            "npm run archify:validate -- agenda-release.dataflow passes 9/9 with zero errors and warnings; git diff --check passes."
+          ]
         }
       ]
     },
@@ -9467,7 +9473,7 @@
         {
           "id": "step-7",
           "title": "Certifier la pipeline corrigée contre FavLib",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Les fixtures couvrent 1501 sorties AniList et 466 sorties MangaUpdates par pages de 40",
             "Chaque interruption MV3 reprend au dernier checkpoint sans doublon",
@@ -9488,12 +9494,17 @@
             "git diff --check",
             "git commit -m test(agenda): certify complete favlib parity"
           ],
-          "evidence": []
+          "evidence": [
+            "Corpus synthétique 1 967 sorties: 1 501 AniList et 466 MangaUpdates, 43 réveils avec reprise par checkpoint, aucune duplication.",
+            "npm run verify passe intégralement; Chromium 153 reconstruit un Agenda local anime INSTANT et manga DATE; builds Chrome et Firefox 1.0.25 passent.",
+            "La prédiction manga reprend la garde FavLib: COMPLETED et CANCELLED ne produisent aucune estimation; ONGOING et HIATUS conservent la cadence médiane bornée.",
+            "Le runtime Firefox requis pour le test installé n'est pas présent sur le poste; aucune installation réseau n'a été effectuée sans autorisation dédiée."
+          ]
         },
         {
           "id": "step-8",
           "title": "Publier séparément la pipeline Agenda corrigée",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Une approbation explicite distincte autorise chaque ressource externe exacte",
             "Le collecteur choisi a passé plusieurs smokes AniList depuis son egress réel",
@@ -9513,7 +9524,13 @@
             "git diff --check",
             "git commit -m chore(release): record corrected agenda publication"
           ],
-          "evidence": []
+          "evidence": [
+            "Cloudflare gate 3b5a999181355cc0b91e232b4092b777913c1da121c7e3230f52f6488fa4cfd6 applied with the exact allowlist: D1 migration target, two versioned R2 ZIP objects, and Worker tobirink-public-api.",
+            "D1 reported no migrations to apply; both 1.0.25 ZIP uploads completed; Worker deployed at 100 percent as version c1e72fad-1262-4632-8dc5-52326bb1f53a with cron */5 * * * *.",
+            "Remote SHA-256 matches local manifest: Chrome c3bef1105a1b54ae8acf03cdf34d4928b9457af11cf6bc7a8a541dc1bd64cc54 and Firefox ffe508210a2e13f81b76b791a9cb86ad1b1624f279ab69127cd7d6b44ff1a460; both return HTTP 200 with immutable caching.",
+            "Installed Chromium 153 reconstructs a non-empty Agenda with one anime INSTANT and one manga DATE; production route smoke and Playwright connection-state smoke pass; previous Worker d498ddc7-55c5-41b0-890a-c1838a1e9dfa remains listed for rollback.",
+            "npm run archify:validate -- agenda-release.dataflow passes 9/9 with zero errors and warnings; git diff --check passes."
+          ]
         }
       ]
     }
