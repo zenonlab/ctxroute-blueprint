@@ -9041,7 +9041,7 @@
         {
           "id": "step-5",
           "title": "Telecharger et conserver atomiquement le calendrier dans l extension",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "L extension charge toutes les pages communes avec If None Match au plus toutes les vingt quatre heures",
             "Une generation n est publiee localement qu apres validation de toutes ses pages",
@@ -9062,7 +9062,11 @@
             "git diff --check",
             "git commit -m fix(extension): hydrate shared release calendar"
           ],
-          "evidence": []
+          "evidence": [
+            "Extension HTTP loader uses a 24-hour cache window, If-None-Match and last-good snapshot semantics",
+            "Invalid or failed responses are never committed; focused adapter test and extension/browser typechecks pass",
+            "Agenda architecture and dataflow views both pass Archify showcase validation"
+          ]
         },
         {
           "id": "step-6",

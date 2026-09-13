@@ -41,6 +41,12 @@
           "site"
         ],
         "note": "Corpus local filtré avant pagination; cover fournisseur puis secours Worker par ID public associé à un master R2."
+      },
+      {
+        "id": "agenda",
+        "label": "Agenda public/local",
+        "focus": ["resolution", "worker", "d1", "ui"],
+        "note": "Le Worker collecte les sorties publiques; l’extension les met en cache puis joint DATE/INSTANT aux Works locaux."
       }
     ]
   },

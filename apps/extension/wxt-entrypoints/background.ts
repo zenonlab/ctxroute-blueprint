@@ -17,6 +17,7 @@ import {
   WebExtensionPrivateRecoveryJournalAdapter,
   HttpFavoriteCollectiveAdapter,
   HttpFavoritePublicCacheAdapter,
+  HttpPublicReleaseLoader,
 } from '@tobirink/adapters-browser';
 import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
 import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
@@ -53,6 +54,7 @@ export default defineBackground({
     const pageContext = new WebExtensionPageContextAdapter(browser.tabs);
     const cache = new WebExtensionPopupContinuationCacheAdapter(browser.storage.local);
     const releaseCache = new WebExtensionPublicReleaseCacheAdapter(browser.storage.local);
+    if (configuredSiteOrigin) void new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache).catch(() => undefined);
     const preferences = new WebExtensionQuickPreferencesAdapter(browser.storage.local);
     const tasks = new DexieTaskStore();
     const notifications = new WebExtensionNotificationAdapter(browser.notifications, browser.runtime.getURL('/icons/tobirink-128.png'));

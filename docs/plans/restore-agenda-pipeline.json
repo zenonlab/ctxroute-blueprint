@@ -162,6 +162,12 @@
         "Executer les tests de securite extension",
         "git diff --check",
         "git commit -m fix(extension): hydrate shared release calendar"
+      ],
+      "status": "DONE",
+      "evidence": [
+        "Extension HTTP loader uses a 24-hour cache window, If-None-Match and last-good snapshot semantics",
+        "Invalid or failed responses are never committed; focused adapter test and extension/browser typechecks pass",
+        "Agenda architecture and dataflow views both pass Archify showcase validation"
       ]
     },
     {
