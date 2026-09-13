@@ -105,6 +105,12 @@
         "npm run archify:validate -- agenda-release.dataflow",
         "git diff --check",
         "git commit -m feat(worker): collect public release calendar"
+      ],
+      "status": "DONE",
+      "evidence": [
+        "D1 migration 0007 adds only public release event and provider sync tables with covering indexes and strict checks",
+        "Collector port runs AniList and MangaUpdates lanes independently and preserves successful events when one lane fails",
+        "Worker typecheck, collector tests, catalogue migration tests and Archify showcase pass"
       ]
     },
     {

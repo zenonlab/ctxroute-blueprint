@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-restore-agenda-pipeline",
+  "stepId": "step-3",
+  "status": "DONE",
+  "completedAt": "2026-09-13T00:00:00.000Z",
+  "evidence": [
+    "D1 migration 0007 adds only public release event and provider sync tables with covering indexes and strict checks",
+    "Collector port runs AniList and MangaUpdates lanes independently and preserves successful events when one lane fails",
+    "Worker typecheck, collector tests, catalogue migration tests and Archify showcase pass"
+  ]
+}

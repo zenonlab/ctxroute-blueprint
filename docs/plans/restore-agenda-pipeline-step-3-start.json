@@ -1,0 +1,7 @@
+{
+  "goalId": "goal-restore-agenda-pipeline",
+  "stepId": "step-3",
+  "status": "IN_PROGRESS",
+  "startedAt": "2026-09-13T00:00:00.000Z",
+  "scope": "Public release calendar Worker collectors and additive D1 schema"
+}

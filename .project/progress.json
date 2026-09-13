@@ -8981,7 +8981,7 @@
         {
           "id": "step-3",
           "title": "Construire le calendrier public Worker et D1",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "La migration 0007 ajoute uniquement les tables et index du calendrier public",
             "AniList et MangaUpdates sont collectes dans des lanes quotidiennes independantes",
@@ -9005,7 +9005,11 @@
             "git diff --check",
             "git commit -m feat(worker): collect public release calendar"
           ],
-          "evidence": []
+          "evidence": [
+            "D1 migration 0007 adds only public release event and provider sync tables with covering indexes and strict checks",
+            "Collector port runs AniList and MangaUpdates lanes independently and preserves successful events when one lane fails",
+            "Worker typecheck, collector tests, catalogue migration tests and Archify showcase pass"
+          ]
         },
         {
           "id": "step-4",
