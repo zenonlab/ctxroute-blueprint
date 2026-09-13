@@ -162,7 +162,7 @@ les proposer comme presets ; le compilateur les convertit ensuite vers des
 | --- | --- | --- |
 | `fixed` | tableau ou cadrage verrouillé | preset, champ de vision, cible |
 | `orbit` | inspection libre bornée | cible, lacet, tangage, distance, inertie |
-| `follow` | suivi d'une instance stable | cible, offset, anticipation, lissage |
+| `follow` | suivi d'une instance stable | cible, offset latéral/vertical, anticipation, lissage |
 | `rail` | course ou visite guidée | spline, progression, regard, bouclage |
 | `cinematic` | transition ou séquence | clip, marqueurs, interruption, retour |
 | `parallax_2d` | scène plane ou multi-calques | amplitude, profondeur, lissage |
@@ -173,6 +173,11 @@ choisir un rig/preset autorisé, d'ajuster ses paramètres bornés et de restaur
 valeurs du thème. « Jouer avec la caméra » active un mode d'interaction explicite sur
 la surface qualifiée ; il ne capture jamais le clavier ou la souris utilisés par une
 autre application.
+
+L'offset latéral est exprimé dans l'axe droit local de la cible et reste optionnel
+(zéro par défaut). Il sert uniquement au cadrage : il ne déplace ni l'instance, ni
+sa session, ni sa trajectoire, et est recopié par les passes d'arrière-plan ancrées
+à la caméra.
 
 La caméra n'impose aucune boucle permanente. Un geste invalide le rendu seulement
 pendant le déplacement et son inertie bornée. Une caméra fixe revient à zéro frame
