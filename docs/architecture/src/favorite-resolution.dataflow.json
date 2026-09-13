@@ -46,7 +46,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Titres locaux avant hydratation; démarrage sans rescan, bootstrap indexé, mutations unitaires et audit durable à 6 h bornent MV3."
+        "note": "Titres locaux immédiats; démarrage sans rescan, bootstrap indexé et lectures groupées par 100 bornent MV3."
       },
       {
         "id": "cover-rights",
@@ -172,7 +172,7 @@
       "stage": 4,
       "row": 1,
       "width": 150,
-      "tag": "transaction + bootstrap indexé"
+      "tag": "transaction + lectures groupées"
     },
     {
       "id": "localDiagnostics",

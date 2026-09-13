@@ -44,11 +44,14 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
     await session.putFavoriteReviewCandidateSet(candidateSet);
   });
   assert((await storage.getWork(id))?.preferredTitle === 'Contract work', 'work round-trip');
+  assert((await storage.getWorks([id, workId('work_missing')]))[0]?.preferredTitle === 'Contract work', 'ordered Work batch preserves missing positions');
   assert((await storage.getLibrary(library.id))?.workIds[0] === id, 'library round-trip');
   assert((await storage.getProgress(progress.id))?.value === 12, 'progress round-trip');
   assert((await storage.findProgressByWorkId(id))?.id === progress.id, 'progress lookup by Work');
+  assert((await storage.findProgressByWorkIds([id])).at(0)?.id === progress.id, 'progress batch lookup by Work');
   assert((await storage.getOrganizerConfiguration())?.folders[0]?.id === 'manga', 'organizer configuration round-trip');
   assert((await storage.getFavoriteSource(source.id))?.url === source.url, 'favorite source round-trip');
+  assert((await storage.getFavoriteParseArtifacts([source.id]))[0] === undefined, 'artifact batch preserves missing positions');
   assert((await storage.getFavoriteBookmarkMutation(source.bookmarkId))?.sequence === mutation.sequence, 'favorite mutation round-trip');
   assert((await storage.getFavoriteInventoryCheckpoint())?.sessionId === checkpoint.sessionId, 'favorite inventory checkpoint round-trip');
   assert((await storage.getFavoriteInventoryMark(source.bookmarkId))?.sessionId === checkpoint.sessionId, 'favorite inventory mark round-trip');
@@ -58,6 +61,7 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   assert((await storage.findFavoriteSourceByReviewId(review.id))?.id === source.id, 'favorite source lookup by Review');
   assert((await storage.listFavoriteSources({ limit: 1 }))[0]?.id === source.id, 'favorite source bounded listing');
   assert((await storage.listFavoriteSources({ afterId: alternateSource.id, limit: 1 })).length === 0, 'favorite source stable cursor');
+  assert(await storage.readPendingFavoriteProjectionCount() === 2, 'pending projection count excludes neither unresolved source');
   assert((await storage.listReviews({ limit: 1, status: 'resolved' }))[0]?.id === review.id, 'review bounded status listing');
   assert((await storage.listReviewsByWorkId({ limit: 2, workId: id })).length === 2, 'multiple Reviews may resolve to one work');
   assert((await storage.listReviews({ limit: 1, status: 'pending' })).length === 0, 'review status filtering');
@@ -93,6 +97,19 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   await storage.putFavoriteSource(createFavoriteSource({ ...direct, bookmarkId: 'bookmark-direct-two', id: favoriteSourceId('source_direct-two') }));
   assert((await storage.listFavoriteSourcesByWorkId({ limit: 1, workId: id }))[0]?.id === direct.id, 'direct Work source index is bounded and works without a Review');
   assert((await storage.listFavoriteSourcesByWorkId({ limit: 2, workId: id })).length === 2, 'multiple sources without Review are preserved');
+  const invalidBatches = [
+    () => storage.getWorks([]),
+    () => storage.getWorks(Array(101).fill(id)),
+    () => storage.findProgressByWorkIds([]),
+    () => storage.findProgressByWorkIds(Array(101).fill(id)),
+    () => storage.getFavoriteParseArtifacts([]),
+    () => storage.getFavoriteParseArtifacts(Array(101).fill(source.id)),
+  ];
+  for (const readBatch of invalidBatches) {
+    let rejected = false;
+    try { await readBatch(); } catch { rejected = true; }
+    assert(rejected, 'storage batches must reject empty inputs and more than 100 identifiers');
+  }
   let sourceMatchLimitRejected = false;
   try {
     await storage.listFavoriteSourcesByWorkId({ limit: 101, workId: id });

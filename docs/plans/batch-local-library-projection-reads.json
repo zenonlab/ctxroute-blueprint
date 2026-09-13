@@ -1,0 +1,53 @@
+{
+  "goalId": "goal-batch-local-library-projection-reads",
+  "title": "Grouper les lectures de la projection locale",
+  "executionMode": "collaborative",
+  "approved": true,
+  "validationEvidence": [
+    "L utilisateur a approuve cette etape par go",
+    "L audit montre que la lecture detaillee emet encore des milliers de requetes IndexedDB unitaires",
+    "La correction etend le port existant sans nouvelle table ni migration"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Lire Works progressions et artefacts par vrais lots",
+      "acceptance": [
+        "Le bootstrap calcule le nombre visible avec des comptes indexes sans scanner les motifs RETRYABLE",
+        "Le catalogue lit Works progressions et artefacts par lots de 100 au maximum",
+        "Les tris facettes pagination et projections provisoires restent strictement identiques",
+        "Un benchmark Chromium couvre 1400 favoris mixtes et mesure le gain avant apres",
+        "Les tests cibles npm run verify Archify et git diff check passent"
+      ],
+      "files": [
+        "packages/application/src/ports/storage-port.ts",
+        "packages/application/src/library/read-library-catalogue.ts",
+        "packages/application/src/library/project-pending-favorites.ts",
+        "packages/application/src/library/read-library-catalogue.test.ts",
+        "packages/contracts/src/memory-storage-port.ts",
+        "packages/contracts/src/storage-port-contract.ts",
+        "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+        "packages/adapters-indexeddb/src/dexie-storage-port.test.ts",
+        "packages/adapters-indexeddb/test/browser-entry.ts",
+        "apps/extension/runtime/web-bridge-adapter.test.ts",
+        "docs/decisions/ADR-0042-local-first-library-projection.md",
+        "docs/systems/favorite-resolution-rebuild-pipeline.md",
+        "docs/architecture/src/favorite-resolution.dataflow.json",
+        "docs/plans/batch-local-library-projection-reads.json",
+        "docs/plans/batch-local-library-projection-reads-completion.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run progress:validate -- docs/plans/batch-local-library-projection-reads.json",
+        "npm run progress:approve -- docs/plans/batch-local-library-projection-reads.json",
+        "Tests application contracts IndexedDB et extension cibles",
+        "Benchmark Chromium 1400 favoris mixtes avant apres",
+        "npm run verify",
+        "npm run archify:validate -- favorite-resolution.dataflow",
+        "git diff --check",
+        "git commit -m perf(extension): batch local library projection reads"
+      ]
+    }
+  ]
+}

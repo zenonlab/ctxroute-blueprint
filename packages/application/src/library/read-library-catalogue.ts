@@ -115,20 +115,19 @@ async function readCatalogueSnapshot(storage: StoragePort, input: LibraryCatalog
   for (let start = 0; start < workIds.length; start += libraryCatalogueReadBatchSize) {
     const batch = workIds.slice(start, start + libraryCatalogueReadBatchSize);
     const records = await storage.transaction(['progress', 'works'], async (session) => {
-      const settled = await Promise.allSettled(batch.map(async (id, index): Promise<LibraryCatalogueItem | undefined> => {
-        const work = await session.getWork(id);
+      const works = await session.getWorks(batch);
+      const progressByWorkId = new Map((await session.findProgressByWorkIds(batch)).map((progress) => [progress.workId, progress]));
+      return batch.map((id, index): LibraryCatalogueItem | undefined => {
+        const work = works[index];
         if (work === undefined) return undefined;
-        const progress = await session.findProgressByWorkId(id);
+        const progress = progressByWorkId.get(id);
         const addedOrder = start + index;
         resolvedWorkIds.add(work.id);
         const item: LibraryCatalogueItem = work.hydration === undefined
           ? { addedOrder, id: work.id, mediaKind: work.mediaKind, state: 'ready', title: work.preferredTitle, work }
           : { addedOrder, candidate: work.hydration.candidate, id: work.id, mediaKind: work.mediaKind, state: 'ready', title: work.preferredTitle, work };
         return progress === undefined ? item : { ...item, progress };
-      }));
-      const failed = settled.find((record): record is PromiseRejectedResult => record.status === 'rejected');
-      if (failed !== undefined) throw failed.reason;
-      return settled.map((record) => record.status === 'fulfilled' ? record.value : undefined);
+      });
     });
     corpus.push(...records.filter((item): item is LibraryCatalogueItem => item !== undefined));
   }
@@ -162,11 +161,10 @@ async function readCatalogueSnapshot(storage: StoragePort, input: LibraryCatalog
 }
 
 export async function readLibraryBootstrapSummary(storage: StoragePort, libraryId: LibraryId): Promise<{ libraryCount: number }> {
-  const [library, counts] = await Promise.all([
+  const [library, pending] = await Promise.all([
     storage.getLibrary(libraryId),
-    storage.readFavoriteResolutionCounts(),
+    storage.readPendingFavoriteProjectionCount(),
   ]);
-  const pending = counts.processing + counts.review + counts.retryable + counts.blocked;
   return Object.freeze({ libraryCount: (library?.workIds.length ?? 0) + pending });
 }
 

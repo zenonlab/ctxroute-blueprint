@@ -1,0 +1,29 @@
+{
+  "goalId": "goal-optimize-extension-library-startup",
+  "stepId": "step-2",
+  "status": "DONE",
+  "files": [
+    "packages/application/src/ports/storage-port.ts",
+    "packages/application/src/library/read-library-catalogue.ts",
+    "packages/application/src/library/project-pending-favorites.ts",
+    "packages/application/src/library/read-library-catalogue.test.ts",
+    "packages/contracts/src/memory-storage-port.ts",
+    "packages/contracts/src/storage-port-contract.ts",
+    "packages/adapters-indexeddb/src/dexie-storage-port.ts",
+    "packages/adapters-indexeddb/test/browser-entry.ts",
+    "apps/extension/runtime/web-bridge-adapter.test.ts",
+    "docs/decisions/ADR-0042-local-first-library-projection.md",
+    "docs/systems/favorite-resolution-rebuild-pipeline.md",
+    "docs/architecture/src/favorite-resolution.dataflow.json",
+    "docs/plans/batch-local-library-projection-reads.json",
+    "docs/plans/batch-local-library-projection-reads-completion.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Dexie utilise bulkGet pour les Work et artefacts et anyOf sur l index workId pour les progressions; les contrats refusent les lots vides ou superieurs a 100.",
+    "Le benchmark Chromium passe avec 500 Work en 19.60 ms et 1400 entrees mixtes resolues et provisoires en 57.80 ms sous la limite de 500 ms.",
+    "npm run verify passe avec 366 tests application 151 extension 45 Worker le contrat IndexedDB Chromium les builds Chrome Firefox et zero vulnerabilite.",
+    "favorite-resolution.dataflow passe Archify showcase 9 sur 9 avec zero erreur et avertissement; git diff check et ESLint quiet passent."
+  ]
+}

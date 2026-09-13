@@ -6,11 +6,13 @@ import {
   createAgendaEntry,
   createFavoriteSource,
   createLibrary,
+  createProgress,
   createReminder,
   createReview,
   createWork,
   favoriteSourceId,
   libraryId,
+  progressId,
   reminderId,
   reviewId,
   workId,
@@ -64,6 +66,35 @@ try {
   if (JSON.stringify(catalogue).length >= 64 * 1024) throw new Error('IndexedDB catalogue page exceeded the MV3 response budget.');
   if (catalogueElapsedMs >= 200) throw new Error(`IndexedDB catalogue exceeded 200 ms: ${catalogueElapsedMs.toFixed(2)} ms.`);
   document.body.dataset.catalogueMs = catalogueElapsedMs.toFixed(2);
+  const mixedStorage = new DexieStoragePort(`tobirink-mixed-catalogue-${Date.now()}`);
+  try {
+    const resolvedWorks = Array.from({ length: 700 }, (_, index) => createWork({
+      externalReferences: [{ externalId: `mixed-${index}`, provider: 'anilist' }],
+      id: workId(`work_mixed-${String(index).padStart(3, '0')}`),
+      mediaKind: 'anime',
+      preferredTitle: `Resolved ${String(index).padStart(3, '0')}`,
+    }));
+    await mixedStorage.database.works.bulkPut(resolvedWorks);
+    await mixedStorage.database.progress.bulkPut(resolvedWorks.slice(0, 350).map((item, index) => createProgress({ id: progressId(`progress_mixed-${String(index).padStart(3, '0')}`), kind: 'episode', maximum: 12, value: index % 12, workId: item.id })));
+    const mixedLibrary = createLibrary(libraryId('library_mixed1'), resolvedWorks.map(({ id }) => id));
+    await mixedStorage.database.libraries.put(mixedLibrary);
+    await importFavoriteSources(Array.from({ length: 700 }, (_, index) => ({
+      bookmarkId: `mixed-pending-${index}`,
+      folderPath: ['Mangas'],
+      order: 700 + index,
+      state: 'eligible' as const,
+      title: `Pending ${String(index).padStart(3, '0')} chapitre ${index % 100}`,
+      url: `https://reader.example/title/pending-${index}/chapter-${index % 100}`,
+    })), mixedStorage, '2026-09-13T00:00:00.000Z');
+    const mixedStartedAt = performance.now();
+    const mixed = await readLibraryCatalogue(mixedStorage, { libraryId: mixedLibrary.id, limit: 24, sort: 'ADDED_DESC' });
+    const mixedElapsedMs = performance.now() - mixedStartedAt;
+    if (mixed.statistics.total !== 1400 || mixed.items.length !== 24 || mixed.nextOffset !== 24) throw new Error('Mixed 1400-favorite catalogue lost resolved or provisional entries.');
+    if (mixedElapsedMs >= 500) throw new Error(`Mixed 1400-favorite catalogue exceeded 500 ms: ${mixedElapsedMs.toFixed(2)} ms.`);
+    document.body.dataset.mixedCatalogueMs = mixedElapsedMs.toFixed(2);
+  } finally {
+    await mixedStorage.deleteDatabase();
+  }
   await importFavoriteSources([{ bookmarkId: 'browser-atomic', folderPath: ['Mangas'], order: 0, state: 'eligible', title: 'Atomic fixture', url: 'https://reader.example/manga/atomic-fixture' }], storage, '2026-09-07T12:00:00.000Z');
   const imported = (await storage.listFavoriteSources({ limit: 10 })).find((source) => source.bookmarkId === 'browser-atomic');
   if (imported === undefined || await storage.getFavoriteParseArtifact(imported.id) === undefined) throw new Error('Favorite artifact did not share the import transaction.');
@@ -162,7 +193,7 @@ try {
   if (ownerState.registration.token !== replacementOwner.registration.token || recoveryJournal !== undefined) throw new Error('Committed private recovery rolled back its restored owner.');
   await recoveryDatabase.delete();
   document.body.dataset.status = 'passed';
-  document.body.textContent = `IndexedDB StoragePort contract passed; 500-work catalogue ${document.body.dataset.catalogueMs} ms`;
+  document.body.textContent = `IndexedDB StoragePort contract passed; 500-work catalogue ${document.body.dataset.catalogueMs} ms; mixed 1400-favorite catalogue ${document.body.dataset.mixedCatalogueMs} ms`;
 } catch (error) {
   document.body.dataset.status = 'failed';
   document.body.textContent = error instanceof Error ? error.message : String(error);

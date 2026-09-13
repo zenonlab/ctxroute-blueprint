@@ -107,9 +107,18 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
     getFavoriteProviderRateCheckpoint: async (provider) => { requireStore('favoriteProviderRateCheckpoints'); return state.favoriteProviderRateCheckpoints.get(provider); },
     getFavoriteResolutionReceipt: async (id) => { requireStore('favoriteResolutionReceipts'); return state.favoriteResolutionReceipts.get(id); },
     readFavoriteResolutionCounts: async () => { requireStore('favoriteSources'); return resolutionCounts(state.favoriteSources); },
+    readPendingFavoriteProjectionCount: async () => {
+      requireStore('favoriteSources');
+      return [...state.favoriteSources.values()].filter((source) => source.presence === 'observed' && source.resolution?.kind !== 'RESOLVED' && source.resolution?.kind !== 'UNSUPPORTED').length;
+    },
     getFavoriteReviewCandidateSet: async (reviewId) => { requireStore('favoriteReviewCandidateSets'); return state.favoriteReviewCandidateSets.get(reviewId); },
     getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); return state.agenda.get(id); },
     getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); return state.favoriteSources.get(id); },
+    getFavoriteParseArtifacts: async (sourceIds) => {
+      requireStore('favoriteArtifacts');
+      if (sourceIds.length < 1 || sourceIds.length > 100) throw new RangeError('Favorite artifact batch must contain between 1 and 100 identifiers.');
+      return sourceIds.map((id) => state.favoriteArtifacts.get(id));
+    },
     findFavoriteSourceByReviewId: async (reviewId: ReviewId) => {
       requireStore('favoriteSources');
       const matches = [...state.favoriteSources.values()].filter((source) => source.reviewId === reviewId);
@@ -125,9 +134,24 @@ function scopedSession(state: MemoryState, allowed?: ReadonlySet<PrivateStoreNam
       if (matches.length > 1) throw new Error('A Work may have only one progress record.');
       return matches[0];
     },
+    findProgressByWorkIds: async (workIds) => {
+      requireStore('progress');
+      if (workIds.length < 1 || workIds.length > 100) throw new RangeError('Progress batch must contain between 1 and 100 Work identifiers.');
+      const selected = new Set(workIds);
+      const matches = [...state.progress.values()].filter((progress) => selected.has(progress.workId));
+      const counts = new Map<string, number>();
+      for (const progress of matches) counts.set(progress.workId, (counts.get(progress.workId) ?? 0) + 1);
+      if ([...counts.values()].some((count) => count > 1)) throw new Error('A Work may have only one progress record.');
+      return matches;
+    },
     getReminder: async (id: ReminderId) => { requireStore('reminders'); return state.reminders.get(id); },
     getReview: async (id: ReviewId) => { requireStore('reviews'); return state.reviews.get(id); },
     getWork: async (id: WorkId) => { requireStore('works'); return state.works.get(id); },
+    getWorks: async (ids) => {
+      requireStore('works');
+      if (ids.length < 1 || ids.length > 100) throw new RangeError('Work batch must contain between 1 and 100 identifiers.');
+      return ids.map((id) => state.works.get(id));
+    },
     listAgendaEntries: async (query) => {
       requireStore('agenda');
       assertAgendaEntryListQuery(query);
@@ -217,16 +241,20 @@ export class MemoryStoragePort implements StoragePort {
   getFavoriteProviderRateCheckpoint: StoragePort['getFavoriteProviderRateCheckpoint'] = (provider) => this.session().getFavoriteProviderRateCheckpoint(provider);
   getFavoriteResolutionReceipt: StoragePort['getFavoriteResolutionReceipt'] = (id) => this.session().getFavoriteResolutionReceipt(id);
   readFavoriteResolutionCounts: StoragePort['readFavoriteResolutionCounts'] = () => this.session().readFavoriteResolutionCounts();
+  readPendingFavoriteProjectionCount: StoragePort['readPendingFavoriteProjectionCount'] = () => this.session().readPendingFavoriteProjectionCount();
   getFavoriteReviewCandidateSet: StoragePort['getFavoriteReviewCandidateSet'] = (reviewId) => this.session().getFavoriteReviewCandidateSet(reviewId);
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
+  getFavoriteParseArtifacts: StoragePort['getFavoriteParseArtifacts'] = (ids) => this.session().getFavoriteParseArtifacts(ids);
   findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
   getOrganizerConfiguration: StoragePort['getOrganizerConfiguration'] = () => this.session().getOrganizerConfiguration();
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
   findProgressByWorkId: StoragePort['findProgressByWorkId'] = (workId) => this.session().findProgressByWorkId(workId);
+  findProgressByWorkIds: StoragePort['findProgressByWorkIds'] = (workIds) => this.session().findProgressByWorkIds(workIds);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
+  getWorks: StoragePort['getWorks'] = (ids) => this.session().getWorks(ids);
   listWorksByIdentityKey: StoragePort['listWorksByIdentityKey'] = (query) => this.session().listWorksByIdentityKey(query);
   listWorks: StoragePort['listWorks'] = (query) => this.session().listWorks(query);
   listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);

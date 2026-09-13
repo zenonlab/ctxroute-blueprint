@@ -75,6 +75,8 @@ describe('WebBridge private projections', () => {
     const agendaSpy = vi.spyOn(storage, 'listAgendaEntries');
     const sourceScanSpy = vi.spyOn(storage, 'listFavoriteSources');
     const workScanSpy = vi.spyOn(storage, 'getWork');
+    const workBatchSpy = vi.spyOn(storage, 'getWorks');
+    const diagnosticCountSpy = vi.spyOn(storage, 'readFavoriteResolutionCounts');
     const id = await addResolvedWork(storage, { id: 'work_weekly', kind: 'anime', title: 'Hebdomadaire' });
     await storage.putLibrary(createLibrary(primaryLibraryId, [id]));
     await storage.putAgendaEntry(createAgendaEntry({ availability: 'official', id: agendaEntryId('agenda_weekly'), occursAt: '2026-09-08T18:30:00.000Z', releaseLabel: 'Épisode 7', workId: id }));
@@ -83,6 +85,8 @@ describe('WebBridge private projections', () => {
     expect(agendaSpy).not.toHaveBeenCalled();
     expect(sourceScanSpy).not.toHaveBeenCalled();
     expect(workScanSpy).not.toHaveBeenCalled();
+    expect(workBatchSpy).not.toHaveBeenCalled();
+    expect(diagnosticCountSpy).not.toHaveBeenCalled();
     const period = await handler({ type: 'agenda.read', requestId: 'request_agenda', from: '2026-09-07', to: '2026-09-14' });
     expect(agendaSpy).toHaveBeenCalledWith({ from: expect.stringMatching(/^2026-09-0[67]T/u), limit: 100, to: expect.stringMatching(/^2026-09-1[34]T/u) });
     expect(period).toMatchObject({ entries: [{ availability: 'official', occursAt: '2026-09-08T18:30:00.000Z', releaseLabel: 'Épisode 7', sourceUrl: 'https://reader.example/work_weekly' }], from: '2026-09-07', to: '2026-09-14' });

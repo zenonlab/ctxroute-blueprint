@@ -1,4 +1,4 @@
-import { assertAgendaEntryListQuery, assertReviewMatchListQuery, assertWorkIdentityQuery } from '@tobirink/application';
+import { assertAgendaEntryListQuery, assertReviewMatchListQuery, assertWorkIdentityQuery, createFavoriteParseArtifactRecord } from '@tobirink/application';
 import type { PrivateStoreName, StoragePort, StorageSession } from '@tobirink/application';
 import {
   createAgendaEntry,
@@ -67,6 +67,16 @@ export class DexieStoragePort implements StoragePort {
           return result;
         });
       },
+      readPendingFavoriteProjectionCount: async () => {
+        requireStore('favoriteSources');
+        return this.database.transaction('r', this.database.favoriteSources, async () => {
+          const table = this.database.favoriteSources;
+          const observed = await table.where('presence').equals('observed').count();
+          const resolved = await table.where(['presence', 'resolution.kind']).equals(['observed', 'RESOLVED']).count();
+          const unsupported = await table.where(['presence', 'resolution.kind']).equals(['observed', 'UNSUPPORTED']).count();
+          return Math.max(0, observed - resolved - unsupported);
+        });
+      },
       ...createDexieFavoriteResolutionSession(this.database, requireStore),
       getFavoriteBookmarkMutation: async (bookmarkId) => { requireStore('favoriteBookmarkMutations'); return this.database.favoriteBookmarkMutations.get(bookmarkId); },
       getFavoriteInventoryCheckpoint: async () => { requireStore('favoriteInventoryCheckpoints'); return this.database.favoriteInventoryCheckpoints.get('favorite-inventory'); },
@@ -76,6 +86,11 @@ export class DexieStoragePort implements StoragePort {
       getFavoriteReviewCandidateSet: async (reviewId) => { requireStore('favoriteReviewCandidateSets'); return this.database.favoriteReviewCandidateSets.get(reviewId); },
       getAgendaEntry: async (id: AgendaEntryId) => { requireStore('agenda'); const entry = await this.database.agenda.get(id); return entry && createAgendaEntry(entry); },
       getFavoriteSource: async (id: FavoriteSourceId) => { requireStore('favoriteSources'); const source = await this.database.favoriteSources.get(id); return source && createFavoriteSource(source); },
+      getFavoriteParseArtifacts: async (sourceIds) => {
+        requireStore('favoriteArtifacts');
+        if (sourceIds.length < 1 || sourceIds.length > 100) throw new RangeError('Favorite artifact batch must contain between 1 and 100 identifiers.');
+        return (await this.database.favoriteArtifacts.bulkGet([...sourceIds])).map((record) => record && createFavoriteParseArtifactRecord(record));
+      },
       findFavoriteSourceByReviewId: async (reviewId: ReviewId) => {
         requireStore('favoriteSources');
         const matches = await this.database.favoriteSources.where('reviewId').equals(reviewId).limit(2).toArray();
@@ -91,9 +106,23 @@ export class DexieStoragePort implements StoragePort {
         if (matches.length > 1) throw new Error('A Work may have only one progress record.');
         return matches[0] && createProgress(matches[0]);
       },
+      findProgressByWorkIds: async (workIds) => {
+        requireStore('progress');
+        if (workIds.length < 1 || workIds.length > 100) throw new RangeError('Progress batch must contain between 1 and 100 Work identifiers.');
+        const matches = (await this.database.progress.where('workId').anyOf([...workIds]).toArray()).map(createProgress);
+        const counts = new Map<string, number>();
+        for (const progress of matches) counts.set(progress.workId, (counts.get(progress.workId) ?? 0) + 1);
+        if ([...counts.values()].some((count) => count > 1)) throw new Error('A Work may have only one progress record.');
+        return matches;
+      },
       getReminder: async (id: ReminderId) => { requireStore('reminders'); const reminder = await this.database.reminders.get(id); return reminder && createReminder(reminder); },
       getReview: async (id: ReviewId) => { requireStore('reviews'); const review = await this.database.reviews.get(id); return review && createReview(review); },
       getWork: async (id: WorkId) => { requireStore('works'); const work = await this.database.works.get(id); return work && createWork(work); },
+      getWorks: async (ids) => {
+        requireStore('works');
+        if (ids.length < 1 || ids.length > 100) throw new RangeError('Work batch must contain between 1 and 100 identifiers.');
+        return (await this.database.works.bulkGet([...ids])).map((work) => work && createWork(work));
+      },
       listAgendaEntries: async (query) => {
         requireStore('agenda');
         assertAgendaEntryListQuery(query);
@@ -169,16 +198,20 @@ export class DexieStoragePort implements StoragePort {
   getFavoriteProviderRateCheckpoint: StoragePort['getFavoriteProviderRateCheckpoint'] = (provider) => this.session().getFavoriteProviderRateCheckpoint(provider);
   getFavoriteResolutionReceipt: StoragePort['getFavoriteResolutionReceipt'] = (id) => this.session().getFavoriteResolutionReceipt(id);
   readFavoriteResolutionCounts: StoragePort['readFavoriteResolutionCounts'] = () => this.session().readFavoriteResolutionCounts();
+  readPendingFavoriteProjectionCount: StoragePort['readPendingFavoriteProjectionCount'] = () => this.session().readPendingFavoriteProjectionCount();
   getFavoriteReviewCandidateSet: StoragePort['getFavoriteReviewCandidateSet'] = (reviewId) => this.session().getFavoriteReviewCandidateSet(reviewId);
   getFavoriteSource: StoragePort['getFavoriteSource'] = (id) => this.session().getFavoriteSource(id);
+  getFavoriteParseArtifacts: StoragePort['getFavoriteParseArtifacts'] = (ids) => this.session().getFavoriteParseArtifacts(ids);
   findFavoriteSourceByReviewId: StoragePort['findFavoriteSourceByReviewId'] = (reviewId) => this.session().findFavoriteSourceByReviewId(reviewId);
   getLibrary: StoragePort['getLibrary'] = (id) => this.session().getLibrary(id);
   getOrganizerConfiguration: StoragePort['getOrganizerConfiguration'] = () => this.session().getOrganizerConfiguration();
   getProgress: StoragePort['getProgress'] = (id) => this.session().getProgress(id);
   findProgressByWorkId: StoragePort['findProgressByWorkId'] = (workId) => this.session().findProgressByWorkId(workId);
+  findProgressByWorkIds: StoragePort['findProgressByWorkIds'] = (workIds) => this.session().findProgressByWorkIds(workIds);
   getReminder: StoragePort['getReminder'] = (id) => this.session().getReminder(id);
   getReview: StoragePort['getReview'] = (id) => this.session().getReview(id);
   getWork: StoragePort['getWork'] = (id) => this.session().getWork(id);
+  getWorks: StoragePort['getWorks'] = (ids) => this.session().getWorks(ids);
   listWorksByIdentityKey: StoragePort['listWorksByIdentityKey'] = (query) => this.session().listWorksByIdentityKey(query);
   listWorks: StoragePort['listWorks'] = (query) => this.session().listWorks(query);
   listAgendaEntries: StoragePort['listAgendaEntries'] = (query) => this.session().listAgendaEntries(query);

@@ -62,13 +62,15 @@ locale peut servir de destination à la carte dans les contextes de confiance d�
 autorisés. Les tris et facettes utilisent le corpus fusionné, avec `Locale` comme
 source et `Inconnu` comme type tant que la résolution ne fournit pas davantage.
 
-Le bootstrap WebBridge lit la bibliothèque autoritaire et les compteurs de
-résolution indexés sans construire, trier ni sérialiser le catalogue complet.
+Le bootstrap WebBridge lit la bibliothèque autoritaire et un compteur de
+projection calculé exclusivement par les index de présence et résolution, sans
+scanner les motifs de reprise ni construire, trier ou sérialiser le catalogue complet.
 Le nombre projeté additionne les `Work` de la bibliothèque aux sources observées
 encore en préparation, Review ou reprise; les invariants de stockage garantissent
 qu’une résolution `RESOLVED` référence un `Work` existant. La lecture détaillée
-conserve le corpus complet nécessaire aux facettes et au tri, mais exécute ses
-lectures de `Work` et progression par lots parallèles de cent au maximum.
+conserve le corpus complet nécessaire aux facettes et au tri. Elle charge les
+`Work` avec `bulkGet`, les progressions avec `anyOf(workIds)` et les artefacts
+avec `bulkGet`, par lots de cent identifiants au maximum.
 
 Au démarrage normal du navigateur, le runner réutilise un checkpoint d’inventaire
 complet et reprend uniquement les travaux dus, sans lancer la réparation globale
@@ -86,3 +88,5 @@ objet persistant. Le contrat de présentation expose l’état et le type inconn
 le site et l’extension les affichent sans les faire passer pour un fournisseur.
 Le réveil MV3 ne crée plus de contention IndexedDB par rescan systématique et le
 premier handshake ne paie plus le coût des facettes de toute la bibliothèque.
+Le contrat groupé conserve l'ordre des `Work`, représente explicitement une
+entrée absente et refuse tout lot vide ou supérieur à cent identifiants.

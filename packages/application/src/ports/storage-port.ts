@@ -162,9 +162,11 @@ export function assertReviewMatchListQuery(query: ReviewMatchListQuery): void {
 
 export interface StorageReadPort {
   readFavoriteResolutionCounts(): Promise<{ observed: number; processing: number; resolved: number; review: number; retryable: number; blocked: number; unsupported: number; internalErrors?: number; collectivePending?: number }>;
+  readPendingFavoriteProjectionCount(): Promise<number>;
   getAgendaEntry(id: AgendaEntryId): Promise<AgendaEntry | undefined>;
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;
   getFavoriteParseArtifact(sourceId: FavoriteSourceId): Promise<FavoriteParseArtifactRecord | undefined>;
+  getFavoriteParseArtifacts(sourceIds: readonly FavoriteSourceId[]): Promise<readonly (FavoriteParseArtifactRecord | undefined)[]>;
   getFavoriteResolutionTask(id: string): Promise<DurableTask | undefined>;
   getFavoriteBookmarkMutation(bookmarkId: string): Promise<FavoriteBookmarkMutation | undefined>;
   getFavoriteInventoryCheckpoint(): Promise<FavoriteInventoryCheckpoint | undefined>;
@@ -177,9 +179,11 @@ export interface StorageReadPort {
   getOrganizerConfiguration(): Promise<OrganizerConfiguration | undefined>;
   getProgress(id: ProgressId): Promise<Progress | undefined>;
   findProgressByWorkId(workId: WorkId): Promise<Progress | undefined>;
+  findProgressByWorkIds(workIds: readonly WorkId[]): Promise<readonly Progress[]>;
   getReminder(id: ReminderId): Promise<Reminder | undefined>;
   getReview(id: ReviewId): Promise<Review | undefined>;
   getWork(id: WorkId): Promise<Work | undefined>;
+  getWorks(ids: readonly WorkId[]): Promise<readonly (Work | undefined)[]>;
   listWorks(query: WorkPageQuery): Promise<readonly Work[]>;
   listWorksByIdentityKey(query: WorkIdentityQuery): Promise<readonly Work[]>;
   listAgendaEntries(query: AgendaEntryListQuery): Promise<readonly AgendaEntry[]>;

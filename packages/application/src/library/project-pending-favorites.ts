@@ -26,7 +26,10 @@ export async function projectFavoriteSources(storage: StoragePort, resolvedWorkI
   for (;;) {
     const sources = await storage.listFavoriteSources(afterId === undefined ? { limit: libraryCatalogueReadBatchSize } : { afterId, limit: libraryCatalogueReadBatchSize });
     if (sources.length === 0) break;
-    const page = await storage.transaction(['favoriteArtifacts'], async (session) => Promise.all(sources.map(async (source) => ({ artifact: await session.getFavoriteParseArtifact(source.id), source }))));
+    const page = await storage.transaction(['favoriteArtifacts'], async (session) => {
+      const artifacts = await session.getFavoriteParseArtifacts(sources.map((source) => source.id));
+      return sources.map((source, index) => ({ artifact: artifacts[index], source }));
+    });
     for (const { artifact: record, source } of page) {
       if (source.presence !== 'observed' || source.resolution?.kind === 'UNSUPPORTED') continue;
       if (source.matchedWorkId !== undefined && resolvedWorkIds.has(source.matchedWorkId) && source.resolution?.kind === 'RESOLVED') {

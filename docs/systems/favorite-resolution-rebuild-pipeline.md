@@ -897,10 +897,13 @@ Options relit automatiquement les phases actives, permet la pause persistante
 et rend actionnable la limite de huit tentatives.
 
 Le bootstrap WebBridge calcule le nombre visible depuis la longueur de la
-bibliothèque et les compteurs de résolution indexés. Il ne construit plus les
-facettes ni le tri du corpus complet. La lecture du catalogue conserve ces
-résultats exacts mais charge `Work` et progression en fenêtres parallèles de
-cent au maximum, au lieu d’enchaîner deux requêtes IndexedDB par œuvre.
+bibliothèque et trois comptes indexés : sources observées, résolues et non
+prises en charge. Il ne scanne pas les motifs `RETRYABLE` et ne construit plus
+les facettes ni le tri du corpus complet. La lecture du catalogue conserve ces
+résultats exacts mais charge les `Work` et artefacts avec `bulkGet`, puis les
+progressions avec `anyOf(workIds)`, en lots de cent identifiants au maximum.
+Le contrat Chromium couvre un corpus mixte de 1 400 entrées résolues et
+provisoires; aucune lecture unitaire par œuvre ou artefact n'est nécessaire.
 
 La version 1.0.14 ajoute deux diagnostics indépendants. Le Worker produit des
 événements structurés uniquement avec la valeur exacte `worker-v1`; ils
