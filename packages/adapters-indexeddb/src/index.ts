@@ -9,3 +9,4 @@ export { DexieFavoriteResolutionOutbox } from './favorite-resolution/dexie-favor
 export { DexieProviderRateCheckpointAdapter } from './favorite-resolution/dexie-provider-rate-checkpoint-adapter';
 export { DexieOrganizerSnapshotStore } from './organizer-snapshot/dexie-organizer-snapshot-store';
 export { DexiePublicReleaseFallbackStore } from './releases/dexie-public-release-fallback-store';
+export { DexiePublicReleaseGenerationCache } from './releases/dexie-public-release-generation-cache';

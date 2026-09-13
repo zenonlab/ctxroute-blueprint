@@ -9404,7 +9404,7 @@
         {
           "id": "step-5",
           "title": "Rendre le snapshot IndexedDB et l API v2 réellement atomiques",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le cache Agenda quitte storage.local pour une génération IndexedDB transactionnelle",
             "Le chargeur suit tous les nextCursor et refuse une génération incomplète",
@@ -9425,7 +9425,13 @@
             "git diff --check",
             "git commit -m fix(agenda): commit complete release generations"
           ],
-          "evidence": []
+          "evidence": [
+            "The extension runtime now stores complete public release generations in IndexedDB; storage.local is no longer the Agenda calendar cache",
+            "The HTTP loader follows every bounded nextCursor, validates stable revision generatedAt and ETag across pages, and never saves an empty malformed duplicate interrupted or partial generation",
+            "D1 migration 0009 stages generation rows in batches of 50 and promotes an active pointer only after SQL COUNT matches; legacy public release rows are copied additively",
+            "D1 reads use the (generation_revision, occurrence_value, id) index and opaque cursor order; route tests prove the window-specific ETag and reject malformed cursors",
+            "All browser, Worker, extension and Chromium IndexedDB tests pass; 371 application tests pass sequentially, all workspace typechecks pass and Agenda dataflow is Archify showcase 9/9"
+          ]
         },
         {
           "id": "step-6",

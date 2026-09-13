@@ -84,7 +84,8 @@ describe('agenda notifications', () => {
     const background = readFileSync(new URL('./wxt-entrypoints/background.ts', import.meta.url), 'utf8');
     const surface = readFileSync(new URL('./runtime/ExtensionSurface.tsx', import.meta.url), 'utf8');
     expect(background).toMatch(/readAgendaPeriod\(privateStorage\.storage, parsed\.data\)/);
-    expect(background).toMatch(/hydrateAgendaFromPublicReleaseCache\(privateStorage\.storage, releaseCache\)/);
+    expect(background).toMatch(/new DexiePublicReleaseGenerationCache\(privateStorage\.storage\.database\)/);
+    expect(background).toMatch(/hydrateAgendaFromPublicReleaseGeneration\(privateStorage\.storage, releaseCache\)/);
     expect(background).toMatch(/scheduleAgendaPeriodNotifications\(privateStorage\.storage, tasks/);
     expect(background).toMatch(/browser\.alarms\.onAlarm\.addListener/);
     expect(background).toMatch(/browser\.runtime\.onStartup\.addListener/);

@@ -1,6 +1,6 @@
 import type { PublicReleaseEventContract } from '@tobirink/application';
 import { publicReleaseEventSchema } from '@tobirink/application';
-import { collectPublicReleaseLanes, upsertPublicReleaseEvents, AniListReleaseCollector, MangaUpdatesReleaseCollector } from './public-release-collectors';
+import { collectPublicReleaseLanes, commitPublicReleaseGeneration, AniListReleaseCollector, MangaUpdatesReleaseCollector } from './public-release-collectors';
 
 export interface PublicReleaseQuery { from?: string; to?: string; cursor?: string; limit: number }
 export interface PublicReleaseCalendarPort {
@@ -8,22 +8,38 @@ export interface PublicReleaseCalendarPort {
   sync(window: { from: string; to: string }): Promise<{ count: number; failures: readonly string[] }>;
 }
 interface CalendarPage { entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; nextCursor?: string }
-interface ReleaseRow { id: string; provider: string; provider_key: string | null; provider_work_id: string; release_kind: string; sequence_number: number | null; sequence_label: string | null; occurrence_kind: string; occurrence_value: string; state: string; source: string; fetched_at: string; parser_version: string; rules_version: string; expires_at: string }
+interface ReleaseRow { id: string; provider: string; provider_work_id: string; release_kind: string; sequence_label: string | null; occurrence_kind: string; occurrence_value: string; state: string; source: string; fetched_at: string; parser_version: string; rules_version: string; expires_at: string }
+interface ReleaseGenerationRow { revision: string; generated_at: string }
+interface ReleaseCursor { id: string | null; occurrence: string | null }
+
+function decodeCursor(cursor: string | undefined): ReleaseCursor {
+  if (cursor === undefined) return { id: null, occurrence: null };
+  const separator = cursor.indexOf('|');
+  if (separator < 10 || separator === cursor.length - 1 || cursor.length > 256) throw new Error('invalid-release-cursor');
+  return { occurrence: cursor.slice(0, separator), id: cursor.slice(separator + 1) };
+}
 
 export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort {
   constructor(private readonly db: D1Database) {}
   async query(input: { from?: string; to?: string; cursor?: string; limit: number }) {
-    const rows = await this.db.prepare('SELECT id, provider, provider_key, provider_work_id, release_kind, sequence_number, sequence_label, occurrence_kind, occurrence_value, state, source, fetched_at, parser_version, rules_version, expires_at FROM public_release_event WHERE (?1 IS NULL OR occurrence_value >= ?1) AND (?2 IS NULL OR occurrence_value <= ?2) AND (?3 IS NULL OR id > ?3) ORDER BY id LIMIT ?4').bind(input.from ?? null, input.to ? `${input.to}T23:59:59.999Z` : null, input.cursor ?? null, input.limit + 1).all<ReleaseRow>();
-    const parsed = rows.results.flatMap((row) => { try { return [publicReleaseEventSchema.parse({ id: row.id, provider: row.provider_key ?? row.provider, providerWorkId: row.provider_work_id, releaseKind: row.release_kind, sequence: row.sequence_label ?? row.sequence_number ?? undefined, occurrence: { kind: row.occurrence_kind, value: row.occurrence_value }, state: row.state, provenance: { source: row.source, fetchedAt: row.fetched_at, parserVersion: row.parser_version, rulesVersion: row.rules_version }, expiresAt: row.expires_at })]; } catch { return []; } });
+    const cursor = decodeCursor(input.cursor);
+    const lowerBound = input.from ?? '0000-01-01';
+    const upperBound = input.to ? `${input.to}T23:59:59.999Z` : '9999-12-31T23:59:59.999Z';
+    const rows = await this.db.prepare("SELECT event.id, event.provider, event.provider_work_id, event.release_kind, event.sequence_label, event.occurrence_kind, event.occurrence_value, event.state, event.source, event.fetched_at, event.parser_version, event.rules_version, event.expires_at FROM public_release_generation_event AS event JOIN public_release_active_generation AS active ON active.revision = event.generation_revision AND active.id = 'active' WHERE event.occurrence_value >= ?1 AND event.occurrence_value <= ?2 AND (event.occurrence_value > ?3 OR (event.occurrence_value = ?3 AND event.id > ?4)) ORDER BY event.occurrence_value, event.id LIMIT ?5").bind(lowerBound, upperBound, cursor.occurrence ?? lowerBound, cursor.id ?? '', input.limit + 1).all<ReleaseRow>();
+    const generation = await this.db.prepare("SELECT generation.revision, generation.generated_at FROM public_release_generation AS generation JOIN public_release_active_generation AS active ON active.revision = generation.revision AND active.id = 'active' LIMIT 1").first<ReleaseGenerationRow>();
+    const parsed = rows.results.flatMap((row) => { try { return [publicReleaseEventSchema.parse({ id: row.id, provider: row.provider, providerWorkId: row.provider_work_id, releaseKind: row.release_kind, sequence: row.sequence_label ?? undefined, occurrence: { kind: row.occurrence_kind, value: row.occurrence_value }, state: row.state, provenance: { source: row.source, fetchedAt: row.fetched_at, parserVersion: row.parser_version, rulesVersion: row.rules_version }, expiresAt: row.expires_at })]; } catch { return []; } });
     const entries = parsed.slice(0, input.limit);
-    const nextCursor = parsed.length > input.limit ? entries.at(-1)?.id : undefined;
-    const page: CalendarPage = { entries: Object.freeze(entries), revision: `d1-${rows.results.length}`, generatedAt: new Date().toISOString() };
+    const last = entries.at(-1);
+    const nextCursor = parsed.length > input.limit && last ? `${last.occurrence.value}|${last.id}` : undefined;
+    const page: CalendarPage = { entries: Object.freeze(entries), revision: generation?.revision ?? 'd1-empty', generatedAt: generation?.generated_at ?? '1970-01-01T00:00:00.000Z' };
     if (nextCursor) page.nextCursor = nextCursor;
     return page;
   }
   async sync(window: { from: string; to: string }) {
     const result = await collectPublicReleaseLanes([new AniListReleaseCollector(), new MangaUpdatesReleaseCollector()], window);
-    if (result.events.length > 0) await upsertPublicReleaseEvents(this.db, result.events);
+    if (result.failures.length > 0) return { count: 0, failures: result.failures };
+    const generatedAt = new Date().toISOString();
+    await commitPublicReleaseGeneration(this.db, result.events, window, `calendar-${crypto.randomUUID()}`, generatedAt);
     return { count: result.events.length, failures: result.failures };
   }
 }

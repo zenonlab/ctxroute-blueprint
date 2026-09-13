@@ -1,4 +1,4 @@
-import { applyConfirmedOrganizerPreview, createEncryptedBackup, hydrateAgendaFromPublicReleaseCache, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, restoreEncryptedBackup, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
+import { applyConfirmedOrganizerPreview, createEncryptedBackup, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, restoreEncryptedBackup, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
 import {
   anilistSourceAdapter,
   mangaUpdatesSourceAdapter,
@@ -9,7 +9,6 @@ import {
   WebExtensionPageContextAdapter,
   WebExtensionPopupContinuationCacheAdapter,
   WebExtensionNotificationAdapter,
-  WebExtensionPublicReleaseCacheAdapter,
   WebExtensionQuickPreferencesAdapter,
   WebExtensionProviderIdentitySyncAdapter,
   WebExtensionProviderIdentitySyncStateAdapter,
@@ -21,7 +20,7 @@ import {
   HttpPublicReleasePageSource,
 } from '@tobirink/adapters-browser';
 import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseFallbackStore, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
@@ -35,7 +34,7 @@ import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favoriteInventoryAuditPeriodMinutes, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
-import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentitySyncPublisher, providerSyncPrefix, resumePublicReleaseFallback } from '@tobirink/application';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, hydrateAgendaFromPublicReleaseGeneration, ProviderIdentitySyncPublisher, providerSyncPrefix, resumePublicReleaseFallback } from '@tobirink/application';
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
@@ -56,7 +55,6 @@ export default defineBackground({
   main() {
     const pageContext = new WebExtensionPageContextAdapter(browser.tabs);
     const cache = new WebExtensionPopupContinuationCacheAdapter(browser.storage.local);
-    const releaseCache = new WebExtensionPublicReleaseCacheAdapter(browser.storage.local);
     const preferences = new WebExtensionQuickPreferencesAdapter(browser.storage.local);
     const tasks = new DexieTaskStore();
     const notifications = new WebExtensionNotificationAdapter(browser.notifications, browser.runtime.getURL('/icons/tobirink-128.png'));
@@ -69,6 +67,7 @@ export default defineBackground({
     const now = () => new Date().toISOString();
     const token = () => crypto.randomUUID();
     const diagnostics = new WebExtensionDiagnostics(browser.storage.local, now, token);
+    const releaseCache = new DexiePublicReleaseGenerationCache(privateStorage.storage.database);
     const releaseFallbackStore = new DexiePublicReleaseFallbackStore(privateStorage.storage.database);
     const releasePageSource = new HttpPublicReleasePageSource();
     const releaseWindow = () => {
@@ -81,8 +80,8 @@ export default defineBackground({
     const refreshPublicReleasesOnce = async () => {
       if (configuredSiteOrigin) {
         try {
-          const shared = await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache);
-          if (shared.snapshot.entries.length > 0) { await browser.alarms.clear(agendaReleaseFallbackAlarmName); return 'shared' as const; }
+          const shared = await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache, releaseWindow());
+          if (shared.snapshot.events.length > 0) { await browser.alarms.clear(agendaReleaseFallbackAlarmName); return 'shared' as const; }
         } catch { /* a direct public-provider fallback resumes below */ }
       }
       const activeFallback = await privateStorage.storage.database.publicReleaseSyncState.get('active');
@@ -228,7 +227,7 @@ export default defineBackground({
     const resumeNotifications = async () => {
       await privateStorage.ensureReady();
       await refreshPublicReleases();
-      const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);
+      const hydration = await hydrateAgendaFromPublicReleaseGeneration(privateStorage.storage, releaseCache);
       if ((await preferences.read()).nativeNotifications) {
         await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries);
       }
@@ -395,7 +394,7 @@ export default defineBackground({
         try {
           await privateStorage.ensureReady();
           await refreshPublicReleases();
-          const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);
+          const hydration = await hydrateAgendaFromPublicReleaseGeneration(privateStorage.storage, releaseCache);
           const quickPreferences = await preferences.read();
           const snapshot = await readAgendaPeriod(privateStorage.storage, parsed.data);
           if (quickPreferences.nativeNotifications) {

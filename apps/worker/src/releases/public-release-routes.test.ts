@@ -87,17 +87,27 @@ describe('public release routes', () => {
   });
 
   it('serves bounded v2 pages with a stable cursor', async () => {
-    const fixture = releaseBindings({ ...validSnapshot(), entries: [
-      { availability: 'official', label: '1', occursAt: '2026-09-05T18:00:00.000Z', releaseId: 'release_1', workId: 'work_frieren' },
-      { availability: 'official', label: '2', occursAt: '2026-09-06T18:00:00.000Z', releaseId: 'release_2', workId: 'work_frieren' },
-    ] });
-    const app = createPublicReleaseApp(fixture.services);
+    const fixture = releaseBindings();
+    const release = (id: string, value: string) => ({ expiresAt: '2026-11-05T00:00:00.000Z', id, occurrence: { kind: 'INSTANT' as const, value }, provenance: { fetchedAt: '2026-09-05T08:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist' as const, providerWorkId: '42', releaseKind: 'episode' as const, state: 'SCHEDULED' as const });
+    const entries = [release('release_1', '2026-09-05T18:00:00.000Z'), release('release_2', '2026-09-06T18:00:00.000Z')];
+    const app = createPublicReleaseApp({ ...fixture.services, releaseCalendar: {
+      async query(input) { const start = input.cursor ? 1 : 0; const page = entries.slice(start, start + 1); return start === 0 ? { entries: page, generatedAt: '2026-09-05T08:00:00.000Z', nextCursor: '2026-09-05T18:00:00.000Z|release_1', revision } : { entries: page, generatedAt: '2026-09-05T08:00:00.000Z', revision }; },
+      async sync() { return { count: 0, failures: [] }; },
+    } });
     const first = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1');
     // SAFETY: the route contract returns a JSON object with an optional cursor.
-    expect((await first.json() as { nextCursor?: string }).nextCursor).toBe('release_1');
-    const second = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1&cursor=release_1');
+    expect((await first.json() as { nextCursor?: string }).nextCursor).toBe('2026-09-05T18:00:00.000Z|release_1');
+    expect(first.headers.get('ETag')).toBe(`"releases-${revision}-2026-09-05-2026-09-06"`);
+    const second = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1&cursor=2026-09-05T18%3A00%3A00.000Z%7Crelease_1');
     // SAFETY: the route contract returns an entries array for every successful page.
     expect((await second.json() as { entries: unknown[] }).entries).toHaveLength(1);
+  });
+
+  it('rejects malformed v2 cursors before querying D1', async () => {
+    const fixture = releaseBindings();
+    const response = await createPublicReleaseApp(fixture.services).request('https://api.example/v2/releases?cursor=release_1');
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid-cursor' });
   });
 
   it('returns an explicit unavailable result when the current pointer is missing', async () => {

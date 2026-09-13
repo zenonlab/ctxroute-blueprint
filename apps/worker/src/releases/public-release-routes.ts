@@ -69,31 +69,21 @@ export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerR
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) return noStoreJson(context, 'invalid-limit', 400);
     const from = url.searchParams.get('from'); const to = url.searchParams.get('to');
     if ((from && !/^\d{4}-\d{2}-\d{2}$/u.test(from)) || (to && !/^\d{4}-\d{2}-\d{2}$/u.test(to)) || (from && to && from > to)) return noStoreJson(context, 'invalid-window', 400);
+    const cursor = url.searchParams.get('cursor');
+    if (cursor && (cursor.length > 256 || cursor.indexOf('|') < 10 || cursor.endsWith('|'))) return noStoreJson(context, 'invalid-cursor', 400);
     try {
       const services = routeServices(context, injected);
-      if (services.releaseCalendar) {
-        const query: PublicReleaseQuery = { limit };
-        if (from) query.from = from;
-        if (to) query.to = to;
-        const cursor = url.searchParams.get('cursor');
-        if (cursor) query.cursor = cursor;
-        const page = await services.releaseCalendar.query(query);
-        const entityTag = `"releases-${page.revision}-${from ?? ''}-${to ?? ''}"`;
-        if (context.req.header('If-None-Match') === entityTag) return new Response(null, { status: 304, headers: { ETag: entityTag, 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600' } });
-        context.header('Cache-Control', services.policy.http.publicReadCacheControl); context.header('ETag', entityTag); context.header('X-Content-Type-Options', 'nosniff');
-        return context.json(page);
-      }
-      const pointer = await services.releases.readPointer(services.policy.releases.currentKey);
-      if (!pointer) return noStoreJson(context, 'release-snapshot-unavailable', 503);
-      const entityTag = `"releases-${pointer.revision}-${from ?? ''}-${to ?? ''}"`;
+      if (!services.releaseCalendar) return noStoreJson(context, 'release-calendar-unavailable', 503);
+      const query: PublicReleaseQuery = { limit };
+      if (from) query.from = from;
+      if (to) query.to = to;
+      if (cursor) query.cursor = cursor;
+      const page = await services.releaseCalendar.query(query);
+      if (!/^[A-Za-z0-9._-]{1,64}$/u.test(page.revision)) return noStoreJson(context, 'release-calendar-unavailable', 503);
+      const entityTag = `"releases-${page.revision}-${from ?? ''}-${to ?? ''}"`;
       if (context.req.header('If-None-Match') === entityTag) return new Response(null, { status: 304, headers: { ETag: entityTag, 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600' } });
-      const stored = await services.releases.readSnapshot([services.policy.releases.snapshotPrefix, `${pointer.revision}.json`].join('/'));
-      if (!stored || stored.revision !== pointer.revision) return noStoreJson(context, 'release-snapshot-unavailable', 503);
-      const filtered = parsePublicReleaseSnapshot({ ...stored, entries: [...stored.entries] }).entries.filter((entry) => (!from || entry.occursAt.slice(0, 10) >= from) && (!to || entry.occursAt.slice(0, 10) <= to));
-      const start = url.searchParams.get('cursor') ? Math.max(0, filtered.findIndex((entry) => entry.releaseId === url.searchParams.get('cursor')) + 1) : 0;
-      const entries = filtered.slice(start, start + limit); const nextCursor = entries.length === limit ? entries.at(-1)?.releaseId : undefined;
       context.header('Cache-Control', services.policy.http.publicReadCacheControl); context.header('ETag', entityTag); context.header('X-Content-Type-Options', 'nosniff');
-      return context.json({ entries, generatedAt: stored.generatedAt, revision: stored.revision, nextCursor });
+      return context.json(page);
     } catch { return noStoreJson(context, 'release-snapshot-unavailable', 503); }
   });
 

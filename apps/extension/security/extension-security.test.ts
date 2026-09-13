@@ -119,7 +119,7 @@ describe('extension security boundary', () => {
     expect(background).toMatch(/writeLocalReviewDecision\(privateStorage\.storage/);
     expect(background).toMatch(/readLocalSearchSnapshot\(privateStorage\.storage/);
     expect(background).not.toMatch(/HttpReviewCandidateAdapter|fetch\(/);
-    expect(background).toMatch(/WebExtensionPublicReleaseCacheAdapter\(browser\.storage\.local\)/);
+    expect(background).toMatch(/DexiePublicReleaseGenerationCache\(privateStorage\.storage\.database\)/);
     expect(background).toMatch(/WebExtensionQuickPreferencesAdapter\(browser\.storage\.local\)/);
     expect(background).not.toMatch(/PublicReleaseSnapshotAdapter|loadLatest\(/);
     expect(background).toMatch(/readPopupContext\(\{[\s\S]*storage: privateStorage\.storage[\s\S]*\}\)/);

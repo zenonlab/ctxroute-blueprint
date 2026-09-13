@@ -2,7 +2,7 @@ import Dexie from 'dexie';
 import before from './fixtures/v1-before.json';
 import after from './fixtures/v2-after.json';
 import versionThree from './fixtures/v3-after.json';
-import { DexiePublicReleaseFallbackStore, DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
+import { DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
 import { importFavoriteSources, readReviewQueue } from '@tobirink/application';
 import { createFavoriteSource, createReview, favoriteSourceId, reviewId } from '@tobirink/domain';
 
@@ -142,6 +142,11 @@ async function verifyReleaseFallbackPromotion(name: string): Promise<void> {
   await store.promote(state.generation, '2026-09-12T00:01:00.000Z');
   const active = await database.publicReleaseEvents.toArray();
   if (active.length !== 1 || active[0]?.id !== event.id || (await database.publicReleaseSyncState.get('active'))?.source !== 'fallback') throw new Error('Complete fallback generation was not promoted atomically.');
+  const cache = new DexiePublicReleaseGenerationCache(database);
+  const mangaEvent = { expiresAt: '2026-11-12T00:00:00.000Z', id: 'mangaupdates-9', occurrence: { kind: 'DATE', value: '2026-09-14' }, provenance: { fetchedAt: '2026-09-13T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'mangaupdates' }, provider: 'mangaupdates', providerWorkId: '77', releaseKind: 'chapter', sequence: '58.5', state: 'CONFIRMED' } as const;
+  await cache.save({ etag: '"releases-shared-window"', events: [mangaEvent], generatedAt: '2026-09-13T00:00:00.000Z', revision: 'shared-1', source: 'shared', window: state.window });
+  const shared = await cache.load();
+  if (shared?.events[0]?.occurrence.kind !== 'DATE' || (await database.publicReleaseSyncState.get('active'))?.source !== 'shared' || await store.load()) throw new Error('Shared generation did not replace fallback state atomically.');
   database.close();
 }
 

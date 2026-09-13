@@ -4,7 +4,7 @@ import type { PublicReleaseEvent } from '@tobirink/domain';
 import type { TobirinkDatabase } from '../database';
 
 export interface PublicReleaseStagingRecord { readonly id: string; readonly generation: string; readonly event: PublicReleaseEvent }
-export interface PublicReleaseSyncRecord { readonly id: string; readonly activeGeneration?: string; readonly checkedAt: string; readonly etag?: string; readonly fallback?: PublicReleaseFallbackState; readonly generation: number; readonly source?: 'fallback' | 'shared' }
+export interface PublicReleaseSyncRecord { readonly id: string; readonly activeGeneration?: string; readonly checkedAt: string; readonly etag?: string; readonly fallback?: PublicReleaseFallbackState; readonly generation: number; readonly revision?: string; readonly source?: 'fallback' | 'shared'; readonly window?: { readonly from: string; readonly to: string } }
 
 const fallbackStateId = 'fallback';
 const activeStateId = 'active';
@@ -56,7 +56,7 @@ export class DexiePublicReleaseFallbackStore implements PublicReleaseFallbackSto
       await this.database.publicReleaseEvents.clear();
       await this.database.publicReleaseEvents.bulkPut(staged.map(({ event }) => toStoredEvent(event)));
       const active = await this.database.publicReleaseSyncState.get(activeStateId);
-      await this.database.publicReleaseSyncState.put({ activeGeneration: generation, checkedAt: completedAt, generation: (active?.generation ?? 0) + 1, id: activeStateId, source: 'fallback' });
+      await this.database.publicReleaseSyncState.put({ activeGeneration: generation, checkedAt: completedAt, etag: `"${generation}"`, generation: (active?.generation ?? 0) + 1, id: activeStateId, revision: generation, source: 'fallback', window: record.fallback.window });
       await this.database.publicReleaseSyncState.delete(fallbackStateId);
       await this.database.publicReleaseStagingEvents.where('generation').equals(generation).delete();
     });
