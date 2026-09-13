@@ -17,6 +17,8 @@ import type {
 } from '@tobirink/application';
 import type { CloudPolicy } from './cloud-policy';
 import { cloudPolicy } from './cloud-policy';
+import type { PublicReleaseCalendarPort } from './releases/public-release-calendar';
+import { D1PublicReleaseCalendarAdapter } from './releases/public-release-calendar';
 
 export interface WorkerServices {
   favoriteCollective: FavoriteCollectiveServicePort;
@@ -26,6 +28,7 @@ export interface WorkerServices {
   coverMasters: CoverMasterReadPort;
   policy: CloudPolicy;
   releases: PublicReleaseObjectPort;
+  releaseCalendar: PublicReleaseCalendarPort;
 }
 
 export type WorkerRuntime = {
@@ -54,5 +57,6 @@ export function createWorkerServices(bindings: Env): WorkerServices {
     coverMasters: new R2CoverMasterReadAdapter(bindings.COVER_BUCKET),
     policy: cloudPolicy,
     releases: new R2PublicReleaseObjectAdapter(bindings.RELEASE_SNAPSHOTS),
+    releaseCalendar: new D1PublicReleaseCalendarAdapter(bindings.COLLECTIVE_DB),
   };
 }

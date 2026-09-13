@@ -29,7 +29,7 @@
   ],
   "nodes": [
     { "id": "providerLanes", "type": "external", "label": "Provider lanes", "sublabel": "AniList · MangaUpdates", "stage": 0, "row": 0, "width": 120, "tag": "J−1 → J+15" },
-    { "id": "worker", "type": "cloud", "label": "Worker Agenda", "sublabel": "lanes + SQL préparé", "stage": 1, "row": 0, "width": 150, "tag": "D1 seul détenteur" },
+    { "id": "worker", "type": "cloud", "label": "Worker Agenda", "sublabel": "cron · lanes · SQL préparé", "stage": 1, "row": 0, "width": 150, "tag": "D1 seul détenteur" },
     { "id": "publicD1", "type": "database", "label": "D1 événements publics", "sublabel": "date · type · ID", "stage": 2, "row": 0, "width": 150, "tag": "sans données privées" },
     { "id": "releaseApi", "type": "backend", "label": "GET /v2/releases", "sublabel": "fenêtre · curseur · ETag", "stage": 2, "row": 1, "width": 150, "tag": "réponse commune" },
     { "id": "releaseCache", "type": "database", "label": "Cache public IndexedDB", "sublabel": "HTTP + génération atomique", "stage": 3, "row": 0, "width": 150, "tag": "dernier snapshot valide" },
