@@ -1,0 +1,4 @@
+import { describe, expect, it } from 'vitest';
+import { createWork, workId } from '@tobirink/domain';
+import { projectLocalAgenda } from './project-local-agenda';
+describe('projectLocalAgenda', () => { it('joins only resolved provider references', () => { const work = createWork({ id: workId('work_local01'), mediaKind: 'anime', preferredTitle: 'Local', externalReferences: [{ provider: 'anilist', externalId: '1' }] }); const event = { id: 'event_1', provider: 'anilist' as const, providerWorkId: '1', releaseKind: 'episode' as const, occurrence: { kind: 'INSTANT' as const, value: '2026-09-13T00:00:00.000Z' }, state: 'CONFIRMED' as const, provenance: { source: 'anilist', fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '1', rulesVersion: '1' }, expiresAt: '2026-09-14T00:00:00.000Z' }; expect(projectLocalAgenda([event], [work])).toHaveLength(1); }); });

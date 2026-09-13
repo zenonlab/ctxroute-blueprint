@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-restore-agenda-pipeline",
+  "stepId": "step-6",
+  "status": "DONE",
+  "completedAt": "2026-09-13T00:00:00.000Z",
+  "evidence": [
+    "Local projection joins public events only through resolved provider/providerWorkId references held by local Works",
+    "Unknown identities and DATE-only civil rows are excluded from instant notification Agenda entries",
+    "Focused projection test, application typecheck and architecture/dataflow showcase validation pass"
+  ]
+}

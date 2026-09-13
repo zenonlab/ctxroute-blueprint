@@ -9071,7 +9071,7 @@
         {
           "id": "step-6",
           "title": "Construire la projection Agenda locale indexee",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Les sorties sont jointes uniquement par provider et providerWorkId resolus",
             "La lecture Agenda ne declenche aucune recherche fournisseur et aucun scan complet",
@@ -9089,7 +9089,11 @@
             "git diff --check",
             "git commit -m feat(agenda): build indexed local projection"
           ],
-          "evidence": []
+          "evidence": [
+            "Local projection joins public events only through resolved provider/providerWorkId references held by local Works",
+            "Unknown identities and DATE-only civil rows are excluded from instant notification Agenda entries",
+            "Focused projection test, application typecheck and architecture/dataflow showcase validation pass"
+          ]
         },
         {
           "id": "step-7",
