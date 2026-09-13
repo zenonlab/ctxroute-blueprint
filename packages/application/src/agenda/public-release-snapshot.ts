@@ -48,7 +48,18 @@ export async function hydrateAgendaFromPublicReleaseCache(
   const agendaEntries: AgendaEntry[] = [];
   await storage.transaction(['agenda', 'works'], async (session) => {
     for (const entry of snapshot.entries) {
-      const linkedWorkId = workId(entry.workId);
+      const directWorkId = workId(entry.workId);
+      let linkedWorkId = directWorkId;
+      if (!await session.getWork(linkedWorkId)) {
+        const separator = entry.workId.indexOf(':');
+        if (separator > 0) {
+          const provider = entry.workId.slice(0, separator);
+          const externalId = entry.workId.slice(separator + 1);
+          const candidates = await session.listWorks({ limit: 500 });
+          const match = candidates.find((work) => work.externalReferences.some((reference) => reference.provider === provider && reference.externalId === externalId));
+          if (match) linkedWorkId = match.id;
+        }
+      }
       if (!await session.getWork(linkedWorkId)) {
         missingWorkIds.push(linkedWorkId);
         continue;
