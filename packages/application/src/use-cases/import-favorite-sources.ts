@@ -2,6 +2,8 @@ import {
   createFavoriteObservation,
   createFavoriteSource,
   favoriteSourceId,
+  libraryId,
+  removeWork,
 } from '@tobirink/domain';
 import type { FavoriteSourceId } from '@tobirink/domain';
 import { claimTask, commitTask, createDurableTask, encodeFavoriteResolutionTaskPayload, recordTaskEffect } from '../tasks';
@@ -48,10 +50,13 @@ export async function importFavoriteSources(
 
   for (let offset = 0; offset < eligible.length; offset += favoriteImportBatchSize) {
     const batch = eligible.slice(offset, offset + favoriteImportBatchSize);
-    await storage.transaction(['favoriteArtifacts', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteSources', 'reviews'], async (session) => {
+    await storage.transaction(['favoriteArtifacts', 'favoriteResolutionReceipts', 'favoriteResolutionTasks', 'favoriteSources', 'libraries', 'reviews'], async (session) => {
       for (const favorite of batch) {
         const id = favoriteSourceIdentity(favorite.bookmarkId);
         const previousSource = await session.getFavoriteSource(id);
+        const previousAutomaticWorkId = previousSource !== undefined && previousSource.reviewId === undefined && previousSource.resolution?.kind === 'RESOLVED'
+          ? previousSource.matchedWorkId
+          : undefined;
         const existingSource = previousSource === undefined ? undefined
           : await correctImportedReview(session, previousSource, resolutionTaskIdentity(favorite.bookmarkId), importedAt);
         const corrected = existingSource !== previousSource;
@@ -87,6 +92,14 @@ export async function importFavoriteSources(
           if (decision === undefined || decision.status === 'pending') {
             const { matchedWorkId: _work, resolution: _resolution, resolutionVersions: _versions, ...processing } = source;
             source = createFavoriteSource(processing);
+          }
+        }
+        if (!sameArtifact && previousAutomaticWorkId !== undefined && source.matchedWorkId === undefined) {
+          const otherReferences = (await session.listFavoriteSourcesByWorkId({ limit: 2, workId: previousAutomaticWorkId }))
+            .filter((candidate) => candidate.id !== id && candidate.presence === 'observed' && candidate.resolution?.kind === 'RESOLVED');
+          if (otherReferences.length === 0) {
+            const primaryLibrary = await session.getLibrary(libraryId('library_primary'));
+            if (primaryLibrary?.workIds.includes(previousAutomaticWorkId) === true) await session.putLibrary(removeWork(primaryLibrary, previousAutomaticWorkId));
           }
         }
         const task = createDurableTask({

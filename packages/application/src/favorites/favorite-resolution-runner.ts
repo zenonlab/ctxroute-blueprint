@@ -11,7 +11,7 @@ import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './
 import { readLocalFavoriteIdentity } from './local-favorite-identity';
 import { favoriteResolutionVersions } from './resolution-result-schema';
 import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
-import { normalizeFavoriteTitle } from './title-normalization';
+import { favoriteProviderDiscoveryTitles, hasFavoriteOvaMarker, hasFavoritePreSerializationMarker, normalizeFavoriteTitle } from './title-normalization';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-ports';
 import { resolveFavoriteProviderLanes } from './resolve-provider-lanes';
@@ -270,6 +270,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   const matchQuery: MutableFavoriteTitleMatchQuery = { sourceTitles: titles };
+  matchQuery.discoveryTitles = favoriteProviderDiscoveryTitles(titles);
+  matchQuery.sourceFormat = hasFavoriteOvaMarker(titles) ? 'OVA' : 'NON_OVA';
+  matchQuery.preSerialization = hasFavoritePreSerializationMarker(titles);
   if (artifact.sourceEvidence.explicitProviderReference !== undefined) matchQuery.explicitProviderReference = artifact.sourceEvidence.explicitProviderReference;
   if (artifact.season !== undefined && artifact.seasonEvidence?.conflict !== true) matchQuery.explicitSeason = artifact.season;
   if (artifact.mediaKind !== 'UNKNOWN') matchQuery.mediaKind = artifact.mediaKind;

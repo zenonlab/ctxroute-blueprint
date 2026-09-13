@@ -18,7 +18,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-07
-- Revised: 2026-09-08
+- Revised: 2026-09-13
 
 ## Contexte
 
@@ -88,6 +88,25 @@ distance bornée. Plusieurs identités distinctes sont ambiguës. Popularité,
 rang, ordre, couverture et premier résultat sont interdits comme preuves.
 OVA/pré-sérialisation restent des compatibilités symétriques; taxonomie
 éditoriale s'applique après hydratation, sans fabriquer une identité.
+
+La préparation structurée v2 conserve le titre brut avant toute variante. Un
+suffixe parenthésé final, non vide et non imbriqué, peut exposer sa base et son
+contenu comme aliases avec provenance. Une année, un nombre seul, une langue,
+un format ou un marqueur de pré-sérialisation reste un qualificatif, jamais un
+alias d'identité. Face à une source non parenthésée, le titre exact et toutes
+les identités fournisseur dont la seule différence est ce suffixe appartiennent
+au même groupe exact : une identité reste résoluble, plusieurs imposent Review.
+Une source qui porte le suffixe complet conserve d'abord sa comparaison exacte.
+Les préfixes substantiels avant virgule ou point-virgule et les formes
+normalisées/compactes servent uniquement à la découverte fournisseur; le
+matcher ne les reçoit pas comme preuve.
+
+Le runner transmet systématiquement la présence ou l'absence des marqueurs OVA
+et pré-sérialisation au filtre symétrique. Les versions parser/matcher/fenêtre
+changent ensemble afin de réenfiler les seules décisions automatiques. Lors de
+ce reparsing, une ancienne appartenance de bibliothèque sans autre
+`FavoriteSource` observée et résolue est retirée de la projection dérivée.
+La `Work`, sa progression, les reçus et toute décision humaine sont conservés.
 
 Payload valide, pagination du catalogue et fenêtre de recherche sont distincts.
 Un endpoint de découverte classé par pertinence n'est jamais parcouru comme un

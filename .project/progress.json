@@ -8445,6 +8445,68 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-restore-structured-title-variants",
+      "title": "Restaurer les variantes structurees de titres FavLib",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Corriger parenthèses recherche qualificatifs et projection derivee",
+          "status": "DONE",
+          "acceptance": [
+            "Existence face a Existence et Existence Wangho produit une ambiguite avec les deux identites",
+            "Un titre parenthese complet garde la priorite exacte et les variantes dangereuses restent exclues",
+            "Les variantes de recherche ne deviennent jamais des preuves automatiques",
+            "OVA et pre serialisation qualifient effectivement le matcher",
+            "Les decisions humaines et les donnees Work progression restent preservees",
+            "Une ancienne appartenance automatique sans source observee est retiree de la projection locale",
+            "Les tests cibles verify et Archify passent"
+          ],
+          "files": [
+            "docs/plans/restore-structured-title-variants.json",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/systems/favorite-parsing-resolution-spec.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "packages/domain/src/favorites/vocabularies.ts",
+            "packages/domain/src/favorites/parse-artifact-contract.ts",
+            "packages/domain/src/favorites/contracts.test.ts",
+            "packages/application/src/favorites/title-normalization.ts",
+            "packages/application/src/favorites/title-normalization.test.ts",
+            "packages/application/src/favorites/favorite-parser.ts",
+            "packages/application/src/favorites/favorite-parser.test.ts",
+            "packages/application/src/favorites/provider-matcher.ts",
+            "packages/application/src/favorites/provider-matcher.test.ts",
+            "packages/application/src/favorites/provider-search-checkpoint.ts",
+            "packages/application/src/favorites/provider-search-checkpoint.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/application/src/use-cases/import-favorite-sources.ts",
+            "packages/application/src/use-cases/import-favorite-sources.test.ts",
+            "scripts/parser-equivalence/favlib-differential.test.ts",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Tests domain application adapters extension et parser equivalence",
+            "npm run verify",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:docs -- --all",
+            "git diff --check",
+            "git commit -m fix(matcher): restore structured title variants"
+          ],
+          "evidence": [
+            "npm run verify passe: 363 tests application, 151 extension, tous workspaces, Chromium IndexedDB, performance, integration et audit 0 vulnerabilite",
+            "Oracle FavLib 3267de2 epingle et tests cibles 130/130 passent; snapshot canonique 82 cas mis a jour uniquement pour versions et fingerprints",
+            "npm run archify:validate -- favorite-resolution.dataflow: showcase 9/9, 0 erreur, 0 avertissement"
+          ]
+        }
+      ]
     }
   ]
 }

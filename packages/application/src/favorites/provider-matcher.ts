@@ -1,13 +1,14 @@
 import { createResolutionDecision, favoriteAliasLimit, providerCandidateLimit } from '@tobirink/domain';
 import type { FavoriteMatchMethod, ProviderCandidate, ProviderCandidateEnvelope, ProviderCandidateReference, ResolutionDecision } from '@tobirink/domain';
-import { isWithinFavoriteEditDistance, normalizeFavoriteTitle } from './title-normalization';
+import { isWithinFavoriteEditDistance, normalizeFavoriteTitle, readSafeParenthesizedFavoriteTitle } from './title-normalization';
 import { readLabelledFavoriteSeason, stripFavoriteSeasonSuffix } from './season-extraction';
 
-export const favoriteMatcherVersion = 'favorite-matcher-v3';
+export const favoriteMatcherVersion = 'favorite-matcher-v4';
 export const favoriteProviderInspectionLimit = 25;
 
 export interface FavoriteTitleMatchQuery {
   readonly blockedTaxonomy?: readonly string[];
+  readonly discoveryTitles?: readonly string[];
   readonly explicitProviderReference?: ProviderCandidateReference;
   readonly explicitSeason?: number;
   readonly mediaKind?: ProviderCandidate['mediaKind'];
@@ -96,6 +97,22 @@ function matchingReferences(sourceTitles: readonly PreparedTitle[], candidates: 
   return Object.freeze([...matches.values()].sort((left, right) => referenceKey(left).localeCompare(referenceKey(right))));
 }
 
+function exactPrimaryReferences(primarySourceTitle: string, candidates: readonly PreparedCandidate[]): readonly ProviderCandidateReference[] {
+  const source = prepare(primarySourceTitle);
+  return matchingReferences([source], candidates, 'ordered-exact');
+}
+
+function parenthesizedExactReferences(sourceTitles: readonly PreparedTitle[], candidates: readonly PreparedCandidate[]): readonly ProviderCandidateReference[] {
+  const expanded = candidates.map((item) => {
+    const baseTitles = item.candidate.titles.flatMap((title) => {
+      const value = readSafeParenthesizedFavoriteTitle(title);
+      return value === undefined ? [] : [prepare(value.base)];
+    });
+    return Object.freeze({ candidate: item.candidate, titles: Object.freeze([...item.titles, ...baseTitles]) });
+  });
+  return matchingReferences(sourceTitles, expanded, 'ordered-exact');
+}
+
 function directReferences(query: FavoriteTitleMatchQuery, candidates: readonly PreparedCandidate[], method: Extract<FavoriteMatchMethod, 'source-id' | 'source-url'>): readonly ProviderCandidateReference[] {
   const matches = new Map<string, ProviderCandidateReference>();
   for (const item of candidates) {
@@ -149,6 +166,7 @@ export function matchFavoriteTitles(query: FavoriteTitleMatchQuery, envelopes: r
 export function inspectFavoriteTitleCandidates(query: FavoriteTitleMatchQuery, input: readonly ProviderCandidate[]): Readonly<{ level: FavoriteMatchMethod; candidateReferences: readonly ProviderCandidateReference[] }> {
   if (query.sourceTitles.length === 0) throw new TypeError('sourceTitles must contain at least one title.');
   if (query.sourceTitles.length > favoriteAliasLimit) throw new RangeError(`sourceTitles accepts at most ${favoriteAliasLimit} titles.`);
+  if (query.discoveryTitles !== undefined && (query.discoveryTitles.length === 0 || query.discoveryTitles.length > 4)) throw new RangeError('discoveryTitles accepts between 1 and 4 titles.');
   if (input.length > favoriteProviderInspectionLimit) throw new RangeError(`candidate inspection accepts at most ${favoriteProviderInspectionLimit} candidates.`);
   if (query.explicitSeason !== undefined && (!Number.isSafeInteger(query.explicitSeason) || query.explicitSeason <= 0)) throw new TypeError('explicitSeason must be a positive safe integer.');
   if (query.sourceCanonicalUrl !== undefined) {
@@ -161,10 +179,13 @@ export function inspectFavoriteTitleCandidates(query: FavoriteTitleMatchQuery, i
   const candidates = Object.freeze(input.filter((candidate) => isProviderCandidateCompatible(query, candidate)).map((candidate) => Object.freeze({ candidate, titles: Object.freeze(candidate.titles.map(prepare)) })));
   const explicitSeason = query.explicitSeason;
   const titleCandidates = explicitSeason === undefined ? candidates : candidates.filter((item) => corroboratesSeason(item.candidate, explicitSeason));
+  const exactPrimary = readSafeParenthesizedFavoriteTitle(query.sourceTitles[0] ?? '') === undefined
+    ? Object.freeze([])
+    : exactPrimaryReferences(query.sourceTitles[0] ?? '', titleCandidates);
   const levels = [
     ['source-id', () => directReferences(query, candidates, 'source-id')],
     ['source-url', () => directReferences(query, candidates, 'source-url')],
-    ['ordered-exact', () => matchingReferences(sourceTitles, titleCandidates, 'ordered-exact')],
+    ['ordered-exact', () => exactPrimary.length > 0 ? exactPrimary : parenthesizedExactReferences(sourceTitles, titleCandidates)],
     ['explicit-season', () => seasonReferences(sourceTitles, query.explicitSeason, candidates)],
     ['reordered-significant-words', () => matchingReferences(sourceTitles, titleCandidates, 'reordered-significant-words')],
     ['bounded-edit-distance', () => matchingReferences(sourceTitles, titleCandidates, 'bounded-edit-distance')],

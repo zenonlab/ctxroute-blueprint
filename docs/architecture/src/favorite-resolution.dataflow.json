@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "TobiRink — résolution et reconstruction cache-first 1.0.22",
+    "title": "TobiRink — résolution structurée et reconstruction cache-first",
     "output": "favorite-resolution.dataflow.html",
     "quality_profile": "showcase",
     "viewBox": [
@@ -118,7 +118,7 @@
       "stage": 1,
       "row": 4,
       "width": 150,
-      "tag": "route + alignement titre/slug · v4"
+      "tag": "route + alignement titre/slug · v5"
     },
     {
       "id": "parseArtifact",
@@ -154,7 +154,7 @@
       "stage": 3,
       "row": 1,
       "width": 150,
-      "tag": "6 niveaux · F/C exacts"
+      "tag": "matcher v4 · variantes bornées"
     },
     {
       "id": "reviewGate",
@@ -313,8 +313,8 @@
     {
       "from": "parseArtifact",
       "to": "titleMatcher",
-      "label": "aliases et preuves",
-      "classification": "ordre déterministe",
+      "label": "brut + aliases parenthésés",
+      "classification": "provenance · ordre déterministe",
       "variant": "emphasis",
       "route": "straight",
       "labelAt": [
@@ -420,6 +420,7 @@
       "title": "Décision fail-closed",
       "items": [
         "L’ordre fournisseur, la popularité et les images ne prouvent rien",
+        "Exact et éditions parenthésées forment un groupe comparable",
         "Chaque niveau exige un seul identifiant fournisseur distinct",
         "Une égalité ou un conflit passe en Review"
       ]

@@ -63,6 +63,16 @@ describe('durable bounded provider search', () => {
     expect(await searchFavoriteProviderPage(port, aliases, 'anilist', 20, checkpoint)).toMatchObject({ envelope: { candidates: [expect.objectContaining({ externalId: 'rich', metadataVersion: 2 })], complete: true } });
   });
 
+  it('uses discovery-only variants for transport without promoting them to title proof', async () => {
+    const checkpoint = checkpointPort();
+    const port: FavoriteProviderCandidatePort = { search: vi.fn(async (input) => createProviderCandidateEnvelope({
+      candidates: [candidate('discovery-only', input.titles[0])], complete: true, digest: 'discovery-only', provider: 'anilist', truncated: false,
+    })) };
+    const result = await searchFavoriteProviderPage(port, { discoveryTitles: ['A substantial discovery clause'], sourceTitles: ['Complete proof title'] }, 'anilist', 20, checkpoint);
+    expect(port.search).toHaveBeenCalledWith(expect.objectContaining({ titles: ['A substantial discovery clause'] }));
+    expect(result).toMatchObject({ envelope: { candidates: [], complete: true }, kind: 'ENVELOPE' });
+  });
+
   it('searches all local aliases before declaring a provider NO_MATCH', async () => {
     const checkpoint = checkpointPort();
     const port: FavoriteProviderCandidatePort = { search: vi.fn(async (input) => createProviderCandidateEnvelope({ candidates: input.titles[0] === 'Other Alias' ? [candidate('alias', 'Other Alias')] : [], complete: true, digest: 'alias-search', provider: 'anilist', truncated: false })) };

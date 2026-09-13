@@ -4,15 +4,19 @@ import { existsSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { resolve } from 'node:path';
 import { Script, createContext } from 'node:vm';
-import { createFavoriteObservation, createSourceEvidence } from '@tobirink/domain';
+import { createFavoriteObservation, createProviderCandidateEnvelope, createSourceEvidence } from '@tobirink/domain';
 import type { SourceEvidence } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { parseFavoriteObservation } from '../../packages/application/src/favorites/favorite-parser';
+import { matchFavoriteTitles } from '../../packages/application/src/favorites/provider-matcher';
+import { readSafeParenthesizedFavoriteTitle } from '../../packages/application/src/favorites/title-normalization';
 
 const referenceCommit = '3267de240fe5e68aa6a42a33dc77883cbdcd255d';
 const referencePath = 'packages/metadata/src/bookmark-parser.ts';
 const referenceDigest = '548f22d14ea381f21ab92e42a5d5ee7bc11d6f42eb5dc40bf22a704b3572294d';
+const referenceMetadataPath = 'packages/metadata/src/index.ts';
+const referenceMetadataDigest = '76affc39b22fd2dda4905a2e82baed753ab751048d1caf24c2b80c462aca9938';
 const configuredRoot = process.env.FAVLIB_READONLY_ROOT;
 const favlibRoot = resolve(configuredRoot ?? '../FavLib');
 const available = existsSync(resolve(favlibRoot, '.git'));
@@ -91,6 +95,17 @@ function normalizedTitle(value: string | undefined): string | undefined {
 }
 
 describe.runIf(available)('readonly FavLib differential oracle', () => {
+  it('retains the pinned parenthesized identity behavior with stricter qualifier guards', () => {
+    const source = execFileSync('git', ['-C', favlibRoot, 'show', `${referenceCommit}:${referenceMetadataPath}`], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+    expect(createHash('sha256').update(source).digest('hex')).toBe(referenceMetadataDigest);
+    expect(source).toContain('export function exactTitleMatchKind');
+    expect(source).toContain('export function explicitTitleAliases');
+    const provider = (externalId: string, title: string) => ({ externalId, mediaKind: 'MANGA' as const, preSerialization: false, provider: 'mangaupdates' as const, titles: [title] });
+    const envelope = createProviderCandidateEnvelope({ candidates: [provider('base', 'Existence'), provider('wangho', 'Existence (Wangho)')], complete: true, digest: 'parenthesized-oracle', provider: 'mangaupdates', truncated: false });
+    expect(matchFavoriteTitles({ sourceTitles: ['Existence'] }, [envelope])).toMatchObject({ kind: 'AMBIGUOUS', level: 'ordered-exact' });
+    expect(readSafeParenthesizedFavoriteTitle('Existence (Wangho)')).toEqual({ alternate: 'Wangho', base: 'Existence' });
+    expect(readSafeParenthesizedFavoriteTitle('Existence (2024)')).toBeUndefined();
+  });
   it('executes the pinned reference and classifies every synthetic difference', () => {
     const reference = loadReferenceParser();
     const results = cases.map((fixture) => ({ fixture, reference: projectReference(reference, fixture), tobirink: projectTobiRink(fixture) }));

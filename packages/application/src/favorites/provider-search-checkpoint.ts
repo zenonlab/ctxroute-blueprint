@@ -13,7 +13,7 @@ const levels = ['source-id', 'source-url', 'ordered-exact', 'explicit-season', '
 // Discovery endpoints are relevance-ranked searches, not catalogue exports.
 // Inspect one bounded result window for at most four independent local aliases;
 // exhausting thousands of remote pages cannot strengthen a title proof.
-export const favoriteProviderSearchWindow = Object.freeze({ aliases: 4, pagesPerAlias: 1, version: 2 });
+export const favoriteProviderSearchWindow = Object.freeze({ aliases: 4, pagesPerAlias: 1, version: 3 });
 const text = z.string().min(1).max(1024);
 const count = z.number().int().nonnegative();
 type MutableProviderCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
@@ -76,12 +76,12 @@ export async function searchFavoriteProviderPage(
   port: FavoriteProviderCandidatePort, query: FavoriteTitleMatchQuery, provider: ResolutionProvider, limit: number,
   checkpoints?: FavoriteSearchCheckpointPort,
 ): Promise<FavoriteProviderSearchStep> {
-  const boundedTitles = query.sourceTitles.slice(0, favoriteProviderSearchWindow.aliases);
+  const boundedTitles = (query.discoveryTitles ?? query.sourceTitles).slice(0, favoriteProviderSearchWindow.aliases);
   const base: MutableProviderSearchQuery = { limit, provider, titles: boundedTitles };
   if (query.explicitProviderReference?.provider === provider) base.explicitProviderReference = query.explicitProviderReference;
   if (checkpoints === undefined) return { kind: 'ENVELOPE', envelope: await port.search(base) };
   const stored = await checkpoints.read(provider);
-  const queryBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([favoriteProviderSearchWindow.version, { ...query, sourceTitles: boundedTitles }])));
+  const queryBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([favoriteProviderSearchWindow.version, { ...query, discoveryTitles: boundedTitles }])));
   const queryDigest = [...new Uint8Array(queryBytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
   const age = stored === undefined ? -1 : checkpoints.now() - stored.startedAt;
   const previous = stored !== undefined && stored.queryDigest === queryDigest && age >= 0 && age <= favoriteProviderPolicy.positiveTtlMs ? stored : undefined;

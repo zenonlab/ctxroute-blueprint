@@ -102,6 +102,26 @@ describe('deterministic favorite title matcher P-01…P-08', () => {
     expect(matchFavoriteTitles({ sourceTitles: ['Hunter × Hunter'] }, [envelope(editions)])).toMatchObject({ kind: 'AMBIGUOUS', level: 'ordered-exact' });
   });
 
+  it('keeps an exact title and its safe parenthesized edition comparable', () => {
+    const editions = [candidate('base', 'Existence'), candidate('wangho', 'Existence (Wangho)')];
+    expect(matchFavoriteTitles({ sourceTitles: ['Existence'] }, [envelope(editions)])).toMatchObject({
+      candidateReferences: [{ externalId: 'base' }, { externalId: 'wangho' }], kind: 'AMBIGUOUS', level: 'ordered-exact',
+    });
+    expect(matchFavoriteTitles({ sourceTitles: ['Existence'] }, [envelope([editions[1]!])])).toMatchObject({ kind: 'MATCH', matchedReference: { externalId: 'wangho' } });
+  });
+
+  it('gives the complete parenthesized source title priority over its aliases', () => {
+    const editions = [candidate('base', 'Existence'), candidate('wangho', 'Existence (Wangho)')];
+    expect(matchFavoriteTitles({ sourceTitles: ['Existence (Wangho)', 'Existence', 'Wangho'] }, [envelope(editions)])).toMatchObject({
+      kind: 'MATCH', level: 'ordered-exact', matchedReference: { externalId: 'wangho' },
+    });
+  });
+
+  it('does not turn year, format or nested parentheses into comparable identities', () => {
+    const qualified = [candidate('year', 'Existence (2024)'), candidate('ova', 'Existence (OVA)'), candidate('nested', 'Existence ((Wangho))')];
+    expect(matchFavoriteTitles({ sourceTitles: ['Existence'] }, [envelope(qualified)])).toMatchObject({ kind: 'NO_MATCH' });
+  });
+
   it('accepts a unique minor typo but preserves intrinsic numbers and corroborated seasons', () => {
     expect(matchFavoriteTitles({ sourceTitles: ['Frieran'] }, [envelope([candidate('1', 'Frieren')])])).toMatchObject({ kind: 'MATCH', level: 'bounded-edit-distance' });
     expect(matchFavoriteTitles({ sourceTitles: ['Synthetic Number 20'] }, [envelope([candidate('1', 'Synthetic Number 21')])])).toMatchObject({ kind: 'NO_MATCH' });

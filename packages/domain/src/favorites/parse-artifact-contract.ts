@@ -1,8 +1,8 @@
 import type { SourceEvidence } from './source-evidence-contract';
-import type { FavoriteMatchMethod, FavoriteMediaKind, FavoritePipelineDiagnostic, FavoriteProgressionProof, FavoriteProgressionRejection, FavoriteTransformation } from './vocabularies';
+import type { FavoriteAliasProvenance, FavoriteMatchMethod, FavoriteMediaKind, FavoritePipelineDiagnostic, FavoriteProgressionProof, FavoriteProgressionRejection, FavoriteTransformation } from './vocabularies';
 
 export interface FavoriteParseArtifact {
-  readonly aliases?: readonly Readonly<{ provenance: 'aligned-bookmark-segment' | 'stable-url-slug'; value: string }>[];
+  readonly aliases?: readonly Readonly<{ provenance: FavoriteAliasProvenance; value: string }>[];
   readonly contractVersion: 2;
   readonly diagnostics: readonly FavoritePipelineDiagnostic[];
   readonly displayTitle?: string;

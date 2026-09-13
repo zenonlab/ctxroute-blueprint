@@ -67,6 +67,25 @@ Le rapprochement existant reste conservateur, et ne remplace pas une migration
 complète des choix automatiques antérieurs. La vérification de la bibliothèque
 privée installée reste distincte de ces tests de transport et de résolution.
 
+### Variantes parenthésées et projection automatique
+
+L'audit FavLib du commit `3267de2` a révélé quatre comportements manquants
+dans la réécriture : regroupement d'un exact avec ses éditions parenthésées,
+aliases sûrs d'un titre parenthésé complet, variantes de découverte distinctes
+des preuves, et alimentation effective des filtres OVA/pré-sérialisation.
+`favorite-parser-v5`, `favorite-matcher-v4` et la fenêtre de recherche v3
+ferment ces écarts sans réintroduire l'inclusion partielle, le sous-titre seul,
+la popularité ou la couverture de tokens de FavLib.
+
+`Existence` comparé à deux fiches `Existence` et `Existence (Wangho)`
+produit donc Review avec les deux identités. `Existence (Wangho)` conserve
+son exact complet. Les années, parenthèses imbriquées, formats, langues et
+marqueurs Novel restent des qualificatifs. Le rescan change le fingerprint,
+protège les décisions humaines et réenfile les décisions automatiques. Si
+l'ancien Work automatique n'est plus référencé par une autre source observée
+résolue, seule son appartenance à la bibliothèque dérivée est retirée; Work,
+progression et reçus restent stockés.
+
 ### Routes Comix et panne de la lane anime
 
 La forme Comix `/title/identifiant-titre/identifiant-chapter-numéro` était
@@ -350,6 +369,11 @@ exposés. Images, dates, popularités et positions de réponse ne prouvent rien.
 Avant chaque niveau, `CandidateCompatibility` applique symétriquement le type,
 OVA et pré-sérialisation. Le filtre éditorial de taxonomie n’intervient jamais
 ici et ne peut donc pas fabriquer une identité.
+
+Le runner dérive ces deux compatibilités du titre brut et des aliases locaux :
+présence explicite de `OVA`/`OAV` contre absence, et présence explicite de
+`Novel` ou pré-sérialisation contre absence. Une option du matcher qui n'est
+pas alimentée par le runner ne constitue pas une validation de ce contrat.
 
 ### 8. Persister la décision
 

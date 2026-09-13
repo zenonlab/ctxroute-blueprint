@@ -400,3 +400,7 @@
 ## Publier et verifier le parser favori 1.0.22 — DONE
 
 - [x] **Appliquer la gate Cloudflare 1.0.22 et verifier la production** — DONE _(evidence: Cloudflare gate b9dc6a63 applied only both immutable 1.0.22 R2 archives and Worker bec0dbe6 at 100 percent; no D1 migration, deletion, cover or secret action ran., Production download advertises 1.0.22; both ZIPs return 200 with immutable caching and exact certified SHA-256 hashes., Six HTTP production Playwright journeys, docs validation and production-publication Archify showcase pass; the installed Chrome and Firefox archives were certified before publication.)_
+
+## Restaurer les variantes structurees de titres FavLib — DONE
+
+- [x] **Corriger parenthèses recherche qualificatifs et projection derivee** — DONE _(evidence: npm run verify passe: 363 tests application, 151 extension, tous workspaces, Chromium IndexedDB, performance, integration et audit 0 vulnerabilite, Oracle FavLib 3267de2 epingle et tests cibles 130/130 passent; snapshot canonique 82 cas mis a jour uniquement pour versions et fingerprints, npm run archify:validate -- favorite-resolution.dataflow: showcase 9/9, 0 erreur, 0 avertissement)_

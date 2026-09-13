@@ -472,6 +472,22 @@ parenthésée ou un sous-titre peut devenir un alias seulement par une étape de
 préparation versionnée qui conserve sa provenance ; elle repasse ensuite par
 la politique commune.
 
+La préparation `favorite-title-preparation-v2` traite seulement une paire
+`Base (Alternative)` finale, non vide et sans parenthèse imbriquée. Elle
+conserve le titre complet et ajoute la base puis l'alternative avec une
+provenance distincte. Elle refuse comme alternative une année, un nombre seul,
+une langue, `OVA`/`OAV`, un format ou `Novel`/pré-sérialisation. Pour une
+source sans parenthèse, un candidat exact et un candidat `Base (Qualifiant)`
+sont comparables au même niveau exact : deux identifiants donnent
+`AMBIGUOUS`. Pour une source portant le titre parenthésé complet, l'exact
+complet est évalué avant ses aliases dérivés.
+
+Les variantes de découverte sont un autre contrat. Le titre brut, puis ses
+aliases parenthésés sûrs, puis une première proposition substantielle avant
+virgule ou point-virgule, puis les formes normalisée et compacte peuvent former
+au plus quatre requêtes. Ces valeurs ne sont jamais ajoutées à
+`sourceTitles` et ne peuvent donc produire seules une correspondance.
+
 ## Langue, format et taxonomie
 
 Ces signaux ont été trouvés à côté du parser. Ils ne modifient pas l’identité

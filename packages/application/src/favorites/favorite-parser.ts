@@ -1,14 +1,14 @@
 import { createFavoriteParseArtifact } from '@tobirink/domain';
-import type { FavoriteObservation, FavoriteParseArtifact, FavoriteTransformation, SourceEvidence } from '@tobirink/domain';
+import type { FavoriteAliasProvenance, FavoriteObservation, FavoriteParseArtifact, FavoriteTransformation, SourceEvidence } from '@tobirink/domain';
 import { extractFavoriteProgression } from './progression-extraction';
 import { extractFavoriteSeason } from './season-extraction';
-import { normalizeFavoriteTitle } from './title-normalization';
+import { normalizeFavoriteTitle, readSafeParenthesizedFavoriteTitle } from './title-normalization';
 import { segmentFavoriteTitle } from './title-segmentation';
 import type { FavoriteTitleAnalysis } from './title-segmentation';
 import { favoriteMatcherVersion } from './provider-matcher';
 
-export const favoriteParserVersion = 'favorite-parser-v4';
-interface MutableFavoriteAlias { provenance: 'aligned-bookmark-segment' | 'stable-url-slug'; value: string }
+export const favoriteParserVersion = 'favorite-parser-v5';
+interface MutableFavoriteAlias { provenance: FavoriteAliasProvenance; value: string }
 
 function fingerprint(parts: readonly string[]): string {
   let hash = 0x811c9dc5;
@@ -91,13 +91,26 @@ export function parseFavoriteObservation(observation: FavoriteObservation, evide
   const seasonEvidence = extractFavoriteSeason(observation.title, evidence);
   const transformations = [...titleAnalysis.transformations, ...(evidence.identityTransformations ?? [])];
   const identity = identityFrom(evidence, titleAnalysis, transformations);
+  const structuredCleanedTitle = readSafeParenthesizedFavoriteTitle(titleAnalysis.cleanedTitle);
+  const displayIdentity = identity !== undefined && structuredCleanedTitle !== undefined
+    && normalizeFavoriteTitle(identity).compact === normalizeFavoriteTitle(titleAnalysis.cleanedTitle).compact
+    ? titleAnalysis.cleanedTitle.trim()
+    : identity;
   const diagnostics = [...evidence.diagnostics];
   if (identity === undefined) diagnostics.push(evidence.rawSlug === undefined ? 'URL_IDENTITY_MISSING' : 'OPAQUE_IDENTITY_UNCORROBORATED');
   const aliases: MutableFavoriteAlias[] = identity === undefined || containsRelease(identity) ? [] : [{ provenance: 'stable-url-slug', value: identity }];
-  if (identity !== undefined && !containsRelease(titleAnalysis.cleanedTitle) && !containsRoutingIdentifier(titleAnalysis.cleanedTitle, evidence) && normalizeFavoriteTitle(identity).compact !== normalizeFavoriteTitle(titleAnalysis.cleanedTitle).compact) aliases.push({ provenance: 'aligned-bookmark-segment', value: titleAnalysis.cleanedTitle });
-  const progression = extractFavoriteProgression({ aliases: aliases.map((alias) => alias.value), evidence, mediaKind: evidence.mediaKind, season: seasonEvidence, title: observation.title, titleAnalysis });
+  const cleanedTitle = titleAnalysis.cleanedTitle.trim();
+  const structuredTitle = structuredCleanedTitle;
+  if (identity !== undefined && !containsRelease(cleanedTitle) && !containsRoutingIdentifier(cleanedTitle, evidence)
+    && (normalizeFavoriteTitle(identity).compact !== normalizeFavoriteTitle(cleanedTitle).compact || structuredTitle !== undefined)) aliases.push({ provenance: 'aligned-bookmark-segment', value: cleanedTitle });
+  if (structuredTitle !== undefined && identity !== undefined && !containsRelease(identity)) {
+    aliases.push({ provenance: 'parenthesized-base', value: structuredTitle.base });
+    aliases.push({ provenance: 'parenthesized-alternate', value: structuredTitle.alternate });
+  }
+  const uniqueAliases = [...new Map(aliases.map((alias) => [`${alias.provenance}:${normalizeFavoriteTitle(alias.value).normalized}`, alias] as const)).values()];
+  const progression = extractFavoriteProgression({ aliases: uniqueAliases.map((alias) => alias.value), evidence, mediaKind: evidence.mediaKind, season: seasonEvidence, title: observation.title, titleAnalysis });
   const artifactInput = {
-    aliases,
+    aliases: uniqueAliases,
     contractVersion: 2 as const,
     diagnostics,
     mediaKind: evidence.mediaKind,
@@ -113,7 +126,7 @@ export function parseFavoriteObservation(observation: FavoriteObservation, evide
     status: identity === undefined ? 'identity-missing' as const : 'parsed' as const,
     transformations,
   };
-  if (identity !== undefined) Object.assign(artifactInput, { displayTitle: identity, identityKey: normalizeFavoriteTitle(identity).normalized });
+  if (displayIdentity !== undefined) Object.assign(artifactInput, { displayTitle: displayIdentity, identityKey: normalizeFavoriteTitle(displayIdentity).normalized });
   if (progression !== undefined) Object.assign(artifactInput, { progress: progression });
   if (seasonEvidence.canonicalSeason !== undefined) Object.assign(artifactInput, { season: seasonEvidence.canonicalSeason });
   if (titleAnalysis.year !== undefined) Object.assign(artifactInput, { year: titleAnalysis.year });

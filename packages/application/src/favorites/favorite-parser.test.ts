@@ -36,6 +36,19 @@ describe('favorite identity parser I-01…I-07', () => {
     observation('1674484774 Skeleton Soldier Couldnt Protect the Dungeon'),
     evidence({ identityTransformations: ['numeric-routing-prefix'], mediaKind: 'MANGA', rawSlug: '1674484774-skeleton-soldier-couldnt-protect-the-dungeon', release: { kind: 'chapter', provenance: 'URL_PATH', raw: 'chapter-51', value: 51 }, stableSlug: 'skeleton-soldier-couldnt-protect-the-dungeon' }),
   )).toMatchObject({ displayTitle: 'Skeleton Soldier Couldnt Protect the Dungeon', identityKey: 'skeleton soldier couldnt protect the dungeon', progress: { kind: 'chapter', value: 51 } }));
+  it('preserves a complete parenthesized title and records bounded alias provenance', () => expect(parseFavoriteObservation(
+    observation('Existence (Wangho)'), evidence({ mediaKind: 'MANGA', rawSlug: 'existence-wangho', stableSlug: 'existence-wangho' }),
+  )).toMatchObject({
+    displayTitle: 'Existence (Wangho)', parserVersion: 'favorite-parser-v5', matcherVersion: 'favorite-matcher-v4',
+    aliases: expect.arrayContaining([
+      { provenance: 'parenthesized-base', value: 'Existence' },
+      { provenance: 'parenthesized-alternate', value: 'Wangho' },
+    ]),
+  }));
+  it.each(['Existence (2024)', 'Existence (OVA)', 'Existence (Novel)', 'Existence ((Wangho))'])('does not create identity aliases from qualifier %s', (title) => {
+    const artifact = parseFavoriteObservation(observation(title), evidence({ mediaKind: 'MANGA', rawSlug: title.toLowerCase().replace(/[^a-z0-9]+/gu, '-'), stableSlug: title.toLowerCase().replace(/[^a-z0-9]+/gu, '-') }));
+    expect(artifact.aliases?.some((alias) => alias.provenance.startsWith('parenthesized-'))).toBe(false);
+  });
   it('does not select one unrelated human segment for an opaque source slug', () => expect(parseFavoriteObservation(
     observation('First Candidate | Second Candidate'), evidence({ rawSlug: 'route-zx731904', stableSlug: 'route-zx731904' }),
   )).toMatchObject({ diagnostics: ['OPAQUE_IDENTITY_UNCORROBORATED'], status: 'identity-missing' }));

@@ -16,9 +16,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "l epopee",
         "identityKey": "l epopee",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "  L’Épopée!!  ",
@@ -35,7 +35,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "  L’Épopée!!  ",
           },
         ],
-        "semanticFingerprint": "fnv1a32:24c6a0e2",
+        "semanticFingerprint": "fnv1a32:8243520e",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -99,9 +99,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "space work",
         "identityKey": "space work",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Space   Work",
@@ -118,7 +118,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Space   Work",
           },
         ],
-        "semanticFingerprint": "fnv1a32:b1bb5e22",
+        "semanticFingerprint": "fnv1a32:4798114e",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -182,9 +182,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "journey great",
         "identityKey": "journey great",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Journey Great",
@@ -201,7 +201,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Journey Great",
           },
         ],
-        "semanticFingerprint": "fnv1a32:41615eb0",
+        "semanticFingerprint": "fnv1a32:e267b310",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -265,9 +265,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "frieran",
         "identityKey": "frieran",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Frieran",
@@ -284,7 +284,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Frieran",
           },
         ],
-        "semanticFingerprint": "fnv1a32:54c4f8c1",
+        "semanticFingerprint": "fnv1a32:528ba325",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -348,9 +348,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture p 05",
         "identityKey": "fixture p 05",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture P-05",
@@ -367,7 +367,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture P-05",
           },
         ],
-        "semanticFingerprint": "fnv1a32:7ddf017c",
+        "semanticFingerprint": "fnv1a32:47725924",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -431,9 +431,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture p 06",
         "identityKey": "fixture p 06",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture P-06",
@@ -450,7 +450,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture P-06",
           },
         ],
-        "semanticFingerprint": "fnv1a32:4cb342c0",
+        "semanticFingerprint": "fnv1a32:0f841520",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -514,9 +514,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "long work subtitle",
         "identityKey": "long work subtitle",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Long Work Subtitle",
@@ -533,7 +533,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Long Work Subtitle",
           },
         ],
-        "semanticFingerprint": "fnv1a32:5da66b81",
+        "semanticFingerprint": "fnv1a32:10b4f8e5",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -588,9 +588,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "running heroes",
         "identityKey": "running heroes",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Running Heroes",
@@ -607,7 +607,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Running Heroes",
           },
         ],
-        "semanticFingerprint": "fnv1a32:c0f303e0",
+        "semanticFingerprint": "fnv1a32:229c8940",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -662,9 +662,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture l 01",
         "identityKey": "fixture l 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture L-01",
@@ -681,7 +681,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture L-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:b69f3234",
+        "semanticFingerprint": "fnv1a32:b9f3f53c",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -745,9 +745,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture l 02",
         "identityKey": "fixture l 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture L-02",
@@ -764,7 +764,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture L-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:4025f230",
+        "semanticFingerprint": "fnv1a32:e12c4690",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -828,9 +828,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture l 03",
         "identityKey": "fixture l 03",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture L-03",
@@ -847,7 +847,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture L-03",
           },
         ],
-        "semanticFingerprint": "fnv1a32:5e18b334",
+        "semanticFingerprint": "fnv1a32:616d763c",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -911,9 +911,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture l 04",
         "identityKey": "fixture l 04",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture L-04",
@@ -930,7 +930,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture L-04",
           },
         ],
-        "semanticFingerprint": "fnv1a32:bd6582d8",
+        "semanticFingerprint": "fnv1a32:5d5f5598",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -994,9 +994,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture l 05",
         "identityKey": "fixture l 05",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture L-05",
@@ -1013,7 +1013,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture L-05",
           },
         ],
-        "semanticFingerprint": "fnv1a32:abf853ec",
+        "semanticFingerprint": "fnv1a32:ddb3c994",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -1077,9 +1077,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture f 01",
         "identityKey": "fixture f 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture F-01",
@@ -1096,7 +1096,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture F-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:01e20bd0",
+        "semanticFingerprint": "fnv1a32:52a1e530",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -1160,9 +1160,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture f 02",
         "identityKey": "fixture f 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture F-02",
@@ -1179,7 +1179,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture F-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:9ebe9f98",
+        "semanticFingerprint": "fnv1a32:6e893158",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -1243,9 +1243,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture c 01",
         "identityKey": "fixture c 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture C-01",
@@ -1262,7 +1262,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture C-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:1ec78564",
+        "semanticFingerprint": "fnv1a32:aecb04ec",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -1326,9 +1326,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture c 02",
         "identityKey": "fixture c 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture C-02",
@@ -1345,7 +1345,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture C-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:edc8943c",
+        "semanticFingerprint": "fnv1a32:0047a8e4",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -1409,9 +1409,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture x 01",
         "identityKey": "fixture x 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture X-01",
@@ -1428,7 +1428,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture X-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:6062a274",
+        "semanticFingerprint": "fnv1a32:2b2b857c",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -1492,9 +1492,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture x 02",
         "identityKey": "fixture x 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture X-02",
@@ -1511,7 +1511,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture X-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:566e3310",
+        "semanticFingerprint": "fnv1a32:e8a91970",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -1575,9 +1575,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture u 01",
         "identityKey": "fixture u 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture U-01",
@@ -1594,7 +1594,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:04a533e0",
+        "semanticFingerprint": "fnv1a32:664eb940",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -1658,9 +1658,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture u 02",
         "identityKey": "fixture u 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "UNKNOWN",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -1694,7 +1694,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:ec530439",
+        "semanticFingerprint": "fnv1a32:516df91d",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -1761,9 +1761,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [
           "URL_IDENTITY_MISSING",
         ],
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "UNKNOWN",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture U-03",
@@ -1780,7 +1780,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-03",
           },
         ],
-        "semanticFingerprint": "fnv1a32:1ad464da",
+        "semanticFingerprint": "fnv1a32:04223dc6",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [],
@@ -1831,9 +1831,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "Fixture U 04",
         "identityKey": "fixture u 04",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture U-04",
@@ -1850,7 +1850,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-04",
           },
         ],
-        "semanticFingerprint": "fnv1a32:884f648e",
+        "semanticFingerprint": "fnv1a32:7719562e",
         "sourceAdapterVersion": "source-adapter-v3:oracle-exact-id-fixture",
         "sourceEvidence": {
           "aliases": [],
@@ -1908,9 +1908,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture u 05",
         "identityKey": "fixture u 05",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "MANGA",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -1944,7 +1944,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-05",
           },
         ],
-        "semanticFingerprint": "fnv1a32:2e330eee",
+        "semanticFingerprint": "fnv1a32:3aff7472",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -2016,9 +2016,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture u 06",
         "identityKey": "fixture u 06",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "MANGA",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -2052,7 +2052,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-06",
           },
         ],
-        "semanticFingerprint": "fnv1a32:12365004",
+        "semanticFingerprint": "fnv1a32:1abbe58c",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -2124,9 +2124,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture u 07",
         "identityKey": "fixture u 07",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "MANGA",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture U-07",
@@ -2143,7 +2143,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-07",
           },
         ],
-        "semanticFingerprint": "fnv1a32:3d5c9c81",
+        "semanticFingerprint": "fnv1a32:f06b29e5",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -2202,9 +2202,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [
           "URL_IDENTITY_MISSING",
         ],
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "UNKNOWN",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture U-08",
@@ -2221,7 +2221,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-08",
           },
         ],
-        "semanticFingerprint": "fnv1a32:4d73a950",
+        "semanticFingerprint": "fnv1a32:9e3382b0",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [],
@@ -2267,9 +2267,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [
           "URL_IDENTITY_MISSING",
         ],
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "UNKNOWN",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture U-09",
@@ -2286,7 +2286,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-09",
           },
         ],
-        "semanticFingerprint": "fnv1a32:69332101",
+        "semanticFingerprint": "fnv1a32:1c41ae65",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [],
@@ -2337,9 +2337,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture u 10",
         "identityKey": "fixture u 10",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture U-10",
@@ -2356,7 +2356,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture U-10",
           },
         ],
-        "semanticFingerprint": "fnv1a32:0e4389e4",
+        "semanticFingerprint": "fnv1a32:9e47096c",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -2424,9 +2424,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "watch fixture t 01",
         "identityKey": "watch fixture t 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Watch Fixture T-01",
@@ -2443,7 +2443,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Watch Fixture T-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:5f6586ef",
+        "semanticFingerprint": "fnv1a32:8d276027",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -2509,9 +2509,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "oav vostfr fixture t 02",
         "identityKey": "oav vostfr fixture t 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "[OAV VOSTFR] Fixture T-02",
@@ -2528,7 +2528,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "[OAV VOSTFR] Fixture T-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:7c7e6b3a",
+        "semanticFingerprint": "fnv1a32:34313b26",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -2592,9 +2592,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture t 03",
         "identityKey": "fixture t 03",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -2639,7 +2639,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture T-03 Episode 12",
           },
         ],
-        "semanticFingerprint": "fnv1a32:b27f09e6",
+        "semanticFingerprint": "fnv1a32:4928b18a",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -2713,9 +2713,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture t 04 12 vostfr",
         "identityKey": "fixture t 04 12 vostfr",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -2749,7 +2749,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture T-04 12 VOSTFR",
           },
         ],
-        "semanticFingerprint": "fnv1a32:8a70a08a",
+        "semanticFingerprint": "fnv1a32:9f8dca36",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -2815,9 +2815,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture t 05 lecture en ligne",
         "identityKey": "fixture t 05 lecture en ligne",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture T-05 - Lecture en ligne",
@@ -2840,7 +2840,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Lecture en ligne",
           },
         ],
-        "semanticFingerprint": "fnv1a32:783243db",
+        "semanticFingerprint": "fnv1a32:9c81ec1b",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -2908,9 +2908,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture t 06 fixtures",
         "identityKey": "fixture t 06 fixtures",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture T-06 - fixtures",
@@ -2933,7 +2933,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "fixtures",
           },
         ],
-        "semanticFingerprint": "fnv1a32:670ebf1e",
+        "semanticFingerprint": "fnv1a32:7ef269a2",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3003,9 +3003,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture t 07 fixture t 07",
         "identityKey": "fixture t 07 fixture t 07",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture T-07 | Fixture T-07",
@@ -3028,7 +3028,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture T-07",
           },
         ],
-        "semanticFingerprint": "fnv1a32:b0d525e6",
+        "semanticFingerprint": "fnv1a32:477ecd8a",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3094,9 +3094,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "scan hero",
         "identityKey": "scan hero",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Scan Hero",
@@ -3113,7 +3113,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Scan Hero",
           },
         ],
-        "semanticFingerprint": "fnv1a32:4b84f836",
+        "semanticFingerprint": "fnv1a32:07d0719a",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3177,9 +3177,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "alice s fixture",
         "identityKey": "alice s fixture",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Alice’s Fixture!",
@@ -3196,7 +3196,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Alice’s Fixture!",
           },
         ],
-        "semanticFingerprint": "fnv1a32:81fd8c24",
+        "semanticFingerprint": "fnv1a32:01c100ac",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3260,9 +3260,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture t 10 2024",
         "identityKey": "fixture t 10 2024",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture T-10 2024",
@@ -3279,7 +3279,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture T-10 2024",
           },
         ],
-        "semanticFingerprint": "fnv1a32:0cb98623",
+        "semanticFingerprint": "fnv1a32:84c63f43",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3344,9 +3344,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture i 01",
         "identityKey": "fixture i 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture I-01",
@@ -3363,7 +3363,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture I-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:feff7f38",
+        "semanticFingerprint": "fnv1a32:b7da4a78",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3427,9 +3427,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture i 02",
         "identityKey": "fixture i 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture I-02",
@@ -3446,7 +3446,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture I-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:620e5944",
+        "semanticFingerprint": "fnv1a32:151810cc",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3510,9 +3510,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture i 03",
         "identityKey": "fixture i 03",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture I-03",
@@ -3529,7 +3529,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture I-03",
           },
         ],
-        "semanticFingerprint": "fnv1a32:928d5a54",
+        "semanticFingerprint": "fnv1a32:296aebdc",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3593,9 +3593,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture i 04",
         "identityKey": "fixture i 04",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture I-04",
@@ -3612,7 +3612,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture I-04",
           },
         ],
-        "semanticFingerprint": "fnv1a32:6bf00390",
+        "semanticFingerprint": "fnv1a32:fe2ae9f0",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3676,9 +3676,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture i 05",
         "identityKey": "fixture i 05",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture I-05",
@@ -3695,7 +3695,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture I-05",
           },
         ],
-        "semanticFingerprint": "fnv1a32:aa3ff510",
+        "semanticFingerprint": "fnv1a32:3c7adb70",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3759,9 +3759,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture i 06",
         "identityKey": "fixture i 06",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture I-06",
@@ -3778,7 +3778,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture I-06",
           },
         ],
-        "semanticFingerprint": "fnv1a32:3e1b2c74",
+        "semanticFingerprint": "fnv1a32:08e40f7c",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3842,9 +3842,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture i 07",
         "identityKey": "fixture i 07",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture I-07",
@@ -3861,7 +3861,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture I-07",
           },
         ],
-        "semanticFingerprint": "fnv1a32:ccbe2774",
+        "semanticFingerprint": "fnv1a32:97870a7c",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -3925,9 +3925,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture s 01 season 4",
         "identityKey": "fixture s 01 season 4",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture S-01 Season 4",
@@ -3948,7 +3948,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture S-01 Season 4",
           },
         ],
-        "semanticFingerprint": "fnv1a32:74e685f8",
+        "semanticFingerprint": "fnv1a32:27d3d638",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4012,9 +4012,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture s 02 4th season",
         "identityKey": "fixture s 02 4th season",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture S-02 4th Season",
@@ -4035,7 +4035,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture S-02 4th Season",
           },
         ],
-        "semanticFingerprint": "fnv1a32:97e36690",
+        "semanticFingerprint": "fnv1a32:2a1e4cf0",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4099,9 +4099,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture s 03",
         "identityKey": "fixture s 03",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture S-03",
@@ -4118,7 +4118,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture S-03",
           },
         ],
-        "semanticFingerprint": "fnv1a32:609e4700",
+        "semanticFingerprint": "fnv1a32:47440160",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4182,9 +4182,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture s 04",
         "identityKey": "fixture s 04",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture S-04",
@@ -4204,7 +4204,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture S-04",
           },
         ],
-        "semanticFingerprint": "fnv1a32:dea33e23",
+        "semanticFingerprint": "fnv1a32:56aff743",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4272,9 +4272,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture s 05 season 2",
         "identityKey": "fixture s 05 season 2",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture S-05",
@@ -4294,7 +4294,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture S-05",
           },
         ],
-        "semanticFingerprint": "fnv1a32:3f2a7807",
+        "semanticFingerprint": "fnv1a32:ac4d071f",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4362,9 +4362,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture s 06 season 3",
         "identityKey": "fixture s 06 season 3",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture S-06",
@@ -4384,7 +4384,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture S-06",
           },
         ],
-        "semanticFingerprint": "fnv1a32:07ca88dc",
+        "semanticFingerprint": "fnv1a32:f3122684",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4448,9 +4448,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture s 07 saison 2",
         "identityKey": "fixture s 07 saison 2",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture S-07 Saison 2",
@@ -4471,7 +4471,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture S-07 Saison 2",
           },
         ],
-        "semanticFingerprint": "fnv1a32:7a7252f0",
+        "semanticFingerprint": "fnv1a32:4148e850",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4535,9 +4535,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture r 01",
         "identityKey": "fixture r 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -4582,7 +4582,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-01 Chapter 12",
           },
         ],
-        "semanticFingerprint": "fnv1a32:6a0cff02",
+        "semanticFingerprint": "fnv1a32:344d49ae",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4656,9 +4656,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture r 02 episode 12 5",
         "identityKey": "fixture r 02 episode 12 5",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -4692,7 +4692,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-02 épisode 12,5",
           },
         ],
-        "semanticFingerprint": "fnv1a32:d5780ef9",
+        "semanticFingerprint": "fnv1a32:4effe7dd",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4758,9 +4758,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture r 03",
         "identityKey": "fixture r 03",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "MANGA",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -4794,7 +4794,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-03",
           },
         ],
-        "semanticFingerprint": "fnv1a32:d2884d89",
+        "semanticFingerprint": "fnv1a32:508a02ad",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4866,9 +4866,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture r 04 chapter 20",
         "identityKey": "fixture r 04 chapter 20",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -4922,7 +4922,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-04 Chapter 20 Chapter 12",
           },
         ],
-        "semanticFingerprint": "fnv1a32:6967fa40",
+        "semanticFingerprint": "fnv1a32:2c38cca0",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -4997,9 +4997,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture r 05",
         "identityKey": "fixture r 05",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture R-05",
@@ -5016,7 +5016,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-05",
           },
         ],
-        "semanticFingerprint": "fnv1a32:da568108",
+        "semanticFingerprint": "fnv1a32:e4d42908",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -5080,9 +5080,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture r 06 2024",
         "identityKey": "fixture r 06 2024",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture R-06 2024",
@@ -5099,7 +5099,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-06 2024",
           },
         ],
-        "semanticFingerprint": "fnv1a32:a6793e7d",
+        "semanticFingerprint": "fnv1a32:1c7f80a9",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -5159,9 +5159,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [
           "URL_IDENTITY_MISSING",
         ],
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "UNKNOWN",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture R-07",
@@ -5178,7 +5178,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-07",
           },
         ],
-        "semanticFingerprint": "fnv1a32:0ee923e2",
+        "semanticFingerprint": "fnv1a32:6c65d50e",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [],
@@ -5224,9 +5224,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [
           "URL_IDENTITY_MISSING",
         ],
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "UNKNOWN",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture R-08",
@@ -5243,7 +5243,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-08",
           },
         ],
-        "semanticFingerprint": "fnv1a32:ee8bcb23",
+        "semanticFingerprint": "fnv1a32:66988443",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [],
@@ -5294,9 +5294,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture r 09",
         "identityKey": "fixture r 09",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture R-09",
@@ -5313,7 +5313,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-09",
           },
         ],
-        "semanticFingerprint": "fnv1a32:e1497708",
+        "semanticFingerprint": "fnv1a32:ebc71f08",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -5377,9 +5377,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "area 51",
         "identityKey": "area 51",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Area 51",
@@ -5397,7 +5397,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Area 51",
           },
         ],
-        "semanticFingerprint": "fnv1a32:cfbd26d2",
+        "semanticFingerprint": "fnv1a32:6adb617e",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -5456,9 +5456,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [
           "URL_IDENTITY_MISSING",
         ],
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "UNKNOWN",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture R-11",
@@ -5475,7 +5475,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-11",
           },
         ],
-        "semanticFingerprint": "fnv1a32:36291b31",
+        "semanticFingerprint": "fnv1a32:8c207a55",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [],
@@ -5526,9 +5526,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture 2nd",
         "identityKey": "fixture 2nd",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture 2nd",
@@ -5545,7 +5545,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture 2nd",
           },
         ],
-        "semanticFingerprint": "fnv1a32:a228ec08",
+        "semanticFingerprint": "fnv1a32:aca69408",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -5609,9 +5609,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture r 13 season 2",
         "identityKey": "fixture r 13 season 2",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture R-13 Season 2",
@@ -5632,7 +5632,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-13 Season 2",
           },
         ],
-        "semanticFingerprint": "fnv1a32:6327d7b0",
+        "semanticFingerprint": "fnv1a32:042e2c10",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -5700,9 +5700,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture r 14 season 3",
         "identityKey": "fixture r 14 season 3",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progress": {
           "candidates": [
             {
@@ -5739,7 +5739,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-14",
           },
         ],
-        "semanticFingerprint": "fnv1a32:43a133c2",
+        "semanticFingerprint": "fnv1a32:164bb16e",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -5811,9 +5811,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture q 01",
         "identityKey": "fixture q 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture Q-01",
@@ -5830,7 +5830,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture Q-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:2979bb78",
+        "semanticFingerprint": "fnv1a32:dc670bb8",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -5894,9 +5894,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture q 02",
         "identityKey": "fixture q 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture Q-02",
@@ -5913,7 +5913,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture Q-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:143d8064",
+        "semanticFingerprint": "fnv1a32:a440ffec",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -5977,9 +5977,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture q 03",
         "identityKey": "fixture q 03",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture Q-03",
@@ -5996,7 +5996,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture Q-03",
           },
         ],
-        "semanticFingerprint": "fnv1a32:cf7795f4",
+        "semanticFingerprint": "fnv1a32:9a4078fc",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6060,9 +6060,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture q 04",
         "identityKey": "fixture q 04",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture Q-04",
@@ -6079,7 +6079,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture Q-04",
           },
         ],
-        "semanticFingerprint": "fnv1a32:d193ce60",
+        "semanticFingerprint": "fnv1a32:333d53c0",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6143,9 +6143,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture q 05",
         "identityKey": "fixture q 05",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture Q-05",
@@ -6162,7 +6162,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture Q-05",
           },
         ],
-        "semanticFingerprint": "fnv1a32:09cd4ea0",
+        "semanticFingerprint": "fnv1a32:532a6300",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6226,9 +6226,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture q 06",
         "identityKey": "fixture q 06",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture Q-06",
@@ -6245,7 +6245,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture Q-06",
           },
         ],
-        "semanticFingerprint": "fnv1a32:27ef8c04",
+        "semanticFingerprint": "fnv1a32:3075218c",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6309,9 +6309,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture q 07",
         "identityKey": "fixture q 07",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture Q-07",
@@ -6328,7 +6328,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture Q-07",
           },
         ],
-        "semanticFingerprint": "fnv1a32:aec23f24",
+        "semanticFingerprint": "fnv1a32:2e85b3ac",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6392,9 +6392,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture q 08",
         "identityKey": "fixture q 08",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture Q-08",
@@ -6411,7 +6411,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture Q-08",
           },
         ],
-        "semanticFingerprint": "fnv1a32:9daed4c8",
+        "semanticFingerprint": "fnv1a32:a2cd02c8",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6475,9 +6475,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture b 01",
         "identityKey": "fixture b 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture B-01",
@@ -6494,7 +6494,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture B-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:eadde7d8",
+        "semanticFingerprint": "fnv1a32:8ad7ba98",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6558,9 +6558,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture b 02",
         "identityKey": "fixture b 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture B-02",
@@ -6577,7 +6577,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture B-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:fceae8e8",
+        "semanticFingerprint": "fnv1a32:278136e8",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6641,9 +6641,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture b 03",
         "identityKey": "fixture b 03",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture B-03",
@@ -6660,7 +6660,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture B-03",
           },
         ],
-        "semanticFingerprint": "fnv1a32:0bb20be8",
+        "semanticFingerprint": "fnv1a32:364859e8",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6724,9 +6724,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture b 04",
         "identityKey": "fixture b 04",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture B-04",
@@ -6743,7 +6743,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture B-04",
           },
         ],
-        "semanticFingerprint": "fnv1a32:0b516370",
+        "semanticFingerprint": "fnv1a32:d227f8d0",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6807,9 +6807,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture b 05",
         "identityKey": "fixture b 05",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture B-05",
@@ -6826,7 +6826,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture B-05",
           },
         ],
-        "semanticFingerprint": "fnv1a32:68b20b68",
+        "semanticFingerprint": "fnv1a32:93485968",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6890,9 +6890,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture o 01",
         "identityKey": "fixture o 01",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture O-01",
@@ -6909,7 +6909,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture O-01",
           },
         ],
-        "semanticFingerprint": "fnv1a32:0f4ddf24",
+        "semanticFingerprint": "fnv1a32:8f1153ac",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [
@@ -6973,9 +6973,9 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
         "diagnostics": [],
         "displayTitle": "fixture o 02",
         "identityKey": "fixture o 02",
-        "matcherVersion": "favorite-matcher-v3",
+        "matcherVersion": "favorite-matcher-v4",
         "mediaKind": "ANIME",
-        "parserVersion": "favorite-parser-v4",
+        "parserVersion": "favorite-parser-v5",
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture O-02",
@@ -6992,7 +6992,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture O-02",
           },
         ],
-        "semanticFingerprint": "fnv1a32:253e87b4",
+        "semanticFingerprint": "fnv1a32:28934abc",
         "sourceAdapterVersion": "source-adapter-v3:generic-url",
         "sourceEvidence": {
           "aliases": [

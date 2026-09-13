@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createReview, createWork, reviewId, workId } from '@tobirink/domain';
+import { createLibrary, createReview, createWork, libraryId, reviewId, workId } from '@tobirink/domain';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import type { ImportableFavorite } from '../resolution';
 import { blockTask, claimTask, commitTask, createDurableTask, recordTaskEffect } from '../tasks';
@@ -28,7 +28,7 @@ describe('importFavoriteSources', () => {
     const [after] = await storage.listFavoriteSources({ limit: 1 });
     const newArtifact = after === undefined ? undefined : await storage.getFavoriteParseArtifact(after.id);
     expect(after?.id).toBe(before?.id);
-    expect(newArtifact?.artifact).toMatchObject({ displayTitle: 'kage no jitsuryokusha ni naritakute', parserVersion: 'favorite-parser-v4', progress: { value: 66.1 }, transformations: ['numeric-routing-suffix'] });
+    expect(newArtifact?.artifact).toMatchObject({ displayTitle: 'kage no jitsuryokusha ni naritakute', parserVersion: 'favorite-parser-v5', progress: { value: 66.1 }, transformations: ['numeric-routing-suffix'] });
     expect(after && await storage.getFavoriteResolutionTask(after.id.replace(/^source_/u, 'favorite-resolution_'))).toMatchObject({ state: 'READY' });
   });
 
@@ -177,6 +177,49 @@ describe('importFavoriteSources', () => {
     expect(await storage.getReview(id)).toEqual(review);
     expect(await storage.getWork(work.id)).toEqual(work);
     expect(await storage.getFavoriteResolutionReceipt(`${source.id}:correction-v1`)).toEqual(invalidate ? expect.objectContaining({ effectDigest: 'correction:faulty-automatic' }) : undefined);
+  });
+
+  it('removes only stale automatic library membership during a semantic reparse', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([favorite], storage, importedAt);
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (!source) throw new Error('Expected source.');
+    const work = createWork({ externalReferences: [{ externalId: '123', provider: 'anilist' }], id: workId('work_stale_auto'), mediaKind: 'anime', preferredTitle: 'Stale automatic title' });
+    await storage.putWork(work);
+    await storage.putLibrary(createLibrary(libraryId('library_primary'), [work.id]));
+    await storage.putFavoriteSource({ ...source, matchedWorkId: work.id, resolution: { kind: 'RESOLVED' }, resolutionVersions: { schema: 1, decision: 1, receipt: 1, parser: 'favorite-parser-v4', matcher: 'favorite-matcher-v3', siteRules: 'source-adapter-v3:generic-bookmark-release-v1' } });
+    const previousArtifact = await storage.getFavoriteParseArtifact(source.id);
+    if (!previousArtifact) throw new Error('Expected artifact.');
+    await storage.putFavoriteParseArtifact({ ...previousArtifact, artifact: { ...previousArtifact.artifact, semanticFingerprint: 'fnv1a32:legacy-v4' } });
+
+    await importFavoriteSources([favorite], storage, importedAt);
+
+    expect((await storage.getFavoriteSource(source.id))?.matchedWorkId).toBeUndefined();
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toEqual([]);
+    expect(await storage.getWork(work.id)).toEqual(work);
+  });
+
+  it('keeps stale membership while another observed resolved source still references the Work', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([favorite, { ...favorite, bookmarkId: '43' }], storage, importedAt);
+    const sources = await storage.listFavoriteSources({ limit: 2 });
+    const source = sources.find((value) => value.bookmarkId === '42');
+    const other = sources.find((value) => value.bookmarkId === '43');
+    if (!source || !other) throw new Error('Expected sources.');
+    const work = createWork({ externalReferences: [{ externalId: '123', provider: 'anilist' }], id: workId('work_shared_auto'), mediaKind: 'anime', preferredTitle: 'Shared title' });
+    await storage.putWork(work);
+    await storage.putLibrary(createLibrary(libraryId('library_primary'), [work.id]));
+    const resolved = { matchedWorkId: work.id, resolution: { kind: 'RESOLVED' as const }, resolutionVersions: { schema: 1 as const, decision: 1 as const, receipt: 1 as const, parser: 'favorite-parser-v4', matcher: 'favorite-matcher-v3', siteRules: 'source-adapter-v3:generic-bookmark-release-v1' } };
+    await storage.putFavoriteSource({ ...source, ...resolved });
+    await storage.putFavoriteSource({ ...other, ...resolved });
+    const previousArtifact = await storage.getFavoriteParseArtifact(source.id);
+    if (!previousArtifact) throw new Error('Expected artifact.');
+    await storage.putFavoriteParseArtifact({ ...previousArtifact, artifact: { ...previousArtifact.artifact, semanticFingerprint: 'fnv1a32:legacy-v4' } });
+
+    await importFavoriteSources([favorite], storage, importedAt);
+
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toEqual([work.id]);
+    expect((await storage.getFavoriteSource(other.id))?.matchedWorkId).toBe(work.id);
   });
 
   it('Q-02 creates a new semantic task revision while preserving import time and a resolved Review', async () => {
