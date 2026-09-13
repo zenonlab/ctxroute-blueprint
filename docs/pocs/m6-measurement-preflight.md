@@ -1,8 +1,8 @@
 # Préflight M6 — qualification matérielle
 
-Date : 10 septembre 2026
+Date : 13 septembre 2026
 
-Statut : non concluant ; harnais prêt, collecte native non exécutée.
+Statut : partiel ; collecte native CPU/RSS et profilage RenderHost exécutés, énergie native encore indisponible.
 
 ## Banc observé
 
@@ -23,12 +23,15 @@ les valeurs brutes, moyenne, médiane, écart-type, empreintes et limitations. S
 tests refusent un ordre non alterné et toute soumission GPU déclarée sous pause ou
 occlusion.
 
-Aucune passe native n'a été produite : le provider qualifié n'est pas installé et
-actif dans WallpaperAgent, les gestes Finder/Spaces et le changement multi-écran
-exigent une manipulation physique, et l'instrument énergétique disponible requiert
-une élévation absente de cette exécution. Aucun joule, watt, pourcentage GPU,
-wakeup, frame time ou input-to-photon n'est donc publié. Sans coût observé, aucune
-optimisation M6 n'est justifiée.
+Le package Wind Waker v53 est maintenant détecté et actif dans WallpaperAgent ;
+la preuve de parentage et de catalogue est conservée dans le reçu privé
+`native-live-v53.json`. Cinq échantillons CPU/RSS et un profilage `sample` de cinq
+secondes sont conservés dans `active-desktop-sample-v53.json` et
+`active-profile-v53.json`. Le profil montre un thread principal majoritairement en
+attente et des coûts dominants dans `wgpu`/Metal (buffers et bind groups) ; aucune
+optimisation spéculative n'est donc appliquée. `powermetrics` reste inutilisable
+sans superutilisateur ; aucun joule, watt, GPU, wakeup ou input-to-photon n'est
+publié. Spaces et multi-écran restent non sondés physiquement.
 
 ## Commandes exécutées
 
