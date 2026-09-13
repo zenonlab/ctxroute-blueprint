@@ -19,12 +19,12 @@ export class AniListReleaseCollector implements PublicReleaseCollector {
   async collect(window: { from: string; to: string }): Promise<readonly PublicReleaseEventContract[]> {
     const from = Math.floor(Date.parse(`${window.from}T00:00:00.000Z`) / 1000);
     const to = Math.floor(Date.parse(`${window.to}T23:59:59.999Z`) / 1000);
-    const response = await this.fetcher('https://graphql.anilist.co', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'query($from:Int!,$to:Int!){airingSchedule(airingAt_greater:$from,airingAt_lesser:$to,sort:TIME,perPage:50){airingAt episode media{id}}}', variables: { from, to } }) });
+    const response = await this.fetcher('https://graphql.anilist.co', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'query($from:Int!,$to:Int!){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$from,airingAt_lesser:$to,sort:TIME){airingAt episode media{id}}}}', variables: { from, to } }) });
     if (!response.ok) throw new Error(`anilist-${response.status}`);
     // SAFETY: AniList's envelope is narrowed by the guards below before any field is used.
-    const body = await response.json() as { data?: { airingSchedule?: Array<{ airingAt?: number; episode?: number; media?: { id?: number } }> } };
+    const body = await response.json() as { data?: { Page?: { airingSchedules?: Array<{ airingAt?: number; episode?: number; media?: { id?: number } }> } } };
     const fetchedAt = new Date().toISOString();
-    const events = (body.data?.airingSchedule ?? []).flatMap((item) => {
+    const events = (body.data?.Page?.airingSchedules ?? []).flatMap((item) => {
       if (!Number.isSafeInteger(item.airingAt) || !Number.isSafeInteger(item.media?.id) || !Number.isSafeInteger(item.episode)) return [];
       return [publicReleaseEventSchema.parse({ id: `anilist-episode-${item.media!.id}-${item.episode}`, provider: 'anilist', providerWorkId: String(item.media!.id), releaseKind: 'episode', sequence: item.episode, occurrence: { kind: 'INSTANT', value: new Date(item.airingAt! * 1000).toISOString() }, state: 'SCHEDULED', provenance: { source: 'anilist', fetchedAt, parserVersion: '1', rulesVersion: '1' }, expiresAt: new Date((item.airingAt! + 60 * 86400) * 1000).toISOString() })];
     });
