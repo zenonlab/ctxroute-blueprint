@@ -60,7 +60,9 @@ compensation empirique dans une recette de thème.
 Les types de volume suivent l'enum et les fonctions d'échantillonnage du loader
 JParticle ; point, ligne, cercle et sphère ont une projection portable distincte.
 Les formes de ruban deviennent une projection portable `surface-stripe` distincte
-des billboards simples et directionnels. Les formes ou volumes sans équivalent natif
+des billboards simples et directionnels. Le profil canonique `anchored-ribbon`
+transporte les points, largeurs et UV dérivés du volume source ; le renderer ne
+reconstruit ni ancre, ni éventail, ni courbure métier. Les formes ou volumes sans équivalent natif
 sont une projection déclarée par l'adaptateur, jamais une branche propre au jeu dans
 Bevy.
 Les champs `FLD1` de gravité locale constante deviennent un vecteur d'accélération

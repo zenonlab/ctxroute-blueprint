@@ -68,9 +68,21 @@ struct Effect {
     acceleration: [f32; 3],
     velocity: Velocity,
     particle: Particle,
+    render_state: RenderState,
     animation: Animation,
     source_track_count: usize,
     source_tracks_sha256: String,
+}
+
+#[derive(Serialize)]
+struct RenderState {
+    blend_flags: u16,
+    alpha_flags: u8,
+    depth_flags: u8,
+    texture_flags: u8,
+    texture_indices: Vec<u16>,
+    primary_color: [u8; 4],
+    environment_color: [u8; 4],
 }
 
 #[derive(Serialize)]
@@ -328,6 +340,15 @@ fn resolve_effect(
                 3 | 4 | 9 => "directional-billboard",
                 _ => "billboard",
             },
+        },
+        render_state: RenderState {
+            blend_flags: emitter.base_shape.blend_flags,
+            alpha_flags: emitter.base_shape.alpha_flags,
+            depth_flags: emitter.base_shape.z_flags,
+            texture_flags: emitter.base_shape.texture_flags,
+            texture_indices: emitter.texture_indices.clone(),
+            primary_color: emitter.base_shape.primary_color,
+            environment_color: emitter.base_shape.environment_color,
         },
         animation: resolve_animation(extra, dynamics.lifetime)?,
         source_track_count: usize::from(emitter.key_blocks) + usize::from(emitter.field_blocks),
