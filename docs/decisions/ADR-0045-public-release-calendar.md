@@ -11,6 +11,7 @@ scope:
   - apps/extension/entrypoints/agenda/**
   - docs/architecture/src/agenda-release.dataflow.json
 review: on-change
+revised: true
 ---
 
 # ADR-0045 — Calendrier public de sorties et projection Agenda locale
@@ -36,7 +37,10 @@ du calendrier.
 D1 reçoit uniquement des événements publics bornés : fournisseur, identifiant
 public de l'œuvre, type de sortie, occurrence `DATE` ou `INSTANT`, état,
 provenance, versions et expiration. Les écritures sont préparées, batchées,
-idempotentes et conservées lors d'une panne. Les titres, URLs, favoris,
+idempotentes et conservées lors d'une panne. Un `403`, `429`, timeout ou
+réponse incomplète est enregistré comme échec de lane, sans `NO_MATCH` et sans
+faire échouer le cron global ; les dernières lignes valides restent servies.
+Les titres, URLs, favoris,
 progressions, dossiers, owners, installations, secrets et payloads fournisseurs
 restent exclus.
 

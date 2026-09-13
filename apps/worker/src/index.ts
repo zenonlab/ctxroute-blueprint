@@ -65,7 +65,11 @@ export const scheduled = async (_controller: ScheduledController, env: Env, _ctx
   const result = await createWorkerServices(env).releaseCalendar.sync({ from, to });
   if (result.failures.length > 0) {
     emitWorkerDiagnostic(env, { durationMs: result.count, method: 'OTHER', requestId: crypto.randomUUID(), routeFamily: 'release', schemaVersion: 1, status: 503, type: 'worker.error' });
-    throw new Error(`agenda-sync-failed:${result.failures.join(',')}`);
+    // A provider outage is a lane failure, not a failed calendar run. The
+    // adapter has already preserved the last valid rows; throwing here makes
+    // Cloudflare report the whole cron as failed and hides those rows from
+    // clients until the next invocation.
+    console.warn(JSON.stringify({ event: 'agenda_sync_lane_failed', failures: result.failures }));
   }
 };
 
