@@ -46,7 +46,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Titres locaux avant hydratation; mutations unitaires, audit durable à 6 h, quatre alias et une page par alias bornent MV3."
+        "note": "Titres locaux avant hydratation; démarrage sans rescan, bootstrap indexé, mutations unitaires et audit durable à 6 h bornent MV3."
       },
       {
         "id": "cover-rights",
@@ -172,7 +172,7 @@
       "stage": 4,
       "row": 1,
       "width": 150,
-      "tag": "transaction + reçu de reparsing auto"
+      "tag": "transaction + bootstrap indexé"
     },
     {
       "id": "localDiagnostics",
@@ -445,6 +445,7 @@
         "Sept facettes stables, menus persistants et pages ajoutées sans exposer le curseur",
         "Réponses paginées obsolètes ignorées après tout changement de requête",
         "Tri par titre, ajout, année, progression ou popularité comparable",
+        "Bootstrap sans scan du catalogue; lectures Work/progression par fenêtres ≤ 100",
         "Genres typés et totaux éditoriaux explicites uniquement",
         "Sync sans titre privé; D1 limité aux fiches fournisseur publiques",
         "URL fournisseur locale; R2 exige licence ou domaine public"

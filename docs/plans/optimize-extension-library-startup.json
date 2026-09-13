@@ -1,0 +1,49 @@
+{
+  "goalId": "goal-optimize-extension-library-startup",
+  "title": "Accelerer le demarrage de la bibliotheque locale",
+  "executionMode": "collaborative",
+  "approved": true,
+  "validationEvidence": [
+    "L utilisateur a explicitement approuve les ameliorations necessaires par go",
+    "Le diagnostic confirme un inventaire force au demarrage et des lectures catalogue sequentielles",
+    "La correction reutilise les compteurs et index existants sans migration IndexedDB"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Rendre le bootstrap et la lecture locale bornes",
+      "acceptance": [
+        "Un demarrage normal reprend les taches sans relire tous les favoris lorsque l inventaire est complet",
+        "Le bootstrap WebBridge calcule ses compteurs sans construire ni trier le catalogue complet",
+        "Une page catalogue lit les Works et progressions par lots paralleles de 100 au maximum",
+        "Les favoris nouveaux modifies supprimes les restaurations et l audit periodique convergent toujours",
+        "Les tests cibles npm run verify Archify et git diff check passent"
+      ],
+      "files": [
+        "packages/application/src/library/read-library-catalogue.ts",
+        "packages/application/src/library/read-library-catalogue.test.ts",
+        "packages/application/src/index.ts",
+        "apps/extension/runtime/web-bridge-adapter.ts",
+        "apps/extension/runtime/web-bridge-adapter.test.ts",
+        "apps/extension/wxt-entrypoints/background.ts",
+        "apps/extension/agenda-notifications.test.ts",
+        "docs/decisions/ADR-0042-local-first-library-projection.md",
+        "docs/systems/favorite-resolution-rebuild-pipeline.md",
+        "docs/architecture/src/favorite-resolution.dataflow.json",
+        "docs/plans/optimize-extension-library-startup.json",
+        "docs/plans/optimize-extension-library-startup-completion.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run progress:validate -- docs/plans/optimize-extension-library-startup.json",
+        "npm run progress:approve -- docs/plans/optimize-extension-library-startup.json",
+        "Tests application et extension cibles du catalogue du bootstrap et du demarrage",
+        "npm run verify",
+        "npm run archify:validate -- favorite-resolution.dataflow",
+        "git diff --check",
+        "git commit -m perf(extension): accelerate local library startup"
+      ]
+    }
+  ]
+}

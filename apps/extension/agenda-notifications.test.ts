@@ -88,6 +88,8 @@ describe('agenda notifications', () => {
     expect(background).toMatch(/scheduleAgendaPeriodNotifications\(privateStorage\.storage, tasks/);
     expect(background).toMatch(/browser\.alarms\.onAlarm\.addListener/);
     expect(background).toMatch(/browser\.runtime\.onStartup\.addListener/);
+    expect(background).toContain('Promise.all([resumeNotifications(), reconcileFavorites()])');
+    expect(background).not.toContain('Promise.all([resumeNotifications(), reconcileFavorites(true), repairLibraryProjection()])');
     expect(background).toMatch(/preferences\.quick\.(read|write)/);
     expect(surface).toMatch(/useLocalAgenda\(\)/);
     expect(surface).toMatch(/agenda=\{agenda\}/);

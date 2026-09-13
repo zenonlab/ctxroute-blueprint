@@ -1,0 +1,26 @@
+{
+  "goalId": "goal-optimize-extension-library-startup",
+  "stepId": "step-1",
+  "status": "DONE",
+  "files": [
+    "packages/application/src/library/read-library-catalogue.ts",
+    "packages/application/src/library/read-library-catalogue.test.ts",
+    "apps/extension/runtime/web-bridge-adapter.ts",
+    "apps/extension/runtime/web-bridge-adapter.test.ts",
+    "apps/extension/wxt-entrypoints/background.ts",
+    "apps/extension/agenda-notifications.test.ts",
+    "docs/decisions/ADR-0042-local-first-library-projection.md",
+    "docs/systems/favorite-resolution-rebuild-pipeline.md",
+    "docs/architecture/src/favorite-resolution.dataflow.json",
+    "docs/plans/optimize-extension-library-startup.json",
+    "docs/plans/optimize-extension-library-startup-completion.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Le demarrage normal reprend le checkpoint et les taches dues sans forcer l inventaire ni la reparation globale; installation restauration mutations continuations et audit periodique conservent la convergence.",
+    "Le bootstrap WebBridge ne lit aucun Work ni aucune page FavoriteSource et son total egale la projection complete pour les etats provisoire resolu et non pris en charge.",
+    "Les lectures detaillees utilisent exactement 100 operations concurrentes par lot; Chromium mesure 44 ms pour 500 Works et npm run verify passe avec zero vulnerabilite.",
+    "30 tests cibles typechecks application extension documentation git diff check et favorite-resolution Archify showcase 9 sur 9 passent."
+  ]
+}

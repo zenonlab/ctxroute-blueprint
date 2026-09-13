@@ -1,4 +1,4 @@
-import { providerCoverFallbackPath, readAgendaPeriod, readLibraryCatalogue, readReviewQueue } from '@tobirink/application';
+import { providerCoverFallbackPath, readAgendaPeriod, readLibraryBootstrapSummary, readLibraryCatalogue, readReviewQueue } from '@tobirink/application';
 import type { FavoriteProviderHydrationPorts, StoragePort } from '@tobirink/application';
 import { libraryId, workId } from '@tobirink/domain';
 import type { FavoriteSource, WorkId } from '@tobirink/domain';
@@ -107,11 +107,11 @@ function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCa
 export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: FavoriteProviderHydrationPorts): WebBridgeRequestHandler {
   return async (request: WebRequest): Promise<WebBridgeValue> => {
     if (request.type === 'bootstrap.read') {
-      const [catalogue, review] = await Promise.all([
-        readLibraryCatalogue(storage, { libraryId: primaryLibraryId, limit: 1 }),
+      const [library, review] = await Promise.all([
+        readLibraryBootstrapSummary(storage, primaryLibraryId),
         readReviewQueue(storage),
       ]);
-      const snapshot: WebBootstrapSnapshot = { availability: 'connected', generation: 0, libraryCount: catalogue.statistics.total, pendingReviewCount: review.items.length, protocolVersion: 4 };
+      const snapshot: WebBootstrapSnapshot = { availability: 'connected', generation: 0, libraryCount: library.libraryCount, pendingReviewCount: review.items.length, protocolVersion: 4 };
       return snapshot;
     }
     if (request.type === 'library.read') {

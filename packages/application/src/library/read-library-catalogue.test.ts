@@ -2,7 +2,7 @@ import { createFavoriteSource, createLibrary, createProgress, createSourceEviden
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import { describe, expect, it } from 'vitest';
 import { importFavoriteSources } from '../use-cases/import-favorite-sources';
-import { readLibraryCatalogue } from './read-library-catalogue';
+import { readLibraryBootstrapSummary, readLibraryCatalogue } from './read-library-catalogue';
 
 function work(id: string, input: { genre: string; popularity: number; status: 'COMPLETED' | 'ONGOING'; title: string; year: number }) {
   return createWork({
@@ -21,14 +21,17 @@ describe('readLibraryCatalogue', () => {
     await storage.putLibrary(createLibrary(libraryId('library_primary'), works.map(value => value.id)));
     for (const item of works) await storage.putWork(item);
     let active = 0; let peak = 0;
-    const getWork = storage.getWork.bind(storage);
-    storage.getWork = async id => { active += 1; peak = Math.max(active, peak); try { return await getWork(id); } finally { active -= 1; } };
+    const transaction = storage.transaction.bind(storage);
+    storage.transaction = async <TResult>(stores, operation) => transaction(stores, async (session) => {
+      const getWork = session.getWork.bind(session);
+      return operation({ ...session, getWork: async (id) => { active += 1; peak = Math.max(active, peak); try { return await getWork(id); } finally { active -= 1; } } });
+    });
     const snapshot = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary'), sort: 'POPULARITY_DESC' });
     expect(snapshot.total).toBe(1400);
     expect(snapshot.truncated).toBe(false);
     expect(snapshot.items[0]?.work?.id).toBe(works[1399]?.id);
     expect(snapshot.facets.genre).toContainEqual({ value: 'last genre', label: 'Last Genre', count: 1 });
-    expect(peak).toBeLessThanOrEqual(100);
+    expect(peak).toBe(100);
   });
   it('filters before pagination while keeping stable multi-select facets', async () => {
     const storage = new MemoryStoragePort();
@@ -76,6 +79,7 @@ describe('readLibraryCatalogue', () => {
 
     const pending = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary'), sort: 'ADDED_DESC' });
     expect(pending).toMatchObject({ statistics: { total: 1 }, items: [{ mediaKind: 'manga', state: 'preparation', title: 'Pending Paper Moon' }] });
+    await expect(readLibraryBootstrapSummary(storage, libraryId('library_primary'))).resolves.toEqual({ libraryCount: pending.statistics.total });
     expect(pending.items[0]?.work).toBeUndefined();
 
     const [source] = await storage.listFavoriteSources({ limit: 1 });
@@ -87,6 +91,7 @@ describe('readLibraryCatalogue', () => {
 
     const hydrated = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary'), sort: 'ADDED_DESC' });
     expect(hydrated).toMatchObject({ statistics: { total: 1 }, items: [{ id: resolved.id, state: 'ready', title: 'Paper Moon' }] });
+    await expect(readLibraryBootstrapSummary(storage, libraryId('library_primary'))).resolves.toEqual({ libraryCount: hydrated.statistics.total });
   });
 
   it('keeps an unknown parsed identity distinct and excludes an unsupported ordinary link', async () => {
@@ -100,5 +105,6 @@ describe('readLibraryCatalogue', () => {
 
     expect(snapshot.items).toEqual([expect.objectContaining({ mediaKind: 'unknown', state: 'preparation', title: 'unclassified blue archive' })]);
     expect(snapshot.facets.type).toContainEqual({ count: 1, label: 'Inconnu', value: 'UNKNOWN' });
+    await expect(readLibraryBootstrapSummary(storage, libraryId('library_primary'))).resolves.toEqual({ libraryCount: snapshot.statistics.total });
   });
 });

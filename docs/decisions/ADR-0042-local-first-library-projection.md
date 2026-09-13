@@ -7,6 +7,7 @@ scope:
   - apps/extension/runtime/library-catalogue-messages.ts
   - apps/extension/runtime/local-library-catalogue-runtime.ts
   - apps/extension/runtime/web-bridge-adapter.ts
+  - apps/extension/wxt-entrypoints/background.ts
   - apps/extension/runtime/ExtensionSurface.tsx
   - apps/web/app/library/page.tsx
   - apps/extension/scripts/installed-review.mjs
@@ -15,12 +16,14 @@ scope:
   - docs/systems/favorite-resolution-rebuild-pipeline.md
   - docs/architecture/src/favorite-resolution.dataflow.json
 review: on-change
+revised: true
 ---
 
 # ADR-0042 — Projection locale avant hydratation fournisseur
 
 - Status: accepted
 - Date: 2026-09-12
+- Revised: 2026-09-13
 
 ## Context
 
@@ -59,6 +62,21 @@ locale peut servir de destination à la carte dans les contextes de confiance d�
 autorisés. Les tris et facettes utilisent le corpus fusionné, avec `Locale` comme
 source et `Inconnu` comme type tant que la résolution ne fournit pas davantage.
 
+Le bootstrap WebBridge lit la bibliothèque autoritaire et les compteurs de
+résolution indexés sans construire, trier ni sérialiser le catalogue complet.
+Le nombre projeté additionne les `Work` de la bibliothèque aux sources observées
+encore en préparation, Review ou reprise; les invariants de stockage garantissent
+qu’une résolution `RESOLVED` référence un `Work` existant. La lecture détaillée
+conserve le corpus complet nécessaire aux facettes et au tri, mais exécute ses
+lectures de `Work` et progression par lots parallèles de cent au maximum.
+
+Au démarrage normal du navigateur, le runner réutilise un checkpoint d’inventaire
+complet et reprend uniquement les travaux dus, sans lancer la réparation globale
+de projection. L’installation, la restauration, une demande humaine et l’audit
+périodique de six heures gardent le droit de
+forcer un inventaire et de réparer la projection; les événements de favoris
+traitent immédiatement chaque création, modification, déplacement ou suppression.
+
 ## Consequences
 
 La bibliothèque reflète l’inventaire parsé avant toute réponse réseau. Une panne
@@ -66,3 +84,5 @@ AniList, MangaUpdates, MangaDex, Kitsu ou du collectif ne cache plus les titres.
 La pagination continue de lire IndexedDB par lots bornés et ne crée aucun nouvel
 objet persistant. Le contrat de présentation expose l’état et le type inconnu;
 le site et l’extension les affichent sans les faire passer pour un fournisseur.
+Le réveil MV3 ne crée plus de contention IndexedDB par rescan systématique et le
+premier handshake ne paie plus le coût des facettes de toute la bibliothèque.

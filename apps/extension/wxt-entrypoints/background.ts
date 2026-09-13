@@ -200,7 +200,7 @@ export default defineBackground({
       await drainDueAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, new Date());
     };
     browser.runtime.onStartup.addListener(() => {
-      void Promise.all([ensureReminderAlarm(), ensureFavoriteInventoryAuditAlarm()]).then(() => Promise.all([resumeNotifications(), reconcileFavorites(true), repairLibraryProjection()])).catch(() => undefined);
+      void Promise.all([ensureReminderAlarm(), ensureFavoriteInventoryAuditAlarm()]).then(() => Promise.all([resumeNotifications(), reconcileFavorites()])).catch(() => undefined);
     });
     browser.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === reminderAlarmName) void Promise.all([resumeNotifications(), restoreFavoriteWake()]).catch(() => undefined);

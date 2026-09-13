@@ -1,4 +1,4 @@
-import type { Progress, ProviderCandidate } from '@tobirink/domain';
+import type { LibraryId, Progress, ProviderCandidate } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { libraryCataloguePageLimit, libraryCatalogueReadBatchSize, libraryFacetLimit } from './library-catalogue-contract';
 import type { LibraryCatalogueItem, LibraryCatalogueQuery, LibraryCatalogueSnapshot, LibraryFacetName, LibraryFacetOption, LibraryFacetState, LibrarySort } from './library-catalogue-contract';
@@ -115,21 +115,22 @@ async function readCatalogueSnapshot(storage: StoragePort, input: LibraryCatalog
   for (let start = 0; start < workIds.length; start += libraryCatalogueReadBatchSize) {
     const batch = workIds.slice(start, start + libraryCatalogueReadBatchSize);
     const records = await storage.transaction(['progress', 'works'], async (session) => {
-      const items: LibraryCatalogueItem[] = [];
-      for (const [index, id] of batch.entries()) {
+      const settled = await Promise.allSettled(batch.map(async (id, index): Promise<LibraryCatalogueItem | undefined> => {
         const work = await session.getWork(id);
-        if (work === undefined) continue;
+        if (work === undefined) return undefined;
         const progress = await session.findProgressByWorkId(id);
         const addedOrder = start + index;
         resolvedWorkIds.add(work.id);
         const item: LibraryCatalogueItem = work.hydration === undefined
           ? { addedOrder, id: work.id, mediaKind: work.mediaKind, state: 'ready', title: work.preferredTitle, work }
           : { addedOrder, candidate: work.hydration.candidate, id: work.id, mediaKind: work.mediaKind, state: 'ready', title: work.preferredTitle, work };
-        items.push(progress === undefined ? item : { ...item, progress });
-      }
-      return items;
+        return progress === undefined ? item : { ...item, progress };
+      }));
+      const failed = settled.find((record): record is PromiseRejectedResult => record.status === 'rejected');
+      if (failed !== undefined) throw failed.reason;
+      return settled.map((record) => record.status === 'fulfilled' ? record.value : undefined);
     });
-    corpus.push(...records);
+    corpus.push(...records.filter((item): item is LibraryCatalogueItem => item !== undefined));
   }
   const sourceProjection = await projectFavoriteSources(storage, resolvedWorkIds);
   for (const [index, item] of corpus.entries()) {
@@ -158,6 +159,15 @@ async function readCatalogueSnapshot(storage: StoragePort, input: LibraryCatalog
     truncated: false,
   };
   return Object.freeze(end < ordered.length ? { ...snapshot, nextOffset: end } : snapshot);
+}
+
+export async function readLibraryBootstrapSummary(storage: StoragePort, libraryId: LibraryId): Promise<{ libraryCount: number }> {
+  const [library, counts] = await Promise.all([
+    storage.getLibrary(libraryId),
+    storage.readFavoriteResolutionCounts(),
+  ]);
+  const pending = counts.processing + counts.review + counts.retryable + counts.blocked;
+  return Object.freeze({ libraryCount: (library?.workIds.length ?? 0) + pending });
 }
 
 export function readLibraryCatalogue(storage: StoragePort, input: LibraryCatalogueQuery): Promise<LibraryCatalogueSnapshot> {

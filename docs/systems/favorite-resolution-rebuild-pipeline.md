@@ -121,7 +121,8 @@ Le runtime actuel possède déjà des fondations réutilisables :
   local T/I/S/R, son empreinte et toutes les preuves/rejets sans I/O;
 - le background compose les ports locaux, les adaptateurs AniList et
   MangaUpdates, puis lance la convergence à l’installation, au démarrage, sur
-  alarme et sur les quatre mutations de favoris;
+  alarme et sur les quatre mutations de favoris; le démarrage reprend le
+  checkpoint existant sans forcer un nouvel inventaire complet;
 - l’import persiste atomiquement `FavoriteSource`, artefact et tâche, sans
   créer de Review;
 - l’outbox IndexedDB v8 réclame les tâches dues par index composé sans
@@ -883,8 +884,10 @@ La version 1.0.15 relie les phases `inventory` et `presence` à une continuation
 MV3 durable. Chaque réveil consomme au plus huit pages locales de 100 éléments;
 la résolution traite ensuite au plus 100 tâches ou 20 secondes. La page de
 présence et son checkpoint sont atomiques. Une fois `complete`, les réveils
-fournisseurs réutilisent l’inventaire sans rescanner les favoris. Installation,
-mise à jour, démarrage et mutation forcent un nouvel inventaire. Une action
+fournisseurs et le démarrage réutilisent l’inventaire sans rescanner les favoris.
+Installation, mise à jour, restauration et audit périodique forcent un nouvel
+inventaire et peuvent réparer la projection complète; une mutation traite
+directement son favori. Une action
 manuelle reprend le checkpoint actif ou vérifie à nouveau un état complet.
 L’outbox choisit sa première échéance par trois lectures indexées bornées;
 `tobirink-favorite-resolution-continuation-v1` est restaurée à chaque démarrage
@@ -892,6 +895,12 @@ du service worker et contrôlée par le réveil périodique sans appel fournisse
 Une alarme future déjà présente n’est pas repoussée par les lectures d’état.
 Options relit automatiquement les phases actives, permet la pause persistante
 et rend actionnable la limite de huit tentatives.
+
+Le bootstrap WebBridge calcule le nombre visible depuis la longueur de la
+bibliothèque et les compteurs de résolution indexés. Il ne construit plus les
+facettes ni le tri du corpus complet. La lecture du catalogue conserve ces
+résultats exacts mais charge `Work` et progression en fenêtres parallèles de
+cent au maximum, au lieu d’enchaîner deux requêtes IndexedDB par œuvre.
 
 La version 1.0.14 ajoute deux diagnostics indépendants. Le Worker produit des
 événements structurés uniquement avec la valeur exacte `worker-v1`; ils
