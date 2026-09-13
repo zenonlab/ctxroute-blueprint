@@ -9014,7 +9014,7 @@
         {
           "id": "step-4",
           "title": "Exposer le calendrier public pagine v2",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "GET v2 releases accepte seulement from to cursor et limit bornes",
             "La pagination est stable et ETag permet 304",
@@ -9032,7 +9032,11 @@
             "git diff --check",
             "git commit -m feat(worker): expose paginated public releases"
           ],
-          "evidence": []
+          "evidence": [
+            "GET /v2/releases validates a bounded date window, limit and stable releaseId cursor while preserving v1",
+            "ETag varies by revision and window and returns 304 without reading the snapshot",
+            "Worker route tests (7) and typecheck pass"
+          ]
         },
         {
           "id": "step-5",

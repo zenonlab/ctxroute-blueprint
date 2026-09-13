@@ -1,0 +1,7 @@
+{
+  "goalId": "goal-restore-agenda-pipeline",
+  "stepId": "step-4",
+  "status": "IN_PROGRESS",
+  "startedAt": "2026-09-13T00:00:00.000Z",
+  "scope": "Bounded v2 public release pagination and conditional HTTP caching"
+}

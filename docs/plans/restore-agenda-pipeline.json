@@ -132,6 +132,12 @@
         "Executer les tests route Worker pagination ETag securite et quotas",
         "git diff --check",
         "git commit -m feat(worker): expose paginated public releases"
+      ],
+      "status": "DONE",
+      "evidence": [
+        "GET /v2/releases validates a bounded date window, limit and stable releaseId cursor while preserving v1",
+        "ETag varies by revision and window and returns 304 without reading the snapshot",
+        "Worker route tests (7) and typecheck pass"
       ]
     },
     {

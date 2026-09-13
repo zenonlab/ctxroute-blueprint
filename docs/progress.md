@@ -431,7 +431,7 @@
 - [x] **Corriger la doctrine Agenda avant le code** — DONE _(evidence: Plan validated and approved after increasing the bounded Progress history limit from 64 to 96, FavLib 3267de2 and ADR 0088 compared with the deployed empty v1 release snapshot, agenda-release.dataflow showcase passes 9/9 with zero errors and warnings)_
 - [x] **Restaurer les contrats temporels et le stockage local additif** — DONE _(evidence: Strict DATE/INSTANT and public/local notification contracts added with focused domain and Zod tests, Dexie version 15 adds five stores without altering existing tables; Chromium migration contract passes, Domain/application/IndexedDB typechecks pass; agenda-release.dataflow showcase remains 9/9 with zero errors and warnings)_
 - [x] **Construire le calendrier public Worker et D1** — DONE _(evidence: D1 migration 0007 adds only public release event and provider sync tables with covering indexes and strict checks, Collector port runs AniList and MangaUpdates lanes independently and preserves successful events when one lane fails, Worker typecheck, collector tests, catalogue migration tests and Archify showcase pass)_
-- [ ] **Exposer le calendrier public pagine v2** — PENDING
+- [x] **Exposer le calendrier public pagine v2** — DONE _(evidence: GET /v2/releases validates a bounded date window, limit and stable releaseId cursor while preserving v1, ETag varies by revision and window and returns 304 without reading the snapshot, Worker route tests (7) and typecheck pass)_
 - [ ] **Telecharger et conserver atomiquement le calendrier dans l extension** — PENDING
 - [ ] **Construire la projection Agenda locale indexee** — PENDING
 - [ ] **Restaurer les predictions manga bornees** — PENDING

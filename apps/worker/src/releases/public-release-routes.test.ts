@@ -86,6 +86,18 @@ describe('public release routes', () => {
     expect(fixture.reads).toEqual(['releases/current.json']);
   });
 
+  it('serves bounded v2 pages with a stable cursor', async () => {
+    const fixture = releaseBindings({ ...validSnapshot(), entries: [
+      { availability: 'official', label: '1', occursAt: '2026-09-05T18:00:00.000Z', releaseId: 'release_1', workId: 'work_frieren' },
+      { availability: 'official', label: '2', occursAt: '2026-09-06T18:00:00.000Z', releaseId: 'release_2', workId: 'work_frieren' },
+    ] });
+    const app = createPublicReleaseApp(fixture.services);
+    const first = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1');
+    expect((await first.json()).nextCursor).toBe('release_1');
+    const second = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1&cursor=release_1');
+    expect((await second.json()).entries).toHaveLength(1);
+  });
+
   it('returns an explicit unavailable result when the current pointer is missing', async () => {
     const fixture = releaseBindings();
     fixture.values.delete('releases/current.json');
