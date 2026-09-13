@@ -5,6 +5,6 @@ const event = { id: 'anilist-1', provider: 'anilist' as const, providerWorkId: '
 describe('public release collectors', () => {
   it('isolates provider failures while retaining successful lane events', async () => {
     const result = await collectPublicReleaseLanes([{ provider: 'anilist', collect: async () => [event] }, { provider: 'mangaUpdates', collect: async () => { throw new Error('429'); } }], { from: '2026-09-12', to: '2026-09-28' });
-    expect(result.events).toHaveLength(1); expect(result.failures).toEqual(['mangaUpdates']);
+    expect(result.events).toHaveLength(1); expect(result.failures[0]).toMatch(/^mangaUpdates:429$/u);
   });
 });

@@ -5,7 +5,7 @@ export interface PublicReleaseD1Writer { batch(statements: readonly D1PreparedSt
 export async function collectPublicReleaseLanes(collectors: readonly PublicReleaseCollector[], window: { from: string; to: string }): Promise<{ events: readonly PublicReleaseEventContract[]; failures: readonly string[] }> {
   const settled = await Promise.allSettled(collectors.map((collector) => collector.collect(window)));
   const events: PublicReleaseEventContract[] = []; const failures: string[] = [];
-  settled.forEach((result, index) => { if (result.status === 'fulfilled') events.push(...result.value); else failures.push(collectors[index]?.provider ?? 'unknown'); });
+  settled.forEach((result, index) => { if (result.status === 'fulfilled') events.push(...result.value); else failures.push(`${collectors[index]?.provider ?? 'unknown'}:${result.reason instanceof Error ? result.reason.message.slice(0, 64) : 'unknown-error'}`); });
   return { events: Object.freeze(events), failures: Object.freeze(failures) };
 }
 export function upsertPublicReleaseEvents(db: PublicReleaseD1Writer, events: readonly PublicReleaseEventContract[]): Promise<readonly D1Result[]> {
