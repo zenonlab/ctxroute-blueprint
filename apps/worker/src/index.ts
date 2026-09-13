@@ -63,7 +63,10 @@ export const scheduled = async (_controller: ScheduledController, env: Env, _ctx
   const from = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
   const to = new Date(now.getTime() + 15 * 86_400_000).toISOString().slice(0, 10);
   const result = await createWorkerServices(env).releaseCalendar.sync({ from, to });
-  if (result.failures.length > 0) emitWorkerDiagnostic(env, { durationMs: result.count, method: 'OTHER', requestId: crypto.randomUUID(), routeFamily: 'release', schemaVersion: 1, status: 503, type: 'worker.error' });
+  if (result.failures.length > 0) {
+    emitWorkerDiagnostic(env, { durationMs: result.count, method: 'OTHER', requestId: crypto.randomUUID(), routeFamily: 'release', schemaVersion: 1, status: 503, type: 'worker.error' });
+    throw new Error(`agenda-sync-failed:${result.failures.join(',')}`);
+  }
 };
 
 export default { fetch: app.fetch, scheduled };
