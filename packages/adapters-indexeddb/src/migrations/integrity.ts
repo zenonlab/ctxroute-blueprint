@@ -8,7 +8,7 @@ import {
   createReview,
   createWork,
 } from '@tobirink/domain';
-import { createFavoriteParseArtifactRecord, parseFavoriteResolutionTaskPayload, restoreDurableTask } from '@tobirink/application';
+import { createFavoriteParseArtifactRecord, localAgendaEventSchema, localNotificationDeliverySchema, localReleaseEvidenceSchema, parseFavoriteResolutionTaskPayload, publicReleaseEventSchema, restoreDurableTask } from '@tobirink/application';
 import type { TobirinkDatabase } from '../database';
 import { providerIdentityRecoveryRecordSchema } from '../recovery/provider-identity-recovery-state-adapter';
 
@@ -18,7 +18,7 @@ export interface IntegrityReport {
 }
 
 export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promise<IntegrityReport> {
-  const [agenda, favoriteArtifacts, favoriteBookmarkMutations, favoriteInventoryCheckpoints, favoriteInventoryMarks, favoriteProviderRateCheckpoints, favoriteResolutionReceipts, favoriteResolutionTasks, favoriteReviewCandidateSets, favoriteSources, libraries, organizer, progress, reminders, reviews, works] = await Promise.all([
+  const [agenda, favoriteArtifacts, favoriteBookmarkMutations, favoriteInventoryCheckpoints, favoriteInventoryMarks, favoriteProviderRateCheckpoints, favoriteResolutionReceipts, favoriteResolutionTasks, favoriteReviewCandidateSets, favoriteSources, libraries, organizer, progress, reminders, reviews, works, publicReleaseEvents, localReleaseEvidence, localAgendaEvents, localNotificationDeliveries] = await Promise.all([
     database.agenda.toArray(),
     database.favoriteArtifacts.toArray(),
     database.favoriteBookmarkMutations.toArray(),
@@ -35,6 +35,7 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
     database.reminders.toArray(),
     database.reviews.toArray(),
     database.works.toArray(),
+    database.publicReleaseEvents.toArray(), database.localReleaseEvidence.toArray(), database.localAgendaEvents.toArray(), database.localNotificationDeliveries.toArray(),
   ]);
   const validAgenda = agenda.map(createAgendaEntry);
   const validFavoriteArtifacts = favoriteArtifacts.map(createFavoriteParseArtifactRecord);
@@ -47,6 +48,10 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
   const validReminders = reminders.map(createReminder);
   const validReviews = reviews.map(createReview);
   const validWorks = works.map(createWork);
+  publicReleaseEvents.forEach((event) => publicReleaseEventSchema.parse(event));
+  localReleaseEvidence.forEach((evidence) => localReleaseEvidenceSchema.parse(evidence));
+  localAgendaEvents.forEach((event) => localAgendaEventSchema.parse(event));
+  localNotificationDeliveries.forEach((delivery) => localNotificationDeliverySchema.parse(delivery));
   const workIds = new Set(validWorks.map((work) => work.id));
   const agendaIds = new Set(validAgenda.map((entry) => entry.id));
   const reviewIds = new Set(validReviews.map((review) => review.id));
@@ -93,7 +98,7 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
   if (recovery.length > 1) throw new Error('Provider identity recovery must have a single checkpoint.');
   for (const record of recovery) providerIdentityRecoveryRecordSchema.parse(record);
   return {
-    checkedRecords: recovery.length + agenda.length + favoriteArtifacts.length + favoriteBookmarkMutations.length + favoriteInventoryCheckpoints.length + favoriteInventoryMarks.length + favoriteProviderRateCheckpoints.length + favoriteResolutionReceipts.length + favoriteResolutionTasks.length + favoriteReviewCandidateSets.length + favoriteSources.length + libraries.length + organizer.length + progress.length + reminders.length + reviews.length + works.length,
+    checkedRecords: recovery.length + agenda.length + favoriteArtifacts.length + favoriteBookmarkMutations.length + favoriteInventoryCheckpoints.length + favoriteInventoryMarks.length + favoriteProviderRateCheckpoints.length + favoriteResolutionReceipts.length + favoriteResolutionTasks.length + favoriteReviewCandidateSets.length + favoriteSources.length + libraries.length + organizer.length + progress.length + reminders.length + reviews.length + works.length + publicReleaseEvents.length + localReleaseEvidence.length + localAgendaEvents.length + localNotificationDeliveries.length,
     schemaVersion: database.verno,
   };
 }

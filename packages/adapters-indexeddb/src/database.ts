@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import type { Table } from 'dexie';
-import type { AgendaEntry, FavoriteSource, Library, OrganizerConfiguration, Progress, Reminder, Review, Work } from '@tobirink/domain';
+import type { AgendaEntry, FavoriteSource, Library, LocalAgendaEvent, LocalNotificationDelivery, LocalReleaseEvidence, OrganizerConfiguration, Progress, PublicReleaseEvent, Reminder, Review, Work } from '@tobirink/domain';
 import type { DurableTask, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet } from '@tobirink/application';
 import { migrateVersion1To2 } from './migrations/v2';
 import type { ProviderIdentityRecoveryRecord } from './recovery/provider-identity-recovery-state-adapter';
@@ -24,6 +24,11 @@ export class TobirinkDatabase extends Dexie {
   readonly works!: Table<Work, string>;
   readonly providerIdentityRecovery!: Table<ProviderIdentityRecoveryRecord, string>;
   readonly privateRecoveryReceipts!: Table<{ committedAt: string; id: string }, string>;
+  readonly publicReleaseEvents!: Table<PublicReleaseEvent, string>;
+  readonly localReleaseEvidence!: Table<LocalReleaseEvidence, string>;
+  readonly localAgendaEvents!: Table<LocalAgendaEvent, string>;
+  readonly localNotificationDeliveries!: Table<LocalNotificationDelivery, string>;
+  readonly publicReleaseSyncState!: Table<{ id: string; generation: number; checkedAt: string; etag?: string }, string>;
 
   constructor(name: string) {
     super(name);
@@ -135,5 +140,12 @@ export class TobirinkDatabase extends Dexie {
       works: '&id, mediaKind, preferredTitle, *hydration.favoriteAliasKeys, *hydration.providerTitleKeys, *hydration.candidate.genres, hydration.candidate.editorialStatus, hydration.candidate.format, hydration.candidate.startYear, hydration.candidate.popularity.value',
     });
     this.version(14).stores({ privateRecoveryReceipts: '&id' });
+    this.version(15).stores({
+      publicReleaseEvents: '&id, provider, providerWorkId, [provider+providerWorkId], releaseKind, state, expiresAt',
+      publicReleaseSyncState: '&id, generation, checkedAt',
+      localReleaseEvidence: '&id, publicReleaseId, workId, observedAt',
+      localAgendaEvents: '&id, workId, availability',
+      localNotificationDeliveries: '&id, agendaEventId, deduplicationKey, status, availableAt',
+    });
   }
 }

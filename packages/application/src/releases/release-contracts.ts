@@ -1,0 +1,13 @@
+import { z } from 'zod';
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
+const instantSchema = z.iso.datetime({ offset: false });
+export const releaseOccurrenceSchema = z.discriminatedUnion('kind', [z.strictObject({ kind: z.literal('DATE'), value: dateSchema }), z.strictObject({ kind: z.literal('INSTANT'), value: instantSchema })]);
+export const publicReleaseEventSchema = z.strictObject({ id: z.string().min(1).max(128), provider: z.enum(['anilist', 'mangaUpdates']), providerWorkId: z.string().min(1).max(128), releaseKind: z.enum(['episode', 'chapter', 'volume', 'special']), sequence: z.number().int().nonnegative().optional(), occurrence: releaseOccurrenceSchema, state: z.enum(['SCHEDULED', 'CONFIRMED', 'ESTIMATED', 'CANCELLED']), provenance: z.strictObject({ source: z.string().min(1).max(128), fetchedAt: z.iso.datetime({ offset: false }), parserVersion: z.string().min(1).max(32), rulesVersion: z.string().min(1).max(32) }), expiresAt: z.iso.datetime({ offset: false }) });
+export const localReleaseEvidenceSchema = z.strictObject({ id: z.string().min(1).max(128), publicReleaseId: z.string().min(1).max(128), workId: z.string().min(1).max(128), observedAt: z.iso.datetime({ offset: false }), source: z.enum(['public', 'manual']), occurrence: releaseOccurrenceSchema, state: z.enum(['SCHEDULED', 'CONFIRMED', 'ESTIMATED', 'CANCELLED']) });
+export const localAgendaEventSchema = z.strictObject({ id: z.string().min(1).max(128), workId: z.string().min(1).max(128), evidenceId: z.string().min(1).max(128), occurrence: releaseOccurrenceSchema, availability: z.enum(['confirmed', 'estimated', 'official', 'unavailable']), releaseLabel: z.string().min(1).max(160) });
+export const localNotificationDeliverySchema = z.strictObject({ id: z.string().min(1).max(128), agendaEventId: z.string().min(1).max(128), deduplicationKey: z.string().min(1).max(256), channel: z.literal('native'), status: z.enum(['pending', 'claimed', 'delivered', 'dismissed']), availableAt: z.iso.datetime({ offset: false }), claimedAt: z.iso.datetime({ offset: false }).optional(), deliveredAt: z.iso.datetime({ offset: false }).optional() });
+export type PublicReleaseEventInput = z.input<typeof publicReleaseEventSchema>;
+export type PublicReleaseEventContract = z.output<typeof publicReleaseEventSchema>;
+export type LocalReleaseEvidenceContract = z.output<typeof localReleaseEvidenceSchema>;
+export type LocalAgendaEventContract = z.output<typeof localAgendaEventSchema>;
+export type LocalNotificationDeliveryContract = z.output<typeof localNotificationDeliverySchema>;

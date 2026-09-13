@@ -429,7 +429,7 @@
 ## Restaurer la pipeline Agenda publique et locale — ACTIVE
 
 - [x] **Corriger la doctrine Agenda avant le code** — DONE _(evidence: Plan validated and approved after increasing the bounded Progress history limit from 64 to 96, FavLib 3267de2 and ADR 0088 compared with the deployed empty v1 release snapshot, agenda-release.dataflow showcase passes 9/9 with zero errors and warnings)_
-- [ ] **Restaurer les contrats temporels et le stockage local additif** — PENDING
+- [x] **Restaurer les contrats temporels et le stockage local additif** — DONE _(evidence: Strict DATE/INSTANT and public/local notification contracts added with focused domain and Zod tests, Dexie version 15 adds five stores without altering existing tables; Chromium migration contract passes, Domain/application/IndexedDB typechecks pass; agenda-release.dataflow showcase remains 9/9 with zero errors and warnings)_
 - [ ] **Construire le calendrier public Worker et D1** — PENDING
 - [ ] **Exposer le calendrier public pagine v2** — PENDING
 - [ ] **Telecharger et conserver atomiquement le calendrier dans l extension** — PENDING

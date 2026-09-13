@@ -78,6 +78,7 @@ export * from './resolution';
 export * from './library';
 export * from './progress';
 export * from './agenda';
+export * from './releases/release-contracts';
 export * from './popup';
 export * from './collective-index';
 export * from './recovery';

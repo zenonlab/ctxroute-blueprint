@@ -124,7 +124,7 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 13 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 15 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   if (!database.favoriteSources.schema.idxByName.matchedWorkId) throw new Error('Direct Work source index was not added.');
   if (!database.works.schema.idxByName['hydration.favoriteAliasKeys']?.multi || !database.works.schema.idxByName['hydration.providerTitleKeys']?.multi) throw new Error('Hydrated identity multi-entry indexes were not added.');
   if (!database.works.schema.idxByName['hydration.candidate.genres']?.multi || !database.works.schema.idxByName['hydration.candidate.editorialStatus'] || !database.works.schema.idxByName['hydration.candidate.popularity.value']) throw new Error('Sortable metadata indexes were not added.');

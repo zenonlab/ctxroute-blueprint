@@ -72,6 +72,12 @@
         "npm run archify:validate -- agenda-release.dataflow",
         "git diff --check",
         "git commit -m refactor(agenda): restore release evidence contracts"
+      ],
+      "status": "DONE",
+      "evidence": [
+        "Strict DATE/INSTANT and public/local notification contracts added with focused domain and Zod tests",
+        "Dexie version 15 adds five stores without altering existing tables; Chromium migration contract passes",
+        "Domain/application/IndexedDB typechecks pass; agenda-release.dataflow showcase remains 9/9 with zero errors and warnings"
       ]
     },
     {

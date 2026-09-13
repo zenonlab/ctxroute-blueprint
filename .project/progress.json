@@ -8950,7 +8950,7 @@
         {
           "id": "step-2",
           "title": "Restaurer les contrats temporels et le stockage local additif",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "PublicReleaseEvent LocalReleaseEvidence LocalAgendaEvent et LocalNotificationDelivery sont distincts et stricts",
             "DATE reste une date civile et INSTANT un instant UTC",
@@ -8972,7 +8972,11 @@
             "git diff --check",
             "git commit -m refactor(agenda): restore release evidence contracts"
           ],
-          "evidence": []
+          "evidence": [
+            "Strict DATE/INSTANT and public/local notification contracts added with focused domain and Zod tests",
+            "Dexie version 15 adds five stores without altering existing tables; Chromium migration contract passes",
+            "Domain/application/IndexedDB typechecks pass; agenda-release.dataflow showcase remains 9/9 with zero errors and warnings"
+          ]
         },
         {
           "id": "step-3",
