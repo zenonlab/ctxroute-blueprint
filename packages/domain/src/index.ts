@@ -19,3 +19,4 @@ export type { ExternalReference, MediaKind, Work, WorkHydration } from './work';
 export * from './organizer';
 export * from './favorites';
 export * from './release-events';
+export * from './manga-prediction';

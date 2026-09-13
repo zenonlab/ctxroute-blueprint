@@ -210,6 +210,12 @@
         "Executer les tests de prediction et de remplacement officiel",
         "git diff --check",
         "git commit -m feat(agenda): derive bounded manga estimates"
+      ],
+      "status": "DONE",
+      "evidence": [
+        "Prediction keeps at most 12 observations and 8 intervals, requires 3 valid intervals and filters to 0.5x–2x median",
+        "Exactly one next civil date is emitted with estimated confidence; native notification code already excludes estimated entries",
+        "Focused prediction tests and domain typecheck pass"
       ]
     },
     {

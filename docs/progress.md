@@ -434,7 +434,7 @@
 - [x] **Exposer le calendrier public pagine v2** — DONE _(evidence: GET /v2/releases validates a bounded date window, limit and stable releaseId cursor while preserving v1, ETag varies by revision and window and returns 304 without reading the snapshot, Worker route tests (7) and typecheck pass)_
 - [x] **Telecharger et conserver atomiquement le calendrier dans l extension** — DONE _(evidence: Extension HTTP loader uses a 24-hour cache window, If-None-Match and last-good snapshot semantics, Invalid or failed responses are never committed; focused adapter test and extension/browser typechecks pass, Agenda architecture and dataflow views both pass Archify showcase validation)_
 - [ ] **Construire la projection Agenda locale indexee** — PENDING
-- [ ] **Restaurer les predictions manga bornees** — PENDING
+- [x] **Restaurer les predictions manga bornees** — DONE _(evidence: Prediction keeps at most 12 observations and 8 intervals, requires 3 valid intervals and filters to 0.5x–2x median, Exactly one next civil date is emitted with estimated confidence; native notification code already excludes estimated entries, Focused prediction tests and domain typecheck pass)_
 - [ ] **Durcir les alarmes et notifications MV3** — PENDING
 - [ ] **Rendre les etats Agenda actionnables** — PENDING
 - [ ] **Reconstruire l Agenda apres perte IndexedDB** — PENDING

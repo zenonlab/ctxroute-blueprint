@@ -9094,7 +9094,7 @@
         {
           "id": "step-7",
           "title": "Restaurer les predictions manga bornees",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Douze observations maximum et huit intervalles maximum alimentent la prediction",
             "Trois intervalles valides sont requis et les valeurs hors demi a double mediane sont exclues",
@@ -9112,7 +9112,11 @@
             "git diff --check",
             "git commit -m feat(agenda): derive bounded manga estimates"
           ],
-          "evidence": []
+          "evidence": [
+            "Prediction keeps at most 12 observations and 8 intervals, requires 3 valid intervals and filters to 0.5x–2x median",
+            "Exactly one next civil date is emitted with estimated confidence; native notification code already excludes estimated entries",
+            "Focused prediction tests and domain typecheck pass"
+          ]
         },
         {
           "id": "step-8",

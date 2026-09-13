@@ -32,7 +32,7 @@
     { "id": "worker", "type": "cloud", "label": "Worker Agenda", "sublabel": "lanes + SQL préparé", "stage": 1, "row": 0, "width": 150, "tag": "D1 seul détenteur" },
     { "id": "publicD1", "type": "database", "label": "D1 événements publics", "sublabel": "date · type · ID", "stage": 2, "row": 0, "width": 150, "tag": "sans données privées" },
     { "id": "releaseApi", "type": "backend", "label": "GET /v2/releases", "sublabel": "fenêtre · curseur · ETag", "stage": 2, "row": 1, "width": 150, "tag": "réponse commune" },
-    { "id": "releaseCache", "type": "database", "label": "Cache public IndexedDB", "sublabel": "génération atomique", "stage": 3, "row": 0, "width": 150, "tag": "dernier snapshot valide" },
+    { "id": "releaseCache", "type": "database", "label": "Cache public IndexedDB", "sublabel": "HTTP + génération atomique", "stage": 3, "row": 0, "width": 150, "tag": "dernier snapshot valide" },
     { "id": "localAgenda", "type": "frontend", "label": "Agenda local", "sublabel": "Works locaux · DATE / INSTANT", "stage": 4, "row": 0, "width": 150, "tag": "projection privée" },
     { "id": "webBridge", "type": "frontend", "label": "WebBridge", "sublabel": "projection locale", "stage": 4, "row": 1, "width": 150, "tag": "site sans D1" }
   ],
@@ -47,6 +47,6 @@
   "cards": [
     { "dot": "emerald", "title": "Autorité", "items": ["AniList anime prioritaire", "MangaUpdates manga prioritaire", "Kitsu ne produit aucune date", "D1 reste public et minimal"] },
     { "dot": "cyan", "title": "Résilience", "items": ["ETag et pagination complète", "Génération atomique", "Dernier snapshot valide hors ligne", "Pannes isolées par fournisseur", "DATE civil séparé de INSTANT UTC"] },
-    { "dot": "amber", "title": "Vie privée", "items": ["Aucun favori dans D1", "Aucun titre privé dans le calendrier", "Jointure uniquement par IDs résolus", "WebBridge ne touche jamais D1"] }
+    { "dot": "amber", "title": "Vie privée", "items": ["Aucun favori dans D1", "Aucun titre privé dans le calendrier", "Jointure uniquement par IDs résolus", "WebBridge ne touche jamais D1", "Prédictions manga locales et bornées"] }
   ]
 }
