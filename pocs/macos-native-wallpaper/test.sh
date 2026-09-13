@@ -39,7 +39,7 @@ xcrun swiftc -swift-version 6 -parse-as-library -D WALLPAPER_NATIVE_DIAGNOSTIC \
   "$probe_source/DiagnosticTheme.swift" "$probe_source/SnapshotTests.swift" \
   "$probe_tests/PhospheneExtension/ColorDiag.swift" \
   -o "$probe_tests/snapshot"
-if "$probe_tests/snapshot" >/dev/null 2>&1; then
+if ("$probe_tests/snapshot" >/dev/null 2>&1) 2>/dev/null; then
   echo 'Snapshot renderer accepted missing arguments.' >&2
   exit 1
 fi
