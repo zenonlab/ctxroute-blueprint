@@ -2,7 +2,7 @@ import type { PublicReleaseEventContract } from '@tobirink/application';
 import { publicReleaseEventSchema } from '@tobirink/application';
 import { z } from 'zod';
 const anilistErrorSchema = z.object({ errors: z.array(z.object({ message: z.string().trim().min(1) }).passthrough()).max(1) }).passthrough();
-export interface PublicReleaseCollector { readonly provider: 'anilist' | 'mangaUpdates'; collect(window: { from: string; to: string }): Promise<readonly PublicReleaseEventContract[]>; }
+export interface PublicReleaseCollector { readonly provider: 'anilist' | 'mangaupdates'; collect(window: { from: string; to: string }): Promise<readonly PublicReleaseEventContract[]>; }
 export interface PublicReleaseD1Writer { batch(statements: readonly D1PreparedStatement[]): Promise<readonly D1Result[]>; prepare(query: string): D1PreparedStatement; }
 export async function collectPublicReleaseLanes(collectors: readonly PublicReleaseCollector[], window: { from: string; to: string }): Promise<{ events: readonly PublicReleaseEventContract[]; failures: readonly string[] }> {
   const settled = await Promise.allSettled(collectors.map((collector) => collector.collect(window)));
@@ -11,7 +11,10 @@ export async function collectPublicReleaseLanes(collectors: readonly PublicRelea
   return { events: Object.freeze(events), failures: Object.freeze(failures) };
 }
 export function upsertPublicReleaseEvents(db: PublicReleaseD1Writer, events: readonly PublicReleaseEventContract[]): Promise<readonly D1Result[]> {
-  const statements = events.map((event) => db.prepare('INSERT INTO public_release_event (id, provider, provider_work_id, release_kind, sequence_number, occurrence_kind, occurrence_value, state, source, fetched_at, parser_version, rules_version, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET state=excluded.state, occurrence_value=excluded.occurrence_value, fetched_at=excluded.fetched_at, expires_at=excluded.expires_at').bind(event.id, event.provider, event.providerWorkId, event.releaseKind, event.sequence ?? null, event.occurrence.kind, event.occurrence.value, event.state, event.provenance.source, event.provenance.fetchedAt, event.provenance.parserVersion, event.provenance.rulesVersion, event.expiresAt));
+  const statements = events.map((event) => {
+    const legacyProvider = event.provider === 'mangaupdates' ? 'mangaUpdates' : event.provider;
+    return db.prepare('INSERT INTO public_release_event (id, provider, provider_key, provider_work_id, release_kind, sequence_number, sequence_label, occurrence_kind, occurrence_value, state, source, fetched_at, parser_version, rules_version, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET provider_key=excluded.provider_key, sequence_label=excluded.sequence_label, state=excluded.state, occurrence_value=excluded.occurrence_value, fetched_at=excluded.fetched_at, expires_at=excluded.expires_at').bind(event.id, legacyProvider, event.provider, event.providerWorkId, event.releaseKind, null, event.sequence ?? null, event.occurrence.kind, event.occurrence.value, event.state, event.provenance.source, event.provenance.fetchedAt, event.provenance.parserVersion, event.provenance.rulesVersion, event.expiresAt);
+  });
   return db.batch(statements);
 }
 
@@ -45,6 +48,6 @@ export class AniListReleaseCollector implements PublicReleaseCollector {
 }
 
 export class MangaUpdatesReleaseCollector implements PublicReleaseCollector {
-  readonly provider = 'mangaUpdates' as const;
+  readonly provider = 'mangaupdates' as const;
   async collect(): Promise<readonly PublicReleaseEventContract[]> { return Object.freeze([]); }
 }

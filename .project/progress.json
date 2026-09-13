@@ -9310,7 +9310,7 @@
         {
           "id": "step-2",
           "title": "Restaurer les contrats DATE INSTANT et numéros de sortie",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le fournisseur canonique mangaupdates joint les événements et les Works",
             "DATE et INSTANT restent une union stricte sans conversion implicite",
@@ -9334,7 +9334,12 @@
             "git diff --check",
             "git commit -m refactor(agenda): restore civil release contracts"
           ],
-          "evidence": []
+          "evidence": [
+            "Strict release contracts preserve DATE and INSTANT, normalize legacy mangaUpdates to mangaupdates and retain textual values such as 58.5, 2a and 29-29.5 (end)",
+            "Additive D1 migration keeps v1 columns and rows while backfilling provider_key and sequence_label; Worker integration reads both legacy and canonical rows",
+            "IndexedDB v16 normalizes stored v15 public events; Chromium migration contract, 31 domain tests, 369 application tests and 50 Worker tests pass",
+            "Agenda dataflow passes all 9 Archify showcase checks; docs, decisions, typechecks and diff checks pass"
+          ]
         },
         {
           "id": "step-3",

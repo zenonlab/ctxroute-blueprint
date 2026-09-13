@@ -444,7 +444,7 @@
 ## Corriger la pipeline Agenda après audit fournisseur — ACTIVE
 
 - [x] **Corriger la doctrine Agenda et matérialiser le plan** — DONE _(evidence: Audit records the Cloudflare AniList 403, incomplete provider pagination, empty MangaUpdates collector, DATE loss, cache mismatch and false-positive loader test, ADR-0045 and the recovery plan define verified-egress shared ingestion, Worker-only D1 writes and a durable private-data-free MV3 fallback, Agenda dataflow passes all 9 Archify showcase checks; documentation, decisions and diff checks pass)_
-- [ ] **Restaurer les contrats DATE INSTANT et numéros de sortie** — PENDING
+- [x] **Restaurer les contrats DATE INSTANT et numéros de sortie** — DONE _(evidence: Strict release contracts preserve DATE and INSTANT, normalize legacy mangaUpdates to mangaupdates and retain textual values such as 58.5, 2a and 29-29.5 (end), Additive D1 migration keeps v1 columns and rows while backfilling provider_key and sequence_label; Worker integration reads both legacy and canonical rows, IndexedDB v16 normalizes stored v15 public events; Chromium migration contract, 31 domain tests, 369 application tests and 50 Worker tests pass)_
 - [ ] **Implémenter les collecteurs fournisseur paginés** — PENDING
 - [ ] **Ajouter le repli Agenda local durable** — PENDING
 - [ ] **Rendre le snapshot IndexedDB et l API v2 réellement atomiques** — PENDING

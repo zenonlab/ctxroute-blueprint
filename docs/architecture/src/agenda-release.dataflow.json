@@ -56,7 +56,7 @@
     { "from": "localAgenda", "to": "localSurfaces", "label": "projection paginée", "classification": "site sans accès D1", "variant": "security", "route": "auto", "labelAt": [960, 542] }
   ],
   "cards": [
-    { "dot": "cyan", "title": "Temps", "items": ["AniList fournit un instant UTC officiel", "MangaUpdates fournit une date civile confirmée", "time_added reste une provenance d’observation", "Une estimation manga ne fabrique jamais d’heure"] },
+    { "dot": "cyan", "title": "Temps", "items": ["AniList fournit un instant UTC officiel", "MangaUpdates fournit une date civile confirmée", "mangaupdates est la clé canonique et le numéro reste textuel", "Une estimation manga ne fabrique jamais d’heure"] },
     { "dot": "emerald", "title": "Résilience", "items": ["Pagination fondée sur la réponse fournisseur", "Une page par checkpoint MV3", "Dernière génération valide conservée", "D1 vide ou périmé active le repli local"] },
     { "dot": "amber", "title": "Frontière privée", "items": ["D1 contient seulement des événements publics", "Aucun titre ou favori dans la collecte", "Les IDs personnels ne quittent pas la projection", "WebBridge lit uniquement l’Agenda local"] }
   ]

@@ -109,6 +109,24 @@ async function seedVersion8(name: string, version = 8): Promise<void> {
   database.close();
 }
 
+async function verifyReleaseContractMigration(name: string): Promise<void> {
+  document.body.dataset.phase = 'release-v15-seed';
+  const legacy = new Dexie(name);
+  legacy.version(15).stores({
+    publicReleaseEvents: '&id, provider, providerWorkId, [provider+providerWorkId], releaseKind, state, expiresAt',
+  });
+  await legacy.table('publicReleaseEvents').add({
+    expiresAt: '2026-11-12T00:00:00.000Z', id: 'legacy-release', occurrence: { kind: 'DATE', value: '2026-09-13' },
+    provenance: { fetchedAt: '2026-09-13T00:00:00.000Z', parserVersion: '1', rulesVersion: '1', source: 'mangaupdates' },
+    provider: 'mangaUpdates', providerWorkId: '42', releaseKind: 'chapter', sequence: 58, state: 'CONFIRMED',
+  });
+  legacy.close();
+  const migrated = new TobirinkDatabase(name);
+  const event = await migrated.publicReleaseEvents.get('legacy-release');
+  if (migrated.verno !== 16 || event?.provider !== 'mangaupdates' || event.sequence !== '58') throw new Error('Release contract migration did not preserve and normalize the legacy event.');
+  migrated.close();
+}
+
 async function verifySuccessfulMigration(name: string, seed: (databaseName: string) => Promise<void>, expectedSources = 0): Promise<void> {
   document.body.dataset.phase = name;
   await seed(name);
@@ -124,7 +142,7 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 15 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 16 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   if (!database.favoriteSources.schema.idxByName.matchedWorkId) throw new Error('Direct Work source index was not added.');
   if (!database.works.schema.idxByName['hydration.favoriteAliasKeys']?.multi || !database.works.schema.idxByName['hydration.providerTitleKeys']?.multi) throw new Error('Hydrated identity multi-entry indexes were not added.');
   if (!database.works.schema.idxByName['hydration.candidate.genres']?.multi || !database.works.schema.idxByName['hydration.candidate.editorialStatus'] || !database.works.schema.idxByName['hydration.candidate.popularity.value']) throw new Error('Sortable metadata indexes were not added.');
@@ -213,6 +231,7 @@ const versionNineName = `tobirink-migration-v9-${Date.now()}`;
 const versionTenName = `tobirink-migration-v10-${Date.now()}`;
 const interruptedName = `tobirink-migration-interrupted-${Date.now()}`;
 const reviewCorrectionName = `tobirink-migration-review-${Date.now()}`;
+const releaseContractName = `tobirink-migration-release-${Date.now()}`;
 try {
   await verifySuccessfulMigration(versionOneName, seedVersion1);
   await verifySuccessfulMigration(versionTwoName, seedVersion2);
@@ -224,6 +243,7 @@ try {
   await verifySuccessfulMigration(versionTenName, (name) => seedVersion8(name, 10), 1);
   await verifyInterruptedMigration(interruptedName);
   await verifyReviewCorrection(reviewCorrectionName);
+  await verifyReleaseContractMigration(releaseContractName);
   document.body.dataset.status = 'passed';
   document.body.textContent = 'IndexedDB migrations passed';
 } catch (error) {
@@ -239,4 +259,5 @@ try {
   await deleteDatabase(versionNineName);
   await deleteDatabase(versionTenName);
   await deleteDatabase(interruptedName);
+  await deleteDatabase(releaseContractName);
 }
