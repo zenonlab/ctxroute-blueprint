@@ -1,0 +1,75 @@
+{
+  "goalId": "goal-publish-library-performance-release-1-0-25",
+  "title": "Certifier et publier la performance locale 1.0.25",
+  "approved": true,
+  "validationEvidence": [
+    "L utilisateur a explicitement autorise la certification le push et le deploiement 1.0.25 par go",
+    "Seuls les deux nouveaux objets R2 et le Worker public sont autorises cote Cloudflare",
+    "D1 covers secrets suppressions et remplacement des archives 1.0.24 sont exclus"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Construire et certifier les archives 1.0.25",
+      "acceptance": [
+        "Les manifests Chrome et Firefox portent 1.0.25",
+        "Les archives sont reproductibles et leurs hashes sont enregistres",
+        "Les parcours installes Chromium et Firefox passent",
+        "Le benchmark Chromium conserve 1400 entrees mixtes sous 500 ms",
+        "npm run verify Archify et git diff check passent sans mutation Cloudflare"
+      ],
+      "files": [
+        "apps/extension/package.json",
+        "package-lock.json",
+        "docs/decisions/ADR-0039-extension-release-versioning.md",
+        "docs/release.md",
+        "docs/systems/favorite-resolution-rebuild-pipeline.md",
+        "docs/architecture/src/favorite-resolution.dataflow.json",
+        "docs/plans/publish-library-performance-release-1-0-25.json",
+        "docs/plans/publish-library-performance-release-1-0-25-step-1-completion.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Versionner l extension en 1.0.25 sans installer de dependance",
+        "npm run package:extension",
+        "node scripts/release/package-extension.mjs --verify-isolated",
+        "node apps/extension/scripts/installed-review.mjs avec archive Chrome 1.0.25",
+        "node apps/extension/scripts/installed-firefox.mjs avec archive Firefox 1.0.25",
+        "npm run verify",
+        "npm run archify:validate -- favorite-resolution.dataflow",
+        "git diff --check",
+        "git commit -m test(extension): certify local performance release 1.0.25"
+      ]
+    },
+    {
+      "id": "step-2",
+      "title": "Publier 1.0.25 puis verifier la production",
+      "acceptance": [
+        "Seuls les deux objets R2 1.0.25 et le Worker public sont modifies",
+        "Aucune migration D1 suppression cover ou modification de secret n est executee",
+        "Les hashes distants correspondent aux archives certifiees",
+        "Le Worker est sain et la page download annonce 1.0.25",
+        "Les parcours de production passent et main est pousse sans force"
+      ],
+      "files": [
+        "build/operations/publish-library-performance-release-1.0.25.json",
+        "docs/release.md",
+        "docs/plans/publish-library-performance-release-1-0-25.json",
+        "docs/plans/publish-library-performance-release-1-0-25-step-2-completion.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Charger les variables Cloudflare depuis le fichier env local sans les afficher",
+        "npm run infra:inspect avec le compte TobiRink attendu",
+        "npm run infra:plan pour les deux archives 1.0.25 et worker-deploy",
+        "npm run infra:apply avec digest et allowlist exacts",
+        "Verifier versions Worker migrations D1 pages publiques et hashes distants",
+        "Executer les parcours Playwright de production",
+        "git commit -m chore(release): publish local performance release 1.0.25",
+        "git push origin main"
+      ]
+    }
+  ]
+}

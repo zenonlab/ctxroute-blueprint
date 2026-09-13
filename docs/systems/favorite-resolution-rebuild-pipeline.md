@@ -1037,6 +1037,14 @@ runner MV3. Elle conserve le modèle cache-first, la reconstruction
 `storage.sync` v2 et le stockage IndexedDB v14; aucun schéma D1 ou IndexedDB ne
 change et les décisions humaines restent préservées.
 
+La candidate 1.0.25 conserve cette reconstruction et accélère uniquement sa
+lecture locale. Un démarrage normal reprend les tâches dues sans forcer
+l'inventaire ni la réparation globale. Le bootstrap utilise les comptes indexés
+observé, résolu et non pris en charge; le catalogue charge les `Work` et
+artefacts avec `bulkGet` et les progressions avec `anyOf(workIds)`, par lots de
+cent identifiants. D1 et les fournisseurs ne sont jamais contactés par une
+lecture de bibliothèque.
+
 Lorsqu'un reparsing modifie l'empreinte sémantique, une ancienne décision
 automatique, y compris une Review automatique déjà résolue, est détachée de la
 source et retirée de la projection visible si aucune autre source observée ne

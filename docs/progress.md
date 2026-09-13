@@ -414,10 +414,12 @@
 
 - [x] **Detacher les resolutions automatiques stale et certifier les deux titres** — DONE _(evidence: 57 tests cibles verts: les deux URLs exactes produisent les titres nettoyés et le reçu conserve Source Review artefact et tâche automatiques., Chromium 153 installé converge sur 1408 favoris, reconstruit après perte IndexedDB, reprend les pannes et conserve zéro Review importée., npm run verify est vert: suites produit, équivalence FavLib synthétique, builds Chrome Firefox, IndexedDB Chromium, performances, CRG, intégration et zéro vulnérabilité.)_
 
-## Certifier et publier le reparsing automatique 1.0.24 — DONE
+## Certifier et publier le reparsing automatique 1.0.24 — ACTIVE
 
 - [x] **Construire et certifier les archives 1.0.24** — DONE _(evidence: Two independent builds reproduce 1.0.24 exactly: Chrome 28a8b940...0b8ca and Firefox 32e55c33...1a219., Exact archives install successfully: Chromium 153 converges 1408 bookmarks with corrected Asura and Void titles, sync recovery and zero imported Review; Firefox 151 passes., npm run verify passes all repository gates with zero vulnerabilities; favorite-resolution Archify showcase passes 9/9 with zero errors and warnings.)_
 - [x] **Publier les archives et le Worker puis verifier la production** — DONE _(evidence: Cloudflare gate e2ef2ab8 changed only both immutable 1.0.24 R2 archives and Worker 586566ea at 100 percent; no D1 migration, deletion, cover or secret action ran., Production download advertises 1.0.24; both ZIPs return HTTP 200 with immutable caching and exact certified SHA-256 hashes., Six HTTP production Playwright journeys pass; final inspection reports no pending D1 migration and an empty covers bucket, while Worker e5da9e96 remains available for rollback.)_
+- [x] **Construire et certifier les archives 1.0.25** — DONE _(evidence: Two independent builds reproduce 1.0.25 exactly: Chrome 717add2b...da5e and Firefox 8ac0fa49...56f4., Installed Chromium 153 completes the 1408-bookmark recovery journey; installed Firefox 151 passes health ordinary-link exclusion empty queue and zero imported Review., npm run verify passes all repository gates; Chromium reads 500 Works in 19.90 ms and 1400 mixed entries in 54.60 ms; favorite-resolution Archify passes 9/9.)_
+- [ ] **Publier 1.0.25 puis verifier la production** — PENDING
 
 ## Accelerer le demarrage de la bibliotheque locale — DONE
 

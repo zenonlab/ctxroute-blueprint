@@ -1,0 +1,22 @@
+{
+  "goalId": "goal-publish-library-performance-release-1-0-25",
+  "stepId": "step-1",
+  "status": "DONE",
+  "files": [
+    "apps/extension/package.json",
+    "package-lock.json",
+    "docs/decisions/ADR-0039-extension-release-versioning.md",
+    "docs/release.md",
+    "docs/systems/favorite-resolution-rebuild-pipeline.md",
+    "docs/architecture/src/favorite-resolution.dataflow.json",
+    "docs/plans/publish-library-performance-release-1-0-25.json",
+    "docs/plans/publish-library-performance-release-1-0-25-step-1-completion.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Two independent builds reproduce 1.0.25 exactly: Chrome 717add2b...da5e and Firefox 8ac0fa49...56f4.",
+    "The exact archives install successfully: Chromium 153 completes the 1408-bookmark recovery journey and Firefox 151 passes health, ordinary-link exclusion, empty queue and zero imported Review.",
+    "Chromium reads 500 resolved Works in about 20 ms and 1400 mixed entries in about 58 ms under the 500 ms release budget."
+  ]
+}

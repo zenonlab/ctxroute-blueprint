@@ -58,6 +58,9 @@ automatiques antérieures via `favorite-parser-v5`, `favorite-matcher-v4` et
 `1.0.24` accepte une route numérique courte devant un slug de sortie uniquement
 avec corroboration exacte du nom et remet en résolution les anciennes Reviews
 automatiques dont l'artefact sémantique a changé, en conservant un reçu complet.
+`1.0.25` retire le rescan global au démarrage normal, remplace les lectures
+IndexedDB unitaires de la bibliothèque par des lots `bulkGet`/`anyOf` bornés à
+cent identifiants et calcule le bootstrap avec trois comptes indexés.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

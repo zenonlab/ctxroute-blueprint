@@ -2,8 +2,8 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.24`; its published archives match the
-verified local candidates.
+The current production release is `1.0.24`; candidate `1.0.25` is being
+certified before publication.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -37,6 +37,27 @@ may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
 ## Release verification
+
+### Local library performance — 2026-09-13
+
+Candidate `1.0.25` keeps IndexedDB authoritative while replacing per-record
+catalogue reads with bounded `bulkGet` and `anyOf(workIds)` batches. Normal
+browser startup reuses the complete inventory checkpoint; opening Library does
+not contact D1 or a provider. Chromium reads 500 resolved Works in about 20 ms
+and a mixed corpus of 1,400 resolved and provisional favorites in about 58 ms,
+below the 500 ms release budget.
+
+Two independent builds reproduce the 21-file archives byte for byte:
+
+- Chrome: 299491 bytes, SHA-256 `717add2b02f14d6690a2d49c9d698a1b163ffcdfd6c9e8d39724b04cf667da5e`.
+- Firefox: 299539 bytes, SHA-256 `8ac0fa495c18c20af85bf81d766f925eb67ba40000621d9dc29d46c50e5756f4`.
+
+Chromium 153 installs the exact Chrome archive and completes the automatic
+1,408-bookmark journey, including structured Asura/Void titles, cache-first
+routing, durable retries, pause/resume, `storage.sync` v2 reconstruction after
+IndexedDB loss, encrypted backup recovery and zero imported Review. Firefox
+151 installs the exact Firefox archive and passes health, ordinary-link
+exclusion, empty-queue and zero-Review checks.
 
 ### Automatic reparse correction — 2026-09-13
 
