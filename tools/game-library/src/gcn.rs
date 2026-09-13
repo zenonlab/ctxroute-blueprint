@@ -2598,10 +2598,12 @@ fn decode_bti_level(
         texture.palette_offset.is_none(),
         "paletted BTI decoding is not qualified"
     );
+    let (_, _, block_bytes, _) = gx_texture_layout(texture.gx_format)?;
     let (block_width, block_height) = match texture.gx_format {
         "i4" => (8_usize, 8_usize),
         "i8" | "ia4" => (8, 4),
         "ia8" => (4, 4),
+        "rgba8" => (4, 4),
         other => bail!("unsupported resolved BTI GX texture format {other}"),
     };
     let width = usize::from(level_width);
@@ -2611,33 +2613,43 @@ fn decode_bti_level(
     for block_y in (0..height).step_by(block_height) {
         for block_x in (0..width).step_by(block_width) {
             for pixel in 0..block_width * block_height {
-                let (intensity, alpha) = match texture.gx_format {
-                    "i4" => {
-                        let value = bytes[cursor + pixel / 2];
-                        let nibble = if pixel.is_multiple_of(2) {
-                            value >> 4
-                        } else {
-                            value & 0x0f
+                let color = match texture.gx_format {
+                    "rgba8" => {
+                        let ar = cursor + pixel * 2;
+                        let ba = cursor + 32 + pixel * 2;
+                        [bytes[ar], bytes[ar + 1], bytes[ba], bytes[ba + 1]]
+                    }
+                    "i4" | "i8" | "ia4" | "ia8" => {
+                        let (intensity, alpha) = match texture.gx_format {
+                            "i4" => {
+                                let value = bytes[cursor + pixel / 2];
+                                let nibble = if pixel.is_multiple_of(2) {
+                                    value >> 4
+                                } else {
+                                    value & 0x0f
+                                };
+                                (nibble * 17, 255)
+                            }
+                            "i8" => (bytes[cursor + pixel], 255),
+                            "ia4" => {
+                                let value = bytes[cursor + pixel];
+                                ((value & 0x0f) * 17, (value >> 4) * 17)
+                            }
+                            "ia8" => (bytes[cursor + pixel * 2 + 1], bytes[cursor + pixel * 2]),
+                            _ => unreachable!(),
                         };
-                        (nibble * 17, 255)
+                        [intensity, intensity, intensity, alpha]
                     }
-                    "i8" => (bytes[cursor + pixel], 255),
-                    "ia4" => {
-                        let value = bytes[cursor + pixel];
-                        ((value & 0x0f) * 17, (value >> 4) * 17)
-                    }
-                    "ia8" => (bytes[cursor + pixel * 2 + 1], bytes[cursor + pixel * 2]),
                     _ => unreachable!(),
                 };
                 let x = pixel % block_width;
                 let y = pixel / block_width;
                 if block_x + x < width && block_y + y < height {
                     let target = ((block_y + y) * width + block_x + x) * 4;
-                    rgba8[target..target + 4]
-                        .copy_from_slice(&[intensity, intensity, intensity, alpha]);
+                    rgba8[target..target + 4].copy_from_slice(&color);
                 }
             }
-            cursor += 32;
+            cursor += block_bytes;
         }
     }
     Ok(rgba8)
@@ -5799,6 +5811,22 @@ pub(crate) mod tests {
         let i8_pixels = decode_bti_base_level(&i8, &i8_report.texture).unwrap();
         assert_eq!(&i8_pixels[0..4], &[0, 0, 0, 255]);
         assert_eq!(&i8_pixels[31 * 4..32 * 4], &[31, 31, 31, 255]);
+    }
+
+    #[test]
+    fn decodes_gx_rgba8_ar_then_ba_tiles() {
+        let mut tile = vec![0_u8; 64];
+        for pixel in 0..16 {
+            tile[pixel * 2] = pixel as u8;
+            tile[pixel * 2 + 1] = 0xa0 + pixel as u8;
+            tile[32 + pixel * 2] = 0xb0 + pixel as u8;
+            tile[32 + pixel * 2 + 1] = 0xc0 + pixel as u8;
+        }
+        let bti = fixture_intensity_bti(6, 4, 4, &tile);
+        let report = parse_bti_texture(&bti).unwrap();
+        let pixels = decode_bti_base_level(&bti, &report.texture).unwrap();
+        assert_eq!(&pixels[0..4], &[0, 0xa0, 0xb0, 0xc0]);
+        assert_eq!(&pixels[15 * 4..16 * 4], &[15, 0xaf, 0xbf, 0xcf]);
     }
 
     #[test]
