@@ -32,7 +32,7 @@
     { "id": "audit", "from": "library", "to": "coverage", "label": "mesurer chaque catégorie", "fromSide": "bottom", "toSide": "top", "labelAt": [1130, 210] },
     { "id": "select", "from": "coverage", "to": "composition", "label": "fermer les dépendances", "fromSide": "bottom", "toSide": "top", "labelAt": [1050, 430] },
     { "id": "execute", "from": "composition", "to": "runtime", "label": "plan · phases · handles", "labelAt": [965, 584] },
-    { "id": "draw", "from": "runtime", "to": "render-profile", "label": "commandes typées", "labelAt": [640, 584] },
+    { "id": "draw", "from": "runtime", "to": "render-profile", "label": "points · largeur · UV · repère local", "labelAt": [640, 584] },
     { "id": "recipe", "from": "recipes", "to": "composition", "label": "lier les rôles sans blobs", "fromSide": "top", "toSide": "top", "via": [[165, 400], [1140, 400]], "labelAt": [650, 394] }
   ]
 }

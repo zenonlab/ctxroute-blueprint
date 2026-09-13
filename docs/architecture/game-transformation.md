@@ -67,6 +67,11 @@ restent sous `private/` et une scène témoin différente doit passer sans modif
 du runtime. Voir
 [ADR-0086](../decisions/ADR-0086-bounded-gcn-j3d-offline-adapter.md).
 
+Pour les effets de surface, le profil résolu transporte les points, largeurs, UV et
+transformations locales issus du volume et du callback source. Le renderer construit
+la bande à partir de ce contrat ; il ne reconstruit ni ancre, ni courbure, ni couleur
+métier.
+
 Les scènes DZS conservent aussi la chaîne d'environnement `EnvR` → `Colo` → `Pale`
 → `Virt` : sélections temporelles, paires couleur/konst des quatre groupes de fond,
 brouillard, distances et registres atmosphériques restent des données typées source.
