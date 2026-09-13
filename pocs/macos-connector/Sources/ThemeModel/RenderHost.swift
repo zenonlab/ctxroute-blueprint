@@ -61,6 +61,7 @@ public struct RenderHostLaunchRequest: Equatable, Sendable {
     private var activeRequest: RenderHostLaunchRequest?
     private var controlGeneration: UInt64 = 0
     public private(set) var themeID: String?
+    public var isRunning: Bool { process?.isRunning == true }
     public var onHitSnapshot: ((RenderHostHitSnapshot) -> Void)?
     /// Called on the main actor when the active process exits after startup.
     /// The controller has already cleared its active request before invoking it.

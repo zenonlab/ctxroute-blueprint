@@ -90,6 +90,9 @@ WindowServer engager son propre geste de révélation du bureau avant le filtrag
 Le transport courant utilise un agent XPC nommé, avec inscription persistante opt-in
 et reprise après échec selon [ADR-0055](../decisions/ADR-0055-macos-durable-agent.md),
 et un provider sandboxé avec exception de recherche Mach limitée à ce service.
+Le même transport expose l'intention bornée `status` : l'agent peut retourner le
+thème sélectionné et l'état du RenderHost sans inspection PID côté client ; cette
+sonde ne transforme pas une observation en qualification Spaces ou multi-écran.
 Les signatures sont épinglées mutuellement ; ni PID ni bundle ID seul ne constitue
 l'identité de confiance. [ADR-0053](../decisions/ADR-0053-macos-provider-xpc.md) remplace
 l'essai App Group, dont la sonde CLI réussissait mais le provider hébergé échouait.

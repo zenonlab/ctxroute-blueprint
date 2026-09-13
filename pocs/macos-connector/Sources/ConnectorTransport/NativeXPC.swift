@@ -12,6 +12,7 @@ public enum ProviderAction: String, Codable, Sendable {
     case catalog
     case activate
     case show
+    case status
 }
 
 public struct ProviderRequest: Codable, Equatable, Sendable {
@@ -31,6 +32,8 @@ public struct ProviderRequest: Codable, Equatable, Sendable {
         case .activate:
             return themeID.map(NativeWire.validID) == true
         case .catalog, .show:
+            return themeID == nil
+        case .status:
             return themeID == nil
         }
     }
@@ -62,16 +65,22 @@ public struct ProviderResponse: Codable, Equatable, Sendable {
     public let accepted: Bool
     public let catalog: [ProviderCatalogItem]?
     public let message: String?
+    public let activeThemeID: String?
+    public let renderHostRunning: Bool?
 
-    public init(accepted: Bool, catalog: [ProviderCatalogItem]? = nil, message: String? = nil) {
+    public init(accepted: Bool, catalog: [ProviderCatalogItem]? = nil, message: String? = nil,
+                activeThemeID: String? = nil, renderHostRunning: Bool? = nil) {
         schemaVersion = 1
         self.accepted = accepted
         self.catalog = catalog
         self.message = message.map { String($0.prefix(160)) }
+        self.activeThemeID = activeThemeID
+        self.renderHostRunning = renderHostRunning
     }
 
     public var isValid: Bool {
         guard schemaVersion == 1, (message?.count ?? 0) <= 160 else { return false }
+        guard activeThemeID.map(NativeWire.validID) ?? true else { return false }
         guard let catalog else { return true }
         return catalog.count <= 64 && Set(catalog.map(\.id)).count == catalog.count &&
             catalog.allSatisfy(\.isValid)

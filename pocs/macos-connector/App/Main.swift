@@ -43,6 +43,20 @@ import os
             FileHandle.standardOutput.write(Data("\n".utf8))
             return
         }
+        if CommandLine.arguments == [CommandLine.arguments[0], "--native-status"] {
+            guard try AgentLauncher.start(app: ProductIdentity.appBundle, service: ProductIdentity.service) else {
+                exit(2)
+            }
+            let agent = ProductIdentity.appBundle.appendingPathComponent(
+                "Contents/Library/LoginItems/Orbite Wallpaper Agent.app")
+            guard let response = AgentClient.perform(ProviderRequest(action: .status), agentBundle: agent),
+                  response.accepted else { exit(3) }
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            FileHandle.standardOutput.write(try encoder.encode(response))
+            FileHandle.standardOutput.write(Data("\n".utf8))
+            return
+        }
         if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--discover-themes" {
             let roots = CommandLine.arguments.dropFirst(2).map { URL(fileURLWithPath: $0, isDirectory: true) }
             let receipt = ThemeDiscovery.discover(roots: roots)
@@ -423,6 +437,10 @@ import os
         case .show:
             showWindow()
             return ProviderResponse(accepted: true)
+        case .status:
+            refresh()
+            return ProviderResponse(accepted: true, activeThemeID: selectedTheme?.package.id,
+                                    renderHostRunning: renderHost.isRunning)
         }
     }
 

@@ -57,6 +57,7 @@ Le connecteur possède une seule fenêtre native de sélection, permission et r�
 - Une bibliothèque vide affiche zéro thème, sans fallback implicite.
 - Ajouter un package compatible le fait apparaître sans changement Swift.
 - Modifier le catalogue ou sa cover actualise Réglages sans redémarrer les processus Apple.
+- La commande `--native-status` interroge l’agent signé par XPC et retourne l’identité du thème actif ainsi que l’état du RenderHost ; elle ne déduit pas Spaces ou le multi-écran.
 - Une recette invalide est refusée et ne lance aucun processus.
 - Une capacité sans RenderHost approuvé échoue explicitement.
 - Le manifeste ne peut choisir ni exécutable ni commande shell.

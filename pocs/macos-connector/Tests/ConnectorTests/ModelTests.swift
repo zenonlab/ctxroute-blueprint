@@ -13,9 +13,11 @@ final class ModelTests: XCTestCase {
     func testWallpaperProviderWireIsTypedBoundedAndThemeAgnostic() throws {
         XCTAssertTrue(ProviderRequest(action: .catalog).isValid)
         XCTAssertTrue(ProviderRequest(action: .show).isValid)
+        XCTAssertTrue(ProviderRequest(action: .status).isValid)
         XCTAssertTrue(ProviderRequest(action: .activate, themeID: "local.course").isValid)
         XCTAssertFalse(ProviderRequest(action: .activate).isValid)
         XCTAssertFalse(ProviderRequest(action: .catalog, themeID: "local.course").isValid)
+        XCTAssertFalse(ProviderRequest(action: .status, themeID: "local.course").isValid)
 
         let items = [
             ProviderCatalogItem(id: "local.course", displayName: "Course locale"),
@@ -25,6 +27,10 @@ final class ModelTests: XCTestCase {
         XCTAssertTrue(response.isValid)
         XCTAssertEqual(try NativeWire.decode(ProviderResponse.self,
             from: NativeWire.encode(response)), response)
+        let status = ProviderResponse(accepted: true, activeThemeID: "local.course", renderHostRunning: true)
+        XCTAssertTrue(status.isValid)
+        XCTAssertEqual(try NativeWire.decode(ProviderResponse.self,
+            from: NativeWire.encode(status)), status)
         XCTAssertFalse(ProviderResponse(accepted: true,
             catalog: items + [items[0]]).isValid)
         XCTAssertFalse(ProviderResponse(accepted: true,
