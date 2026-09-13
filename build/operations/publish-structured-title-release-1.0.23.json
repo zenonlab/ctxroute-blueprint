@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "gateVersion": 1,
+  "driverId": "cloudflare-wrangler",
+  "accountId": "6aef9b2e29d0671c8b5dd36b0b660f4b",
+  "createdAt": "2026-09-13T00:41:17.503Z",
+  "expiresAt": "2026-09-13T00:56:17.503Z",
+  "inspectionDigest": "9a33580b2a56cb9bb48efe25cf3c73a33068825dd6beb72137eebf0b9f5b12ed",
+  "previewDigest": "2486d1995779f3f5489ff4aaf2bd8e177b7ecdf11e349c63a7ee502ce11e1ac5",
+  "actions": [
+    {
+      "kind": "worker-deploy",
+      "target": "worker:tobirink-public-api"
+    }
+  ],
+  "digest": "be5b171c13a489e071a83603751f4639d73b1f6f0d318fee128835423b2c0eb3"
+}

@@ -8512,7 +8512,7 @@
       "schemaVersion": 1,
       "id": "goal-publish-structured-title-release-1-0-23",
       "title": "Certifier et publier la correction des titres structures 1.0.23",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
@@ -8557,7 +8557,7 @@
         {
           "id": "step-2",
           "title": "Publier les archives et le Worker puis verifier la production",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Seuls les deux objets R2 1.0.23 et le Worker public sont modifies",
             "Aucune migration D1 suppression cover ou modification de secret n est executee",
@@ -8582,7 +8582,11 @@
             "git commit -m chore(release): publish structured title release 1.0.23",
             "git push origin main"
           ],
-          "evidence": []
+          "evidence": [
+            "Cloudflare gates 6dc2ade9 and be5b171c changed only the two immutable 1.0.23 release objects and Worker e5da9e96 at 100 percent; rollback remains bec0dbe6.",
+            "Production download advertises 1.0.23; both ZIPs return HTTP 200 with immutable caching and exact certified SHA-256 hashes.",
+            "Six HTTP production Playwright journeys pass; final inspection reports no pending D1 migration and an empty covers bucket."
+          ]
         }
       ]
     }

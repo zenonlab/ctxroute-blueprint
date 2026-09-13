@@ -2,8 +2,8 @@
 
 ## Build a release candidate
 
-The current production release remains `1.0.22`; candidate `1.0.23` is being
-certified from the exact repository state before its separately gated upload.
+The current production release is `1.0.23`; its published archives match the
+verified local candidates.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -59,10 +59,22 @@ Two isolated builds reproduce the 21-file archives byte for byte:
 - Chrome: 298903 bytes, SHA-256 `783c88c71401f23d8cb6134a4688ddd00cc12307468018f002a8404216eebe02`.
 - Firefox: 298939 bytes, SHA-256 `20f3bf65bfb74be7912544fd8903cbdc7acee269eae84b8962a1c05e70e69625`.
 
-The immutable Cloudflare publication receipt is recorded after the separate
-provider gate completes. Worker `bec0dbe6-7952-4fb1-8aca-4c50f49c4d06` is the
-pinned rollback reference for this candidate. No D1 migration, cover mutation
-or secret change belongs to this release.
+Cloudflare gate plan
+`6dc2ade94d7b48a1bfb28bcf376a54fc81f7352e9040b8b96b01543bba139457`
+uploaded only the two immutable 1.0.23 R2 objects and deployed the Worker. A
+production probe then exposed stale prebuilt website assets before release
+certification could finish. After rebuilding the static site from the same
+certified source, follow-up gate
+`be5b171c13a489e071a83603751f4639d73b1f6f0d318fee128835423b2c0eb3`
+redeployed only the Worker and those versioned assets. Worker
+`e5da9e96-d50a-4166-a01f-466cc5e7a4ef` is active at 100 percent; Worker
+`bec0dbe6-7952-4fb1-8aca-4c50f49c4d06` remains the pinned rollback reference.
+
+The production download page advertises both 1.0.23 links. Each archive returns
+HTTP 200 with immutable one-year caching and the exact certified hash above.
+The final inspection reports no pending D1 migration, the covers bucket remains
+empty, and all six HTTP production Playwright journeys pass. No D1 row, cover,
+secret, previous archive or migration was modified.
 
 ### Persistent recovery release — 2026-09-12
 

@@ -405,7 +405,7 @@
 
 - [x] **Corriger parenthèses recherche qualificatifs et projection derivee** — DONE _(evidence: npm run verify passe: 363 tests application, 151 extension, tous workspaces, Chromium IndexedDB, performance, integration et audit 0 vulnerabilite, Oracle FavLib 3267de2 epingle et tests cibles 130/130 passent; snapshot canonique 82 cas mis a jour uniquement pour versions et fingerprints, npm run archify:validate -- favorite-resolution.dataflow: showcase 9/9, 0 erreur, 0 avertissement)_
 
-## Certifier et publier la correction des titres structures 1.0.23 — ACTIVE
+## Certifier et publier la correction des titres structures 1.0.23 — DONE
 
 - [x] **Construire et certifier les archives 1.0.23** — DONE _(evidence: Chrome and Firefox 1.0.23 archives reproduce byte for byte with SHA-256 783c88c7...be02 and 20f3bf65...9625., Installed Chromium 153 completes 1406-bookmark convergence, storage.sync v2 reconstruction, encrypted backup recovery and zero imported Review; installed Firefox 151 passes., npm run verify passes with zero vulnerabilities; favorite-resolution dataflow passes Archify showcase 9/9 with zero errors and warnings.)_
-- [ ] **Publier les archives et le Worker puis verifier la production** — PENDING
+- [x] **Publier les archives et le Worker puis verifier la production** — DONE _(evidence: Cloudflare gates 6dc2ade9 and be5b171c changed only the two immutable 1.0.23 release objects and Worker e5da9e96 at 100 percent; rollback remains bec0dbe6., Production download advertises 1.0.23; both ZIPs return HTTP 200 with immutable caching and exact certified SHA-256 hashes., Six HTTP production Playwright journeys pass; final inspection reports no pending D1 migration and an empty covers bucket.)_
