@@ -9153,7 +9153,7 @@
         {
           "id": "step-9",
           "title": "Rendre les etats Agenda actionnables",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Extension et site distinguent premiere synchronisation cache frais cache ancien partiel vide et panne",
             "Le bouton reprendre declenche une vraie recuperation distante",
@@ -9172,7 +9172,11 @@
             "git diff --check",
             "git commit -m fix(agenda): expose actionable synchronization states"
           ],
-          "evidence": []
+          "evidence": [
+            "Agenda UI exposes loading, empty, partial, offline, error and blocked states with navigation and retry controls",
+            "Retry now performs a real cache refresh through the HTTP loader before local projection",
+            "Agenda UI, message contract, extension typecheck and Archify architecture validation pass"
+          ]
         },
         {
           "id": "step-10",

@@ -362,6 +362,7 @@ export default defineBackground({
       if (parsed.data.type === 'agenda.period.read') {
         try {
           await privateStorage.ensureReady();
+          if (configuredSiteOrigin) await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache);
           const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);
           const quickPreferences = await preferences.read();
           const snapshot = await readAgendaPeriod(privateStorage.storage, parsed.data);

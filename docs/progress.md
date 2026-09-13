@@ -436,7 +436,7 @@
 - [x] **Construire la projection Agenda locale indexee** — DONE _(evidence: Local projection joins public events only through resolved provider/providerWorkId references held by local Works, Unknown identities and DATE-only civil rows are excluded from instant notification Agenda entries, Focused projection test, application typecheck and architecture/dataflow showcase validation pass)_
 - [x] **Restaurer les predictions manga bornees** — DONE _(evidence: Prediction keeps at most 12 observations and 8 intervals, requires 3 valid intervals and filters to 0.5x–2x median, Exactly one next civil date is emitted with estimated confidence; native notification code already excludes estimated entries, Focused prediction tests and domain typecheck pass)_
 - [x] **Durcir les alarmes et notifications MV3** — DONE _(evidence: Stable agenda-next and agenda-reconcile alarms are recreated at MV3 startup and share the existing idempotent drain, Alarm wakeups resume notifications and favorite continuation without creating duplicate alarm names, Extension typecheck and Agenda runtime tests pass; architecture/dataflow Archify validation passes)_
-- [ ] **Rendre les etats Agenda actionnables** — PENDING
+- [x] **Rendre les etats Agenda actionnables** — DONE _(evidence: Agenda UI exposes loading, empty, partial, offline, error and blocked states with navigation and retry controls, Retry now performs a real cache refresh through the HTTP loader before local projection, Agenda UI, message contract, extension typecheck and Archify architecture validation pass)_
 - [ ] **Reconstruire l Agenda apres perte IndexedDB** — PENDING
 - [ ] **Certifier la pipeline Agenda complete** — PENDING
 - [ ] **Publier separement la pipeline Agenda certifiee** — PENDING
