@@ -20,7 +20,7 @@ export class AniListReleaseCollector implements PublicReleaseCollector {
   async collect(window: { from: string; to: string }): Promise<readonly PublicReleaseEventContract[]> {
     const from = Math.floor(Date.parse(`${window.from}T00:00:00.000Z`) / 1000);
     const to = Math.floor(Date.parse(`${window.to}T23:59:59.999Z`) / 1000);
-    const response = await this.fetcher('https://graphql.anilist.co', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ query: 'query($from:Int!,$to:Int!){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$from,airingAt_lesser:$to,sort:TIME){airingAt episode media{id}}}}', variables: { from, to } }) });
+    const response = await this.fetcher('https://graphql.anilist.co', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'TobiRink/1.0 (+https://tobirink.com)' }, body: JSON.stringify({ query: 'query($from:Int!,$to:Int!){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$from,airingAt_lesser:$to,sort:TIME){airingAt episode media{id}}}}', variables: { from, to } }) });
     if (!response.ok) throw new Error(`anilist-${response.status}`);
     // SAFETY: AniList's envelope is narrowed by the guards below before any field is used.
     const body = await response.json() as { data?: { Page?: { airingSchedules?: Array<{ airingAt?: number; episode?: number; media?: { id?: number } }> } } };
