@@ -414,7 +414,7 @@
 
 - [x] **Detacher les resolutions automatiques stale et certifier les deux titres** — DONE _(evidence: 57 tests cibles verts: les deux URLs exactes produisent les titres nettoyés et le reçu conserve Source Review artefact et tâche automatiques., Chromium 153 installé converge sur 1408 favoris, reconstruit après perte IndexedDB, reprend les pannes et conserve zéro Review importée., npm run verify est vert: suites produit, équivalence FavLib synthétique, builds Chrome Firefox, IndexedDB Chromium, performances, CRG, intégration et zéro vulnérabilité.)_
 
-## Certifier et publier le reparsing automatique 1.0.24 — ACTIVE
+## Certifier et publier le reparsing automatique 1.0.24 — DONE
 
 - [x] **Construire et certifier les archives 1.0.24** — DONE _(evidence: Two independent builds reproduce 1.0.24 exactly: Chrome 28a8b940...0b8ca and Firefox 32e55c33...1a219., Exact archives install successfully: Chromium 153 converges 1408 bookmarks with corrected Asura and Void titles, sync recovery and zero imported Review; Firefox 151 passes., npm run verify passes all repository gates with zero vulnerabilities; favorite-resolution Archify showcase passes 9/9 with zero errors and warnings.)_
-- [ ] **Publier les archives et le Worker puis verifier la production** — PENDING
+- [x] **Publier les archives et le Worker puis verifier la production** — DONE _(evidence: Cloudflare gate e2ef2ab8 changed only both immutable 1.0.24 R2 archives and Worker 586566ea at 100 percent; no D1 migration, deletion, cover or secret action ran., Production download advertises 1.0.24; both ZIPs return HTTP 200 with immutable caching and exact certified SHA-256 hashes., Six HTTP production Playwright journeys pass; final inspection reports no pending D1 migration and an empty covers bucket, while Worker e5da9e96 remains available for rollback.)_

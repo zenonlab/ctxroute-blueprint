@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.23`; its published archives match the
+The current production release is `1.0.24`; its published archives match the
 verified local candidates.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
@@ -56,8 +56,20 @@ including the reported Asura and Void route shapes, with cache-first routing,
 durable retry, `storage.sync` v2 reconstruction after IndexedDB loss, encrypted
 backup recovery and zero imported Review. Firefox 151 installs the exact
 Firefox archive and passes health, ordinary-link exclusion and zero-Review
-checks. Production remains on 1.0.23 until the separate Cloudflare gate is
-applied.
+checks.
+
+Cloudflare gate plan
+`e2ef2ab8c1ac436cec02414d053de3471228e4074b9cecb0eebe77cb620997e6`
+uploaded only the two immutable 1.0.24 R2 objects and deployed Worker
+`586566ea-1092-4820-b32f-c896c2a0edef` at 100 percent. Worker
+`e5da9e96-d50a-4166-a01f-466cc5e7a4ef` remains available as the pinned rollback
+reference.
+
+The production download page advertises both 1.0.24 links. Each archive returns
+HTTP 200 with immutable one-year caching and the exact certified hash above.
+The final inspection reports no pending D1 migration and an empty covers
+bucket. All six HTTP production Playwright journeys pass. No D1 row, cover,
+secret, previous archive or migration was modified.
 
 ### Favorite title/slug alignment release — 2026-09-13
 

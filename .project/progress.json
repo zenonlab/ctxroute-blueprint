@@ -8645,7 +8645,7 @@
       "schemaVersion": 1,
       "id": "goal-publish-legacy-reparse-release-1-0-24",
       "title": "Certifier et publier le reparsing automatique 1.0.24",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
@@ -8692,7 +8692,7 @@
         {
           "id": "step-2",
           "title": "Publier les archives et le Worker puis verifier la production",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Seuls les deux objets R2 1.0.24 et le Worker public sont modifies",
             "Aucune migration D1 suppression cover ou modification de secret n est executee",
@@ -8704,6 +8704,7 @@
             "build/operations/publish-legacy-reparse-release-1.0.24.json",
             "docs/release.md",
             "docs/plans/publish-legacy-reparse-release-1-0-24.json",
+            "docs/plans/publish-legacy-reparse-release-1-0-24-step-2-completion.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
@@ -8717,7 +8718,11 @@
             "git commit -m chore(release): publish automatic reparse release 1.0.24",
             "git push origin main"
           ],
-          "evidence": []
+          "evidence": [
+            "Cloudflare gate e2ef2ab8 changed only both immutable 1.0.24 R2 archives and Worker 586566ea at 100 percent; no D1 migration, deletion, cover or secret action ran.",
+            "Production download advertises 1.0.24; both ZIPs return HTTP 200 with immutable caching and exact certified SHA-256 hashes.",
+            "Six HTTP production Playwright journeys pass; final inspection reports no pending D1 migration and an empty covers bucket, while Worker e5da9e96 remains available for rollback."
+          ]
         }
       ]
     }
