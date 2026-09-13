@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseWebMessage, parseWebRequestEnvelope, webBridgeMessageLimit, webPageBridgeInboundSchema, webProtocolVersion, webRequestSchema } from './web-bridge';
+import { parseWebMessage, parseWebRequestEnvelope, webAgendaPeriodSchema, webBridgeMessageLimit, webPageBridgeInboundSchema, webProtocolVersion, webRequestSchema } from './web-bridge';
 
 describe('WebBridgePort transport contract', () => {
   it('accepts only bounded versioned requests', () => {
@@ -34,6 +34,13 @@ describe('WebBridgePort transport contract', () => {
     expect(webRequestSchema.parse({ type: 'agenda.read', requestId: 'req_7', from: '2026-09-07', to: '2026-09-14' })).toBeTruthy();
     expect(() => webRequestSchema.parse({ type: 'agenda.read', requestId: 'req_8', from: '2026-09-08', to: '2026-09-15' })).toThrow(/Monday-to-Monday/u);
     expect(() => webRequestSchema.parse({ type: 'agenda.read', requestId: 'req_9', from: '2026-09-07', to: '2026-09-15' })).toThrow(/Monday-to-Monday/u);
+  });
+
+  it('preserves one civil or instant occurrence in Agenda responses', () => {
+    const base = { availability: 'confirmed' as const, kind: 'manga' as const, releaseLabel: 'Chapitre 58.5', title: 'Manga', workId: 'work_manga_date' };
+    expect(webAgendaPeriodSchema.safeParse({ entries: [{ ...base, occursOn: '2026-09-09' }], from: '2026-09-07', to: '2026-09-14' }).success).toBe(true);
+    expect(webAgendaPeriodSchema.safeParse({ entries: [{ ...base, occursAt: '2026-09-09T00:00:00.000Z', occursOn: '2026-09-09' }], from: '2026-09-07', to: '2026-09-14' }).success).toBe(false);
+    expect(webAgendaPeriodSchema.safeParse({ entries: [{ ...base }], from: '2026-09-07', to: '2026-09-14' }).success).toBe(false);
   });
 
   it('validates correlated page responses while preserving version mismatch detection', () => {

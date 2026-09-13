@@ -1,0 +1,13 @@
+{
+  "goalId": "goal-correct-agenda-provider-pipeline",
+  "stepId": "step-6",
+  "status": "DONE",
+  "completedAt": "2026-09-13T18:06:20.000Z",
+  "evidence": [
+    "MangaUpdates CONFIRMED events remain civil DATE values through IndexedDB, extension messages, WebBridge and UI; invalid calendar dates are rejected",
+    "Manga prediction uses at most 12 observations and 8 per-chapter intervals, requires 3 bounded intervals, filters outliers and emits one next estimated DATE",
+    "A later confirmed release replaces the matching estimate and advances the single prediction; DATE and estimated events never enter native notification scheduling",
+    "IndexedDB v18 atomically commits events and their projected revision, uses bounded occurrence and evidence indexes, reuses unchanged projections and invalidates them whenever a Work identity changes",
+    "Domain 33, application 375, extension 152, UI 129 and contracts 17 tests pass; Chromium v18 migration and 1400-favorite storage contracts pass; all workspace typechecks, lint, docs, decisions, UI validation, git diff check and Agenda Archify showcase 9/9 pass"
+  ]
+}

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
+const dateSchema = z.iso.date();
 const instantSchema = z.iso.datetime({ offset: false });
 export const releaseOccurrenceSchema = z.discriminatedUnion('kind', [z.strictObject({ kind: z.literal('DATE'), value: dateSchema }), z.strictObject({ kind: z.literal('INSTANT'), value: instantSchema })]);
 const releaseSequenceSchema = z.union([
@@ -12,7 +12,7 @@ export const publicReleaseEventSchema = z.strictObject({ ...publicReleaseFields,
   const canonical = { ...event, provider: provider === 'mangaUpdates' ? 'mangaupdates' as const : provider };
   return sequence === undefined ? canonical : { ...canonical, sequence: String(sequence) };
 }).pipe(canonicalPublicReleaseEventSchema);
-export const localReleaseEvidenceSchema = z.strictObject({ id: z.string().min(1).max(128), publicReleaseId: z.string().min(1).max(128), workId: z.string().min(1).max(128), observedAt: z.iso.datetime({ offset: false }), source: z.enum(['public', 'manual']), occurrence: releaseOccurrenceSchema, state: z.enum(['SCHEDULED', 'CONFIRMED', 'ESTIMATED', 'CANCELLED']) });
+export const localReleaseEvidenceSchema = z.strictObject({ id: z.string().min(1).max(128), publicReleaseId: z.string().min(1).max(128), workId: z.string().min(1).max(128), observedAt: z.iso.datetime({ offset: false }), source: z.enum(['public', 'manual']), occurrence: releaseOccurrenceSchema, state: z.enum(['SCHEDULED', 'CONFIRMED', 'ESTIMATED', 'CANCELLED']), provider: z.enum(['anilist', 'mangaupdates']).optional(), providerWorkId: z.string().min(1).max(128).optional(), releaseKind: z.enum(['episode', 'chapter', 'volume', 'special']).optional(), sequence: z.string().min(1).max(64).optional() });
 export const localAgendaEventSchema = z.strictObject({ id: z.string().min(1).max(128), workId: z.string().min(1).max(128), evidenceId: z.string().min(1).max(128), occurrence: releaseOccurrenceSchema, availability: z.enum(['confirmed', 'estimated', 'official', 'unavailable']), releaseLabel: z.string().min(1).max(160) });
 export const localNotificationDeliverySchema = z.strictObject({ id: z.string().min(1).max(128), agendaEventId: z.string().min(1).max(128), deduplicationKey: z.string().min(1).max(256), channel: z.literal('native'), status: z.enum(['pending', 'claimed', 'delivered', 'dismissed']), availableAt: z.iso.datetime({ offset: false }), claimedAt: z.iso.datetime({ offset: false }).optional(), deliveredAt: z.iso.datetime({ offset: false }).optional() });
 export type PublicReleaseEventInput = z.input<typeof publicReleaseEventSchema>;

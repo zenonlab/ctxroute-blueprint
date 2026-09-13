@@ -32,8 +32,10 @@ export function createAgendaDays(period: LocalAgendaPeriod, snapshot: { items: r
   const timeLabel = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
   return period.days.map(({ date, id }) => ({
     displayDate: dateLabel.format(date), id, isToday: id === localDayId(new Date()), label: dayLabel.format(date),
-    releases: snapshot.items.filter((item) => localDayId(new Date(item.occursAt)) === id).map((item) => {
-      const release = { availability: item.availability, displayDate: timeLabel.format(new Date(item.occursAt)), id: item.id, occursAt: item.occursAt, precision: item.availability === 'estimated' ? 'Horaire estimé' : 'Horaire', release: item.release, source: item.source, title: item.title };
+    releases: snapshot.items.filter((item) => (item.occursOn ?? (item.occursAt ? localDayId(new Date(item.occursAt)) : '')) === id).map((item) => {
+      const civil = item.occursOn !== undefined;
+      const base = { availability: item.availability, displayDate: civil ? 'Toute la journée' : timeLabel.format(new Date(item.occursAt!)), id: item.id, precision: civil ? item.availability === 'estimated' ? 'Date estimée' : 'Date confirmée' : item.availability === 'estimated' ? 'Horaire estimé' : 'Horaire', release: item.release, source: item.source, title: item.title };
+      const release = item.occursAt === undefined ? base : { ...base, occursAt: item.occursAt };
       return item.sourceUrl ? { ...release, href: item.sourceUrl } : release;
     }),
   }));

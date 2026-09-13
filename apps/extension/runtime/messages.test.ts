@@ -77,6 +77,14 @@ describe('extension Agenda messages', () => {
     }).success).toBe(true);
     expect(agendaPeriodResponseSchema.safeParse({
       ok: true,
+      snapshot: { items: [{ availability: 'confirmed', id: 'agenda_release-date', mediaType: 'manga', occursOn: '2026-09-09', release: 'Chapitre 58.5', source: 'mangaupdates', title: 'Manga', workId: 'work_manga-date' }], missingWorkIds: [], source: 'local', updatedAt: '2026-09-06T08:00:00.000Z' },
+    }).success).toBe(true);
+    expect(agendaPeriodResponseSchema.safeParse({
+      ok: true,
+      snapshot: { items: [{ availability: 'confirmed', id: 'agenda_release-both', mediaType: 'manga', occursAt: '2026-09-09T00:00:00.000Z', occursOn: '2026-09-09', release: 'Chapitre 58.5', source: 'mangaupdates', title: 'Manga', workId: 'work_manga-date' }], missingWorkIds: [], source: 'local', updatedAt: '2026-09-06T08:00:00.000Z' },
+    }).success).toBe(false);
+    expect(agendaPeriodResponseSchema.safeParse({
+      ok: true,
       snapshot: { items: [{ availability: 'official', id: 'agenda_release-one', mediaType: 'anime', occursAt: '2026-09-08T10:00:00.000Z', release: 'Episode 1', source: 'anilist', sourceUrl: 'javascript:alert(1)', title: 'Frieren', workId: 'work_frieren-one' }], missingWorkIds: [], source: 'local', updatedAt: '2026-09-06T08:00:00.000Z' },
     }).success).toBe(false);
     expect(agendaPeriodResponseSchema.safeParse({ ok: true, snapshot: { items: Array.from({ length: 101 }, () => ({})), missingWorkIds: [] } }).success).toBe(false);

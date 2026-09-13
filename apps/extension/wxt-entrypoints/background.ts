@@ -1,4 +1,4 @@
-import { applyConfirmedOrganizerPreview, createEncryptedBackup, parseOrganizerConfiguration, readAgendaPeriod, readLibraryPage, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, restoreEncryptedBackup, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
+import { applyConfirmedOrganizerPreview, createEncryptedBackup, parseOrganizerConfiguration, readLibraryPage, readLocalReleaseAgenda, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, restoreEncryptedBackup, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
 import {
   anilistSourceAdapter,
   mangaUpdatesSourceAdapter,
@@ -20,7 +20,7 @@ import {
   HttpPublicReleasePageSource,
 } from '@tobirink/adapters-browser';
 import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
@@ -34,7 +34,7 @@ import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favoriteInventoryAuditPeriodMinutes, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
-import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, hydrateAgendaFromPublicReleaseGeneration, ProviderIdentitySyncPublisher, providerSyncPrefix, resumePublicReleaseFallback } from '@tobirink/application';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda, ProviderIdentitySyncPublisher, providerSyncPrefix, resumePublicReleaseFallback } from '@tobirink/application';
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
@@ -68,13 +68,14 @@ export default defineBackground({
     const token = () => crypto.randomUUID();
     const diagnostics = new WebExtensionDiagnostics(browser.storage.local, now, token);
     const releaseCache = new DexiePublicReleaseGenerationCache(privateStorage.storage.database);
+    const releaseAgenda = new DexieLocalReleaseAgenda(privateStorage.storage.database);
     const releaseFallbackStore = new DexiePublicReleaseFallbackStore(privateStorage.storage.database);
     const releasePageSource = new HttpPublicReleasePageSource();
     const releaseWindow = () => {
       const start = new Date();
-      start.setUTCDate(start.getUTCDate() - 7);
+      start.setUTCDate(start.getUTCDate() - 1);
       const end = new Date();
-      end.setUTCDate(end.getUTCDate() + 35);
+      end.setUTCDate(end.getUTCDate() + 15);
       return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
     };
     const refreshPublicReleasesOnce = async () => {
@@ -118,7 +119,7 @@ export default defineBackground({
       storage: privateStorage.storage,
       sync: identitySync,
     });
-    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts);
+    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts, releaseAgenda);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const ensureAgendaReconcileAlarm = () => browser.alarms.create(agendaReconcileAlarmName, { periodInMinutes: agendaReconcileAlarmPeriodMinutes });
@@ -227,7 +228,7 @@ export default defineBackground({
     const resumeNotifications = async () => {
       await privateStorage.ensureReady();
       await refreshPublicReleases();
-      const hydration = await hydrateAgendaFromPublicReleaseGeneration(privateStorage.storage, releaseCache);
+      const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
       if ((await preferences.read()).nativeNotifications) {
         await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries);
       }
@@ -394,27 +395,27 @@ export default defineBackground({
         try {
           await privateStorage.ensureReady();
           await refreshPublicReleases();
-          const hydration = await hydrateAgendaFromPublicReleaseGeneration(privateStorage.storage, releaseCache);
+          const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
           const quickPreferences = await preferences.read();
-          const snapshot = await readAgendaPeriod(privateStorage.storage, parsed.data);
+          const snapshot = await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, parsed.data);
           if (quickPreferences.nativeNotifications) {
-            await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, snapshot.items.map(({ entry }) => entry));
+            await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries);
           }
           return {
             ok: true,
             snapshot: {
-              items: snapshot.items.filter(({ entry }) => quickPreferences.showEstimatedReleases || entry.availability !== 'estimated').map(({ entry, source, work }) => {
+              items: snapshot.items.filter(({ event }) => quickPreferences.showEstimatedReleases || event.availability !== 'estimated').map(({ event, source, work }) => {
                 const item = {
-                  availability: entry.availability,
-                  id: entry.id,
+                  availability: event.availability,
+                  id: event.id,
                   mediaType: work.mediaKind,
-                  occursAt: entry.occursAt,
-                  release: entry.releaseLabel,
+                  release: event.releaseLabel,
                   source: work.externalReferences[0]?.provider ?? work.mediaKind,
                   title: work.preferredTitle,
                   workId: work.id,
                 };
-                return source ? { ...item, sourceUrl: source.url } : item;
+                const dated = event.occurrence.kind === 'DATE' ? { ...item, occursOn: event.occurrence.value } : { ...item, occursAt: event.occurrence.value };
+                return source ? { ...dated, sourceUrl: source.url } : dated;
               }),
               missingWorkIds: [...snapshot.missingWorkIds, ...hydration.missingWorkIds],
               source: hydration.state === 'hydrated' ? 'cache' : 'local',

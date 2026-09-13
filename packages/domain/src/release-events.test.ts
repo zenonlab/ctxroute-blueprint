@@ -4,6 +4,7 @@ import { createPublicReleaseEvent, createReleaseOccurrence } from './release-eve
 describe('release occurrences', () => {
   it('keeps civil dates timezone free', () => {
     expect(createReleaseOccurrence({ kind: 'DATE', value: '2026-09-13' })).toEqual({ kind: 'DATE', value: '2026-09-13' });
+    expect(() => createReleaseOccurrence({ kind: 'DATE', value: '2026-02-30' })).toThrow();
   });
   it('requires canonical UTC instants', () => {
     expect(() => createReleaseOccurrence({ kind: 'INSTANT', value: '2026-09-13T12:00:00.000+01:00' })).toThrow();

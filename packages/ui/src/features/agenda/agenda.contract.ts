@@ -30,7 +30,8 @@ export interface AgendaDay {
 export interface AgendaPeriodItem {
   availability: AgendaAvailability;
   id: string;
-  occursAt: string;
+  occursAt?: string;
+  occursOn?: string;
   release: string;
   source: string;
   sourceUrl?: string;

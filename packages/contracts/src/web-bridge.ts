@@ -78,13 +78,14 @@ export const webAgendaPeriodSchema = z.object({
   entries: z.array(z.object({
     availability: z.enum(['official', 'confirmed', 'estimated']),
     kind: z.enum(['anime', 'manga']),
-    occursAt: z.string().datetime({ offset: true }),
+    occursAt: z.string().datetime({ offset: true }).optional(),
+    occursOn: z.string().date().optional(),
     releaseLabel: boundedText(240),
     sourceLabel: boundedText(240).optional(),
     sourceUrl: z.string().url().max(2048).optional(),
     title: boundedText(240),
     workId: workIdSchema,
-  }).strict()).max(100),
+  }).strict().superRefine((entry, context) => { if ((entry.occursAt === undefined) === (entry.occursOn === undefined)) context.addIssue({ code: 'custom', message: 'Agenda entry requires one occurrence.', path: ['occursAt'] }); })).max(100),
   from: z.string().date(),
   to: z.string().date(),
 }).strict();

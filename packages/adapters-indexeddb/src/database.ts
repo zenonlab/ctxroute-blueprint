@@ -29,6 +29,7 @@ export class TobirinkDatabase extends Dexie {
   readonly publicReleaseEvents!: Table<PublicReleaseEvent, string>;
   readonly localReleaseEvidence!: Table<LocalReleaseEvidence, string>;
   readonly localAgendaEvents!: Table<LocalAgendaEvent, string>;
+  readonly localAgendaProjectionState!: Table<{ id: 'active'; revision: string }, 'active'>;
   readonly localNotificationDeliveries!: Table<LocalNotificationDelivery, string>;
   readonly publicReleaseSyncState!: Table<PublicReleaseSyncRecord, string>;
   readonly publicReleaseStagingEvents!: Table<PublicReleaseStagingRecord, string>;
@@ -159,6 +160,11 @@ export class TobirinkDatabase extends Dexie {
     });
     this.version(17).stores({
       publicReleaseStagingEvents: '&id, generation',
+    });
+    this.version(18).stores({
+      localAgendaEvents: '&id, workId, occurrence.value, [occurrence.kind+occurrence.value], availability',
+      localAgendaProjectionState: '&id',
+      localReleaseEvidence: '&id, publicReleaseId, workId, observedAt, [workId+occurrence.value]',
     });
   }
 }

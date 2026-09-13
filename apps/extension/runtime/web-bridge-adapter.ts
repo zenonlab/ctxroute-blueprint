@@ -1,5 +1,5 @@
-import { providerCoverFallbackPath, readAgendaPeriod, readLibraryBootstrapSummary, readLibraryCatalogue, readReviewQueue } from '@tobirink/application';
-import type { FavoriteProviderHydrationPorts, StoragePort } from '@tobirink/application';
+import { providerCoverFallbackPath, readAgendaPeriod, readLibraryBootstrapSummary, readLibraryCatalogue, readLocalReleaseAgenda, readReviewQueue } from '@tobirink/application';
+import type { FavoriteProviderHydrationPorts, LocalReleaseAgendaPort, StoragePort } from '@tobirink/application';
 import { libraryId, workId } from '@tobirink/domain';
 import type { FavoriteSource, WorkId } from '@tobirink/domain';
 import type { LibraryCatalogueItem } from '@tobirink/application';
@@ -104,7 +104,7 @@ function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCa
   };
 }
 
-export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: FavoriteProviderHydrationPorts): WebBridgeRequestHandler {
+export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: FavoriteProviderHydrationPorts, localAgenda?: LocalReleaseAgendaPort): WebBridgeRequestHandler {
   return async (request: WebRequest): Promise<WebBridgeValue> => {
     if (request.type === 'bootstrap.read') {
       const [library, review] = await Promise.all([
@@ -153,11 +153,14 @@ export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: 
     if (request.type === 'agenda.read') {
       const from = localMidnight(request.from);
       const to = localMidnight(request.to);
-      const period = await readAgendaPeriod(storage, { from, to });
-      const entries = period.items.flatMap(({ entry, source, work }) => {
-        if (entry.availability === 'unavailable') return [];
-        const base = { availability: entry.availability, kind: work.mediaKind, occursAt: entry.occursAt, releaseLabel: entry.releaseLabel, title: work.preferredTitle, workId: work.id };
-        return source ? [{ ...base, sourceLabel: source.title, sourceUrl: source.url }] : [base];
+      const legacy = localAgenda === undefined ? await readAgendaPeriod(storage, { from, to }) : undefined;
+      const projected = localAgenda === undefined ? undefined : await readLocalReleaseAgenda(storage, localAgenda, { from: request.from, to: request.to });
+      const periodItems = projected?.items.map(({ event, source, work }) => ({ occurrence: event.occurrence, availability: event.availability, releaseLabel: event.releaseLabel, source, work })) ?? legacy?.items.map(({ entry, source, work }) => ({ occurrence: { kind: 'INSTANT' as const, value: entry.occursAt }, availability: entry.availability, releaseLabel: entry.releaseLabel, source, work })) ?? [];
+      const entries = periodItems.flatMap(({ availability, occurrence, releaseLabel, source, work }) => {
+        if (availability === 'unavailable') return [];
+        const base = { availability, kind: work.mediaKind, releaseLabel, title: work.preferredTitle, workId: work.id };
+        const dated = occurrence.kind === 'DATE' ? { ...base, occursOn: occurrence.value } : { ...base, occursAt: occurrence.value };
+        return source ? [{ ...dated, sourceLabel: source.title, sourceUrl: source.url }] : [dated];
       });
       const snapshot: WebAgendaPeriod = { entries: [...entries], from: request.from, to: request.to };
       while (!projectionFits(JSON.stringify(snapshot)) && snapshot.entries.length > 0) snapshot.entries.pop();

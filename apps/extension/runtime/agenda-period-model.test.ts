@@ -25,4 +25,11 @@ describe('local Agenda period model', () => {
     const release = createAgendaDays(period, { items: [{ availability: 'official', id: 'agenda_release-one', occursAt, release: 'Episode 1', source: 'anilist', title: 'Frieren' }] }).flatMap((day) => day.releases)[0];
     expect(release).not.toHaveProperty('href');
   });
+
+  it('keeps MangaUpdates civil dates independent from timezone conversion', () => {
+    const period = createLocalAgendaPeriod(new Date(2026, 8, 9, 12), 0);
+    const release = createAgendaDays(period, { items: [{ availability: 'confirmed', id: 'agenda_manga-date', occursOn: '2026-09-09', release: 'Chapitre 58.5', source: 'mangaupdates', title: 'Manga' }] }).flatMap((day) => day.releases)[0];
+    expect(release).toMatchObject({ displayDate: 'Toute la journée', precision: 'Date confirmée' });
+    expect(release).not.toHaveProperty('occursAt');
+  });
 });

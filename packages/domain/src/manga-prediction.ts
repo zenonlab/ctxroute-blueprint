@@ -1,8 +1,19 @@
 export interface MangaReleaseObservation { readonly releasedOn: string; readonly chapter: number; }
 export interface MangaReleasePrediction { readonly releasedOn: string; readonly confidence: 'estimated'; readonly basedOn: number; }
 export function predictNextMangaRelease(observations: readonly MangaReleaseObservation[]): MangaReleasePrediction | undefined {
-  const ordered = [...observations].sort((a, b) => a.releasedOn.localeCompare(b.releasedOn)).slice(-12);
-  const intervals = ordered.slice(1).map((item, i) => Date.parse(item.releasedOn) - Date.parse(ordered[i]!.releasedOn)).filter((value) => value > 0).slice(-8);
+  const validObservations = observations.filter(({ chapter, releasedOn }) => Number.isFinite(chapter) && chapter >= 0 && /^\d{4}-\d{2}-\d{2}$/u.test(releasedOn) && new Date(`${releasedOn}T00:00:00.000Z`).toISOString().slice(0, 10) === releasedOn);
+  const byChapter = new Map<number, MangaReleaseObservation>();
+  for (const observation of validObservations) {
+    const previous = byChapter.get(observation.chapter);
+    if (!previous || observation.releasedOn < previous.releasedOn) byChapter.set(observation.chapter, observation);
+  }
+  const ordered = [...byChapter.values()].sort((a, b) => a.releasedOn.localeCompare(b.releasedOn) || a.chapter - b.chapter).slice(-12);
+  const intervals = ordered.slice(1).flatMap((item, i) => {
+    const previous = ordered[i]!;
+    const chapterDelta = item.chapter - previous.chapter;
+    const elapsed = Date.parse(item.releasedOn) - Date.parse(previous.releasedOn);
+    return chapterDelta > 0 && elapsed > 0 ? [elapsed / chapterDelta] : [];
+  }).slice(-8);
   if (intervals.length < 3) return undefined;
   const sorted = [...intervals].sort((a, b) => a - b); const median = sorted[Math.floor(sorted.length / 2)]!;
   const valid = intervals.filter((value) => value >= median * 0.5 && value <= median * 2);

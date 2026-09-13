@@ -185,7 +185,11 @@ export class DexieStoragePort implements StoragePort {
       putProgress: async (progress: Progress) => { requireStore('progress'); await this.database.progress.put(createProgress(progress)); },
       putReminder: async (reminder: Reminder) => { requireStore('reminders'); await this.database.reminders.put(createReminder(reminder)); },
       putReview: async (review: Review) => { requireStore('reviews'); await this.database.reviews.put(createReview(review)); },
-      putWork: async (work: Work) => { requireStore('works'); await this.database.works.put(createWork(work)); },
+      putWork: async (work: Work) => {
+        requireStore('works');
+        await this.database.localAgendaProjectionState.delete('active');
+        await this.database.works.put(createWork(work));
+      },
     };
   }
 

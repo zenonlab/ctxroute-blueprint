@@ -39,8 +39,9 @@ function AgendaSurface() {
   if (status === 'incompatible' || status === 'error') return <WebMemberShell><main className="member-state-page"><BridgeState /></main></WebMemberShell>;
   const items: AgendaPeriodItem[] = snapshot?.entries.map((entry) => ({
     availability: entry.availability,
-    id: `${entry.workId}_${entry.occursAt}`,
+    id: `${entry.workId}_${entry.occursAt ?? entry.occursOn}`,
     occursAt: entry.occursAt,
+    occursOn: entry.occursOn,
     release: entry.releaseLabel,
     source: entry.sourceLabel ?? 'Source enregistrée',
     sourceUrl: entry.sourceUrl,

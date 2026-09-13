@@ -2,9 +2,9 @@ import Dexie from 'dexie';
 import before from './fixtures/v1-before.json';
 import after from './fixtures/v2-after.json';
 import versionThree from './fixtures/v3-after.json';
-import { DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
+import { DexieLocalReleaseAgenda, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
 import { importFavoriteSources, readReviewQueue } from '@tobirink/application';
-import { createFavoriteSource, createReview, favoriteSourceId, reviewId } from '@tobirink/domain';
+import { createFavoriteSource, createReview, createWork, favoriteSourceId, reviewId, workId } from '@tobirink/domain';
 
 async function deleteDatabase(name: string): Promise<void> {
   await Dexie.delete(name);
@@ -123,7 +123,7 @@ async function verifyReleaseContractMigration(name: string): Promise<void> {
   legacy.close();
   const migrated = new TobirinkDatabase(name);
   const event = await migrated.publicReleaseEvents.get('legacy-release');
-  if (migrated.verno !== 17 || event?.provider !== 'mangaupdates' || event.sequence !== '58' || migrated.publicReleaseStagingEvents.schema.idxByName.generation === undefined) throw new Error('Release contract migration did not preserve and normalize the legacy event or add durable staging.');
+  if (migrated.verno !== 18 || event?.provider !== 'mangaupdates' || event.sequence !== '58' || migrated.publicReleaseStagingEvents.schema.idxByName.generation === undefined || migrated.localAgendaEvents.schema.idxByName['occurrence.value'] === undefined || migrated.localAgendaProjectionState.schema.primKey.name !== 'id' || migrated.localReleaseEvidence.schema.idxByName['[workId+occurrence.value]'] === undefined) throw new Error('Release contract migration did not preserve and normalize the legacy event or add durable Agenda indexes.');
   migrated.close();
 }
 
@@ -147,6 +147,16 @@ async function verifyReleaseFallbackPromotion(name: string): Promise<void> {
   await cache.save({ etag: '"releases-shared-window"', events: [mangaEvent], generatedAt: '2026-09-13T00:00:00.000Z', revision: 'shared-1', source: 'shared', window: state.window });
   const shared = await cache.load();
   if (shared?.events[0]?.occurrence.kind !== 'DATE' || (await database.publicReleaseSyncState.get('active'))?.source !== 'shared' || await store.load()) throw new Error('Shared generation did not replace fallback state atomically.');
+  const agenda = new DexieLocalReleaseAgenda(database);
+  const localWorkId = workId('work_release-date');
+  const evidence = { id: 'evidence-release-date', publicReleaseId: mangaEvent.id, workId: localWorkId, observedAt: '2026-09-13T00:00:00.000Z', source: 'public', occurrence: mangaEvent.occurrence, state: mangaEvent.state, provider: mangaEvent.provider, providerWorkId: mangaEvent.providerWorkId, releaseKind: mangaEvent.releaseKind, sequence: mangaEvent.sequence } as const;
+  await agenda.commit('shared-1', [evidence], [{ availability: 'confirmed', evidenceId: evidence.id, id: 'agenda-release-date', occurrence: evidence.occurrence, releaseLabel: 'chapter 58.5', workId: localWorkId }]);
+  const period = await agenda.listPeriod('2026-09-14', '2026-09-15', 100);
+  if (period.length !== 1 || period[0]?.occurrence.kind !== 'DATE' || period[0].occurrence.value !== '2026-09-14' || !await agenda.isCurrent('shared-1')) throw new Error('Civil Agenda date or projected revision was not queryable through the version 18 indexes.');
+  const storage = new DexieStoragePort(name);
+  await storage.putWork(createWork({ externalReferences: [{ externalId: '77', provider: 'mangaupdates' }], id: localWorkId, mediaKind: 'manga', preferredTitle: 'Release fixture' }));
+  if (await agenda.isCurrent('shared-1')) throw new Error('Writing a Work did not invalidate the local Agenda identity projection.');
+  storage.close();
   database.close();
 }
 
@@ -165,7 +175,7 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 17 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 18 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   if (!database.favoriteSources.schema.idxByName.matchedWorkId) throw new Error('Direct Work source index was not added.');
   if (!database.works.schema.idxByName['hydration.favoriteAliasKeys']?.multi || !database.works.schema.idxByName['hydration.providerTitleKeys']?.multi) throw new Error('Hydrated identity multi-entry indexes were not added.');
   if (!database.works.schema.idxByName['hydration.candidate.genres']?.multi || !database.works.schema.idxByName['hydration.candidate.editorialStatus'] || !database.works.schema.idxByName['hydration.candidate.popularity.value']) throw new Error('Sortable metadata indexes were not added.');
