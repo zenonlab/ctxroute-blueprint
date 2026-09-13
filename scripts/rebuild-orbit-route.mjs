@@ -17,7 +17,7 @@ for (let i = 0; i < points.length; i += 4) {
     const a = bridged.at(-1), b = orbit[0], d = Math.hypot(b[0] - a[0], b[2] - a[2]), steps = Math.max(1, Math.ceil(d / 30000));
     for (let s = 1; s < steps; s++) { const t = s / steps; bridged.push([a[0] + (b[0] - a[0]) * t, 0, a[2] + (b[2] - a[2]) * t]); }
   }
-  bridged.push(...orbit);
+  bridged.push(...orbit, ...orbit);
 }
 const nodes = bridged.map((p, i) => ({ id: `orbit-${String(i).padStart(3, "0")}`, position: p, next: [`orbit-${String((i + 1) % bridged.length).padStart(3, "0")}`], annotations: {} }));
 navigation.nodes = nodes;
