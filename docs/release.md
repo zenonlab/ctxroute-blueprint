@@ -2,8 +2,8 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.22`; its published archives match the
-verified local candidates.
+The current production release remains `1.0.22`; candidate `1.0.23` is being
+certified from the exact repository state before its separately gated upload.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -40,35 +40,29 @@ been accepted and uploaded through an explicitly approved provider operation.
 
 ### Favorite title/slug alignment release — 2026-09-13
 
-Candidate `1.0.22` ships `favorite-parser-v4`. For a decorated bookmark name,
-the unique human segment whose normalized form equals the stable URL slug
-becomes the local identity. A six-to-twelve-digit routing prefix is removed
-only when the URL proves a release and the bookmark name independently
-corroborates the remainder. Intrinsic numbers and unresolved multi-segment
-titles remain unchanged or explicitly unresolved.
+Candidate `1.0.23` ships `favorite-parser-v5`, `favorite-matcher-v4` and
+`favorite-provider-search-v3`. Parenthesized aliases remain available for
+provider discovery while identity proof still requires corroboration. OVA and
+prepublication signals are passed through the MV3 runner. Automatic artifacts
+from older versions are reparsed; human decisions remain authoritative.
 
-The pinned read-only FavLib differential passes its five synthetic tests and
-the 82-case semantic oracle changes only the parser version and its derived
-fingerprints. Chromium 153 installs the exact archive and completes automatic
-1,406-bookmark convergence, `storage.sync` v2 reconstruction after IndexedDB
-loss, encrypted backup restore, cache-first routing, durable retry,
-pause/resume and zero imported Review. Firefox 151 installs its exact archive
-and passes health, ordinary-link exclusion and zero-Review checks.
+The pinned read-only FavLib differential and the 82-case semantic oracle are
+part of the full repository gate. Chromium 153 installs the exact Chrome
+archive and completes automatic 1,406-bookmark convergence, `storage.sync` v2
+reconstruction after IndexedDB loss, encrypted backup recovery, cache-first
+routing, durable retry, pause/resume and zero imported Review. Firefox 151
+installs the exact Firefox archive and passes health, ordinary-link exclusion
+and zero-Review checks.
 
 Two isolated builds reproduce the 21-file archives byte for byte:
 
-- Chrome: 298194 bytes, SHA-256 `3f951b9c0b7a80ef869f85ef189846859a88a81730b63c7825725a0f70cb615c`.
-- Firefox: 298231 bytes, SHA-256 `326289df74b7f9d3b97c6be72024fee6020c807c831f1a8d89b41d6be6800fcb`.
+- Chrome: 298903 bytes, SHA-256 `783c88c71401f23d8cb6134a4688ddd00cc12307468018f002a8404216eebe02`.
+- Firefox: 298939 bytes, SHA-256 `20f3bf65bfb74be7912544fd8903cbdc7acee269eae84b8962a1c05e70e69625`.
 
-Cloudflare gate plan
-`b9dc6a6378a824b7a7c534b8a039fafffdb9921697df49cd62f8b38ae550f069`
-uploaded only those two immutable R2 objects and deployed Worker
-`bec0dbe6-7952-4fb1-8aca-4c50f49c4d06` at 100 percent. The production page
-advertises both 1.0.22 links; each response returns HTTP 200 with immutable
-one-year caching and the exact certified hash above. The final inspection
-reports no pending D1 migration and the six HTTP production Playwright
-journeys pass. Worker `c1eef241-0eed-4f2c-b389-598f0106763d` remains the
-rollback reference. No D1, cover bucket or secret was modified.
+The immutable Cloudflare publication receipt is recorded after the separate
+provider gate completes. Worker `bec0dbe6-7952-4fb1-8aca-4c50f49c4d06` is the
+pinned rollback reference for this candidate. No D1 migration, cover mutation
+or secret change belongs to this release.
 
 ### Persistent recovery release — 2026-09-12
 

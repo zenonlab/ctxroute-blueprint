@@ -8507,6 +8507,84 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-structured-title-release-1-0-23",
+      "title": "Certifier et publier la correction des titres structures 1.0.23",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Construire et certifier les archives 1.0.23",
+          "status": "DONE",
+          "acceptance": [
+            "Les manifests Chrome et Firefox portent 1.0.23",
+            "Les archives sont reproductibles et leurs hashes sont enregistres",
+            "Les parcours installes Chromium et Firefox passent",
+            "npm run verify et Archify passent",
+            "Aucune ressource Cloudflare n est modifiee"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/release.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/plans/publish-structured-title-release-1-0-23.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run package:extension",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "node apps/extension/scripts/installed-review.mjs avec archive Chrome 1.0.23",
+            "node apps/extension/scripts/installed-firefox.mjs avec archive Firefox 1.0.23",
+            "npm run verify",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check",
+            "git commit -m test(matcher): certify structured title release 1.0.23"
+          ],
+          "evidence": [
+            "Chrome and Firefox 1.0.23 archives reproduce byte for byte with SHA-256 783c88c7...be02 and 20f3bf65...9625.",
+            "Installed Chromium 153 completes 1406-bookmark convergence, storage.sync v2 reconstruction, encrypted backup recovery and zero imported Review; installed Firefox 151 passes.",
+            "npm run verify passes with zero vulnerabilities; favorite-resolution dataflow passes Archify showcase 9/9 with zero errors and warnings."
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Publier les archives et le Worker puis verifier la production",
+          "status": "TODO",
+          "acceptance": [
+            "Seuls les deux objets R2 1.0.23 et le Worker public sont modifies",
+            "Aucune migration D1 suppression cover ou modification de secret n est executee",
+            "Les hashes distants correspondent aux archives certifiees",
+            "Le Worker est sain et la page download annonce 1.0.23",
+            "Les parcours de production passent et main est pousse sans force"
+          ],
+          "files": [
+            "build/operations/publish-structured-title-release-1.0.23.json",
+            "docs/release.md",
+            "docs/plans/publish-structured-title-release-1-0-23.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Charger seulement les variables Cloudflare depuis le fichier env Fav multiline sans les afficher",
+            "npm run infra:inspect avec le compte 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "npm run infra:plan pour les deux archives 1.0.23 et worker-deploy",
+            "npm run infra:apply avec digest et allowlist exacts",
+            "Verifier versions Worker migrations D1 pages publiques et hashes distants",
+            "Executer les parcours Playwright de production",
+            "git commit -m chore(release): publish structured title release 1.0.23",
+            "git push origin main"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

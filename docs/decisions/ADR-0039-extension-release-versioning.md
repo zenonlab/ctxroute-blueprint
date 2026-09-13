@@ -47,9 +47,14 @@ certifies automatic first-install convergence with the corrected batch route.
 `1.0.21` accélère la publication checkpointée du snapshot synchronisé, certifie
 sa reconstruction après perte d’IndexedDB et ajoute l’export/import privé v5
 chiffré avec journal de reprise pour l’identité collective.
-`1.0.22` relie l’unique segment humain du nom de favori au slug stable,
+`1.0.22` relie l'unique segment humain du nom de favori au slug stable,
 retire un identifiant numérique de routage seulement avec corroboration de la
 sortie URL et du nom, et force le reparsing par `favorite-parser-v4`.
+`1.0.23` conserve les formes parenthésées comme alias structurés de découverte
+sans les promouvoir seules en preuve d'identité, câble explicitement les
+indices OVA et prépublication dans le runner MV3, et invalide les décisions
+automatiques antérieures via `favorite-parser-v5`, `favorite-matcher-v4` et
+`favorite-provider-search-v3`. Les décisions humaines restent préservées.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

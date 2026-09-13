@@ -1014,9 +1014,13 @@ humains non concordants reste sans identité plutôt que de choisir arbitraireme
 Le titre et le slug bruts restent dans l'artefact local pour expliquer la
 décision et permettre un reparsing versionné.
 
-La candidate locale 1.0.22 distribue ce parser dans les deux manifests. Elle
-conserve le modèle cache-first, la reconstruction `storage.sync` v2 et le
-stockage IndexedDB v14 de la 1.0.21; aucun schéma D1 ou IndexedDB ne change.
+La candidate locale 1.0.23 distribue `favorite-parser-v5`,
+`favorite-matcher-v4` et `favorite-provider-search-v3` dans les deux manifests.
+Les variantes parenthésées servent à la découverte tout en restant séparées des
+preuves d'identité; les indices OVA et prépublication atteignent désormais le
+runner MV3. Elle conserve le modèle cache-first, la reconstruction
+`storage.sync` v2 et le stockage IndexedDB v14; aucun schéma D1 ou IndexedDB ne
+change et les décisions humaines restent préservées.
 
 Les liens MangaUpdates modernes fournis par MangaDex sont conservés comme
 références publiques validées et utilisés pour hydrater exactement la source
