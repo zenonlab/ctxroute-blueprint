@@ -199,6 +199,68 @@ describe('importFavoriteSources', () => {
     expect(await storage.getWork(work.id)).toEqual(work);
   });
 
+  it.each([
+    {
+      bookmarkId: 'asura-lineage',
+      cleanTitle: 'Genius of the Unique Lineage',
+      legacyTitle: '0906168628 genius of the unique lineage',
+      title: '0906168628 Genius of the Unique Lineage',
+      url: 'https://www.asurascans.com/0906168628-genius-of-the-unique-lineage-chapter-31/',
+    },
+    {
+      bookmarkId: 'void-appraiser',
+      cleanTitle: 'Artifact Reading Appraiser',
+      legacyTitle: 'Artifact Reading Appraiser | Chapter 18 | Void Scans',
+      title: 'Artifact Reading Appraiser | Chapter 18 | Void Scans',
+      url: 'https://void-scans.com/1/artifact-reading-appraiser-chapter-18/',
+    },
+  ])('reparses a legacy automatic Review and projects $cleanTitle', async ({ bookmarkId, cleanTitle, legacyTitle, title, url }) => {
+    const storage = new MemoryStoragePort();
+    const input = { ...favorite, bookmarkId, title, url };
+    await importFavoriteSources([input], storage, importedAt);
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (!source) throw new Error('Expected source.');
+    const artifact = await storage.getFavoriteParseArtifact(source.id);
+    const taskId = source.id.replace(/^source_/u, 'favorite-resolution_');
+    const task = await storage.getFavoriteResolutionTask(taskId);
+    if (!artifact || !task) throw new Error('Expected parser state.');
+    const staleWork = createWork({ externalReferences: [{ externalId: 'legacy', provider: 'mangadex' }], id: workId(`work_${bookmarkId}`), mediaKind: 'manga', preferredTitle: legacyTitle });
+    const staleReview = createReview({ decisionOrigin: 'automatic', id: reviewId(`review_${bookmarkId}`), matchedWorkId: staleWork.id, sourceLabel: url, status: 'resolved', title: legacyTitle });
+    const claimed = claimTask(task, 'legacy', importedAt, '2026-09-06T00:01:00.000Z');
+    await storage.putWork(staleWork);
+    await storage.putLibrary(createLibrary(libraryId('library_primary'), [staleWork.id]));
+    await storage.putReview(staleReview);
+    await storage.putFavoriteSource({
+      ...source,
+      matchedWorkId: staleWork.id,
+      resolution: { kind: 'RESOLVED' },
+      resolutionVersions: { schema: 1, decision: 1, receipt: 1, parser: 'favorite-parser-v4', matcher: 'favorite-matcher-v3', siteRules: artifact.artifact.sourceAdapterVersion },
+      reviewId: staleReview.id,
+    });
+    await storage.putFavoriteParseArtifact({
+      ...artifact,
+      artifact: { ...artifact.artifact, displayTitle: legacyTitle, identityKey: legacyTitle.toLocaleLowerCase(), parserVersion: 'favorite-parser-v4', semanticFingerprint: `fnv1a32:legacy-${bookmarkId}` },
+    });
+    await storage.putFavoriteResolutionTask(commitTask(recordTaskEffect(claimed, 'legacy', 'resolved:legacy'), 'legacy'));
+
+    await importFavoriteSources([input], storage, '2026-09-13T01:00:00.000Z');
+
+    const updated = await storage.getFavoriteSource(source.id);
+    expect(updated?.matchedWorkId).toBeUndefined();
+    expect(updated?.resolution).toBeUndefined();
+    expect(updated?.reviewId).toBeUndefined();
+    const reparsedArtifact = await storage.getFavoriteParseArtifact(source.id);
+    expect(reparsedArtifact?.artifact).toMatchObject({ displayTitle: cleanTitle, parserVersion: 'favorite-parser-v5' });
+    expect(await storage.getFavoriteResolutionTask(taskId)).toMatchObject({ state: 'READY' });
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toEqual([]);
+    expect(await storage.getWork(staleWork.id)).toEqual(staleWork);
+    expect(await storage.getReview(staleReview.id)).toEqual(staleReview);
+    expect(reparsedArtifact && await storage.getFavoriteResolutionReceipt(`${source.id}:semantic-reparse:${reparsedArtifact.artifact.semanticFingerprint}`)).toMatchObject({
+      correction: { artifact: { artifact: { displayTitle: legacyTitle } }, review: staleReview, source: { matchedWorkId: staleWork.id }, task: { state: 'COMMITTED' } },
+      effectDigest: 'correction:semantic-automatic',
+    });
+  });
+
   it('keeps stale membership while another observed resolved source still references the Work', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([favorite, { ...favorite, bookmarkId: '43' }], storage, importedAt);

@@ -54,7 +54,7 @@ export async function importFavoriteSources(
       for (const favorite of batch) {
         const id = favoriteSourceIdentity(favorite.bookmarkId);
         const previousSource = await session.getFavoriteSource(id);
-        const previousAutomaticWorkId = previousSource !== undefined && previousSource.reviewId === undefined && previousSource.resolution?.kind === 'RESOLVED'
+        let previousAutomaticWorkId = previousSource !== undefined && previousSource.reviewId === undefined && previousSource.resolution?.kind === 'RESOLVED'
           ? previousSource.matchedWorkId
           : undefined;
         const existingSource = previousSource === undefined ? undefined
@@ -89,9 +89,28 @@ export async function importFavoriteSources(
         const sameArtifact = existingArtifact?.artifact.semanticFingerprint === artifact.semanticFingerprint;
         if (!sameArtifact && source.resolution !== undefined) {
           const decision = source.reviewId === undefined ? undefined : await session.getReview(source.reviewId);
-          if (decision === undefined || decision.status === 'pending') {
-            const { matchedWorkId: _work, resolution: _resolution, resolutionVersions: _versions, ...processing } = source;
-            source = createFavoriteSource(processing);
+          const staleAutomaticReview = decision?.decisionOrigin === 'automatic';
+          if (decision === undefined || decision.status === 'pending' || staleAutomaticReview) {
+            if (staleAutomaticReview) {
+              previousAutomaticWorkId = source.resolution.kind === 'RESOLVED' ? source.matchedWorkId : previousAutomaticWorkId;
+              const receiptId = `${source.id}:semantic-reparse:${artifact.semanticFingerprint}`;
+              if (await session.getFavoriteResolutionReceipt(receiptId) === undefined) {
+                const correction = { schemaVersion: 1 as const, source, review: decision };
+                const withArtifact = existingArtifact === undefined ? correction : { ...correction, artifact: existingArtifact };
+                await session.putFavoriteResolutionReceipt({
+                  completedAt: importedAt,
+                  correction: existingTask === undefined ? withArtifact : { ...withArtifact, task: existingTask },
+                  effectDigest: 'correction:semantic-automatic',
+                  id: receiptId,
+                  idempotencyKey: receiptId,
+                  sourceId: source.id,
+                });
+              }
+            }
+            const { matchedWorkId: _work, resolution: _resolution, resolutionVersions: _versions, reviewId: _review, ...processing } = source;
+            source = createFavoriteSource(staleAutomaticReview || source.reviewId === undefined
+              ? processing
+              : { ...processing, reviewId: source.reviewId });
           }
         }
         if (!sameArtifact && previousAutomaticWorkId !== undefined && source.matchedWorkId === undefined) {

@@ -118,7 +118,7 @@
       "stage": 1,
       "row": 4,
       "width": 150,
-      "tag": "route + alignement titre/slug · v5"
+      "tag": "route bornée + titre/slug · v5"
     },
     {
       "id": "parseArtifact",
@@ -172,7 +172,7 @@
       "stage": 4,
       "row": 1,
       "width": 150,
-      "tag": "transaction + export AES-GCM"
+      "tag": "transaction + reçu de reparsing auto"
     },
     {
       "id": "localDiagnostics",

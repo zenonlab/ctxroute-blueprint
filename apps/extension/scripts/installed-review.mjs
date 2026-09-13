@@ -92,6 +92,8 @@ try {
     await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Synthetic pending manhwa 006', url: 'https://manhwaz.com/webtoon/synthetic-pending-manhwa-006/chapter-66.1' });
     await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Synthetic cache anime', url: 'https://reader.example/anime/synthetic-cache-anime' });
     await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Synthetic rescued manga Chapter 31', url: 'https://reader.example/view/9384/chapter/31' });
+    await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: '0906168628 Genius of the Unique Lineage', url: 'https://www.asurascans.com/0906168628-genius-of-the-unique-lineage-chapter-31/' });
+    await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Artifact Reading Appraiser | Chapter 18 | Void Scans', url: 'https://void-scans.com/1/artifact-reading-appraiser-chapter-18/' });
   });
   const { id: extensionId } = await debugging.send('Extensions.loadUnpacked', { path: extensionPath });
   await page.goto(`chrome-extension://${extensionId}/options.html`);
@@ -111,17 +113,19 @@ try {
   }
   assert.equal(status?.ok, true);
   assert.equal(status.inventory.status, 'complete');
-  assert.equal(status.counts.observed, 1406);
+  assert.equal(status.counts.observed, 1408);
   assert.equal(status.counts.unsupported, 1401);
   process.stdout.write(`Installed cache diagnostics: cacheReads=${publicCacheReads}, tobirinkRequests=${tobirinkRequests}, paths=${[...tobirinkPaths].join(',')}, titleSearches=${providerTitleSearches}, counts=${JSON.stringify(status.counts)}\n`);
   const catalogue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
   assert.equal(catalogue.ok, true);
-  assert.equal(catalogue.snapshot.statistics.total, 5, JSON.stringify(catalogue.snapshot.items));
+  assert.equal(catalogue.snapshot.statistics.total, 7, JSON.stringify(catalogue.snapshot.items));
   assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic pending manga' && item.mediaType === 'manga' && item.state === 'retryable'));
   assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic pending manhwa' && item.mediaType === 'manga' && item.state === 'retryable'), JSON.stringify(catalogue.snapshot.items));
   assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic cache anime' && item.state === 'ready'));
   assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic rescued manga' && item.mediaType === 'unknown' && item.state === 'retryable'));
-  assert.equal(providerTitleSearches, 2);
+  assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'genius of the unique lineage' && item.state === 'retryable'), JSON.stringify(catalogue.snapshot.items));
+  assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'artifact reading appraiser' && item.state === 'retryable'), JSON.stringify(catalogue.snapshot.items));
+  assert.ok(providerTitleSearches >= 2);
   assert.ok(resolutionOrder.indexOf('public-cache') < resolutionOrder.indexOf('provider-search'));
   const backupPassphrase = 'synthetic-local-passphrase';
   const ownerToken = 'a'.repeat(64);
@@ -137,7 +141,7 @@ try {
   assert.ok(!backup.serialized.includes(backupPassphrase));
   const wrongRestore = await page.evaluate(({ serialized }) => globalThis.chrome.runtime.sendMessage({ confirmation: 'replace-private-state', passphrase: 'incorrect-passphrase', serialized, type: 'recovery.backup.restore', version: 1 }), backup);
   assert.equal(wrongRestore.ok, false);
-  assert.equal((await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }))).snapshot.statistics.total, 5);
+  assert.equal((await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }))).snapshot.statistics.total, 7);
   let synchronizedSnapshot;
   for (let pass = 0; pass < 180; pass += 1) {
     synchronizedSnapshot = await page.evaluate(() => globalThis.chrome.storage.sync.get(null));
@@ -168,7 +172,7 @@ try {
     await new Promise((resolve) => { setTimeout(resolve, 200); });
   }
   assert.equal(recoveredStatus?.inventory.status, 'complete');
-  assert.equal(recoveredStatus.counts.observed, 1406);
+  assert.equal(recoveredStatus.counts.observed, 1408);
   const recoveredCatalogue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
   assert.equal(recoveredCatalogue.ok, true);
   assert.ok(recoveredCatalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic cache anime' && item.state === 'ready'));
@@ -186,7 +190,7 @@ try {
   }
   const restarted = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
   assert.equal(restarted.ok, true);
-  assert.equal(restarted.snapshot.statistics.total, 5);
+  assert.equal(restarted.snapshot.statistics.total, 7);
   const continuation = await page.evaluate(() => globalThis.chrome.alarms.get('tobirink-favorite-resolution-continuation-v1'));
   assert.ok(Number.isFinite(continuation?.scheduledTime));
   const queue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'review.queue.read', version: 1 }));
@@ -221,7 +225,7 @@ try {
   await page.getByRole('button', { name: 'Activer le diagnostic' }).waitFor();
   const diagnosticLock = await page.evaluate(() => globalThis.chrome.storage.local.get('tobirink.extensionDiagnostics'));
   assert.equal(diagnosticLock['tobirink.extensionDiagnostics'], 'off');
-  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, automatic 1406-bookmark convergence, storage.sync v2 reconstruction after IndexedDB loss, encrypted private backup with owner identity and wrong-password rejection, cache-first provider routing, durable retries, pause/resume, zero imported Review and private status UI passed.\n`);
+  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, automatic 1408-bookmark convergence, structured Asura/Void titles, storage.sync v2 reconstruction after IndexedDB loss, encrypted private backup with owner identity and wrong-password rejection, cache-first provider routing, durable retries, pause/resume, zero imported Review and private status UI passed.\n`);
 } finally {
   await context.close();
 }

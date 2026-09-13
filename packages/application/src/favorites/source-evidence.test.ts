@@ -55,6 +55,19 @@ describe('favorite source evidence U-01…U-10', () => {
       mediaKind: 'UNKNOWN', proofs: ['RELEASE_PATH'], release: { kind: 'chapter', value: 31 }, sourceAdapter: 'generic-bookmark-release-v1', title: 'Genius of the Unique Lineage',
     });
   });
+  it('accepts a bounded numeric route only when the bookmark corroborates its release-bearing slug', () => {
+    const url = 'https://void-scans.com/1/artifact-reading-appraiser-chapter-18/';
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'bookmark-void', title: 'Artifact Reading Appraiser | Chapter 18 | Void Scans', url })).toMatchObject({
+      canonicalUrl: 'https://void-scans.com/1/artifact-reading-appraiser',
+      release: { kind: 'chapter', provenance: 'URL_SLUG_SUFFIX', value: 18 },
+      stableSlug: 'artifact-reading-appraiser',
+      title: 'artifact reading appraiser',
+    });
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'bookmark-uncorroborated', title: 'Unrelated page', url })).toMatchObject({
+      sourceAdapter: 'generic-bookmark-release-v1',
+      title: 'Unrelated page',
+    });
+  });
   it.each([
     ['not a URL', 'INVALID_URL'],
     ['ftp://fixtures.tobirink.invalid/anime/frieren', 'NON_WEB_URL'],

@@ -1,0 +1,46 @@
+{
+  "goalId": "goal-repair-legacy-automatic-title-reparse",
+  "title": "Reparer le reparsing des anciens titres automatiques",
+  "approved": true,
+  "validationEvidence": [
+    "Le parser pur nettoie deja les deux cas mais une ancienne Review automatique resolue conserve son Work stale",
+    "L utilisateur a approuve la correction bornee par go",
+    "Aucun deploiement D1 secret suppression ou publication ne fait partie de cette etape"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Detacher les resolutions automatiques stale et certifier les deux titres",
+      "acceptance": [
+        "Une modification semantique detache une ancienne resolution automatique et son lien Review sans supprimer les archives",
+        "La bibliotheque retire le Work automatique stale puis projette le nouveau titre parse",
+        "Les decisions humaines et les correspondances automatiques semantiquement inchangees restent intactes",
+        "Les deux cas signales affichent Genius of the Unique Lineage et Artifact Reading Appraiser",
+        "Les tests installes npm run verify et Archify passent"
+      ],
+      "files": [
+        "packages/application/src/favorites/source-evidence.ts",
+        "packages/application/src/favorites/source-evidence.test.ts",
+        "packages/application/src/use-cases/import-favorite-sources.ts",
+        "packages/application/src/use-cases/import-favorite-sources.test.ts",
+        "apps/extension/scripts/installed-review.mjs",
+        "docs/systems/favorite-resolution-rebuild-pipeline.md",
+        "docs/architecture/src/favorite-resolution.dataflow.json",
+        "docs/plans/repair-legacy-automatic-title-reparse.json",
+        "docs/plans/repair-legacy-automatic-title-reparse-completion.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run progress:validate -- docs/plans/repair-legacy-automatic-title-reparse.json",
+        "npm run progress:approve -- docs/plans/repair-legacy-automatic-title-reparse.json",
+        "Tests application cibles du reparsing automatique et des deux URLs",
+        "node apps/extension/scripts/installed-review.mjs avec le ZIP Chrome courant",
+        "npm run verify",
+        "npm run archify:validate -- favorite-resolution.dataflow",
+        "git diff --check",
+        "git commit -m fix(favorites): reparse legacy automatic resolutions"
+      ]
+    }
+  ]
+}

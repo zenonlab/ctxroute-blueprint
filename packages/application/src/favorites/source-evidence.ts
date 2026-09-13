@@ -35,6 +35,13 @@ function comparableIdentity(value: string): string {
   return normalizeFavoriteTitle(value).normalized;
 }
 
+function bookmarkCorroboratesSlug(observedTitle: string, stableSlug: string): boolean {
+  const slugKey = comparableIdentity(stableSlug);
+  return slugKey.length > 0 && segmentFavoriteTitle(observedTitle).segments
+    .filter((segment) => !segment.excluded)
+    .some((segment) => comparableIdentity(segment.cleaned) === slugKey);
+}
+
 function stripLeadingRoutingIdentifier(slug: string, release: SourceEvidence['release'], observedTitle: string): StructuralIdentity {
   if (release === undefined) return { slug, transformed: false };
   const match = /^(\d{6,12})[-_.]+(.+)$/u.exec(slug);
@@ -139,7 +146,11 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
   const category = decoded[identityIndex - 1]?.toLowerCase();
   const categoryRoute = category !== undefined && routeCategorySegments.has(category);
   const rootReleaseRoute = identityIndex === 0 && release !== undefined;
-  if (!categoryRoute && !rootReleaseRoute) {
+  const boundedNumericReleaseRoute = identityIndex === 1
+    && release !== undefined
+    && /^\d{1,4}$/u.test(decoded[0] ?? '')
+    && bookmarkCorroboratesSlug(input.title, stableSlug);
+  if (!categoryRoute && !rootReleaseRoute && !boundedNumericReleaseRoute) {
     return release === undefined ? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED')
       : (bookmarkTitleReleaseEvidence(input, url, release) ?? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED'));
   }

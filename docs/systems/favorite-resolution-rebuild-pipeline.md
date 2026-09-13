@@ -1011,6 +1011,9 @@ dur. Un préfixe numérique de routage long n'est retiré qu'avec une sortie
 prouvée par l'URL et la même identité corroborée par le nom. Les nombres
 intrinsèques sont conservés. Un slug opaque accompagné de plusieurs segments
 humains non concordants reste sans identité plutôt que de choisir arbitrairement.
+Une route numérique courte placée avant un slug portant une sortie, comme
+`/1/oeuvre-chapter-18`, suit la même règle de corroboration : le slug nettoyé
+est retenu seulement si un segment humain du favori lui correspond exactement.
 Le titre et le slug bruts restent dans l'artefact local pour expliquer la
 décision et permettre un reparsing versionné.
 
@@ -1021,6 +1024,14 @@ preuves d'identité; les indices OVA et prépublication atteignent désormais le
 runner MV3. Elle conserve le modèle cache-first, la reconstruction
 `storage.sync` v2 et le stockage IndexedDB v14; aucun schéma D1 ou IndexedDB ne
 change et les décisions humaines restent préservées.
+
+Lorsqu'un reparsing modifie l'empreinte sémantique, une ancienne décision
+automatique, y compris une Review automatique déjà résolue, est détachée de la
+source et retirée de la projection visible si aucune autre source observée ne
+référence son Work. L'ancienne source, sa Review, son artefact et sa tâche sont
+conservés dans un reçu de correction; la nouvelle résolution repart en `READY`.
+Une décision humaine résolue ou no-match reste autoritaire et n'est jamais
+invalidée par ce mécanisme.
 
 Les liens MangaUpdates modernes fournis par MangaDex sont conservés comme
 références publiques validées et utilisés pour hydrater exactement la source

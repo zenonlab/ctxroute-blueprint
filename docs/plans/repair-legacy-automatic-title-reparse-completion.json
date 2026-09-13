@@ -1,0 +1,24 @@
+{
+  "goalId": "goal-repair-legacy-automatic-title-reparse",
+  "stepId": "step-1",
+  "status": "DONE",
+  "files": [
+    "packages/application/src/favorites/source-evidence.ts",
+    "packages/application/src/favorites/source-evidence.test.ts",
+    "packages/application/src/use-cases/import-favorite-sources.ts",
+    "packages/application/src/use-cases/import-favorite-sources.test.ts",
+    "apps/extension/scripts/installed-review.mjs",
+    "docs/systems/favorite-resolution-rebuild-pipeline.md",
+    "docs/architecture/src/favorite-resolution.dataflow.json",
+    "docs/plans/repair-legacy-automatic-title-reparse.json",
+    "docs/plans/repair-legacy-automatic-title-reparse-completion.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "57 tests cibles verts: les deux URLs exactes produisent les titres nettoyés et le reçu conserve Source Review artefact et tâche automatiques.",
+    "Chromium 153 installé converge sur 1408 favoris, reconstruit après perte IndexedDB, reprend les pannes et conserve zéro Review importée.",
+    "npm run verify est vert: suites produit, équivalence FavLib synthétique, builds Chrome Firefox, IndexedDB Chromium, performances, CRG, intégration et zéro vulnérabilité.",
+    "favorite-resolution.dataflow passe Archify showcase 9/9 sans erreur ni avertissement; git diff --check passe."
+  ]
+}
