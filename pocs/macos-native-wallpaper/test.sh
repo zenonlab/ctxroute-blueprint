@@ -39,7 +39,14 @@ xcrun swiftc -swift-version 6 -parse-as-library -D WALLPAPER_NATIVE_DIAGNOSTIC \
   "$probe_source/DiagnosticTheme.swift" "$probe_source/SnapshotTests.swift" \
   "$probe_tests/PhospheneExtension/ColorDiag.swift" \
   -o "$probe_tests/snapshot"
-if ("$probe_tests/snapshot" >/dev/null 2>&1) 2>/dev/null; then
+if /usr/bin/python3 - "$probe_tests/snapshot" <<'PY'
+import subprocess
+import sys
+
+result = subprocess.run([sys.argv[1]], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+raise SystemExit(1 if result.returncode != 0 else 0)
+PY
+then
   echo 'Snapshot renderer accepted missing arguments.' >&2
   exit 1
 fi
