@@ -1,0 +1,12 @@
+{
+  "goalId": "goal-correct-agenda-provider-pipeline",
+  "stepId": "step-3",
+  "status": "DONE",
+  "completedAt": "2026-09-13T17:16:54.000Z",
+  "evidence": [
+    "AniList follows pageInfo.hasNextPage with a 100-page hard limit and 2.2-second reservations; MangaUpdates follows returned page, per_page and total_hits with a 250-page hard limit and 3-second reservations",
+    "Every accepted page emits a serializable checkpoint containing its events, next page and not-before time; incomplete, malformed, oversized, 403 and 429 responses never return a partial lane",
+    "Live MangaUpdates inspection confirmed per_page 40, metadata.series.series_id and record.id without retaining titles or payloads",
+    "All 53 Worker tests and Worker typecheck pass; Agenda dataflow remains Archify showcase 9/9"
+  ]
+}

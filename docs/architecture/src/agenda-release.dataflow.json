@@ -57,7 +57,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "Temps", "items": ["AniList fournit un instant UTC officiel", "MangaUpdates fournit une date civile confirmée", "mangaupdates est la clé canonique et le numéro reste textuel", "Une estimation manga ne fabrique jamais d’heure"] },
-    { "dot": "emerald", "title": "Résilience", "items": ["Pagination fondée sur la réponse fournisseur", "Une page par checkpoint MV3", "Dernière génération valide conservée", "D1 vide ou périmé active le repli local"] },
+    { "dot": "emerald", "title": "Résilience", "items": ["AniList suit pageInfo.hasNextPage", "MangaUpdates suit page, per_page et total_hits", "Une page par checkpoint MV3", "Dernière génération valide conservée"] },
     { "dot": "amber", "title": "Frontière privée", "items": ["D1 contient seulement des événements publics", "Aucun titre ou favori dans la collecte", "Les IDs personnels ne quittent pas la projection", "WebBridge lit uniquement l’Agenda local"] }
   ]
 }
