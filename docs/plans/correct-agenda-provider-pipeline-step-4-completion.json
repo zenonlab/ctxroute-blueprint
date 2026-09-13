@@ -1,0 +1,12 @@
+{
+  "goalId": "goal-correct-agenda-provider-pipeline",
+  "stepId": "step-4",
+  "status": "DONE",
+  "completedAt": "2026-09-13T17:30:00.000Z",
+  "evidence": [
+    "The extension tries the shared /v2/releases generation first and starts the provider fallback only for an empty, stale or unavailable shared calendar",
+    "The MV3 fallback sends only a bounded civil-date window and page number directly to AniList or MangaUpdates; no favorite, title, URL, progress or owner identity enters either request",
+    "IndexedDB v17 stages each validated page by generation and atomically promotes only after both provider lanes complete while retaining the prior active generation until promotion",
+    "Application, browser, Worker, extension and Chromium migration tests pass; all workspace typechecks pass and Agenda dataflow remains Archify showcase 9/9"
+  ]
+}

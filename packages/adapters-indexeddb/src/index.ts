@@ -8,3 +8,4 @@ export { DexieTaskStore } from './task-store';
 export { DexieFavoriteResolutionOutbox } from './favorite-resolution/dexie-favorite-resolution-outbox';
 export { DexieProviderRateCheckpointAdapter } from './favorite-resolution/dexie-provider-rate-checkpoint-adapter';
 export { DexieOrganizerSnapshotStore } from './organizer-snapshot/dexie-organizer-snapshot-store';
+export { DexiePublicReleaseFallbackStore } from './releases/dexie-public-release-fallback-store';

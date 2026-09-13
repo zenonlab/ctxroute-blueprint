@@ -9374,7 +9374,7 @@
         {
           "id": "step-4",
           "title": "Ajouter le repli Agenda local durable",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "D1 récent reste prioritaire",
             "Un D1 vide périmé ou indisponible déclenche les fenêtres publiques directes depuis MV3",
@@ -9394,7 +9394,12 @@
             "git diff --check",
             "git commit -m feat(extension): add durable agenda fallback"
           ],
-          "evidence": []
+          "evidence": [
+            "The extension tries the shared /v2/releases generation first and starts the provider fallback only for an empty, stale or unavailable shared calendar",
+            "The MV3 fallback sends only a bounded civil-date window and page number directly to AniList or MangaUpdates; no favorite, title, URL, progress or owner identity enters either request",
+            "IndexedDB v17 stages each validated page by generation and atomically promotes only after both provider lanes complete while retaining the prior active generation until promotion",
+            "Application, browser, Worker, extension and Chromium migration tests pass; all workspace typechecks pass and Agenda dataflow remains Archify showcase 9/9"
+          ]
         },
         {
           "id": "step-5",

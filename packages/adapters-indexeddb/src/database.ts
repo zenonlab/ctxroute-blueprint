@@ -5,6 +5,7 @@ import { publicReleaseEventSchema } from '@tobirink/application';
 import type { DurableTask, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet } from '@tobirink/application';
 import { migrateVersion1To2 } from './migrations/v2';
 import type { ProviderIdentityRecoveryRecord } from './recovery/provider-identity-recovery-state-adapter';
+import type { PublicReleaseStagingRecord, PublicReleaseSyncRecord } from './releases/dexie-public-release-fallback-store';
 
 export class TobirinkDatabase extends Dexie {
   readonly agenda!: Table<AgendaEntry, string>;
@@ -29,7 +30,8 @@ export class TobirinkDatabase extends Dexie {
   readonly localReleaseEvidence!: Table<LocalReleaseEvidence, string>;
   readonly localAgendaEvents!: Table<LocalAgendaEvent, string>;
   readonly localNotificationDeliveries!: Table<LocalNotificationDelivery, string>;
-  readonly publicReleaseSyncState!: Table<{ id: string; generation: number; checkedAt: string; etag?: string }, string>;
+  readonly publicReleaseSyncState!: Table<PublicReleaseSyncRecord, string>;
+  readonly publicReleaseStagingEvents!: Table<PublicReleaseStagingRecord, string>;
 
   constructor(name: string) {
     super(name);
@@ -154,6 +156,9 @@ export class TobirinkDatabase extends Dexie {
       await transaction.table<PublicReleaseEvent>('publicReleaseEvents').toCollection().modify((event) => {
         Object.assign(event, publicReleaseEventSchema.parse(event));
       });
+    });
+    this.version(17).stores({
+      publicReleaseStagingEvents: '&id, generation',
     });
   }
 }

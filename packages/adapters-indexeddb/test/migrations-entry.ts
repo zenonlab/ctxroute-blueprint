@@ -2,7 +2,7 @@ import Dexie from 'dexie';
 import before from './fixtures/v1-before.json';
 import after from './fixtures/v2-after.json';
 import versionThree from './fixtures/v3-after.json';
-import { DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
+import { DexiePublicReleaseFallbackStore, DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
 import { importFavoriteSources, readReviewQueue } from '@tobirink/application';
 import { createFavoriteSource, createReview, favoriteSourceId, reviewId } from '@tobirink/domain';
 
@@ -123,8 +123,26 @@ async function verifyReleaseContractMigration(name: string): Promise<void> {
   legacy.close();
   const migrated = new TobirinkDatabase(name);
   const event = await migrated.publicReleaseEvents.get('legacy-release');
-  if (migrated.verno !== 16 || event?.provider !== 'mangaupdates' || event.sequence !== '58') throw new Error('Release contract migration did not preserve and normalize the legacy event.');
+  if (migrated.verno !== 17 || event?.provider !== 'mangaupdates' || event.sequence !== '58' || migrated.publicReleaseStagingEvents.schema.idxByName.generation === undefined) throw new Error('Release contract migration did not preserve and normalize the legacy event or add durable staging.');
   migrated.close();
+}
+
+async function verifyReleaseFallbackPromotion(name: string): Promise<void> {
+  document.body.dataset.phase = 'release-fallback-promotion';
+  const database = new TobirinkDatabase(name);
+  await database.open();
+  const store = new DexiePublicReleaseFallbackStore(database);
+  const state = { generation: 'fallback-test', lanes: { anilist: { complete: false, nextPage: 1, notBefore: 0 }, mangaupdates: { complete: false, nextPage: 1, notBefore: 0 } }, startedAt: '2026-09-12T00:00:00.000Z', window: { from: '2026-09-12', to: '2026-10-17' } } as const;
+  const event = { expiresAt: '2026-11-12T00:00:00.000Z', id: 'anilist-episode-42-1', occurrence: { kind: 'INSTANT', value: '2026-09-13T00:00:00.000Z' }, provenance: { fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist', providerWorkId: '42', releaseKind: 'episode', sequence: '1', state: 'SCHEDULED' } as const;
+  await database.publicReleaseEvents.put({ ...event, id: 'previous-release' });
+  await store.begin(state);
+  await store.stage(state.generation, { complete: true, events: [event], page: 1, provider: 'anilist' });
+  if (!await database.publicReleaseEvents.get('previous-release')) throw new Error('Partial fallback replaced the last active generation.');
+  await store.stage(state.generation, { complete: true, events: [], page: 1, provider: 'mangaupdates' });
+  await store.promote(state.generation, '2026-09-12T00:01:00.000Z');
+  const active = await database.publicReleaseEvents.toArray();
+  if (active.length !== 1 || active[0]?.id !== event.id || (await database.publicReleaseSyncState.get('active'))?.source !== 'fallback') throw new Error('Complete fallback generation was not promoted atomically.');
+  database.close();
 }
 
 async function verifySuccessfulMigration(name: string, seed: (databaseName: string) => Promise<void>, expectedSources = 0): Promise<void> {
@@ -142,7 +160,7 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 16 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 17 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   if (!database.favoriteSources.schema.idxByName.matchedWorkId) throw new Error('Direct Work source index was not added.');
   if (!database.works.schema.idxByName['hydration.favoriteAliasKeys']?.multi || !database.works.schema.idxByName['hydration.providerTitleKeys']?.multi) throw new Error('Hydrated identity multi-entry indexes were not added.');
   if (!database.works.schema.idxByName['hydration.candidate.genres']?.multi || !database.works.schema.idxByName['hydration.candidate.editorialStatus'] || !database.works.schema.idxByName['hydration.candidate.popularity.value']) throw new Error('Sortable metadata indexes were not added.');
@@ -232,6 +250,7 @@ const versionTenName = `tobirink-migration-v10-${Date.now()}`;
 const interruptedName = `tobirink-migration-interrupted-${Date.now()}`;
 const reviewCorrectionName = `tobirink-migration-review-${Date.now()}`;
 const releaseContractName = `tobirink-migration-release-${Date.now()}`;
+const releaseFallbackName = `tobirink-release-fallback-${Date.now()}`;
 try {
   await verifySuccessfulMigration(versionOneName, seedVersion1);
   await verifySuccessfulMigration(versionTwoName, seedVersion2);
@@ -244,6 +263,7 @@ try {
   await verifyInterruptedMigration(interruptedName);
   await verifyReviewCorrection(reviewCorrectionName);
   await verifyReleaseContractMigration(releaseContractName);
+  await verifyReleaseFallbackPromotion(releaseFallbackName);
   document.body.dataset.status = 'passed';
   document.body.textContent = 'IndexedDB migrations passed';
 } catch (error) {
@@ -260,4 +280,5 @@ try {
   await deleteDatabase(versionTenName);
   await deleteDatabase(interruptedName);
   await deleteDatabase(releaseContractName);
+  await deleteDatabase(releaseFallbackName);
 }

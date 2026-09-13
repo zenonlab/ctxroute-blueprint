@@ -18,9 +18,10 @@ import {
   HttpFavoriteCollectiveAdapter,
   HttpFavoritePublicCacheAdapter,
   HttpPublicReleaseLoader,
+  HttpPublicReleasePageSource,
 } from '@tobirink/adapters-browser';
 import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseFallbackStore, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
@@ -34,13 +35,15 @@ import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favoriteInventoryAuditPeriodMinutes, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
-import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentitySyncPublisher, providerSyncPrefix } from '@tobirink/application';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, ProviderIdentitySyncPublisher, providerSyncPrefix, resumePublicReleaseFallback } from '@tobirink/application';
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
 import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, readFavoriteResolutionPaused, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteResolutionPaused } from '../runtime/favorite-resolution-continuation';
 
 const primaryLibraryId = libraryId('library_primary');
+const agendaReleaseFallbackAlarmName = 'tobirink-agenda-release-fallback-v1';
+const agendaReleaseAlarmMinimumDelayMs = 30_000;
 
 interface FavoriteStatusInventory {
   continuationAt?: string;
@@ -54,7 +57,6 @@ export default defineBackground({
     const pageContext = new WebExtensionPageContextAdapter(browser.tabs);
     const cache = new WebExtensionPopupContinuationCacheAdapter(browser.storage.local);
     const releaseCache = new WebExtensionPublicReleaseCacheAdapter(browser.storage.local);
-    if (configuredSiteOrigin) void new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache).catch(() => undefined);
     const preferences = new WebExtensionQuickPreferencesAdapter(browser.storage.local);
     const tasks = new DexieTaskStore();
     const notifications = new WebExtensionNotificationAdapter(browser.notifications, browser.runtime.getURL('/icons/tobirink-128.png'));
@@ -67,6 +69,34 @@ export default defineBackground({
     const now = () => new Date().toISOString();
     const token = () => crypto.randomUUID();
     const diagnostics = new WebExtensionDiagnostics(browser.storage.local, now, token);
+    const releaseFallbackStore = new DexiePublicReleaseFallbackStore(privateStorage.storage.database);
+    const releasePageSource = new HttpPublicReleasePageSource();
+    const releaseWindow = () => {
+      const start = new Date();
+      start.setUTCDate(start.getUTCDate() - 7);
+      const end = new Date();
+      end.setUTCDate(end.getUTCDate() + 35);
+      return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+    };
+    const refreshPublicReleasesOnce = async () => {
+      if (configuredSiteOrigin) {
+        try {
+          const shared = await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache);
+          if (shared.snapshot.entries.length > 0) { await browser.alarms.clear(agendaReleaseFallbackAlarmName); return 'shared' as const; }
+        } catch { /* a direct public-provider fallback resumes below */ }
+      }
+      const activeFallback = await privateStorage.storage.database.publicReleaseSyncState.get('active');
+      if (activeFallback?.source === 'fallback' && Date.now() - Date.parse(activeFallback.checkedAt) < 86_400_000) return 'fallback' as const;
+      const result = await resumePublicReleaseFallback({ source: releasePageSource, store: releaseFallbackStore, token }, releaseWindow());
+      if (result.state === 'complete') await browser.alarms.clear(agendaReleaseFallbackAlarmName);
+      else await browser.alarms.create(agendaReleaseFallbackAlarmName, { when: Math.max(Date.now() + agendaReleaseAlarmMinimumDelayMs, result.nextWakeAt ?? Date.now()) });
+      return result.state;
+    };
+    let releaseRefreshInFlight: ReturnType<typeof refreshPublicReleasesOnce> | undefined;
+    const refreshPublicReleases = () => {
+      releaseRefreshInFlight ??= refreshPublicReleasesOnce().finally(() => { releaseRefreshInFlight = undefined; });
+      return releaseRefreshInFlight;
+    };
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const resolutionPaused = () => readFavoriteResolutionPaused(browser.storage.local);
     const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
@@ -197,6 +227,7 @@ export default defineBackground({
     });
     const resumeNotifications = async () => {
       await privateStorage.ensureReady();
+      await refreshPublicReleases();
       const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);
       if ((await preferences.read()).nativeNotifications) {
         await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries);
@@ -208,6 +239,7 @@ export default defineBackground({
     });
     browser.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === reminderAlarmName || alarm.name === agendaNextAlarmName || alarm.name === agendaReconcileAlarmName) void Promise.all([resumeNotifications(), restoreFavoriteWake()]).catch(() => undefined);
+      if (alarm.name === agendaReleaseFallbackAlarmName) void resumeNotifications().catch(() => undefined);
       if (alarm.name === favoriteResolutionContinuationAlarmName) void reconcileFavorites().then(repairLibraryProjection).catch(() => undefined);
       if (alarm.name === favoriteInventoryAuditAlarmName) void reconcileFavorites(true).then(repairLibraryProjection).catch(() => undefined);
     });
@@ -362,7 +394,7 @@ export default defineBackground({
       if (parsed.data.type === 'agenda.period.read') {
         try {
           await privateStorage.ensureReady();
-          if (configuredSiteOrigin) await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache);
+          await refreshPublicReleases();
           const hydration = await hydrateAgendaFromPublicReleaseCache(privateStorage.storage, releaseCache);
           const quickPreferences = await preferences.read();
           const snapshot = await readAgendaPeriod(privateStorage.storage, parsed.data);
