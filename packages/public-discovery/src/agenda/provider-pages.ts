@@ -5,7 +5,8 @@ const responseByteLimit = 1_000_000;
 const jsonSchema = z.json();
 type ProviderJson = z.output<typeof jsonSchema>;
 const scalarSchema = z.union([z.string().trim().min(1).max(128), z.number().finite()]);
-const mangaUpdatesRecordSchema = z.object({ chapter: scalarSchema.optional(), chapter_number: scalarSchema.optional(), id: scalarSchema.optional(), release_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u), release_id: scalarSchema.optional(), volume: scalarSchema.optional(), volume_number: scalarSchema.optional() }).passthrough();
+const nullableScalarSchema = scalarSchema.nullable().optional();
+const mangaUpdatesRecordSchema = z.object({ chapter: nullableScalarSchema, chapter_number: nullableScalarSchema, id: nullableScalarSchema, release_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u), release_id: nullableScalarSchema, volume: nullableScalarSchema, volume_number: nullableScalarSchema }).passthrough();
 const mangaUpdatesSeriesSchema = z.object({ id: scalarSchema.optional(), series_id: scalarSchema.optional() }).passthrough();
 export const mangaUpdatesAgendaResultSchema = z.object({ metadata: z.object({ series: mangaUpdatesSeriesSchema.optional() }).passthrough().optional(), record: mangaUpdatesRecordSchema, series: mangaUpdatesSeriesSchema.optional(), series_id: scalarSchema.optional() }).passthrough();
 export const mangaUpdatesAgendaPageSchema = z.object({ page: z.number().int().positive(), per_page: z.number().int().min(1).max(100), results: z.array(mangaUpdatesAgendaResultSchema).max(100), total_hits: z.number().int().nonnegative() }).passthrough();
@@ -27,7 +28,7 @@ async function parseBoundedJson(response: Response): Promise<ProviderJson> {
 export async function parseAniListAgendaPage(response: Response): Promise<z.output<typeof aniListAgendaPageSchema>> { return aniListAgendaPageSchema.parse(await parseBoundedJson(response)); }
 export async function parseMangaUpdatesAgendaPage(response: Response): Promise<z.output<typeof mangaUpdatesAgendaPageSchema>> { return mangaUpdatesAgendaPageSchema.parse(await parseBoundedJson(response)); }
 
-function scalar(value: z.infer<typeof scalarSchema> | undefined): string | undefined { return value === undefined ? undefined : String(value).trim(); }
+function scalar(value: z.infer<typeof scalarSchema> | null | undefined): string | undefined { return value === undefined || value === null ? undefined : String(value).trim(); }
 
 export function createMangaUpdatesAgendaEvent(item: z.infer<typeof mangaUpdatesAgendaResultSchema>, fetchedAt: string): PublicAgendaReleaseEvent {
   const seriesId = scalar(item.series_id) ?? scalar(item.series?.series_id) ?? scalar(item.series?.id) ?? scalar(item.metadata?.series?.series_id) ?? scalar(item.metadata?.series?.id);

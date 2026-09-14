@@ -25,7 +25,7 @@ describe('public Agenda collectors', () => {
     const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
       // SAFETY: the collector creates this request body and the test reads only its numeric page.
       const request = JSON.parse(String(init?.body)) as { page: number }; pages.push(request.page);
-      const results = request.page === 1 ? [{ metadata: { series: { series_id: 42 } }, record: { chapter: '58.5', id: 'a', release_date: '2026-09-13' } }] : [{ metadata: { series: { series_id: 43 } }, record: { chapter: '29-29.5 (end)', id: 'b', release_date: '2026-09-14' } }];
+      const results = request.page === 1 ? [{ metadata: { series: { series_id: 42 } }, record: { chapter: '58.5', id: 'a', release_date: '2026-09-13', volume: null } }] : [{ metadata: { series: { series_id: 43 } }, record: { chapter: '29-29.5 (end)', id: 'b', release_date: '2026-09-14', volume: null } }];
       return Response.json({ page: request.page, per_page: 1, results, total_hits: 2 });
     });
     const events = await new MangaUpdatesAgendaCollector(fetcher, async (milliseconds) => { pauses.push(milliseconds); }).collect({ from: '2026-09-12', to: '2026-09-28' });
