@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "TobiRink — pipeline publique déployée",
+    "quality_profile": "showcase",
+    "viewBox": [1320, 760],
+    "views": [
+      {
+        "id": "deployed-path",
+        "label": "Chemin déployé",
+        "focus": ["extension", "worker", "d1", "r2"],
+        "note": "Le Worker 4f2b30ee sert les claims, Agenda et ZIP 1.0.27; D1 possède le schéma mais aucune génération active."
+      },
+      {
+        "id": "collector-path",
+        "label": "Collecte OIDC",
+        "focus": ["providers", "github", "worker", "d1"],
+        "note": "Les workflows sont publiés, mais GitHub Billing refuse actuellement les jobs avant leur première étape."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "providers",
+      "type": "external",
+      "label": "AniList / MangaUpdates",
+      "sublabel": "Faits publics fournisseurs",
+      "pos": [50, 80],
+      "size": [230, 72]
+    },
+    {
+      "id": "github",
+      "type": "security",
+      "label": "GitHub Actions OIDC",
+      "sublabel": "Jobs refusés avant exécution · Billing",
+      "pos": [400, 80],
+      "size": [250, 72]
+    },
+    {
+      "id": "extension",
+      "type": "frontend",
+      "label": "Extension MV3 1.0.27",
+      "sublabel": "IndexedDB privé · D1-first",
+      "pos": [50, 330],
+      "size": [230, 72]
+    },
+    {
+      "id": "worker",
+      "type": "cloud",
+      "label": "Cloudflare Worker",
+      "sublabel": "4f2b30ee · aucun cron fournisseur",
+      "pos": [700, 330],
+      "size": [250, 72]
+    },
+    {
+      "id": "d1",
+      "type": "database",
+      "label": "D1 tobirink-public",
+      "sublabel": "Schéma prêt · 0 génération active",
+      "pos": [1040, 190],
+      "size": [230, 72]
+    },
+    {
+      "id": "r2",
+      "type": "database",
+      "label": "R2 public-releases",
+      "sublabel": "ZIP Chrome / Firefox 1.0.27",
+      "pos": [1040, 470],
+      "size": [230, 72]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Cloudflare publié",
+      "wraps": ["worker", "d1", "r2"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    { "id": "local-provider-fallback", "from": "extension", "to": "providers", "label": "bail D1 ou repli Agenda", "variant": "dashed" },
+    { "id": "provider-collection", "from": "providers", "to": "github", "label": "pages bornées", "variant": "dashed" },
+    { "id": "oidc-ingestion", "from": "github", "to": "worker", "label": "OIDC · bloqué avant émission", "variant": "security" },
+    { "id": "extension-api", "from": "extension", "to": "worker", "label": "HTTPS · claims / Agenda / ZIP", "variant": "emphasis" },
+    { "id": "worker-sql", "from": "worker", "to": "d1", "label": "SQL · PENDING / VERIFIED / générations" },
+    { "id": "worker-archives", "from": "worker", "to": "r2", "label": "lecture des archives immuables" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Publié et vérifié", "items": ["Migration 0011 appliquée", "Worker et deux ZIP 1.0.27 disponibles", "Aucun protocole Collectif actif"] },
+    { "dot": "amber", "title": "Preuve encore manquante", "items": ["GitHub refuse les jobs pour Billing", "D1 reste à zéro génération Agenda", "Aucun succès fournisseur réel revendiqué"] }
+  ]
+}

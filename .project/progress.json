@@ -9622,9 +9622,9 @@
             "Vérifier la production après approbation exacte des opérations"
           ],
           "evidence": [
-            "Worker 4f2b30ee-ef24-4ccc-aefb-e880be5fa50e déployé à 100 %, migration 0011 appliquée, aucun cron Cloudflare et aucune migration restante.",
-            "Route /v2/releases répond HTTP 200 avec revision d1-empty; D1 confirme 0 génération active et 0 événement faute de collecte.",
-            "external: run Agenda 34853308267 refusé avant toute étape par GitHub pour paiement échoué ou limite de dépense; aucun succès fournisseur réel ne peut être revendiqué."
+            "Worker 4f2b30ee-ef24-4ccc-aefb-e880be5fa50e déployé à 100 %, migration 0011 appliquée, deux ZIP 1.0.27 vérifiés, aucun cron Cloudflare et aucune migration restante.",
+            "Vue public-pipeline.architecture ajoutée au registre produit; npm run archify:validate -- architecture passe showcase 9/9 avec zéro erreur et avertissement.",
+            "external: deux tentatives Agenda/découverte (34853308267/34853312139 puis 34854671530/34854675359) sont refusées avant toute étape par GitHub pour paiement échoué ou limite de dépense; D1 reste sans génération active."
           ]
         }
       ]

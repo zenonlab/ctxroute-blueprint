@@ -71,6 +71,9 @@ Agenda active. Les runs GitHub `34853308267` et `34853312139` n'ont exécuté
 aucune étape : GitHub les a refusés pour paiement de compte échoué ou limite de
 dépense insuffisante. La collecte réelle reste donc non certifiée jusqu'à la
 résolution de ce blocage externe.
+Une seconde tentative autonome produit le même résultat avant toute étape sur
+les runs Agenda `34854671530` et découverte `34854675359`; aucun appel
+fournisseur, jeton OIDC ou écrit D1 n'a été exécuté par ces jobs.
 
 ## Release verification
 
