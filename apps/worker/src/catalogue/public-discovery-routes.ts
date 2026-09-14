@@ -56,7 +56,10 @@ async function authorize(request: { header(name: string): string | undefined }, 
   const token = bearer(request);
   if (!token) return false;
   try { await verify(token, url); return true; }
-  catch { return false; }
+  catch (error) {
+    console.warn('discovery-ingestion-authorization-rejected', error instanceof Error ? error.message : 'unknown');
+    return false;
+  }
 }
 
 export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyToken: VerifyCollectorToken = verifyGitHubAgendaToken): Hono<WorkerRuntime> {

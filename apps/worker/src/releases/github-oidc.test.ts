@@ -17,7 +17,7 @@ describe('GitHub Agenda OIDC', () => {
     if (!('publicKey' in keys)) throw new Error('expected-key-pair');
     const publicKey = await crypto.subtle.exportKey('jwk', keys.publicKey);
     const now = Date.parse('2026-09-14T10:00:00.000Z'); const nowSeconds = Math.floor(now / 1000);
-    const header = encode({ alg: 'RS256', kid: 'fixture', typ: 'JWT' });
+    const header = encode({ alg: 'RS256', kid: 'fixture', typ: 'JWT', x5t: 'fixture-thumbprint' });
     const claims = encode({ aud: 'https://tobirink.test/v2/releases/generations', event_name: 'schedule', exp: nowSeconds + 300, iat: nowSeconds, iss: 'https://token.actions.githubusercontent.com', ref: 'refs/heads/main', repository: 'tristan-monticelli/Tobirink', workflow_ref: 'tristan-monticelli/Tobirink/.github/workflows/agenda-collector.yml@refs/heads/main' });
     const signature = encodeBytes(new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', keys.privateKey, new TextEncoder().encode(`${header}.${claims}`))));
     const token = `${header}.${claims}.${signature}`;

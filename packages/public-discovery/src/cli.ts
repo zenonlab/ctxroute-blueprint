@@ -21,7 +21,7 @@ export async function runPublicDiscoveryCli(environment: PublicDiscoveryCliEnvir
       resultToken: token(environment.DISCOVERY_RESULT_OIDC_TOKEN, 'discovery-result-oidc-token'),
     }),
     limit: 20,
-    nonce: crypto.randomUUID,
+    nonce: () => crypto.randomUUID(),
     now: () => new Date().toISOString(),
     resolver: createPublicDiscoveryResolver(),
   });

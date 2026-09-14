@@ -10,7 +10,12 @@ const identitiesByPath: ReadonlyMap<string, GitHubCollectorIdentity> = new Map<s
   ['/v3/catalogue/discoveries/collector/claims', Object.freeze({ repository: publicDiscoveryRepository, workflow: `${publicDiscoveryRepository}/.github/workflows/collect.yml@refs/heads/main` })],
   ['/v3/catalogue/discoveries/results', Object.freeze({ repository: publicDiscoveryRepository, workflow: `${publicDiscoveryRepository}/.github/workflows/collect.yml@refs/heads/main` })],
 ]);
-const jwtHeaderSchema = z.strictObject({ alg: z.literal('RS256'), kid: z.string().min(1).max(256), typ: z.string().optional() });
+const jwtHeaderSchema = z.strictObject({
+  alg: z.literal('RS256'),
+  kid: z.string().min(1).max(256),
+  typ: z.string().optional(),
+  x5t: z.string().min(1).max(256).optional(),
+});
 const jwtClaimsSchema = z.object({
   aud: z.union([z.string(), z.array(z.string()).max(4)]), exp: z.number().int(), iat: z.number().int(), iss: z.literal(issuer),
   event_name: z.enum(['schedule', 'workflow_dispatch']), nbf: z.number().int().optional(), ref: z.literal('refs/heads/main'),

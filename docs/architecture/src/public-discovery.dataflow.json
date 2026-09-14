@@ -188,7 +188,7 @@
       "title": "MISS D1",
       "items": [
         "D1 conserve une seule requête PENDING par clé",
-        "Le prochain run quotidien ou manuel hydrate la fiche",
+        "Un bail PROCESSING empêche tout second collecteur concurrent",
         "Le résultat VERIFIED répond aux prochaines lectures"
       ]
     },
@@ -200,7 +200,7 @@
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
         "D1 et le code Worker restent privés; seul le collecteur MIT est public",
         "GitHub utilise workers.dev pour éviter le challenge Bot Fight Mode du site",
-        "Les refus edge exposent seulement statut, cf-ray et type de réponse; jamais le jeton OIDC"
+        "OIDC valide l’en-tête GitHub RS256/kid/x5t puis journalise seulement un code de rejet, jamais le jeton"
       ]
     }
   ]
