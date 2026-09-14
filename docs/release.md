@@ -64,9 +64,19 @@ l’orchestration des lanes AniList, MangaUpdates, MangaDex, Kitsu Anime et Kits
 Manga. Il publie une fiche complète ou une issue terminale via OIDC.
 
 Cette candidate et la migration `0012_server_public_discovery.sql` ne sont pas
-publiées. Le workflow est configuré pour un run quotidien ou manuel, mais les
-runs du dépôt restent bloqués avant exécution par l’état de facturation GitHub
-déjà observé. Aucun secret partagé ou fichier `.env` n’est requis.
+publiées. `packages/public-discovery` est désormais une racine MIT autonome :
+elle contient les cinq adaptateurs, le matching, le CLI, son lockfile et le
+workflow quotidien/manual destiné au futur dépôt public
+`tristan-monticelli/tobirink-public-discovery`. Le workflow privé homonyme ne
+fait plus que vérifier manuellement cet export et ne lance plus de collecte
+planifiée payante.
+
+Le Worker local n’accorde les audiences v3 qu’au dépôt public exact, à
+`refs/heads/main`, à `.github/workflows/collect.yml` et aux événements
+`schedule` ou `workflow_dispatch`. Aucun secret partagé ou fichier `.env`
+n’est requis. Le dépôt GitHub public, le push, la migration et le déploiement
+Worker restent à effectuer séparément; aucune collecte de production n’est
+revendiquée à ce stade.
 
 ### Publication D1-first et Agenda OIDC — 2026-09-14
 

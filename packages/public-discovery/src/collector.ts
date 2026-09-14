@@ -9,7 +9,7 @@ import {
   type PublicDiscoveryResult,
   type PublicDiscoveryResultBatch,
   type PublicDiscoveryTerminalResolution,
-} from './contracts';
+} from './contracts.js';
 
 export interface PublicDiscoveryGatewayPort {
   claim(limit: number): Promise<PublicDiscoveryClaimBatch>;

@@ -1,0 +1,51 @@
+name: Collect public discovery requests
+
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: public-discovery-verification
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install and verify
+        run: npm ci && npm run verify
+
+      - name: Request claim token
+        id: claim-oidc
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          result-encoding: string
+          script: return await core.getIDToken('https://tobirink.com/v3/catalogue/discoveries/collector/claims')
+
+      - name: Request result token
+        id: result-oidc
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          result-encoding: string
+          script: return await core.getIDToken('https://tobirink.com/v3/catalogue/discoveries/results')
+
+      - name: Resolve and publish
+        env:
+          DISCOVERY_CLAIM_OIDC_TOKEN: ${{ steps.claim-oidc.outputs.result }}
+          DISCOVERY_RESULT_OIDC_TOKEN: ${{ steps.result-oidc.outputs.result }}
+        run: node dist/run.js

@@ -44,25 +44,31 @@ transitoire par demande, refuse les résultats dont la clé ou le digest diffèr
 et publie seulement des objets JSON validés. Il ne transporte jamais `Request`,
 `Response`, `Error`, fonction ou instance de classe à travers ses ports.
 
-Le dépôt TobiRink conserve deux compositions minces : un adaptateur HTTP vers
-les routes Worker et un résolveur multi-fournisseurs construit avec les
-adaptateurs existants. Le point d’entrée GitHub Actions obtient ses jetons OIDC,
-injecte ces deux ports et appelle une seule fonction du composant. Les URLs,
-audiences et variables d’environnement restent dans ce point d’entrée, jamais
-dans le composant extractible.
+Le package porte aussi sa composition autonome : adaptateur HTTP vers les
+routes Worker, matching borné, adaptateurs AniList, MangaUpdates, MangaDex,
+Kitsu Anime et Kitsu Manga, puis point d’entrée GitHub Actions. Ce dernier
+obtient ses jetons OIDC temporaires et appelle la même fonction publique. Les
+URLs, audiences et variables d’environnement restent dans le CLI, jamais dans
+le moteur injectable.
 
 Le package expose un export public stable, un test avec ports mémoire et un
-contrôle d’isolation qui échoue sur tout import `@tobirink/*`, API navigateur,
-binding Cloudflare ou lecture de `process.env`. Il doit pouvoir être copié dans
-un dépôt indépendant avec `zod` comme seule dépendance d’exécution.
+contrôle d’isolation qui échoue sur tout import `@tobirink/*` ou identifiant
+ressemblant à un secret. Il doit pouvoir être extrait par `git subtree` comme
+racine du dépôt public `tristan-monticelli/tobirink-public-discovery`.
+
+Cette racine est publiée sous licence MIT et reste `private: true` au sens npm :
+le code peut être public sans autoriser une publication accidentelle sur le
+registre. `zod` reste l’unique dépendance d’exécution; TypeScript, Vitest,
+esbuild et les types Node sont des dépendances de développement épinglées.
 
 ## Conséquences
 
 La cadence et l’hébergeur du collecteur peuvent changer sans modifier
-l’extension, le Worker ou le moteur. GitHub Actions reste la composition
-opérationnelle initiale et son OIDC garde l’autorité de publication. Le package
-portable n’accorde à lui seul aucun accès à D1 ou aux fournisseurs : ces
-capacités viennent exclusivement des ports fournis par le dépôt qui l’appelle.
+l’extension ou le Worker. GitHub Actions reste la composition opérationnelle
+initiale. Le Worker n’accepte les audiences Discovery que si les claims OIDC
+nomment aussi le dépôt public exact, `refs/heads/main` et
+`.github/workflows/collect.yml@refs/heads/main`; les workflows de forks et de
+pull request ne reçoivent donc aucune autorité D1.
 
 La première implémentation matérialise ce contrat en version `2`, avec des lots
 de cinquante demandes au maximum et les issues terminales `VERIFIED`,

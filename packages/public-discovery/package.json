@@ -1,12 +1,18 @@
 {
   "name": "@tobirink/public-discovery",
   "version": "0.1.0",
-  "description": "Portable, provider-agnostic public discovery batch orchestrator.",
+  "description": "Standalone public catalogue discovery collector for AniList, MangaUpdates, MangaDex and Kitsu.",
   "private": true,
   "type": "module",
-  "license": "Apache-2.0",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "license": "MIT",
+  "exports": { ".": "./src/index.ts", "./cli": "./src/cli.ts" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run verify:isolation && npm run typecheck && npm test && npm run build",
+    "verify:isolation": "node scripts/verify-isolation.mjs"
+  },
   "dependencies": { "zod": "4.5.4" },
-  "devDependencies": { "typescript": "5.9.3", "vitest": "4.1.11" }
+  "devDependencies": { "@types/node": "24.10.15", "typescript": "5.9.3", "vitest": "4.1.11" }
 }

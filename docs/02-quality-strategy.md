@@ -83,6 +83,11 @@ browser or `workerd` test when platform behavior is the risk.
   Les tests du runner prouvent qu’un MISS, un PENDING et un VERIFIED ne lancent
   aucune recherche ou hydratation fournisseur dans la découverte automatique
   de l’extension.
+  Le package exportable exécute en plus les tests HTTP réels des cinq
+  adaptateurs, vérifie les deux ordres de fallback et l’ambiguïté inter-lanes,
+  refuse tout import `@tobirink/*` et produit son bundle depuis son propre
+  manifeste et son propre lockfile. Les tests OIDC Worker exigent le dépôt,
+  la branche, le workflow, l’événement et chacune des deux audiences exactes.
   Les anciennes routes de consentement, d’appairage et de cache non vérifié
   doivent répondre 404.
 - Public-catalogue tests prove that D1 stores only reconstructible work titles

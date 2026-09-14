@@ -68,19 +68,19 @@
     {
       "id": "github",
       "type": "security",
-      "label": "Composant Discovery",
-      "sublabel": "ports claim · resolve · publish",
+      "label": "Repo public Discovery",
+      "sublabel": "moteur · 5 sources · Actions",
       "stage": 3,
       "row": 2,
       "yOffset": -30,
       "width": 140,
-      "tag": "package extractible"
+      "tag": "MIT · runner standard"
     },
     {
       "id": "providers",
       "type": "external",
       "label": "APIs fournisseurs",
-      "sublabel": "AniList · MU · MangaDex · Kitsu",
+      "sublabel": "AniList · MU · MD · Kitsu ×2",
       "stage": 4,
       "row": 2,
       "yOffset": -30,
@@ -150,18 +150,18 @@
       "from": "github",
       "to": "providers",
       "label": "requête API bornée",
-      "classification": "AniList · MU · MangaDex · Kitsu",
+      "classification": "AniList · MU · MangaDex · Kitsu Anime/Manga",
       "variant": "emphasis",
       "route": "auto",
       "labelAt": [853, 428]
     },
     {
-      "from": "providers",
+      "from": "github",
       "to": "verifiedD1",
       "label": "profil public validé + OIDC",
-      "classification": "ingestion Worker autorisée",
+      "classification": "repo · main · workflow exacts",
       "variant": "security",
-      "route": "straight",
+      "route": "auto",
       "labelAt": [820, 300]
     },
     {
@@ -198,7 +198,7 @@
       "items": [
         "Aucun utilisateur, compte, consentement ou Collectif",
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
-        "Une panne fournisseur garde la requête en attente pour reprise"
+        "Le Worker et D1 restent privés; seul le collecteur MIT est public"
       ]
     }
   ]
