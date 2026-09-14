@@ -124,6 +124,7 @@ describe('extension security boundary', () => {
     expect(background).not.toMatch(/FavoriteOwnerRuntime|HttpFavoriteCollectiveAdapter|HttpFavoritePublicCacheAdapter|owner\.action/);
     expect(extensionSurface).not.toMatch(/CollectiveSettings|useFavoriteOwner/);
     expect(background).toMatch(/DexiePublicReleaseGenerationCache\(privateStorage\.storage\.database\)/);
+    expect(background).not.toMatch(/HttpPublicReleasePageSource|DexiePublicReleaseFallbackStore|resumePublicReleaseFallback|agenda-release-fallback/);
     expect(background).toMatch(/WebExtensionQuickPreferencesAdapter\(browser\.storage\.local\)/);
     expect(background).not.toMatch(/PublicReleaseSnapshotAdapter|loadLatest\(/);
     expect(background).toMatch(/readPopupContext\(\{[\s\S]*storage: privateStorage\.storage[\s\S]*\}\)/);

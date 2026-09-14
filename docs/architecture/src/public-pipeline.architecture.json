@@ -40,8 +40,8 @@
     {
       "id": "extension",
       "type": "frontend",
-      "label": "Extension MV3 1.0.29 candidate",
-      "sublabel": "IndexedDB privé · lectures D1-first",
+      "label": "Extension MV3 1.0.30",
+      "sublabel": "IndexedDB privé · zéro egress fournisseur",
       "pos": [50, 330],
       "size": [230, 72]
     },
@@ -79,7 +79,6 @@
     }
   ],
   "connections": [
-    { "id": "local-provider-fallback", "from": "extension", "to": "providers", "label": "repli Agenda uniquement", "variant": "dashed" },
     { "id": "provider-collection", "from": "providers", "to": "github", "label": "pages bornées", "variant": "emphasis" },
     { "id": "oidc-ingestion", "from": "github", "to": "worker", "label": "OIDC · dépôt et workflow exacts", "variant": "security" },
     { "id": "extension-api", "from": "extension", "to": "worker", "label": "HTTPS · demandes / Agenda v3", "variant": "emphasis" },

@@ -65,18 +65,16 @@ AniList / MangaUpdates
         ↓ jointure locale par providerWorkId
         ↓ Agenda / rappels / WebBridge local
 
-Si D1 est vide, périmé ou indisponible :
-AniList / MangaUpdates
-        ↓ pages publiques directes depuis MV3
-        ↓ checkpoint et cadence durable par fournisseur
-        ↓ même génération IndexedDB atomique
+Si D1 est temporairement indisponible :
+dernière génération partagée IndexedDB de même fenêtre et âgée de moins de huit jours
+        ↓ aucune API fournisseur depuis MV3
+        ↓ sinon état Agenda indisponible jusqu’au prochain run GitHub
 ```
 
 La collecte ne reçoit jamais de favori ni d'identifiant d'installation. Une
-panne d'une lane conserve l'autre lane et les données précédentes. Kitsu ne
-devient jamais arbitre du calendrier. Le repli local ne contribue aucun
-événement à D1 et s'arrête dès qu'une génération publique récente et complète
-est disponible.
+panne d'une lane conserve la génération D1 active précédente. Kitsu ne devient
+jamais arbitre du calendrier. L'extension ne collecte aucune sortie fournisseur
+et ne contribue aucun événement à D1.
 
 Les bornes sont : fenêtre J−1/J+15, 24 heures entre rafraîchissements,
 50 résultats par page AniList, taille MangaUpdates déterminée par `per_page`
@@ -93,5 +91,5 @@ La reconstruction après reset est : favoris navigateur → IDs
 `storage.sync` → identités D1 via Worker → hydratation locale → calendrier
 public → projection → alarmes. La génération active et les deux précédentes
 restent récupérables. Le chargeur partagé refuse une génération âgée d'au moins
-huit jours ou dont la fenêtre ne couvre pas la requête; il bascule alors sur le
-repli MV3 sans altérer D1.
+huit jours ou dont la fenêtre ne couvre pas la requête; il échoue fermé sans
+appel fournisseur MV3 ni altération de D1.

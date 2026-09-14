@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "Publication production TobiRink 1.0.29",
+    "title": "Publication production TobiRink 1.0.30",
     "quality_profile": "showcase",
     "viewBox": [1068, 760],
     "views": [
@@ -28,12 +28,12 @@
     { "label": "Vérifier" }
   ],
   "nodes": [
-    { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "build automatique 1.0.29", "stage": 0, "row": 0, "tag": "Next statique" },
-    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.29", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
+    { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "build automatique 1.0.30", "stage": 0, "row": 0, "tag": "Next statique" },
+    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.30", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
     { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 2, "tag": "fail closed" },
     { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP versionnés", "stage": 2, "row": 3, "tag": "R2" },
     { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "production" },
-    { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "liens 1.0.29", "stage": 3, "row": 0, "tag": "HTTP 200" },
+    { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "liens 1.0.30", "stage": 3, "row": 0, "tag": "HTTP 200" },
     { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 3, "tag": "HTTP 200" },
     { "id": "productionEvidence", "type": "security", "label": "Preuve production", "sublabel": "statuts + hashes", "stage": 4, "row": 2, "tag": "concordants" }
   ],
@@ -53,7 +53,7 @@
       "title": "Résultat",
       "items": [
         "Le build Worker dérive toujours la page de la version extension courante",
-        "Les deux archives 1.0.29 publiques reproduisent leurs hashes locaux",
+        "Les deux archives 1.0.30 publiques reproduisent leurs hashes locaux",
         "La page publique pointe vers les mêmes objets R2 versionnés",
         "Les lectures Agenda restent servies depuis D1"
       ]
@@ -62,7 +62,7 @@
       "dot": "cyan",
       "title": "Limites conservées",
       "items": [
-        "Aucune mutation D1 n’est nécessaire pour publier les assets 1.0.29",
+        "Aucune mutation D1 n’est nécessaire pour publier les assets 1.0.30",
         "Chaque objet R2 modifié figure dans l’allowlist exacte",
         "La version Worker précédente reste disponible pour rollback"
       ]

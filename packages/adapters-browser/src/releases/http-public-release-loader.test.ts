@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { PublicReleaseGeneration } from '@tobirink/application';
 import { HttpPublicReleaseLoader } from './http-public-release-loader';
 
-const releaseEvent = (id: string, instant: string) => ({ expiresAt: '2026-11-12T00:00:00.000Z', id, occurrence: { kind: 'INSTANT', value: instant }, provenance: { fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist', providerWorkId: '42', releaseKind: 'episode', state: 'SCHEDULED' });
+const releaseEvent = (id: string, instant: string): PublicReleaseGeneration['events'][number] => ({ expiresAt: '2026-11-12T00:00:00.000Z', id, occurrence: { kind: 'INSTANT', value: instant }, provenance: { fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist', providerWorkId: '42', releaseKind: 'episode', state: 'SCHEDULED' });
 const sourceWindow = { from: '2026-09-01', to: '2026-10-01' };
 
 describe('HttpPublicReleaseLoader', () => {
@@ -34,6 +35,15 @@ describe('HttpPublicReleaseLoader', () => {
     const cache = { load: async () => snapshot, save: vi.fn() };
     const loader = new HttpPublicReleaseLoader('https://tobirink.com', async (_input, init) => { expect(init?.headers).toEqual({ 'If-None-Match': snapshot.etag }); return new Response(null, { status: 304 }); }, () => Date.parse('2026-09-12T00:00:00.000Z'));
     expect((await loader.load(cache, snapshot.window)).source).toBe('cache'); expect(cache.save).not.toHaveBeenCalled();
+  });
+
+  it('uses a valid last-good shared generation when D1 is temporarily unavailable', async () => {
+    const snapshot = { etag: '"release-r1-window"', events: [releaseEvent('anilist-episode-42-1', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-10T00:00:00.000Z', revision: 'r1', source: 'shared' as const, window: sourceWindow };
+    const cache = { load: async () => snapshot, save: vi.fn() };
+    const fetcher = vi.fn(async () => new Response(null, { status: 503 }));
+    const loader = new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T00:00:00.000Z'));
+    await expect(loader.load(cache, sourceWindow)).resolves.toEqual({ snapshot, source: 'cache' });
+    expect(cache.save).not.toHaveBeenCalled();
   });
 
   it('follows every cursor and commits only the complete generation', async () => {

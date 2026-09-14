@@ -60,11 +60,12 @@ incomplet comme un échec total. Son activation et la première collecte réelle
 restent des opérations publiées et vérifiées séparément; aucun succès n'est
 déduit des fixtures locales.
 
-L'extension possède un repli direct. Quand le calendrier D1 est absent, périmé
-ou incomplet, elle collecte les mêmes fenêtres publiques page par page depuis
-MV3, avec checkpoint IndexedDB et cadence durable. Ce repli n'envoie aucun
-favori, titre, URL ou ensemble d'identifiants au Worker et ne contribue rien à
-D1. Une génération publique récente remplace ensuite le repli local.
+L'extension ne possède aucun repli fournisseur Agenda. Elle lit le calendrier
+D1 par `/v3/releases`; une indisponibilité réseau peut réutiliser la dernière
+génération partagée de même fenêtre tant qu'elle a moins de huit jours. Sans
+génération partagée valide, Agenda expose son état indisponible et attend la
+prochaine collecte GitHub. Ni un démarrage, ni une alarme, ni une lecture Agenda
+ne peut appeler AniList ou MangaUpdates depuis MV3.
 
 Kitsu reste un repli de résolution et ne produit aucune date Agenda. MangaDex
 conserve son rôle d'identité exacte et de sorties spécialisées sans devenir
@@ -98,9 +99,10 @@ L'extension charge toutes les pages d'une même génération au plus une fois pa
 24 heures, les valide puis les écrit atomiquement dans IndexedDB. Une réponse
 partagée est utilisable seulement si elle a moins de huit jours et si sa fenêtre
 source couvre intégralement la fenêtre demandée. Une réponse plus ancienne,
-hors couverture ou contenant une ligne invalide échoue fermée et déclenche le
-repli MV3. Le cache Agenda ne réside pas dans `storage.local`. Une erreur
-conserve la dernière génération valide. L'Agenda local joint ces événements aux Works résolus par
+hors couverture ou contenant une ligne invalide échoue fermée sans appeler de
+fournisseur. Le cache Agenda ne réside pas dans `storage.local`. Une erreur
+réseau conserve et peut servir la dernière génération partagée valide de même
+fenêtre. L'Agenda local joint ces événements aux Works résolus par
 `(provider, providerWorkId)` uniquement. Il ne cherche jamais un fournisseur
 pendant une lecture locale et ne joint jamais par titre.
 
@@ -129,8 +131,7 @@ Le calendrier reste mutualisable sans rendre l'utilisateur dépendant de
 l'egress Cloudflare. Une collecte hebdomadaire alimente toutes les lectures;
 une recherche utilisateur ne relance pas les fournisseurs Agenda. Le site et WebBridge ne voient toujours qu'une projection
 locale. Les résultats publics restent disponibles hors ligne et les pannes
-fournisseur ne réinitialisent pas le calendrier validé. Le repli direct augmente
-le trafic fournisseur seulement lorsque le cache partagé ne peut pas servir une
-génération complète. La publication du Worker et du workflow reste derrière
+fournisseur ne réinitialisent pas le calendrier validé. Seul le workflow public
+planifié ou déclenché manuellement appelle les fournisseurs Agenda. La publication du Worker et du workflow reste derrière
 les gates opérationnelles correspondantes. Aucun secret d'ingestion ou `.env`
 Agenda n'est créé.

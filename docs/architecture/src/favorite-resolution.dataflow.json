@@ -452,7 +452,7 @@
         "Alarme nommée restaurée à chaque réveil MV3; aucun runner concurrent",
         "GitHub Actions possède seul les lanes AniList, MU, MangaDex et Kitsu",
         "Panne, 403 ou page incomplète : PENDING puis reprise bornée",
-        "Le repli fournisseur direct appartient uniquement à Agenda"
+        "Agenda lit D1 ou son dernier cache valide sans repli fournisseur MV3"
       ]
     },
     {

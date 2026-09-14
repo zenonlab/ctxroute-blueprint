@@ -14,10 +14,9 @@ import {
   WebExtensionProviderIdentitySyncStateAdapter,
   HttpPublicDiscoveryAdapter,
   HttpPublicReleaseLoader,
-  HttpPublicReleasePageSource,
 } from '@tobirink/adapters-browser';
 import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
@@ -31,15 +30,12 @@ import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favoriteInventoryAuditPeriodMinutes, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
-import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda, ProviderIdentitySyncPublisher, providerSyncPrefix, resumePublicReleaseFallback } from '@tobirink/application';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda, ProviderIdentitySyncPublisher, providerSyncPrefix } from '@tobirink/application';
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
 import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, readFavoriteResolutionPaused, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteResolutionPaused } from '../runtime/favorite-resolution-continuation';
 
 const primaryLibraryId = libraryId('library_primary');
-const agendaReleaseFallbackAlarmName = 'tobirink-agenda-release-fallback-v1';
-const agendaReleaseAlarmMinimumDelayMs = 30_000;
-
 interface FavoriteStatusInventory {
   continuationAt?: string;
   startedAt?: string;
@@ -65,8 +61,6 @@ export default defineBackground({
     const diagnostics = new WebExtensionDiagnostics(browser.storage.local, now, token);
     const releaseCache = new DexiePublicReleaseGenerationCache(privateStorage.storage.database);
     const releaseAgenda = new DexieLocalReleaseAgenda(privateStorage.storage.database);
-    const releaseFallbackStore = new DexiePublicReleaseFallbackStore(privateStorage.storage.database);
-    const releasePageSource = new HttpPublicReleasePageSource();
     const releaseWindow = () => {
       const start = new Date();
       start.setUTCDate(start.getUTCDate() - 1);
@@ -75,19 +69,8 @@ export default defineBackground({
       return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
     };
     const refreshPublicReleasesOnce = async () => {
-      if (configuredSiteOrigin) {
-        try {
-          await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache, releaseWindow());
-          await browser.alarms.clear(agendaReleaseFallbackAlarmName);
-          return 'shared' as const;
-        } catch { /* a direct public-provider fallback resumes below */ }
-      }
-      const activeFallback = await privateStorage.storage.database.publicReleaseSyncState.get('active');
-      if (activeFallback?.source === 'fallback' && Date.now() - Date.parse(activeFallback.checkedAt) < 86_400_000) return 'fallback' as const;
-      const result = await resumePublicReleaseFallback({ source: releasePageSource, store: releaseFallbackStore, token }, releaseWindow());
-      if (result.state === 'complete') await browser.alarms.clear(agendaReleaseFallbackAlarmName);
-      else await browser.alarms.create(agendaReleaseFallbackAlarmName, { when: Math.max(Date.now() + agendaReleaseAlarmMinimumDelayMs, result.nextWakeAt ?? Date.now()) });
-      return result.state;
+      await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache, releaseWindow());
+      return 'shared' as const;
     };
     let releaseRefreshInFlight: ReturnType<typeof refreshPublicReleasesOnce> | undefined;
     const refreshPublicReleases = () => {
@@ -228,7 +211,6 @@ export default defineBackground({
     });
     browser.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === reminderAlarmName || alarm.name === agendaNextAlarmName || alarm.name === agendaReconcileAlarmName) void Promise.all([resumeNotifications(), restoreFavoriteWake()]).catch(() => undefined);
-      if (alarm.name === agendaReleaseFallbackAlarmName) void resumeNotifications().catch(() => undefined);
       if (alarm.name === favoriteResolutionContinuationAlarmName) void reconcileFavorites().then(repairLibraryProjection).catch(() => undefined);
       if (alarm.name === favoriteInventoryAuditAlarmName) void reconcileFavorites(true).then(repairLibraryProjection).catch(() => undefined);
     });

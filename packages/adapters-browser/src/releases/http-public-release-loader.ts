@@ -16,7 +16,8 @@ export class HttpPublicReleaseLoader {
   async load(cache: PublicReleaseGenerationCachePort, window: { from: string; to: string }): Promise<{ snapshot: PublicReleaseGeneration; source: 'network' | 'cache' }> {
     const cached = await cache.load();
     const matchingCache = cached?.source === 'shared' && cached.revision !== 'd1-empty' && cached.window.from === window.from && cached.window.to === window.to ? cached : undefined;
-    if (matchingCache && this.clock() - Date.parse(matchingCache.generatedAt) >= 0 && this.clock() - Date.parse(matchingCache.generatedAt) < 86_400_000) return { snapshot: publicReleaseGenerationSchema.parse(matchingCache), source: 'cache' };
+    const matchingCacheAge = matchingCache ? this.clock() - Date.parse(matchingCache.generatedAt) : undefined;
+    if (matchingCache && matchingCacheAge !== undefined && matchingCacheAge >= 0 && matchingCacheAge < 86_400_000) return { snapshot: publicReleaseGenerationSchema.parse(matchingCache), source: 'cache' };
     const events = new Map<string, PublicReleaseGeneration['events'][number]>();
     let cursor: string | undefined;
     let etag: string | undefined;
@@ -28,12 +29,21 @@ export class HttpPublicReleaseLoader {
       url.searchParams.set('from', window.from); url.searchParams.set('to', window.to); url.searchParams.set('limit', '100');
       if (cursor) url.searchParams.set('cursor', cursor);
       const headers = pageNumber === 1 && matchingCache ? { 'If-None-Match': matchingCache.etag } : undefined;
-      const response = await this.fetcher(url, headers ? { headers } : undefined);
+      let response: Response;
+      try {
+        response = await this.fetcher(url, headers ? { headers } : undefined);
+      } catch (error) {
+        if (matchingCache && matchingCacheAge !== undefined && matchingCacheAge >= 0 && matchingCacheAge < maximumSharedGenerationAgeMs) return { snapshot: publicReleaseGenerationSchema.parse(matchingCache), source: 'cache' };
+        throw error;
+      }
       if (response.status === 304) {
         if (pageNumber !== 1 || !matchingCache) throw new Error('public-release-unexpected-304');
         return { snapshot: publicReleaseGenerationSchema.parse(matchingCache), source: 'cache' };
       }
-      if (!response.ok) throw new Error(`public-release-http-${response.status}`);
+      if (!response.ok) {
+        if (matchingCache && matchingCacheAge !== undefined && matchingCacheAge >= 0 && matchingCacheAge < maximumSharedGenerationAgeMs) return { snapshot: publicReleaseGenerationSchema.parse(matchingCache), source: 'cache' };
+        throw new Error(`public-release-http-${response.status}`);
+      }
       const responseEtag = response.headers.get('etag');
       if (!responseEtag || (etag !== undefined && responseEtag !== etag)) throw new Error('public-release-etag-mismatch');
       etag = responseEtag;

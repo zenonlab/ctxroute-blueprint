@@ -72,6 +72,10 @@ produite par le composant Discovery appelé via GitHub Actions OIDC.
 d'identités et de couvertures ne peut plus réactiver les adaptateurs
 fournisseurs lorsque Public Discovery est configuré; le calendrier partagé
 utilise `/v3/releases` et vérifie fraîcheur et couverture avant tout repli.
+`1.0.30` retire aussi le dernier repli Agenda direct vers AniList et
+MangaUpdates. L'extension lit uniquement la génération D1 partagée ou son
+dernier cache partagé valide ; toute nouvelle collecte fournisseur appartient
+au workflow GitHub public vérifié.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile, static download page and release tests follow it.

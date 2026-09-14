@@ -3,7 +3,7 @@
 ## Build a release candidate
 
 The current production archives remain immutable. The repository source is the
-unpublished `1.0.29` candidate.
+unpublished `1.0.30` candidate.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -131,6 +131,22 @@ publiés : Chrome `78cd2e6755dc0d26d92c209eda082711dd0917b794f41f947e7ed4b5aa6be
 (302755 octets) et Firefox
 `532c5f69c7914e42a0b9cefc80286dbd38d5bdbd74a9d46049ab9c846ae010a7`
 (302807 octets).
+
+### Candidate sans egress fournisseur MV3 — 1.0.30
+
+Le candidat `1.0.30` retire le dernier repli Agenda direct depuis l'extension.
+Le background lit exclusivement `/v3/releases`; si D1 est temporairement
+indisponible, il peut conserver une génération partagée de moins de huit jours,
+mais ne contacte jamais AniList ni MangaUpdates. La collecte et l'hydratation
+D1 restent la responsabilité exclusive du workflow GitHub public vérifié.
+
+Les archives `1.0.29` restent immuables. Le packaging reproductible produit
+Chrome `993297b5610e1f6e949ec289f4697f9f15e8f0b85b52ce6d12a54edfe2717b99`
+(300921 octets) et Firefox
+`7757cf8182cf54575fa69683b9d5c5f616e332a49b4e9242583c6fb97a9f7d06`
+(300959 octets). Chromium 153 certifie le ZIP Chrome exact avec Agenda D1 et
+zéro appel fournisseur; Firefox 155 certifie le ZIP Firefox exact avec les
+sorties anime `INSTANT` et manga `DATE`.
 
 ### Publication D1-first et Agenda OIDC — 2026-09-14
 

@@ -9526,9 +9526,9 @@
             "git commit -m chore(release): record corrected agenda publication"
           ],
           "evidence": [
-            "Worker gate now rebuilds web assets before preview and apply; build failure prevents Wrangler. Infrastructure tests 20/20, Sensor SAFE, ESLint and docs pass.",
-            "Production publication dataflow updated from stale 1.0.19 to actual 1.0.29 flow; Archify showcase passes 9/9 with no errors or warnings.",
-            "Remaining: exact installed 1.0.29 certification, main merge, Worker-only deploy and production verification."
+            "Extension 1.0.30 removes the composed Agenda provider fallback; security regression and architecture/dataflow views prove extension -> D1 only, with AniList/MangaUpdates owned by the public GitHub workflow.",
+            "npm run verify passes completely: 143 extension, 60 Worker, 85 browser adapter, 375 application tests, all typechecks, performance, integration, audit 0 vulnerabilities and Archify showcase.",
+            "Exact archives certified: Chrome 993297b5... (Chromium 153, D1 Agenda and zero provider calls) and Firefox 7757cf81... (Firefox 155, anime INSTANT and manga DATE). D1 audit found no synthetic test rows. Remaining: commit/push, immutable 1.0.30 R2 publication, merge, Worker deploy and production verification."
           ]
         }
       ]

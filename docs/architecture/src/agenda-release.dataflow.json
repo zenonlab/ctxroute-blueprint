@@ -13,10 +13,10 @@
         "note": "GitHub Actions collecte chaque semaine; OIDC lie dépôt, branche, workflow et audience avant l’écriture D1."
       },
       {
-        "id": "local-fallback",
-        "label": "Repli local",
-        "focus": ["providerApis", "mv3Fallback", "releaseGeneration", "localAgenda"],
-        "note": "Si le calendrier partagé est absent, périmé ou indisponible, MV3 reprend les pages publiques. Une fenêtre publiée sans sortie reste valide."
+        "id": "offline-cache",
+        "label": "Dernier succès local",
+        "focus": ["releaseApi", "releaseGeneration", "localAgenda"],
+        "note": "Une panne D1 réutilise uniquement une génération partagée valide; MV3 n’appelle jamais les fournisseurs Agenda."
       },
       {
         "id": "private-projection",
@@ -37,7 +37,6 @@
     { "id": "providerApis", "type": "external", "label": "APIs fournisseurs", "sublabel": "AniList · MangaUpdates", "stage": 0, "row": 1, "width": 145, "tag": "données publiques" },
     { "id": "scheduledCollector", "type": "backend", "label": "GitHub Actions public", "sublabel": "agenda.yml · AniList + MU", "stage": 1, "row": 0, "width": 175, "tag": "hebdomadaire + manuel" },
     { "id": "syncGate", "type": "security", "label": "Identité GitHub OIDC", "sublabel": "dépôt · branche · workflow · audience", "stage": 1, "row": 1, "width": 175, "tag": "jeton court sans secret" },
-    { "id": "mv3Fallback", "type": "backend", "label": "Repli MV3 local", "sublabel": "une page par réveil · reprise testée", "stage": 1, "row": 4, "yOffset": -200, "width": 175, "tag": "checkpoint durable" },
     { "id": "workerIngest", "type": "security", "label": "POST générations", "sublabel": "workers.dev · schéma · digest", "stage": 2, "row": 0, "width": 165, "tag": "auteur D1 unique" },
     { "id": "releaseD1", "type": "database", "label": "D1 Agenda", "sublabel": "générations · événements DATE/INSTANT", "stage": 2, "row": 1, "width": 175, "tag": "pointeur actif atomique" },
     { "id": "releaseApi", "type": "backend", "label": "GET /v3/releases", "sublabel": "fenêtre source · fraîcheur · ETag", "stage": 2, "row": 2, "width": 175, "tag": "pages de 100" },
@@ -52,8 +51,6 @@
     { "from": "workerIngest", "to": "releaseD1", "label": "promotion + rétention", "classification": "active + deux sauvegardes", "variant": "security", "route": "auto", "labelAt": [530, 200] },
     { "from": "releaseD1", "to": "releaseApi", "label": "fenêtre ordonnée", "classification": "source couvrante · 40 jours max", "variant": "default", "route": "auto", "labelAt": [640, 314] },
     { "from": "releaseApi", "to": "releaseGeneration", "label": "pages + fenêtre + ETag", "classification": "moins de huit jours · fail-closed", "variant": "emphasis", "route": "auto", "labelAt": [835, 350] },
-    { "from": "providerApis", "to": "mv3Fallback", "label": "repli public direct", "classification": "403/429 repris durablement", "variant": "dashed", "route": "auto" },
-    { "from": "mv3Fallback", "to": "releaseGeneration", "label": "pages en staging puis promotion", "classification": "aucune donnée favorite", "variant": "dashed", "route": "auto", "fromSide": "bottom", "toSide": "bottom", "via": [[315, 450], [745, 450]], "labelAt": [530, 428] },
     { "from": "releaseGeneration", "to": "localAgenda", "label": "événements validés", "classification": "jointure locale par ID", "variant": "emphasis", "route": "auto", "labelAt": [858, 656] },
     { "from": "localAgenda", "to": "localSurfaces", "label": "projection paginée", "classification": "site sans accès D1", "variant": "security", "route": "auto", "labelAt": [960, 456] }
   ]
