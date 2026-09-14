@@ -9275,7 +9275,7 @@
       "schemaVersion": 1,
       "id": "goal-correct-agenda-provider-pipeline",
       "title": "Corriger la pipeline Agenda après audit fournisseur",
-      "status": "DONE",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -9505,7 +9505,7 @@
         {
           "id": "step-8",
           "title": "Publier séparément la pipeline Agenda corrigée",
-          "status": "DONE",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Une approbation explicite distincte autorise chaque ressource externe exacte",
             "Le collecteur choisi a passé plusieurs smokes AniList depuis son egress réel",
@@ -9526,9 +9526,9 @@
             "git commit -m chore(release): record corrected agenda publication"
           ],
           "evidence": [
-            "Cloudflare gate 3faa51ed… published both 1.0.29 ZIPs and activated Worker 5d55c52d-3f50-473b-8bdf-62f1d30fa81c at 100%; no D1 migration was pending.",
-            "Public run 34894650534 passed 47 tests and published active generation calendar-0a3ba9d… with 765 events: AniList 239 and MangaUpdates 526; D1 retains 1 active plus 1 staging generation.",
-            "Live /v2 and /v3 return the active revision; repeated /v2 bytes are identical, conditional requests return 304, and remote Chrome/Firefox SHA-256 match the verified 1.0.29 candidates."
+            "Worker gate now rebuilds web assets before preview and apply; build failure prevents Wrangler. Infrastructure tests 20/20, Sensor SAFE, ESLint and docs pass.",
+            "Production publication dataflow updated from stale 1.0.19 to actual 1.0.29 flow; Archify showcase passes 9/9 with no errors or warnings.",
+            "Remaining: exact installed 1.0.29 certification, main merge, Worker-only deploy and production verification."
           ]
         }
       ]

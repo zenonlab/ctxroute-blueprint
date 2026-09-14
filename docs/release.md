@@ -827,6 +827,13 @@ warning that pinned action releases still declare the deprecated Node.js 20
 action runtime; GitHub executed them on Node.js 24, matching the workflow's
 configured application runtime.
 
+The closing audit found that this Worker deployment had reused a previously
+built `apps/web/out`, so `/download` still advertised 1.0.25 even though the
+verified 1.0.29 objects were already available. The infrastructure driver now
+rebuilds the web workspace before both `worker-deploy` preview and apply, and
+aborts before Wrangler when that build fails. Final production evidence must
+not be recorded until `/download` serves both 1.0.29 links.
+
 ## Rollback
 
 ### Agenda certification correction — 2026-09-14

@@ -2,15 +2,15 @@
   "schema_version": 1,
   "diagram_type": "dataflow",
   "meta": {
-    "title": "Publication production TobiRink 1.0.19",
+    "title": "Publication production TobiRink 1.0.29",
     "quality_profile": "showcase",
     "viewBox": [1068, 760],
     "views": [
       {
         "id": "publication",
         "label": "Publication bornée",
-        "focus": ["releasePackages", "releaseSchedule", "approvalGate", "releaseBucket", "publicWorker"],
-        "note": "Le digest approuvé lie les archives, le snapshot immuable, son pointeur et le Worker public."
+        "focus": ["staticExport", "releasePackages", "approvalGate", "releaseBucket", "publicWorker"],
+        "note": "Le gate reconstruit les assets avant preview et apply, puis borne chaque cible externe."
       },
       {
         "id": "verification",
@@ -28,22 +28,20 @@
     { "label": "Vérifier" }
   ],
   "nodes": [
-    { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "5 routes publiques", "stage": 0, "row": 0, "tag": "Next statique" },
-    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.19", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
-    { "id": "releaseSchedule", "type": "backend", "label": "Agenda public", "sublabel": "snapshot + pointeur", "stage": 0, "row": 4, "tag": "schéma strict" },
-    { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + 4 cibles", "stage": 1, "row": 2, "tag": "appliquée" },
-    { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP + agenda révisionné", "stage": 2, "row": 3, "tag": "R2" },
+    { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "build automatique 1.0.29", "stage": 0, "row": 0, "tag": "Next statique" },
+    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.29", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
+    { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 2, "tag": "fail closed" },
+    { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP versionnés", "stage": 2, "row": 3, "tag": "R2" },
     { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "production" },
-    { "id": "memberPages", "type": "frontend", "label": "Pages Workbench", "sublabel": "accueil / biblio / agenda", "stage": 3, "row": 0, "tag": "HTTP 200" },
+    { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "liens 1.0.29", "stage": 3, "row": 0, "tag": "HTTP 200" },
     { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 3, "tag": "HTTP 200" },
     { "id": "productionEvidence", "type": "security", "label": "Preuve production", "sublabel": "statuts + hashes", "stage": 4, "row": 2, "tag": "concordants" }
   ],
   "flows": [
-    { "id": "exportToGate", "from": "staticExport", "to": "approvalGate", "label": "66 assets", "classification": "prévisualisé", "variant": "default" },
+    { "id": "exportToGate", "from": "staticExport", "to": "approvalGate", "label": "build avant Wrangler", "classification": "prévisualisé", "variant": "default" },
     { "id": "packagesToGate", "from": "releasePackages", "to": "approvalGate", "label": "tailles + SHA-256", "classification": "lié au digest", "variant": "security", "labelAt": [300, 450] },
-    { "id": "scheduleToGate", "from": "releaseSchedule", "to": "approvalGate", "label": "JSON + SHA-256", "classification": "révision identique", "variant": "security", "labelAt": [136, 542] },
     { "id": "gateToWorker", "from": "approvalGate", "to": "publicWorker", "label": "déploiement", "classification": "cible autorisée", "variant": "emphasis" },
-    { "id": "gateToBucket", "from": "approvalGate", "to": "releaseBucket", "label": "snapshot puis pointeur", "classification": "clés autorisées", "variant": "security" },
+    { "id": "gateToBucket", "from": "approvalGate", "to": "releaseBucket", "label": "archives versionnées", "classification": "clés autorisées", "variant": "security" },
     { "id": "workerToPages", "from": "publicWorker", "to": "memberPages", "label": "assets statiques", "classification": "public", "variant": "default" },
     { "id": "bucketToDownloads", "from": "releaseBucket", "to": "publicDownloads", "label": "via Worker", "classification": "route bornée", "variant": "security" },
     { "id": "pagesToEvidence", "from": "memberPages", "to": "productionEvidence", "label": "5 × HTTP 200", "classification": "vérifié", "variant": "default" },
@@ -54,17 +52,17 @@
       "dot": "emerald",
       "title": "Résultat",
       "items": [
-        "Le Worker public sert la surface Workbench 1.0.19 sur tobirink.com",
-        "Les deux archives 1.0.19 publiques reproduisent leurs hashes locaux",
-        "L’agenda vide valide répond sans inventer de sortie publique",
-        "Les routes inconnues restent en 404"
+        "Le build Worker dérive toujours la page de la version extension courante",
+        "Les deux archives 1.0.29 publiques reproduisent leurs hashes locaux",
+        "La page publique pointe vers les mêmes objets R2 versionnés",
+        "Les lectures Agenda restent servies depuis D1"
       ]
     },
     {
       "dot": "cyan",
       "title": "Limites conservées",
       "items": [
-        "Migrations additives 0005 et 0006 appliquées sans suppression distante",
+        "Aucune mutation D1 n’est nécessaire pour publier les assets 1.0.29",
         "Chaque objet R2 modifié figure dans l’allowlist exacte",
         "La version Worker précédente reste disponible pour rollback"
       ]

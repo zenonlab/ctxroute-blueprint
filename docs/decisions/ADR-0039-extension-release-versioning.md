@@ -74,9 +74,12 @@ fournisseurs lorsque Public Discovery est configuré; le calendrier partagé
 utilise `/v3/releases` et vérifie fraîcheur et couverture avant tout repli.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
-version source; the lockfile and release tests follow it. Existing archives are
-retained unchanged. Publishing a new archive remains behind the Cloudflare
-infrastructure gate.
+version source; the lockfile, static download page and release tests follow it.
+Existing archives are retained unchanged. A `worker-deploy` preview and apply
+must each rebuild the web workspace before invoking Wrangler, so the reviewed
+bundle and the deployed Worker cannot reuse a stale `apps/web/out` from an
+older extension version. A failed web build prevents Wrangler from running.
+Publishing a new archive remains behind the Cloudflare infrastructure gate.
 
 ## Consequences
 
