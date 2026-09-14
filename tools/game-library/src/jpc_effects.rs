@@ -291,7 +291,9 @@ fn resolve_effect(
         emitter_translation: dynamics.emitter_translation,
         emitter_rotation: dynamics
             .emitter_rotation
-            .map(|value| f32::from(value) * std::f32::consts::TAU / 65536.0),
+            // JPAC 1.00 stores BEM1 emitter rotations as signed degrees,
+            // unlike the normalized fixed-point emitter direction.
+            .map(|value| f32::from(value).to_radians()),
         emitter_scale: dynamics.emitter_scale,
         emitter_direction: direction,
         emitter_direction_mode: "vector",
