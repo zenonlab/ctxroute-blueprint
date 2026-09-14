@@ -5,7 +5,7 @@ const privateRepository = 'tristan-monticelli/Tobirink';
 const publicDiscoveryRepository = 'tristan-monticelli/tobirink-public-discovery';
 interface GitHubCollectorIdentity { readonly repository: string; readonly workflow: string }
 const identitiesByPath: ReadonlyMap<string, GitHubCollectorIdentity> = new Map<string, GitHubCollectorIdentity>([
-  ['/v2/releases/generations', Object.freeze({ repository: privateRepository, workflow: `${privateRepository}/.github/workflows/agenda-collector.yml@refs/heads/main` })],
+  ['/v2/releases/generations', Object.freeze({ repository: publicDiscoveryRepository, workflow: `${publicDiscoveryRepository}/.github/workflows/agenda.yml@refs/heads/main` })],
   ['/v2/catalogue/discoveries/promotions', Object.freeze({ repository: privateRepository, workflow: `${privateRepository}/.github/workflows/public-discovery-collector.yml@refs/heads/main` })],
   ['/v3/catalogue/discoveries/collector/claims', Object.freeze({ repository: publicDiscoveryRepository, workflow: `${publicDiscoveryRepository}/.github/workflows/collect.yml@refs/heads/main` })],
   ['/v3/catalogue/discoveries/results', Object.freeze({ repository: publicDiscoveryRepository, workflow: `${publicDiscoveryRepository}/.github/workflows/collect.yml@refs/heads/main` })],

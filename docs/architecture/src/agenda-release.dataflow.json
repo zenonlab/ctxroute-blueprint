@@ -35,7 +35,7 @@
   ],
   "nodes": [
     { "id": "providerApis", "type": "external", "label": "APIs fournisseurs", "sublabel": "AniList · MangaUpdates", "stage": 0, "row": 1, "width": 145, "tag": "données publiques" },
-    { "id": "scheduledCollector", "type": "backend", "label": "GitHub Actions public", "sublabel": "repo MIT · AniList + MU", "stage": 1, "row": 0, "width": 175, "tag": "hebdomadaire + manuel" },
+    { "id": "scheduledCollector", "type": "backend", "label": "GitHub Actions public", "sublabel": "agenda.yml · AniList + MU", "stage": 1, "row": 0, "width": 175, "tag": "hebdomadaire + manuel" },
     { "id": "syncGate", "type": "security", "label": "Identité GitHub OIDC", "sublabel": "dépôt · branche · workflow · audience", "stage": 1, "row": 1, "width": 175, "tag": "jeton court sans secret" },
     { "id": "mv3Fallback", "type": "backend", "label": "Repli MV3 local", "sublabel": "une page par réveil · reprise testée", "stage": 1, "row": 4, "yOffset": -200, "width": 175, "tag": "checkpoint durable" },
     { "id": "workerIngest", "type": "security", "label": "POST générations", "sublabel": "workers.dev · schéma · digest", "stage": 2, "row": 0, "width": 165, "tag": "auteur D1 unique" },
