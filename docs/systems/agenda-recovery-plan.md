@@ -24,7 +24,9 @@ Il ne publie rien si une lane échoue. Le Worker vérifie le jeton GitHub OIDC e
 le schéma strict de la génération, dérive une révision SHA-256 idempotente,
 écrit par lots préparés et ne remplace jamais l'actuelle par une génération
 plus ancienne. Rejouer le même lot n'ajoute aucun événement. `GET /v2/releases`
-est désormais une lecture D1 pure et ne déclenche aucune collecte.
+reste le contrat compatible; `GET /v3/releases` expose en plus la fenêtre
+source. Ces deux routes sont des lectures D1 pures et ne déclenchent aucune
+collecte.
 
 L’ingestion Agenda ne contient que des événements publics et ne transmet aucun
 profil hydraté par l’extension. La découverte favorite est une pipeline séparée
@@ -58,7 +60,7 @@ AniList / MangaUpdates
         ↓ collecteur planifié à egress vérifié
         ↓ batch public signé vers le Worker
         ↓ D1 public borné, écrit uniquement par le Worker
-        ↓ GET /v2/releases + ETag + curseur
+        ↓ GET /v3/releases + fenêtre source + ETag + curseur
         ↓ IndexedDB : génération complète et atomique
         ↓ jointure locale par providerWorkId
         ↓ Agenda / rappels / WebBridge local
@@ -89,5 +91,7 @@ conserver décimales, suffixes et plages.
 
 La reconstruction après reset est : favoris navigateur → IDs
 `storage.sync` → identités D1 via Worker → hydratation locale → calendrier
-public → projection → alarmes. Chaque génération précédente reste récupérable
-jusqu'au reçu de validation.
+public → projection → alarmes. La génération active et les deux précédentes
+restent récupérables. Le chargeur partagé refuse une génération âgée d'au moins
+huit jours ou dont la fenêtre ne couvre pas la requête; il bascule alors sur le
+repli MV3 sans altérer D1.

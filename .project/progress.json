@@ -9275,7 +9275,7 @@
       "schemaVersion": 1,
       "id": "goal-correct-agenda-provider-pipeline",
       "title": "Corriger la pipeline Agenda après audit fournisseur",
-      "status": "BLOCKED",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -9505,7 +9505,7 @@
         {
           "id": "step-8",
           "title": "Publier séparément la pipeline Agenda corrigée",
-          "status": "BLOCKED",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Une approbation explicite distincte autorise chaque ressource externe exacte",
             "Le collecteur choisi a passé plusieurs smokes AniList depuis son egress réel",
@@ -9526,9 +9526,10 @@
             "git commit -m chore(release): record corrected agenda publication"
           ],
           "evidence": [
-            "external: AniList server access from Cloudflare was explicitly refused (403 manually blocked, ADR-0045); after another production attempt on 2026-09-14, agenda_last_success_at remains NULL and agenda_retry_at advances to 10:31:21.029Z. GET /v2/releases remains d1-empty.",
-            "Worker 5497b61c-a25d-4ca2-b193-8e747fada840 and 1.0.26 downloads were published earlier. Local 1.0.27 fixes native browser fetch and passes installed Firefox certification, but is not published.",
-            "Shared collector and signed ingestion are unimplemented targets; certifying live shared data requires authorized AniList access. Publication cannot be described as complete from structural tests or populated local fixtures."
+            "Architecture corrigée: Discovery automatique D1-first sans recherche/hydratation/couverture fournisseur MV3; Agenda v3 vérifie fenêtre source et fraîcheur.",
+            "D1 Agenda échoue sur ligne active invalide et conserve active + deux sauvegardes; MangaUpdates journalise les compteurs et refuse plus de 5 % sans identité.",
+            "npm run verify passe intégralement; quatre vues Archify passent 9/9; ZIP 1.0.29 reproductibles créés localement.",
+            "Publication Git et plan Cloudflare exact restent à exécuter dans cette étape."
           ]
         }
       ]

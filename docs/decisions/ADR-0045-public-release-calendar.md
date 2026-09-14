@@ -86,19 +86,35 @@ minimale de 2,2 secondes. MangaUpdates utilise `page`, `per_page` et
 d'observation et ne devient jamais un horaire de sortie. Les valeurs comme
 `58.5`, `2a` et `29-29.5 (end)` restent des numéros textuels bornés.
 
-`GET /v2/releases` est une lecture commune, paginée par occurrence puis clé
-sémantique stable. Son curseur porte ces deux valeurs et sa révision dérive de
-la génération validée, jamais du nombre de lignes d'une page. Elle ne reçoit
-aucun identifiant personnel et renvoie un ETag exact pour sa fenêtre.
-`/v1/releases` reste intact pendant la transition pour compatibilité et
-rollback.
+`GET /v2/releases` reste byte-compatible avec les extensions déjà publiées.
+`GET /v3/releases` ajoute la fenêtre source de la génération active. Les deux
+lectures sont paginées par occurrence puis clé sémantique stable, refusent une
+plage supérieure à quarante jours et ne reçoivent aucun identifiant personnel.
+Le curseur porte occurrence et identifiant; la révision dérive de la génération
+validée et l'ETag exact inclut version de route, révision et fenêtre demandée.
+`/v1/releases` reste intact pour compatibilité et rollback.
 
 L'extension charge toutes les pages d'une même génération au plus une fois par
-24 heures, les valide puis les écrit atomiquement dans IndexedDB. Le cache
-Agenda ne réside pas dans `storage.local`. Une erreur conserve la dernière
-génération valide. L'Agenda local joint ces événements aux Works résolus par
+24 heures, les valide puis les écrit atomiquement dans IndexedDB. Une réponse
+partagée est utilisable seulement si elle a moins de huit jours et si sa fenêtre
+source couvre intégralement la fenêtre demandée. Une réponse plus ancienne,
+hors couverture ou contenant une ligne invalide échoue fermée et déclenche le
+repli MV3. Le cache Agenda ne réside pas dans `storage.local`. Une erreur
+conserve la dernière génération valide. L'Agenda local joint ces événements aux Works résolus par
 `(provider, providerWorkId)` uniquement. Il ne cherche jamais un fournisseur
 pendant une lecture locale et ne joint jamais par titre.
+
+Après une promotion complète, la transaction de cycle de vie conserve la
+génération active et au plus les deux générations précédentes. Elle supprime
+d'abord leurs événements enfants puis les générations parentes; le pointeur
+actif est exclu explicitement de chaque requête de rétention. Une ingestion
+interrompue ne change pas le pointeur, et son staging éventuel sera borné par la
+prochaine promotion réussie.
+
+La collecte MangaUpdates compte les lignes reçues, acceptées et sans identité
+de série sans journaliser titre ni payload. Une lane dont plus de cinq pour cent
+des lignes reçues sont sans identité échoue entièrement afin qu'une dérive de
+schéma fournisseur ne réduise pas silencieusement le calendrier partagé.
 
 Les dates civiles ne sont pas converties en minuit UTC. Une date confirmée
 remplace une estimation. Une estimation manga demande trois intervalles

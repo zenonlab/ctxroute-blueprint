@@ -61,7 +61,7 @@ describe('public release routes', () => {
     const audiences: string[] = [];
     const app = createPublicReleaseApp({ ...fixture.services, releaseCalendar: {
       async ingest(input) { received.push(input); return { accepted: true, count: input.events.length, replayed: false, revision: `calendar-${'a'.repeat(48)}` }; },
-      async query() { return { entries: [], generatedAt, revision }; },
+      async query() { return { entries: [], generatedAt, revision, window: { from: date, to: date } }; },
     } }, async (_token, audience) => { audiences.push(audience); });
     const payload = {
       events: [{ expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(), id: 'anilist-episode-42-1', occurrence: { kind: 'INSTANT', value: generatedAt }, provenance: { fetchedAt: generatedAt, parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist', providerWorkId: '42', releaseKind: 'episode', sequence: '1', state: 'SCHEDULED' }],
@@ -127,7 +127,7 @@ describe('public release routes', () => {
     const release = (id: string, value: string) => ({ expiresAt: '2026-11-05T00:00:00.000Z', id, occurrence: { kind: 'INSTANT' as const, value }, provenance: { fetchedAt: '2026-09-05T08:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist' as const, providerWorkId: '42', releaseKind: 'episode' as const, state: 'SCHEDULED' as const });
     const entries = [release('release_1', '2026-09-05T18:00:00.000Z'), release('release_2', '2026-09-06T18:00:00.000Z')];
     const app = createPublicReleaseApp({ ...fixture.services, releaseCalendar: {
-      async query(input) { const start = input.cursor ? 1 : 0; const page = entries.slice(start, start + 1); return start === 0 ? { entries: page, generatedAt: '2026-09-05T08:00:00.000Z', nextCursor: '2026-09-05T18:00:00.000Z|release_1', revision } : { entries: page, generatedAt: '2026-09-05T08:00:00.000Z', revision }; },
+      async query(input) { const start = input.cursor ? 1 : 0; const page = entries.slice(start, start + 1); const window = { from: '2026-09-05', to: '2026-09-06' }; return start === 0 ? { entries: page, generatedAt: '2026-09-05T08:00:00.000Z', nextCursor: '2026-09-05T18:00:00.000Z|release_1', revision, window } : { entries: page, generatedAt: '2026-09-05T08:00:00.000Z', revision, window }; },
     } });
     const first = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1');
     // SAFETY: the route contract returns a JSON object with an optional cursor.
@@ -136,6 +136,30 @@ describe('public release routes', () => {
     const second = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1&cursor=2026-09-05T18%3A00%3A00.000Z%7Crelease_1');
     // SAFETY: the route contract returns an entries array for every successful page.
     expect((await second.json() as { entries: unknown[] }).entries).toHaveLength(1);
+  });
+
+  it('keeps v2 byte-compatible and exposes source coverage only on v3', async () => {
+    const fixture = releaseBindings();
+    const page = { entries: [], generatedAt: '2026-09-14T08:00:00.000Z', revision, window: { from: '2026-09-13', to: '2026-09-29' } };
+    const app = createPublicReleaseApp({ ...fixture.services, releaseCalendar: { async query() { return page; } } });
+    const v2 = await app.request('https://api.example/v2/releases?from=2026-09-13&to=2026-09-29');
+    const v3 = await app.request('https://api.example/v3/releases?from=2026-09-13&to=2026-09-29');
+    expect(await v2.json()).toEqual({ entries: [], generatedAt: page.generatedAt, revision });
+    expect(await v3.json()).toEqual(page);
+    expect(v3.headers.get('ETag')).toBe(`"releases-v3-${revision}-2026-09-13-2026-09-29"`);
+  });
+
+  it.each([
+    'https://api.example/v3/releases?from=2026-09-01&to=2026-10-11',
+    'https://api.example/v3/releases?from=2026-02-30&to=2026-03-01',
+    'https://api.example/v3/releases?from=2026-09-01',
+    'https://api.example/v2/releases?from=2026-09-01&to=2026-10-11',
+    'https://api.example/v2/releases?from=2026-02-30&to=2026-03-01',
+  ])('rejects an unbounded or invalid window before querying D1', async (url) => {
+    const fixture = releaseBindings(); let queried = false;
+    const app = createPublicReleaseApp({ ...fixture.services, releaseCalendar: { async query() { queried = true; return { entries: [], generatedAt: '2026-09-14T08:00:00.000Z', revision, window: { from: '2026-09-01', to: '2026-10-10' } }; } } });
+    const response = await app.request(url);
+    expect(response.status).toBe(400); expect(await response.json()).toEqual({ error: 'invalid-window' }); expect(queried).toBe(false);
   });
 
   it('rejects malformed v2 cursors before querying D1', async () => {

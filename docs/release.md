@@ -2,9 +2,8 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.27`; its published archives remain
-unchanged. The repository source is the verified but unpublished `1.0.28`
-candidate.
+The current production archives remain immutable. The repository source is the
+unpublished `1.0.29` candidate.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -115,6 +114,23 @@ ont renvoyé HTTP 200, un corps identique, la même révision et le même ETag
 Le Worker final certifié est `b398b19c-3cac-4e50-9c24-86902eb03853`; la version
 précédente `ca4a3757-fca5-484e-aff8-47d7801bad3f` reste disponible pour rollback. Aucune variable
 secrète ni fichier `.env` Agenda n’a été créé.
+
+### Candidate de durcissement 1.0.29
+
+Le candidat `1.0.29` conserve `/v2/releases` pour les versions publiées et lit
+le calendrier via `/v3/releases`, qui expose la fenêtre de la génération D1.
+Une génération âgée d'au moins huit jours, hors fenêtre ou contenant une ligne
+invalide est refusée et déclenche le repli Agenda MV3. D1 conserve la génération
+active et deux sauvegardes; la collecte MangaUpdates échoue si plus de 5 % des
+lignes reçues n'ont pas d'identité de série. Quand Public Discovery est
+configuré, aucun chemin automatique d'identité ou de couverture ne contacte un
+fournisseur depuis l'extension.
+
+Le packaging reproductible local produit les candidats suivants, encore non
+publiés : Chrome `78cd2e6755dc0d26d92c209eda082711dd0917b794f41f947e7ed4b5aa6be211`
+(302755 octets) et Firefox
+`532c5f69c7914e42a0b9cefc80286dbd38d5bdbd74a9d46049ab9c846ae010a7`
+(302807 octets).
 
 ### Publication D1-first et Agenda OIDC — 2026-09-14
 

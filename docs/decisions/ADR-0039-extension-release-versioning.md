@@ -12,7 +12,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-11
-- Revised: 2026-09-13
+- Revised: 2026-09-14
 
 ## Context
 
@@ -68,6 +68,10 @@ Collectif par le cache public vérifié D1-first de l'ADR-0046.
 `1.0.28` retire la recherche fournisseur de la découverte automatique MV3 :
 l’extension lit ou crée une demande D1 v2, puis consomme la fiche complète
 produite par le composant Discovery appelé via GitHub Actions OIDC.
+`1.0.29` rend cette frontière exhaustive : la récupération automatique
+d'identités et de couvertures ne peut plus réactiver les adaptateurs
+fournisseurs lorsque Public Discovery est configuré; le calendrier partagé
+utilise `/v3/releases` et vérifie fraîcheur et couverture avant tout repli.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

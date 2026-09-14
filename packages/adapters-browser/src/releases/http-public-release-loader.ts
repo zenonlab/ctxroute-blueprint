@@ -2,7 +2,8 @@ import { publicReleaseEventSchema, publicReleaseGenerationSchema } from '@tobiri
 import type { PublicReleaseGeneration, PublicReleaseGenerationCachePort } from '@tobirink/application';
 import { z } from 'zod';
 export interface PublicReleaseFetch { (input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
-const pageSchema = z.strictObject({ entries: z.array(publicReleaseEventSchema).max(100), generatedAt: z.iso.datetime({ offset: false }), nextCursor: z.string().min(1).max(512).optional(), revision: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/u) });
+const pageSchema = z.strictObject({ entries: z.array(publicReleaseEventSchema).max(100), generatedAt: z.iso.datetime({ offset: false }), nextCursor: z.string().min(1).max(512).optional(), revision: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/u), window: z.strictObject({ from: z.iso.date(), to: z.iso.date() }) });
+const maximumSharedGenerationAgeMs = 8 * 86_400_000;
 async function parsePage(response: Response): Promise<z.output<typeof pageSchema>> {
   const declaredLength = Number(response.headers.get('content-length') ?? 0);
   if (Number.isFinite(declaredLength) && declaredLength > 1_000_000) throw new Error('public-release-response-too-large');
@@ -21,8 +22,9 @@ export class HttpPublicReleaseLoader {
     let etag: string | undefined;
     let revision: string | undefined;
     let generatedAt: string | undefined;
+    let sourceWindow: { from: string; to: string } | undefined;
     for (let pageNumber = 1; pageNumber <= 100; pageNumber += 1) {
-      const url = new URL('/v2/releases', this.origin);
+      const url = new URL('/v3/releases', this.origin);
       url.searchParams.set('from', window.from); url.searchParams.set('to', window.to); url.searchParams.set('limit', '100');
       if (cursor) url.searchParams.set('cursor', cursor);
       const headers = pageNumber === 1 && matchingCache ? { 'If-None-Match': matchingCache.etag } : undefined;
@@ -37,7 +39,11 @@ export class HttpPublicReleaseLoader {
       etag = responseEtag;
       const body = await parsePage(response);
       if ((revision !== undefined && body.revision !== revision) || (generatedAt !== undefined && body.generatedAt !== generatedAt)) throw new Error('public-release-generation-mismatch');
-      revision = body.revision; generatedAt = body.generatedAt;
+      if (sourceWindow !== undefined && (body.window.from !== sourceWindow.from || body.window.to !== sourceWindow.to)) throw new Error('public-release-generation-mismatch');
+      if (body.window.from > window.from || body.window.to < window.to) throw new Error('public-release-generation-window-mismatch');
+      const generationAge = this.clock() - Date.parse(body.generatedAt);
+      if (generationAge < 0 || generationAge >= maximumSharedGenerationAgeMs) throw new Error('public-release-generation-stale');
+      revision = body.revision; generatedAt = body.generatedAt; sourceWindow = body.window;
       for (const event of body.entries) { if (events.has(event.id)) throw new Error('public-release-duplicate-event'); events.set(event.id, event); }
       if (!body.nextCursor) {
         if (revision === 'd1-empty') throw new Error('public-release-generation-empty');

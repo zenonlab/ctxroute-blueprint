@@ -17,6 +17,7 @@ describe('worker diagnostics', () => {
     expect(classifyWorkerRoute('/v2/favorites/lookup')).toBe('unknown');
     expect(classifyWorkerRoute('/v2/catalogue/discoveries/claims')).toBe('catalogue');
     expect(classifyWorkerRoute('/v2/releases/generations')).toBe('release');
+    expect(classifyWorkerRoute('/v3/releases')).toBe('release');
     expect(classifyWorkerRoute('/library/work_123')).toBe('site');
     expect(classifyWorkerRoute('/private/value')).toBe('unknown');
     expect(workerMethod('DELETE')).toBe('OTHER');

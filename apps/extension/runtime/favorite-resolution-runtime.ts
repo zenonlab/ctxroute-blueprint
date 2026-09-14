@@ -147,16 +147,18 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           diagnosticFailureCode = 'INVENTORY_UNAVAILABLE';
           await recordDiagnostic({ counts: { batches: inventoryBatches, observed }, errorCode: 'INVENTORY_UNAVAILABLE', outcome: 'failed', runId, stage: 'inventory' });
         }
-        const identityPreparation = await dependencies.identityRecovery?.prepare();
+        const identityPreparation = dependencies.publicDiscovery === undefined ? await dependencies.identityRecovery?.prepare() : undefined;
         await prepareResolutionCaches();
         const result = await runFavoriteResolutionSlice(dependencies);
         const counts = { blocked: result.blocked, completed: result.completed, retried: result.retried };
         await recordDiagnostic({ counts, outcome: result.retried > 0 || result.blocked > 0 || result.continuationRequired ? 'retryable' : 'complete', runId, stage: 'resolution' });
-        coverRepairAfterId = await dependencies.identityRecovery?.coverRepairAfterId?.() ?? coverRepairAfterId;
-        const repairedCovers = await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now, coverRepairAfterId, dependencies.candidates);
-        coverRepairAfterId = repairedCovers.nextAfterId;
-        if (repairedCovers.inspected === 0) coverRepairAfterId = undefined;
-        await dependencies.identityRecovery?.saveCoverRepairAfterId?.(coverRepairAfterId);
+        if (dependencies.publicDiscovery === undefined) {
+          coverRepairAfterId = await dependencies.identityRecovery?.coverRepairAfterId?.() ?? coverRepairAfterId;
+          const repairedCovers = await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now, coverRepairAfterId, dependencies.candidates);
+          coverRepairAfterId = repairedCovers.nextAfterId;
+          if (repairedCovers.inspected === 0) coverRepairAfterId = undefined;
+          await dependencies.identityRecovery?.saveCoverRepairAfterId?.(coverRepairAfterId);
+        }
         const identityPublication = await dependencies.identityRecovery?.publish();
         if (inventoryFailure !== undefined) throw inventoryFailure;
         if (!inventoryComplete || result.continuationRequired || identityPreparation?.kind === 'PENDING' || identityPublication?.kind === 'SCANNING') return dependencies.now();
