@@ -43,7 +43,12 @@ export function createPublicDiscoveryHttpGateway(options: PublicDiscoveryHttpGat
   const request = async (path: string, token: string, body: DiscoveryRequestBody): Promise<Response> => {
     const response = await fetcher(endpoint(options.baseUrl, path), {
       body: JSON.stringify(body),
-      headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'TobiRink-Public-Discovery/0.1 (+https://github.com/tristan-monticelli/tobirink-public-discovery)',
+      },
       method: 'POST',
       redirect: 'error',
       signal: AbortSignal.timeout(30_000),

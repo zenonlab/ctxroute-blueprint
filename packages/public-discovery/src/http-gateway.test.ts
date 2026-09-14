@@ -19,7 +19,10 @@ describe('public discovery HTTP gateway', () => {
       }],
       schemaVersion: 2, verifiedAt: '2026-09-14T12:00:00.000Z',
     })).resolves.toEqual({ published: 1, replayed: 0 });
-    expect(fetcher).toHaveBeenNthCalledWith(1, 'https://tobirink.test/v3/catalogue/discoveries/collector/claims', expect.objectContaining({ headers: expect.objectContaining({ Authorization: `Bearer ${claimToken}` }) }));
+    expect(fetcher).toHaveBeenNthCalledWith(1, 'https://tobirink.test/v3/catalogue/discoveries/collector/claims', expect.objectContaining({ headers: expect.objectContaining({
+      Authorization: `Bearer ${claimToken}`,
+      'User-Agent': 'TobiRink-Public-Discovery/0.1 (+https://github.com/tristan-monticelli/tobirink-public-discovery)',
+    }) }));
     expect(fetcher).toHaveBeenNthCalledWith(2, 'https://tobirink.test/v3/catalogue/discoveries/results', expect.objectContaining({ headers: expect.objectContaining({ Authorization: `Bearer ${resultToken}` }) }));
   });
 
