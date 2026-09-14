@@ -60,11 +60,12 @@ incomplet comme un échec total. Son activation et la première collecte réelle
 restent des opérations publiées et vérifiées séparément; aucun succès n'est
 déduit des fixtures locales.
 
-L'extension possède un repli direct. Quand le calendrier D1 est absent, périmé
-ou incomplet, elle collecte les mêmes fenêtres publiques page par page depuis
-MV3, avec checkpoint IndexedDB et cadence durable. Ce repli n'envoie aucun
-favori, titre, URL ou ensemble d'identifiants au Worker et ne contribue rien à
-D1. Une génération publique récente remplace ensuite le repli local.
+L'extension ne possède aucun repli fournisseur Agenda. Elle lit le calendrier
+D1 par `/v3/releases`; une indisponibilité réseau peut réutiliser la dernière
+génération partagée de même fenêtre tant qu'elle a moins de huit jours. Sans
+génération partagée valide, Agenda expose son état indisponible et attend la
+prochaine collecte GitHub. Ni un démarrage, ni une alarme, ni une lecture Agenda
+ne peut appeler AniList ou MangaUpdates depuis MV3.
 
 Kitsu reste un repli de résolution et ne produit aucune date Agenda. MangaDex
 conserve son rôle d'identité exacte et de sorties spécialisées sans devenir
@@ -86,19 +87,36 @@ minimale de 2,2 secondes. MangaUpdates utilise `page`, `per_page` et
 d'observation et ne devient jamais un horaire de sortie. Les valeurs comme
 `58.5`, `2a` et `29-29.5 (end)` restent des numéros textuels bornés.
 
-`GET /v2/releases` est une lecture commune, paginée par occurrence puis clé
-sémantique stable. Son curseur porte ces deux valeurs et sa révision dérive de
-la génération validée, jamais du nombre de lignes d'une page. Elle ne reçoit
-aucun identifiant personnel et renvoie un ETag exact pour sa fenêtre.
-`/v1/releases` reste intact pendant la transition pour compatibilité et
-rollback.
+`GET /v2/releases` reste byte-compatible avec les extensions déjà publiées.
+`GET /v3/releases` ajoute la fenêtre source de la génération active. Les deux
+lectures sont paginées par occurrence puis clé sémantique stable, refusent une
+plage supérieure à quarante jours et ne reçoivent aucun identifiant personnel.
+Le curseur porte occurrence et identifiant; la révision dérive de la génération
+validée et l'ETag exact inclut version de route, révision et fenêtre demandée.
+`/v1/releases` reste intact pour compatibilité et rollback.
 
 L'extension charge toutes les pages d'une même génération au plus une fois par
-24 heures, les valide puis les écrit atomiquement dans IndexedDB. Le cache
-Agenda ne réside pas dans `storage.local`. Une erreur conserve la dernière
-génération valide. L'Agenda local joint ces événements aux Works résolus par
+24 heures, les valide puis les écrit atomiquement dans IndexedDB. Une réponse
+partagée est utilisable seulement si elle a moins de huit jours et si sa fenêtre
+source couvre intégralement la fenêtre demandée. Une réponse plus ancienne,
+hors couverture ou contenant une ligne invalide échoue fermée sans appeler de
+fournisseur. Le cache Agenda ne réside pas dans `storage.local`. Une erreur
+réseau conserve et peut servir la dernière génération partagée valide de même
+fenêtre. L'Agenda local joint ces événements aux Works résolus par
 `(provider, providerWorkId)` uniquement. Il ne cherche jamais un fournisseur
 pendant une lecture locale et ne joint jamais par titre.
+
+Après une promotion complète, la transaction de cycle de vie conserve la
+génération active et au plus les deux générations précédentes. Elle supprime
+d'abord leurs événements enfants puis les générations parentes; le pointeur
+actif est exclu explicitement de chaque requête de rétention. Une ingestion
+interrompue ne change pas le pointeur, et son staging éventuel sera borné par la
+prochaine promotion réussie.
+
+La collecte MangaUpdates compte les lignes reçues, acceptées et sans identité
+de série sans journaliser titre ni payload. Une lane dont plus de cinq pour cent
+des lignes reçues sont sans identité échoue entièrement afin qu'une dérive de
+schéma fournisseur ne réduise pas silencieusement le calendrier partagé.
 
 Les dates civiles ne sont pas converties en minuit UTC. Une date confirmée
 remplace une estimation. Une estimation manga demande trois intervalles
@@ -113,8 +131,7 @@ Le calendrier reste mutualisable sans rendre l'utilisateur dépendant de
 l'egress Cloudflare. Une collecte hebdomadaire alimente toutes les lectures;
 une recherche utilisateur ne relance pas les fournisseurs Agenda. Le site et WebBridge ne voient toujours qu'une projection
 locale. Les résultats publics restent disponibles hors ligne et les pannes
-fournisseur ne réinitialisent pas le calendrier validé. Le repli direct augmente
-le trafic fournisseur seulement lorsque le cache partagé ne peut pas servir une
-génération complète. La publication du Worker et du workflow reste derrière
+fournisseur ne réinitialisent pas le calendrier validé. Seul le workflow public
+planifié ou déclenché manuellement appelle les fournisseurs Agenda. La publication du Worker et du workflow reste derrière
 les gates opérationnelles correspondantes. Aucun secret d'ingestion ou `.env`
 Agenda n'est créé.

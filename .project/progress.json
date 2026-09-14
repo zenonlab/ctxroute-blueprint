@@ -9275,7 +9275,7 @@
       "schemaVersion": 1,
       "id": "goal-correct-agenda-provider-pipeline",
       "title": "Corriger la pipeline Agenda après audit fournisseur",
-      "status": "BLOCKED",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -9505,7 +9505,7 @@
         {
           "id": "step-8",
           "title": "Publier séparément la pipeline Agenda corrigée",
-          "status": "BLOCKED",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Une approbation explicite distincte autorise chaque ressource externe exacte",
             "Le collecteur choisi a passé plusieurs smokes AniList depuis son egress réel",
@@ -9526,9 +9526,9 @@
             "git commit -m chore(release): record corrected agenda publication"
           ],
           "evidence": [
-            "external: AniList server access from Cloudflare was explicitly refused (403 manually blocked, ADR-0045); after another production attempt on 2026-09-14, agenda_last_success_at remains NULL and agenda_retry_at advances to 10:31:21.029Z. GET /v2/releases remains d1-empty.",
-            "Worker 5497b61c-a25d-4ca2-b193-8e747fada840 and 1.0.26 downloads were published earlier. Local 1.0.27 fixes native browser fetch and passes installed Firefox certification, but is not published.",
-            "Shared collector and signed ingestion are unimplemented targets; certifying live shared data requires authorized AniList access. Publication cannot be described as complete from structural tests or populated local fixtures."
+            "Extension 1.0.30 removes the composed Agenda provider fallback; security regression and architecture/dataflow views prove extension -> D1 only, with AniList/MangaUpdates owned by the public GitHub workflow.",
+            "npm run verify passes completely: 143 extension, 60 Worker, 85 browser adapter, 375 application tests, all typechecks, performance, integration, audit 0 vulnerabilities and Archify showcase.",
+            "Exact archives certified: Chrome 993297b5... (Chromium 153, D1 Agenda and zero provider calls) and Firefox 7757cf81... (Firefox 155, anime INSTANT and manga DATE). D1 audit found no synthetic test rows. Remaining: commit/push, immutable 1.0.30 R2 publication, merge, Worker deploy and production verification."
           ]
         }
       ]

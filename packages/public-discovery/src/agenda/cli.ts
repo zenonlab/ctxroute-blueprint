@@ -20,5 +20,4 @@ const response = await fetch('https://tobirink-public-api.choukky.workers.dev/v2
 if (!response.ok) throw new Error(`agenda-ingestion-${response.status}:${(await response.text()).slice(0, 256)}`);
 const receipt = publicAgendaReceiptSchema.parse(await response.json());
 if (!receipt.accepted || receipt.count !== collection.events.length) throw new Error('agenda-ingestion-not-promoted');
-const providers = { anilist: collection.events.filter((event) => event.provider === 'anilist').length, mangaupdates: collection.events.filter((event) => event.provider === 'mangaupdates').length };
-process.stdout.write(`${JSON.stringify({ event: 'agenda_generation_published', providers, ...receipt, window })}\n`);
+process.stdout.write(`${JSON.stringify({ event: 'agenda_generation_published', providers: collection.quality, ...receipt, window })}\n`);

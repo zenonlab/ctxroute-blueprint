@@ -10,13 +10,13 @@
         "id": "deployed-path",
         "label": "Chemin déployé",
         "focus": ["extension", "worker", "d1", "r2"],
-        "note": "Le Worker 4f2b30ee sert les claims, Agenda et ZIP 1.0.27; D1 possède le schéma mais aucune génération active."
+        "note": "Le Worker sert Discovery D1-first et Agenda; D1 conserve une génération active et deux sauvegardes bornées."
       },
       {
         "id": "collector-path",
         "label": "Collecte OIDC",
         "focus": ["providers", "github", "worker", "d1"],
-        "note": "Les workflows sont publiés, mais GitHub Billing refuse actuellement les jobs avant leur première étape."
+        "note": "Les workflows publics collectent les fournisseurs puis publient par OIDC sans secret partagé."
       }
     ]
   },
@@ -33,15 +33,15 @@
       "id": "github",
       "type": "security",
       "label": "GitHub Actions OIDC",
-      "sublabel": "Jobs refusés avant exécution · Billing",
+      "sublabel": "Agenda hebdomadaire · Discovery quotidien",
       "pos": [400, 80],
       "size": [250, 72]
     },
     {
       "id": "extension",
       "type": "frontend",
-      "label": "Extension MV3 1.0.27",
-      "sublabel": "IndexedDB privé · D1-first",
+      "label": "Extension MV3 1.0.30",
+      "sublabel": "IndexedDB privé · zéro egress fournisseur",
       "pos": [50, 330],
       "size": [230, 72]
     },
@@ -49,7 +49,7 @@
       "id": "worker",
       "type": "cloud",
       "label": "Cloudflare Worker",
-      "sublabel": "4f2b30ee · aucun cron fournisseur",
+      "sublabel": "API bornée · aucun egress fournisseur",
       "pos": [700, 330],
       "size": [250, 72]
     },
@@ -57,7 +57,7 @@
       "id": "d1",
       "type": "database",
       "label": "D1 tobirink-public",
-      "sublabel": "Schéma prêt · 0 génération active",
+      "sublabel": "Discovery terminal · Agenda révisionné",
       "pos": [1040, 190],
       "size": [230, 72]
     },
@@ -65,7 +65,7 @@
       "id": "r2",
       "type": "database",
       "label": "R2 public-releases",
-      "sublabel": "ZIP Chrome / Firefox 1.0.27",
+      "sublabel": "ZIP Chrome / Firefox immuables",
       "pos": [1040, 470],
       "size": [230, 72]
     }
@@ -79,15 +79,14 @@
     }
   ],
   "connections": [
-    { "id": "local-provider-fallback", "from": "extension", "to": "providers", "label": "bail D1 ou repli Agenda", "variant": "dashed" },
-    { "id": "provider-collection", "from": "providers", "to": "github", "label": "pages bornées", "variant": "dashed" },
-    { "id": "oidc-ingestion", "from": "github", "to": "worker", "label": "OIDC · bloqué avant émission", "variant": "security" },
-    { "id": "extension-api", "from": "extension", "to": "worker", "label": "HTTPS · claims / Agenda / ZIP", "variant": "emphasis" },
+    { "id": "provider-collection", "from": "providers", "to": "github", "label": "pages bornées", "variant": "emphasis" },
+    { "id": "oidc-ingestion", "from": "github", "to": "worker", "label": "OIDC · dépôt et workflow exacts", "variant": "security" },
+    { "id": "extension-api", "from": "extension", "to": "worker", "label": "HTTPS · demandes / Agenda v3", "variant": "emphasis" },
     { "id": "worker-sql", "from": "worker", "to": "d1", "label": "SQL · PENDING / VERIFIED / générations" },
     { "id": "worker-archives", "from": "worker", "to": "r2", "label": "lecture des archives immuables" }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Publié et vérifié", "items": ["Migration 0011 appliquée", "Worker et deux ZIP 1.0.27 disponibles", "Aucun protocole Collectif actif"] },
-    { "dot": "amber", "title": "Preuve encore manquante", "items": ["GitHub refuse les jobs pour Billing", "D1 reste à zéro génération Agenda", "Aucun succès fournisseur réel revendiqué"] }
+    { "dot": "emerald", "title": "Pipeline vérifiée", "items": ["Discovery terminal réutilisé", "Agenda AniList + MangaUpdates actif", "Aucun protocole Collectif actif"] },
+    { "dot": "cyan", "title": "Cycle de vie borné", "items": ["Agenda frais moins de huit jours", "Fenêtre source vérifiée", "Active + deux sauvegardes D1"] }
   ]
 }

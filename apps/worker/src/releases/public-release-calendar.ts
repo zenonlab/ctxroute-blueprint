@@ -6,11 +6,11 @@ import type { PublicReleaseIngestion } from './public-release-ingestion';
 export interface PublicReleaseQuery { from?: string; to?: string; cursor?: string; limit: number }
 export interface PublicReleaseCalendarPort {
   ingest(input: PublicReleaseIngestion): Promise<{ accepted: boolean; count: number; replayed: boolean; revision: string }>;
-  query(input: PublicReleaseQuery): Promise<{ entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; nextCursor?: string }>;
+  query(input: PublicReleaseQuery): Promise<{ entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; window: { from: string; to: string }; nextCursor?: string }>;
 }
-interface CalendarPage { entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; nextCursor?: string }
+interface CalendarPage { entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; window: { from: string; to: string }; nextCursor?: string }
 interface ReleaseRow { id: string; provider: string; provider_work_id: string; release_kind: string; sequence_label: string | null; occurrence_kind: string; occurrence_value: string; state: string; source: string; fetched_at: string; parser_version: string; rules_version: string; expires_at: string }
-interface ReleaseGenerationRow { revision: string; generated_at: string }
+interface ReleaseGenerationRow { revision: string; generated_at: string; window_from: string; window_to: string }
 interface ReleaseCursor { id: string | null; occurrence: string | null }
 function decodeCursor(cursor: string | undefined): ReleaseCursor {
   if (cursor === undefined) return { id: null, occurrence: null };
@@ -35,13 +35,16 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
     const cursor = decodeCursor(input.cursor);
     const lowerBound = input.from ?? '0000-01-01';
     const upperBound = input.to ? `${input.to}T23:59:59.999Z` : '9999-12-31T23:59:59.999Z';
-    const rows = await this.db.prepare("SELECT event.id, event.provider, event.provider_work_id, event.release_kind, event.sequence_label, event.occurrence_kind, event.occurrence_value, event.state, event.source, event.fetched_at, event.parser_version, event.rules_version, event.expires_at FROM public_release_generation_event AS event JOIN public_release_active_generation AS active ON active.revision = event.generation_revision AND active.id = 'active' WHERE event.occurrence_value >= ?1 AND event.occurrence_value <= ?2 AND (event.occurrence_value > ?3 OR (event.occurrence_value = ?3 AND event.id > ?4)) ORDER BY event.occurrence_value, event.id LIMIT ?5").bind(lowerBound, upperBound, cursor.occurrence ?? lowerBound, cursor.id ?? '', input.limit + 1).all<ReleaseRow>();
-    const generation = await this.db.prepare("SELECT generation.revision, generation.generated_at FROM public_release_generation AS generation JOIN public_release_active_generation AS active ON active.revision = generation.revision AND active.id = 'active' LIMIT 1").first<ReleaseGenerationRow>();
-    const parsed = rows.results.flatMap((row) => { try { return [publicReleaseEventSchema.parse({ id: row.id, provider: row.provider, providerWorkId: row.provider_work_id, releaseKind: row.release_kind, sequence: row.sequence_label ?? undefined, occurrence: { kind: row.occurrence_kind, value: row.occurrence_value }, state: row.state, provenance: { source: row.source, fetchedAt: row.fetched_at, parserVersion: row.parser_version, rulesVersion: row.rules_version }, expiresAt: row.expires_at })]; } catch { return []; } });
+    const generation = await this.db.prepare("SELECT generation.revision, generation.generated_at, generation.window_from, generation.window_to FROM public_release_generation AS generation JOIN public_release_active_generation AS active ON active.revision = generation.revision AND active.id = 'active' LIMIT 1").first<ReleaseGenerationRow>();
+    const emptyRows: ReleaseRow[] = [];
+    const rows = generation === null
+      ? { results: emptyRows }
+      : await this.db.prepare("SELECT id, provider, provider_work_id, release_kind, sequence_label, occurrence_kind, occurrence_value, state, source, fetched_at, parser_version, rules_version, expires_at FROM public_release_generation_event WHERE generation_revision = ?1 AND occurrence_value >= ?2 AND occurrence_value <= ?3 AND (occurrence_value > ?4 OR (occurrence_value = ?4 AND id > ?5)) ORDER BY occurrence_value, id LIMIT ?6").bind(generation.revision, lowerBound, upperBound, cursor.occurrence ?? lowerBound, cursor.id ?? '', input.limit + 1).all<ReleaseRow>();
+    const parsed = rows.results.map((row) => publicReleaseEventSchema.parse({ id: row.id, provider: row.provider, providerWorkId: row.provider_work_id, releaseKind: row.release_kind, sequence: row.sequence_label ?? undefined, occurrence: { kind: row.occurrence_kind, value: row.occurrence_value }, state: row.state, provenance: { source: row.source, fetchedAt: row.fetched_at, parserVersion: row.parser_version, rulesVersion: row.rules_version }, expiresAt: row.expires_at }));
     const entries = parsed.slice(0, input.limit);
     const last = entries.at(-1);
     const nextCursor = parsed.length > input.limit && last ? `${last.occurrence.value}|${last.id}` : undefined;
-    const page: CalendarPage = { entries: Object.freeze(entries), revision: generation?.revision ?? 'd1-empty', generatedAt: generation?.generated_at ?? '1970-01-01T00:00:00.000Z' };
+    const page: CalendarPage = { entries: Object.freeze(entries), revision: generation?.revision ?? 'd1-empty', generatedAt: generation?.generated_at ?? '1970-01-01T00:00:00.000Z', window: { from: generation?.window_from ?? '1970-01-01', to: generation?.window_to ?? '1970-01-01' } };
     if (nextCursor) page.nextCursor = nextCursor;
     return page;
   }

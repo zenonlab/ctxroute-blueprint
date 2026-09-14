@@ -55,8 +55,10 @@ async function test_inspect_read_only_resources() {
 
 async function test_preview_and_apply_translations() {
   const calls = [];
+  const builds = [];
   const run = async args => { calls.push(args); return args.includes('--dry-run') ? 'bundle preview' : 'applied'; };
-  const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run });
+  const buildWorkerAssets = async options => { builds.push(options); };
+  const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run, buildWorkerAssets });
   const actions = driver.resolveOperations(['worker-deploy', 'd1-migrate:CATALOGUE_DB']);
   const preview = await driver.preview(actions);
   assert.deepEqual(preview, {
@@ -67,12 +69,31 @@ async function test_preview_and_apply_translations() {
     ],
   });
   assert.deepEqual(calls, [['deploy', '--dry-run']]);
+  assert.deepEqual(builds, [{ workerDirectory: '/worker' }]);
   calls.length = 0;
   await driver.apply(preview.actions);
   assert.deepEqual(calls, [
     ['d1', 'migrations', 'apply', 'CATALOGUE_DB', '--remote'],
     ['deploy'],
   ]);
+  assert.deepEqual(builds, [
+    { workerDirectory: '/worker' },
+    { workerDirectory: '/worker' },
+  ]);
+}
+
+async function test_worker_build_failure_prevents_wrangler() {
+  const calls = [];
+  const driver = createCloudflareDriver({
+    config,
+    workerDirectory: '/worker',
+    run: async args => { calls.push(args); return ''; },
+    buildWorkerAssets: async () => { throw new Error('web-build-failed'); },
+  });
+  const actions = driver.resolveOperations(['worker-deploy']);
+  await assert.rejects(() => driver.preview(actions), /web-build-failed/u);
+  await assert.rejects(() => driver.apply(actions), /web-build-failed/u);
+  assert.deepEqual(calls, []);
 }
 
 async function test_release_publish_is_hashed_and_translated() {
@@ -182,6 +203,7 @@ function test_reject_invalid_r2_identifiers() {
 test('the driver derives operation targets from configuration', test_derive_operation_targets);
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
+test('a failed web build prevents Worker preview and deployment', test_worker_build_failure_prevents_wrangler);
 test('release publication hashes bytes before translating the bounded R2 upload', test_release_publish_is_hashed_and_translated);
 test('release snapshots are schema-validated and uploaded before their pointer', test_release_snapshot_publication_is_validated_and_ordered);
 test('release snapshot publication rejects unsafe revisions, mismatches, incomplete pairs and invalid JSON', test_release_snapshot_publication_fails_closed);

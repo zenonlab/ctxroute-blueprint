@@ -92,8 +92,12 @@ L’extension consulte d’abord IndexedDB, puis `storage.sync`, puis D1. Un
 `VERIFIED` fournit directement le candidat hydraté complet utilisé pour écrire
 le Work local. `PENDING` programme une relecture sans fournisseur. `NOT_FOUND`
 et `AMBIGUOUS` terminent la tâche en Review locale sans relancer le composant.
-Le chemin de découverte ne compose aucun adaptateur de recherche ou
-d’hydratation fournisseur dans le background MV3.
+Quand Public Discovery est configuré, le chemin automatique de découverte et
+la réparation automatique de couvertures ne consultent aucun adaptateur de
+recherche ou d'hydratation fournisseur. Le background conserve des adaptateurs
+distincts uniquement pour le repli Agenda public et pour les actions manuelles
+qui affichent explicitement leur effet réseau; leur présence au composition
+root ne les autorise jamais comme repli implicite d'un état D1.
 
 Le protocole ne possède aucun réglage Collectif, appairage ou consentement
 produit spécifique. La permission navigateur native `bookmarks` et la

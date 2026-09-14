@@ -19,7 +19,7 @@ interface WorkerDiagnosticBindings {
 export function classifyWorkerRoute(pathname: string): WorkerRouteFamily {
   if (pathname === '/v1/catalogue' || pathname.startsWith('/v1/catalogue/') || pathname.startsWith('/v2/catalogue/')) return 'catalogue';
   if (pathname.startsWith('/v1/media/provider-covers/') || pathname.startsWith('/v1/media/covers/')) return 'cover';
-  if (pathname === '/v1/releases' || pathname === '/v2/releases' || pathname.startsWith('/v2/releases/') || pathname.startsWith('/downloads/')) return 'release';
+  if (pathname === '/v1/releases' || pathname === '/v2/releases' || pathname === '/v3/releases' || pathname.startsWith('/v2/releases/') || pathname.startsWith('/downloads/')) return 'release';
   if (pathname === '/' || pathname === '/library' || pathname.startsWith('/library/') || pathname === '/agenda' || pathname === '/privacy' || pathname === '/download') return 'site';
   return 'unknown';
 }

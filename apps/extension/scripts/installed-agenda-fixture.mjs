@@ -4,7 +4,7 @@ export function installedAgendaFixture(reference = new Date()) {
   const date = reference.toISOString().slice(0, 10);
   const nextDay = new Date(`${date}T00:00:00.000Z`); nextDay.setUTCDate(nextDay.getUTCDate() + 1);
   return {
-    active: { activeGeneration: 'installed-agenda', checkedAt: reference.toISOString(), etag: '"installed-agenda"', generation: 1, id: 'active', revision: 'installed-agenda', source: 'fallback', window: { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) } },
+    active: { activeGeneration: 'installed-agenda', checkedAt: reference.toISOString(), etag: '"installed-agenda"', generation: 1, id: 'active', revision: 'installed-agenda', source: 'shared', window: { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) } },
     events: [
       { expiresAt: end.toISOString(), id: 'installed-anilist-42-1', occurrence: { kind: 'INSTANT', value: `${date}T18:00:00.000Z` }, provenance: { fetchedAt: reference.toISOString(), parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist', providerWorkId: '42', releaseKind: 'episode', sequence: '1', state: 'SCHEDULED' },
       { expiresAt: end.toISOString(), id: 'installed-mangaupdates-77-58', occurrence: { kind: 'DATE', value: date }, provenance: { fetchedAt: reference.toISOString(), parserVersion: '2', rulesVersion: '2', source: 'mangaupdates' }, provider: 'mangaupdates', providerWorkId: '77', releaseKind: 'chapter', sequence: '58.5', state: 'CONFIRMED' },

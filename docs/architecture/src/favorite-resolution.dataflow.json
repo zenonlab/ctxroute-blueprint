@@ -34,7 +34,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "La preuve d’identité est conservée sans attendre D1 ni l’hydratation; chaque fournisseur inspecte une fenêtre de résultats bornée."
+        "note": "La preuve d’identité est conservée avant D1; une fiche terminale revient du cache public sans appel fournisseur MV3."
       },
       {
         "id": "bounded-convergence",
@@ -46,7 +46,7 @@
           "privateStore",
           "localDiagnostics"
         ],
-        "note": "Titres locaux immédiats; démarrage sans rescan, bootstrap indexé et lectures groupées par 100 bornent MV3."
+        "note": "Titres locaux immédiats; demande D1 unique, attente durable et lectures groupées par 100 bornent MV3."
       },
       {
         "id": "cover-rights",
@@ -141,12 +141,12 @@
     },
     {
       "id": "providerAdapters",
-      "type": "external",
-      "label": "Lanes fournisseur",
+      "type": "database",
+      "label": "Profil D1 terminal",
       "stage": 3,
       "row": 4,
       "width": 150,
-      "tag": "identité + affichage borné"
+      "tag": "VERIFIED · NOT_FOUND · AMBIGUOUS"
     },
     {
       "id": "titleMatcher",
@@ -155,7 +155,7 @@
       "stage": 3,
       "row": 1,
       "width": 150,
-      "tag": "v1.0.25 · lectures groupées"
+      "tag": "profil vérifié · lectures groupées"
     },
     {
       "id": "reviewGate",
@@ -301,21 +301,18 @@
     {
       "from": "durableQueue",
       "to": "providerAdapters",
-      "label": "bail ou ID exact",
-      "classification": "PENDING/VERIFIED : arrêt",
-      "variant": "dashed",
+      "label": "réponse D1 terminale",
+      "classification": "PENDING : attente · aucun fetch",
+      "variant": "security",
       "route": "straight",
-      "labelAt": [
-        620,
-        660
-      ]
+      "labelAt": [620, 660]
     },
     {
       "from": "providerAdapters",
       "to": "titleMatcher",
-      "label": "candidats + affichage",
-      "classification": "réponse bornée",
-      "variant": "default",
+      "label": "fiche ou Review",
+      "classification": "aucun fetch MV3",
+      "variant": "security",
       "labelAt": [
         760,
         660
@@ -377,8 +374,8 @@
     {
       "from": "durableQueue",
       "to": "cacheWorker",
-      "label": "lecture, claim puis IDs publics",
-      "classification": "aucun titre privé · PENDING",
+      "label": "lecture ou demande unique",
+      "classification": "MISS devient PENDING",
       "variant": "security"
     },
     {
@@ -395,7 +392,7 @@
     {
       "from": "cacheWorker",
       "to": "publicD1",
-      "label": "claim atomique / promotion",
+      "label": "lecture / création atomique",
       "route": "straight",
       "labelAt": [423, 946],
       "classification": "clé unique · état borné",
@@ -450,12 +447,12 @@
       "title": "Convergence MV3 bornée",
       "items": [
         "Routes structurelles: identifiants de routage exclus avec provenance",
-        "Curseurs, reçus, alimentation cache et cadences survivent à MV3",
+        "Une clé PENDING ou terminale interdit toute recherche fournisseur MV3",
         "Inventaire puis présence: pages et checkpoints atomiques",
         "Alarme nommée restaurée à chaque réveil MV3; aucun runner concurrent",
-        "MangaUpdates: 25 inspectés, preuves seules conservées, curseur durable",
-        "API MU sans Origin; panne, 403 ou page incomplète : RETRYABLE",
-        "Kitsu suit seulement NO_MATCH principal complet"
+        "GitHub Actions possède seul les lanes AniList, MU, MangaDex et Kitsu",
+        "Panne, 403 ou page incomplète : PENDING puis reprise bornée",
+        "Agenda lit D1 ou son dernier cache valide sans repli fournisseur MV3"
       ]
     },
     {

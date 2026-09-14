@@ -12,7 +12,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-11
-- Revised: 2026-09-13
+- Revised: 2026-09-14
 
 ## Context
 
@@ -68,11 +68,22 @@ Collectif par le cache public vérifié D1-first de l'ADR-0046.
 `1.0.28` retire la recherche fournisseur de la découverte automatique MV3 :
 l’extension lit ou crée une demande D1 v2, puis consomme la fiche complète
 produite par le composant Discovery appelé via GitHub Actions OIDC.
+`1.0.29` rend cette frontière exhaustive : la récupération automatique
+d'identités et de couvertures ne peut plus réactiver les adaptateurs
+fournisseurs lorsque Public Discovery est configuré; le calendrier partagé
+utilise `/v3/releases` et vérifie fraîcheur et couverture avant tout repli.
+`1.0.30` retire aussi le dernier repli Agenda direct vers AniList et
+MangaUpdates. L'extension lit uniquement la génération D1 partagée ou son
+dernier cache partagé valide ; toute nouvelle collecte fournisseur appartient
+au workflow GitHub public vérifié.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
-version source; the lockfile and release tests follow it. Existing archives are
-retained unchanged. Publishing a new archive remains behind the Cloudflare
-infrastructure gate.
+version source; the lockfile, static download page and release tests follow it.
+Existing archives are retained unchanged. A `worker-deploy` preview and apply
+must each rebuild the web workspace before invoking Wrangler, so the reviewed
+bundle and the deployed Worker cannot reuse a stale `apps/web/out` from an
+older extension version. A failed web build prevents Wrangler from running.
+Publishing a new archive remains behind the Cloudflare infrastructure gate.
 
 ## Consequences
 

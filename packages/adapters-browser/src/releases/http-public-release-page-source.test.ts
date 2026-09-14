@@ -8,7 +8,7 @@ describe('HttpPublicReleasePageSource', () => {
       if (this !== globalThis) throw new TypeError('fetch requires the browser global receiver');
       return String(input).includes('graphql.anilist.co')
         ? Response.json({ data: { Page: { airingSchedules: [], pageInfo: { hasNextPage: false } } } })
-        : Response.json({ entries: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'calendar-test' }, { headers: { ETag: '"calendar-test"' } });
+        : Response.json({ entries: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'calendar-test', window: { from: '2026-09-12', to: '2026-09-28' } }, { headers: { ETag: '"calendar-test"' } });
     });
     vi.stubGlobal('fetch', fetcher);
     try {

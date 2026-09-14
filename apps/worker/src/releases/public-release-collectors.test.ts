@@ -5,7 +5,7 @@ import type { PublicReleasePageCheckpoint } from './public-release-collectors';
 const event = { id: 'anilist-1', provider: 'anilist' as const, providerWorkId: '1', releaseKind: 'episode' as const, occurrence: { kind: 'INSTANT' as const, value: '2026-09-13T00:00:00.000Z' }, state: 'SCHEDULED' as const, provenance: { source: 'anilist', fetchedAt: '2026-09-13T00:00:00.000Z', parserVersion: '1', rulesVersion: '1' }, expiresAt: '2026-09-14T00:00:00.000Z' };
 describe('public release collectors', () => {
   it('isolates provider failures while retaining successful lane events', async () => {
-    const result = await collectPublicReleaseLanes([{ provider: 'anilist', collect: async () => [event] }, { provider: 'mangaupdates', collect: async () => { throw new Error('429'); } }], { from: '2026-09-12', to: '2026-09-28' });
+    const result = await collectPublicReleaseLanes([{ provider: 'anilist', collect: async () => ({ events: [event], received: 1, skippedUnidentified: 0 }) }, { provider: 'mangaupdates', collect: async () => { throw new Error('429'); } }], { from: '2026-09-12', to: '2026-09-28' });
     expect(result.events).toHaveLength(1); expect(result.failures[0]).toMatch(/^mangaupdates:429$/u);
   });
 
@@ -22,8 +22,8 @@ describe('public release collectors', () => {
       const request = JSON.parse(String(init?.body)) as { variables: { page: number } };
       return Response.json({ data: { Page: { airingSchedules: [{ airingAt: 1_800_000_000 + request.variables.page, episode: request.variables.page, media: { id: 700 } }], pageInfo: { hasNextPage: request.variables.page === 1 } } } });
     });
-    const events = await new AniListReleaseCollector(fetcher, async (milliseconds) => { pauses.push(milliseconds); }, async (checkpoint) => { checkpoints.push(checkpoint); }, () => 10_000).collect({ from: '2026-09-12', to: '2026-09-28' });
-    expect(events.map((item) => item.sequence)).toEqual(['1', '2']);
+    const result = await new AniListReleaseCollector(fetcher, async (milliseconds) => { pauses.push(milliseconds); }, async (checkpoint) => { checkpoints.push(checkpoint); }, () => 10_000).collect({ from: '2026-09-12', to: '2026-09-28' });
+    expect(result.events.map((item) => item.sequence)).toEqual(['1', '2']);
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(pauses).toEqual([2_200]);
     expect(checkpoints.map(({ complete, nextPage, notBefore, page }) => ({ complete, nextPage, notBefore, page }))).toEqual([
@@ -44,8 +44,8 @@ describe('public release collectors', () => {
         : [{ metadata: { series: { series_id: 44 } }, record: { chapter: '29-29.5 (end)', id: 'c', release_date: '2026-09-13' } }];
       return Response.json({ page: request.page, per_page: 2, results, total_hits: 3 });
     });
-    const events = await new MangaUpdatesReleaseCollector(fetcher, async (milliseconds) => { pauses.push(milliseconds); }).collect({ from: '2026-09-12', to: '2026-09-28' });
-    expect(events.map((item) => item.sequence)).toEqual(['58.5', '2a', '29-29.5 (end)']);
+    const result = await new MangaUpdatesReleaseCollector(fetcher, async (milliseconds) => { pauses.push(milliseconds); }).collect({ from: '2026-09-12', to: '2026-09-28' });
+    expect(result.events.map((item) => item.sequence)).toEqual(['58.5', '2a', '29-29.5 (end)']);
     expect(requestedPages).toEqual([1, 2]);
     expect(pauses).toEqual([3_000]);
   });

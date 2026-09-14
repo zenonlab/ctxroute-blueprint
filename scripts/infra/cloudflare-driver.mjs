@@ -42,7 +42,7 @@ export async function loadCloudflareConfig(path) {
   return { worker, d1, r2 };
 }
 
-export function createCloudflareDriver({ config, workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile }) {
+export function createCloudflareDriver({ config, workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild }) {
   validateCloudflareConfig(config);
   const operations = new Map([
     ...releasePublishOperations(config),
@@ -79,6 +79,7 @@ export function createCloudflareDriver({ config, workerDirectory, releaseDirecto
       const actions = materializeActions(operations, requestedActions, config, releaseDirectory);
       const output = {};
       if (actions.some(action => action.kind === 'worker-deploy')) {
+        await buildWorkerAssets({ workerDirectory });
         output.worker = (await run(['deploy', '--dry-run'], { cwd: workerDirectory })).trim();
       }
       const artifacts = await Promise.all(actions.filter(isReleaseArtifactAction).map(async action => {
@@ -93,6 +94,9 @@ export function createCloudflareDriver({ config, workerDirectory, releaseDirecto
     async apply(actions) {
       const selected = materializeActions(operations, actions, config, releaseDirectory)
         .sort((left, right) => operationPriority(left) - operationPriority(right));
+      if (selected.some(action => action.kind === 'worker-deploy')) {
+        await buildWorkerAssets({ workerDirectory });
+      }
       const results = [];
       for (const action of selected) {
         const args = mutationArguments(action);
@@ -123,6 +127,15 @@ async function runWrangler(args, { cwd }) {
     env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
   });
   return stdout;
+}
+
+async function runWebBuild({ workerDirectory }) {
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  await execFileAsync(npm, ['run', 'build', '--workspace', '@tobirink/web'], {
+    cwd: resolve(workerDirectory, '../..'),
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024,
+  });
 }
 
 function resolveOperations(operations, names, config, releaseDirectory) {

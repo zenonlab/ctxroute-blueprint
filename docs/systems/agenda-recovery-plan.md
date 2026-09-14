@@ -24,7 +24,9 @@ Il ne publie rien si une lane échoue. Le Worker vérifie le jeton GitHub OIDC e
 le schéma strict de la génération, dérive une révision SHA-256 idempotente,
 écrit par lots préparés et ne remplace jamais l'actuelle par une génération
 plus ancienne. Rejouer le même lot n'ajoute aucun événement. `GET /v2/releases`
-est désormais une lecture D1 pure et ne déclenche aucune collecte.
+reste le contrat compatible; `GET /v3/releases` expose en plus la fenêtre
+source. Ces deux routes sont des lectures D1 pures et ne déclenchent aucune
+collecte.
 
 L’ingestion Agenda ne contient que des événements publics et ne transmet aucun
 profil hydraté par l’extension. La découverte favorite est une pipeline séparée
@@ -58,23 +60,21 @@ AniList / MangaUpdates
         ↓ collecteur planifié à egress vérifié
         ↓ batch public signé vers le Worker
         ↓ D1 public borné, écrit uniquement par le Worker
-        ↓ GET /v2/releases + ETag + curseur
+        ↓ GET /v3/releases + fenêtre source + ETag + curseur
         ↓ IndexedDB : génération complète et atomique
         ↓ jointure locale par providerWorkId
         ↓ Agenda / rappels / WebBridge local
 
-Si D1 est vide, périmé ou indisponible :
-AniList / MangaUpdates
-        ↓ pages publiques directes depuis MV3
-        ↓ checkpoint et cadence durable par fournisseur
-        ↓ même génération IndexedDB atomique
+Si D1 est temporairement indisponible :
+dernière génération partagée IndexedDB de même fenêtre et âgée de moins de huit jours
+        ↓ aucune API fournisseur depuis MV3
+        ↓ sinon état Agenda indisponible jusqu’au prochain run GitHub
 ```
 
 La collecte ne reçoit jamais de favori ni d'identifiant d'installation. Une
-panne d'une lane conserve l'autre lane et les données précédentes. Kitsu ne
-devient jamais arbitre du calendrier. Le repli local ne contribue aucun
-événement à D1 et s'arrête dès qu'une génération publique récente et complète
-est disponible.
+panne d'une lane conserve la génération D1 active précédente. Kitsu ne devient
+jamais arbitre du calendrier. L'extension ne collecte aucune sortie fournisseur
+et ne contribue aucun événement à D1.
 
 Les bornes sont : fenêtre J−1/J+15, 24 heures entre rafraîchissements,
 50 résultats par page AniList, taille MangaUpdates déterminée par `per_page`
@@ -89,5 +89,7 @@ conserver décimales, suffixes et plages.
 
 La reconstruction après reset est : favoris navigateur → IDs
 `storage.sync` → identités D1 via Worker → hydratation locale → calendrier
-public → projection → alarmes. Chaque génération précédente reste récupérable
-jusqu'au reçu de validation.
+public → projection → alarmes. La génération active et les deux précédentes
+restent récupérables. Le chargeur partagé refuse une génération âgée d'au moins
+huit jours ou dont la fenêtre ne couvre pas la requête; il échoue fermé sans
+appel fournisseur MV3 ni altération de D1.
