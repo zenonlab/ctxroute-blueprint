@@ -52,12 +52,16 @@ function bearer(request: { header(name: string): string | undefined }): string |
   return /^Bearer ([A-Za-z0-9._-]{32,8192})$/u.exec(request.header('Authorization') ?? '')?.[1];
 }
 
+function oidcRejectionCode(message: string | undefined): string {
+  return message && /^agenda-oidc-[a-z-]+$/u.test(message) ? message : 'agenda-oidc-invalid';
+}
+
 async function authorize(request: { header(name: string): string | undefined }, url: string, verify: VerifyCollectorToken): Promise<boolean> {
   const token = bearer(request);
   if (!token) return false;
   try { await verify(token, url); return true; }
   catch (error) {
-    console.warn('discovery-ingestion-authorization-rejected', error instanceof Error ? error.message : 'unknown');
+    console.warn('discovery-ingestion-authorization-rejected', oidcRejectionCode(error instanceof Error ? error.message : undefined));
     return false;
   }
 }

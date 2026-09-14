@@ -1,6 +1,6 @@
 import { applyD1Migrations, env, SELF } from 'cloudflare:test';
 import { D1PublicDiscoveryAdapter, D1PublicDiscoveryV2Adapter } from '@tobirink/adapters-cloudflare';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
 
 const discoveryKey = (marker: string) => ({ fingerprint: marker.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' });
@@ -19,6 +19,18 @@ async function claim(key: ReturnType<typeof discoveryKey>) {
 }
 
 describe('verified public discovery cache', () => {
+  it('logs only a bounded code when collector OIDC verification rejects', async () => {
+    const adapter = new D1PublicDiscoveryAdapter(env.PUBLIC_DB);
+    const app = createPublicDiscoveryApp({ publicDiscovery: adapter }, async () => { throw new Error('raw verifier details'); });
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
+      headers: { Authorization: `Bearer ${'x'.repeat(32)}` }, method: 'POST',
+    });
+    expect(response.status).toBe(401);
+    expect(warning).toHaveBeenCalledWith('discovery-ingestion-authorization-rejected', 'agenda-oidc-invalid');
+    warning.mockRestore();
+  });
+
   it('stores one server-side request for repeated v3 discovery misses', async () => {
     const key = discoveryKey('e');
     const body = { key, query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Sousou no Frieren'] }, schemaVersion: 2 };

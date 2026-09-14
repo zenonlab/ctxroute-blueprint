@@ -200,7 +200,7 @@
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
         "D1 et le code Worker restent privés; seul le collecteur MIT est public",
         "GitHub utilise workers.dev pour éviter le challenge Bot Fight Mode du site",
-        "OIDC valide l’en-tête GitHub RS256/kid/x5t puis journalise seulement un code de rejet, jamais le jeton"
+        "OIDC valide l’en-tête GitHub RS256/kid/x5t puis journalise seulement un code de rejet stable et borné, jamais le jeton ni les détails du vérificateur"
       ]
     }
   ]

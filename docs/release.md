@@ -55,7 +55,7 @@ textuelle concurrente, les autres clients attendent, puis une proposition d’ID
 reste non fiable jusqu’à sa promotion par le workflow GitHub OIDC. La migration
 D1, les archives et le Worker corrigés ont été publiés le 14 septembre 2026.
 
-### Candidate locale — découverte serveur portable 1.0.28
+### Découverte serveur portable 1.0.28 publiée et certifiée
 
 La version `1.0.28` remplace, pour la découverte automatique, le bail de
 recherche confié à l’extension par une demande D1 v2 dédupliquée. Le composant
@@ -63,20 +63,33 @@ portable `@tobirink/public-discovery`, appelé par GitHub Actions, possède seul
 l’orchestration des lanes AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu
 Manga. Il publie une fiche complète ou une issue terminale via OIDC.
 
-Cette candidate et la migration `0012_server_public_discovery.sql` ne sont pas
-publiées. `packages/public-discovery` est désormais une racine MIT autonome :
-elle contient les cinq adaptateurs, le matching, le CLI, son lockfile et le
-workflow quotidien/manual destiné au futur dépôt public
-`tristan-monticelli/tobirink-public-discovery`. Le workflow privé homonyme ne
-fait plus que vérifier manuellement cet export et ne lance plus de collecte
-planifiée payante.
+La migration `0012_server_public_discovery.sql` est appliquée sur D1 et le
+Worker `tobirink-public-api` est publié sur la route existante ainsi que sur
+`tobirink-public-api.choukky.workers.dev`; le durcissement final des journaux
+OIDC correspond à la version Worker `5ed013e0-18f3-412a-ac4e-57273efa7d47`.
+`packages/public-discovery` est une racine MIT autonome publiée dans le dépôt public
+`tristan-monticelli/tobirink-public-discovery`. Elle contient les cinq
+adaptateurs, le matching, le CLI, son lockfile et le workflow quotidien/manual.
+Le workflow privé homonyme ne lance aucune collecte planifiée.
 
-Le Worker local n’accorde les audiences v3 qu’au dépôt public exact, à
+Le Worker n’accorde les audiences v3 qu’au dépôt public exact, à
 `refs/heads/main`, à `.github/workflows/collect.yml` et aux événements
 `schedule` ou `workflow_dispatch`. Aucun secret partagé ou fichier `.env`
-n’est requis. Le dépôt GitHub public, le push, la migration et le déploiement
-Worker restent à effectuer séparément; aucune collecte de production n’est
-revendiquée à ce stade.
+n’est requis. Le run public `34879839965`, sur le commit public
+`f208aca5a2a5d695680658493464d2852266802b`, a revendiqué une requête réelle,
+interrogé les fournisseurs et publié une fiche complète : `claimed=1`,
+`failed=0`, `published=1`, `replayed=0`.
+
+D1 conserve la fiche Frieren dans l’état `VERIFIED`, avec 1778 octets de
+résultat et l’horodatage `2026-09-14T18:17:19.741Z`. Le run immédiatement
+suivant `34879931399` rapporte `claimed=0`, et une nouvelle soumission HTTP de
+la même œuvre retourne directement la même fiche `VERIFIED`; dans les deux cas,
+`attempt_count=2`, `updated_at` et la taille du résultat restent inchangés. Les
+deux tentatives comptabilisées correspondent à la certification initiale et à
+sa reprise après expiration d’un bail abandonné par un défaut CLI corrigé;
+aucun nouvel appel fournisseur n’est effectué après l’état terminal.
+Le run `34880368092` répète cette preuve à zéro après le dernier déploiement du
+Worker et valide donc encore l’identité OIDC sans modifier D1.
 
 ### Publication D1-first et Agenda OIDC — 2026-09-14
 
@@ -95,9 +108,11 @@ Agenda active. Les runs GitHub `34853308267` et `34853312139` n'ont exécuté
 aucune étape : GitHub les a refusés pour paiement de compte échoué ou limite de
 dépense insuffisante. La collecte réelle reste donc non certifiée jusqu'à la
 résolution de ce blocage externe.
-Une seconde tentative autonome produit le même résultat avant toute étape sur
+Une seconde tentative autonome a produit le même résultat avant toute étape sur
 les runs Agenda `34854671530` et découverte `34854675359`; aucun appel
 fournisseur, jeton OIDC ou écrit D1 n'a été exécuté par ces jobs.
+Ce blocage historique du dépôt privé est clos pour la découverte par le dépôt
+public et les runs de certification `34879839965` et `34879931399` ci-dessus.
 
 ## Release verification
 
