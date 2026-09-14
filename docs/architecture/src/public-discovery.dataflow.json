@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "TobiRink — découverte publique D1-first",
+    "output": "public-discovery.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 460],
+    "views": [
+      {
+        "id": "cache-hit",
+        "label": "Œuvre déjà dans D1",
+        "focus": ["extension", "worker", "publicD1", "extensionResult"],
+        "note": "D1 renvoie la fiche hydratée; ni l’extension ni le Worker n’appellent un fournisseur."
+      },
+      {
+        "id": "cache-miss",
+        "label": "Œuvre absente de D1",
+        "focus": ["extension", "worker", "publicD1", "github", "providers", "verifiedD1", "extensionResult"],
+        "note": "Le miss devient une requête unique; GitHub Actions interroge le fournisseur puis hydrate D1."
+      },
+      {
+        "id": "boundaries",
+        "label": "Frontières",
+        "focus": ["extension", "worker", "publicD1", "github", "providers"],
+        "note": "Aucun compte, consentement, Collectif ou appel AniList direct depuis l’extension."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Demande" },
+    { "label": "API" },
+    { "label": "Cache et file" },
+    { "label": "Collecte" },
+    { "label": "Résultat" }
+  ],
+  "nodes": [
+    {
+      "id": "extension",
+      "type": "frontend",
+      "label": "Extension MV3",
+      "sublabel": "demande une œuvre",
+      "stage": 0,
+      "row": 1,
+      "width": 140,
+      "tag": "D1-first"
+    },
+    {
+      "id": "worker",
+      "type": "cloud",
+      "label": "API TobiRink",
+      "sublabel": "lecture ou création",
+      "stage": 1,
+      "row": 1,
+      "width": 140,
+      "tag": "aucun appel fournisseur"
+    },
+    {
+      "id": "publicD1",
+      "type": "database",
+      "label": "D1 catalogue public",
+      "sublabel": "requête unique · profil complet",
+      "stage": 2,
+      "row": 1,
+      "width": 140,
+      "tag": "PENDING · VERIFIED"
+    },
+    {
+      "id": "github",
+      "type": "security",
+      "label": "Composant Discovery",
+      "sublabel": "appelé par GitHub Actions OIDC",
+      "stage": 3,
+      "row": 2,
+      "yOffset": -30,
+      "width": 140,
+      "tag": "package extractible"
+    },
+    {
+      "id": "providers",
+      "type": "external",
+      "label": "APIs fournisseurs",
+      "sublabel": "AniList · MU · MangaDex · Kitsu",
+      "stage": 4,
+      "row": 2,
+      "yOffset": -30,
+      "width": 140,
+      "tag": "GitHub uniquement"
+    },
+    {
+      "id": "verifiedD1",
+      "type": "database",
+      "label": "D1 fiche VERIFIED",
+      "sublabel": "même catalogue · profil complet",
+      "stage": 4,
+      "row": 1,
+      "yOffset": -20,
+      "width": 140,
+      "tag": "requête + hydratation"
+    },
+    {
+      "id": "extensionResult",
+      "type": "frontend",
+      "label": "Résultat extension",
+      "sublabel": "fiche D1 ou attente",
+      "stage": 4,
+      "row": 0,
+      "width": 140,
+      "tag": "zéro API fournisseur"
+    }
+  ],
+  "flows": [
+    {
+      "from": "extension",
+      "to": "worker",
+      "label": "requête d’œuvre normalisée",
+      "classification": "HTTPS · aucune identité",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [208, 226]
+    },
+    {
+      "from": "worker",
+      "to": "publicD1",
+      "label": "lecture ou création atomique",
+      "classification": "clé unique · déduplication",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [423, 316]
+    },
+    {
+      "from": "publicD1",
+      "to": "extensionResult",
+      "label": "HIT : fiche hydratée",
+      "classification": "réponse D1 immédiate",
+      "variant": "emphasis",
+      "route": "auto",
+      "labelAt": [650, 204]
+    },
+    {
+      "from": "publicD1",
+      "to": "github",
+      "label": "MISS : requête PENDING unique",
+      "classification": "dédupliquée par clé",
+      "variant": "security",
+      "route": "auto",
+      "labelAt": [638, 402]
+    },
+    {
+      "from": "github",
+      "to": "providers",
+      "label": "requête API bornée",
+      "classification": "AniList · MU · MangaDex · Kitsu",
+      "variant": "emphasis",
+      "route": "auto",
+      "labelAt": [853, 428]
+    },
+    {
+      "from": "providers",
+      "to": "verifiedD1",
+      "label": "profil public validé + OIDC",
+      "classification": "ingestion Worker autorisée",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [820, 300]
+    },
+    {
+      "from": "verifiedD1",
+      "to": "extensionResult",
+      "label": "lecture suivante",
+      "classification": "aucun nouvel appel fournisseur",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [850, 204]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "HIT D1",
+      "items": [
+        "La fiche hydratée repart directement vers l’extension",
+        "Aucun appel AniList, MangaUpdates ou autre fournisseur"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "MISS D1",
+      "items": [
+        "D1 conserve une seule requête PENDING par clé",
+        "Le composant appelé par GitHub Actions hydrate la fiche",
+        "Le résultat VERIFIED répond aux prochaines lectures"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Périmètre",
+      "items": [
+        "Aucun utilisateur, compte, consentement ou Collectif",
+        "L’extension ne possède aucun accès direct aux APIs fournisseurs",
+        "Une panne fournisseur garde la requête en attente pour reprise"
+      ]
+    }
+  ]
+}
