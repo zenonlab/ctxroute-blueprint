@@ -59,7 +59,9 @@ racine du dépôt public `tristan-monticelli/tobirink-public-discovery`.
 Cette racine est publiée sous licence MIT et reste `private: true` au sens npm :
 le code peut être public sans autoriser une publication accidentelle sur le
 registre. `zod` reste l’unique dépendance d’exécution; TypeScript, Vitest,
-esbuild et les types Node sont des dépendances de développement épinglées.
+et les types Node sont des dépendances de développement épinglées. Le lockfile
+autonome doit être résolu depuis ce manifeste par la version npm exécutée sur
+le runner public et réussir `npm ci` hors du monorepo.
 
 ## Conséquences
 
