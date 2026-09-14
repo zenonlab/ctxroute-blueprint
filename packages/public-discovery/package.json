@@ -1,11 +1,11 @@
 {
   "name": "@tobirink/public-discovery",
   "version": "0.1.0",
-  "description": "Standalone public catalogue discovery collector for AniList, MangaUpdates, MangaDex and Kitsu.",
+  "description": "Standalone public catalogue discovery and Agenda collectors for TobiRink.",
   "private": true,
   "type": "module",
   "license": "MIT",
-  "exports": { ".": "./src/index.ts", "./cli": "./src/cli.ts" },
+  "exports": { ".": "./src/index.ts", "./agenda": "./src/agenda/index.ts", "./agenda/cli": "./src/agenda/cli.ts", "./cli": "./src/cli.ts" },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",

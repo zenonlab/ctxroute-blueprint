@@ -9537,7 +9537,7 @@
       "schemaVersion": 1,
       "id": "goal-agenda-shared-refresh-repair",
       "title": "Réparer la collecte Agenda et sa mutualisation catalogue",
-      "status": "BLOCKED",
+      "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -9604,27 +9604,31 @@
         },
         {
           "id": "step-3",
-          "title": "Préparer la publication et vérifier la collecte réelle",
-          "status": "BLOCKED",
+          "title": "Publier Agenda via le dépôt public et certifier D1",
+          "status": "IN_PROGRESS",
           "acceptance": [
-            "Les ressources externes et le digest sont approuvés séparément avant mutation.",
-            "Les preuves distinguent nombre d'œuvres catalogue, métadonnées publiques et sorties actives.",
-            "Un cycle fournisseur réel remplit le cache et une seconde demande ne répète pas le travail frais."
+            "Le collecteur public autonome appelle AniList et MangaUpdates; Worker et extension ne les appellent pas sur le chemin partagé.",
+            "OIDC lie workers.dev au dépôt public exact et le workflow privé ne collecte plus.",
+            "Un run public active D1 non vide; deux GET réutilisent D1; verify et Archify passent."
           ],
           "files": [
-            "build/operations/**",
-            "docs/release.md",
-            "docs/progress.md"
+            "packages/public-discovery/**",
+            ".github/workflows/agenda-collector.yml",
+            "apps/worker/src/releases/**",
+            "docs/**",
+            ".project/progress.json"
           ],
           "commands": [
-            "npm run infra:inspect",
+            "npm run verify --workspace @tobirink/public-discovery",
+            "npm run test --workspace @tobirink/worker",
+            "npm run archify:validate -- agenda-release.dataflow",
+            "Publier le subtree, déployer le Worker et lancer agenda.yml",
             "npm run verify",
-            "Vérifier la production après approbation exacte des opérations"
+            "git push origin main"
           ],
           "evidence": [
-            "Publication complète: Worker 4f2b30ee-ef24-4ccc-aefb-e880be5fa50e, migration 0011, ZIP 1.0.27 et vue public-pipeline.architecture showcase 9/9.",
-            "Troisième cycle: runs Agenda 34855014417 et Discovery 34855018391 refusés avant toute étape; annotations GitHub: paiement récent échoué ou limite de dépense à augmenter.",
-            "external: D1 confirme 0 génération active, 0 événement, 0 claim et 0 VERIFIED; /v2/releases reste d1-empty jusqu’au rétablissement GitHub Billing."
+            "Plan validé; go autonome confirmé.",
+            "Initial: dépôt public sans agenda.yml; v2 releases=d1-empty."
           ]
         }
       ]

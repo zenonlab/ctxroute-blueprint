@@ -1,6 +1,6 @@
 # Public Discovery
 
-Standalone MIT-licensed collector for the TobiRink public catalogue.
+Standalone MIT-licensed collectors for the TobiRink public catalogue and Agenda.
 
 The repository validates the D1 request/result protocol and resolves missing
 works through five explicit provider identities: AniList, MangaUpdates,
@@ -40,3 +40,9 @@ Its API base URL is the existing Worker's `workers.dev` endpoint so Cloudflare
 Bot Fight Mode on the public website cannot challenge the GitHub runner. Both
 write routes still require an audience-specific GitHub OIDC token bound to the
 exact public repository, `main` branch and workflow file.
+
+`agenda.yml` performs the weekly AniList and MangaUpdates calendar refresh on
+the same standard public runner. It publishes only bounded public release
+events to the existing Worker through the audience-specific `workers.dev`
+route. Cloudflare and the extension serve D1; neither calls an Agenda provider
+on the shared path. No title, favorite, URL, account or `.env` enters this flow.

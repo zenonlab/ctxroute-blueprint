@@ -9,6 +9,8 @@ scope:
   - packages/adapters-indexeddb/src/**
   - apps/extension/wxt-entrypoints/background.ts
   - apps/extension/entrypoints/agenda/**
+  - packages/public-discovery/**
+  - .github/workflows/agenda-collector.yml
   - docs/architecture/src/agenda-release.dataflow.json
 review: on-change
 revised: true
@@ -35,14 +37,21 @@ utiles, mais sa formule de terminaison MangaUpdates ne constitue pas un oracle.
 
 ## Décision
 
-La collecte partagée est séparée du Worker HTTP. Un workflow GitHub Actions
-planifié chaque lundi à 03:17 UTC lit deux lanes indépendantes : AniList pour les
+La collecte partagée est séparée du Worker HTTP. Le package MIT autonome du
+dépôt public `tristan-monticelli/tobirink-public-discovery` possède les contrats,
+parseurs et collecteurs Agenda sans dépendance au monorepo privé. Son workflow
+GitHub Actions `agenda.yml`, planifié chaque lundi à 03:17 UTC, lit deux lanes indépendantes : AniList pour les
 sorties anime officielles et MangaUpdates pour les sorties manga, manhwa et
 manhua confirmées. Il transmet au Worker une génération complète, bornée,
 versionnée et sans donnée personnelle. Un jeton GitHub OIDC court authentifie
-l'émetteur sans secret partagé. Le Worker vérifie signature RS256 auprès du
+l'émetteur sans secret partagé sur l’audience `workers.dev`. Le Worker vérifie signature RS256 auprès du
 JWKS GitHub, issuer, audience, dépôt, branche et identité exacte du workflow,
 valide nonce, digest, fenêtre et schéma, puis reste l'unique auteur D1.
+
+Le workflow du dépôt privé est manuel et vérifie seulement l’export autonome.
+Il ne demande aucun jeton OIDC, n’appelle aucun fournisseur et ne publie aucune
+génération. La source publique devient ainsi l’unique exécuteur partagé des
+requêtes AniList et MangaUpdates.
 
 Le cron Cloudflare et la collecte déclenchée par `GET /v2/releases` sont
 supprimés : une lecture publique ne provoque jamais une requête fournisseur.
