@@ -9537,7 +9537,7 @@
       "schemaVersion": 1,
       "id": "goal-agenda-shared-refresh-repair",
       "title": "Réparer la collecte Agenda et sa mutualisation catalogue",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -9605,7 +9605,7 @@
         {
           "id": "step-3",
           "title": "Publier Agenda via le dépôt public et certifier D1",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Le collecteur public autonome appelle AniList et MangaUpdates; Worker et extension ne les appellent pas sur le chemin partagé.",
             "OIDC lie workers.dev au dépôt public exact et le workflow privé ne collecte plus.",
@@ -9627,8 +9627,9 @@
             "git push origin main"
           ],
           "evidence": [
-            "Plan validé; go autonome confirmé.",
-            "Initial: dépôt public sans agenda.yml; v2 releases=d1-empty."
+            "Public run 34888271094 published active D1 generation calendar-8b7baa47d143d46d6b21facd9cbc19f025990c3277334ff3 with 765 events: AniList 239 and MangaUpdates 526.",
+            "Final Worker b398b19c-3cac-4e50-9c24-86902eb03853 accepts exact public agenda.yml OIDC; two GET reads were byte-identical with stable revision/ETag and conditional GET returned 304.",
+            "Public component 46 tests, Worker 52 tests, full repository validation through all product suites, npm audit 0 vulnerabilities, docs and Archify showcase 9/9 passed."
           ]
         }
       ]

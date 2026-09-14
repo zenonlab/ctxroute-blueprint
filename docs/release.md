@@ -91,6 +91,31 @@ aucun nouvel appel fournisseur n’est effectué après l’état terminal.
 Le run `34880368092` répète cette preuve à zéro après le dernier déploiement du
 Worker et valide donc encore l’identité OIDC sans modifier D1.
 
+### Agenda public autonome publié et certifié
+
+Le calendrier partagé est désormais collecté exclusivement par
+`.github/workflows/agenda.yml` dans le dépôt public
+`tristan-monticelli/tobirink-public-discovery`. Le workflow privé Agenda ne
+possède plus de planification, de permission OIDC ni d’appel fournisseur. Le
+Worker ne contient plus les clients réseau AniList/MangaUpdates : il vérifie le
+jeton OIDC, valide la génération et reste l’unique auteur D1.
+
+Le run public `34888271094`, sur le commit public
+`cab3b8e2965f3953cf0927d7146b970b4ae2e11e`, a réussi en 1 min 35 s et publié
+765 événements réels : 239 AniList et 526 MangaUpdates, pour la fenêtre
+2026-09-13–2026-09-29. Les six sorties MangaUpdates observées sans identité de
+série ont été ignorées sans inventer de rattachement; ce cas est couvert par un
+test de régression.
+
+D1 confirme la génération active
+`calendar-8b7baa47d143d46d6b21facd9cbc19f025990c3277334ff3`, avec les mêmes comptes
+239/526 et `event_count=765`. Deux lectures consécutives de `GET /v2/releases`
+ont renvoyé HTTP 200, un corps identique, la même révision et le même ETag
+`releases-calendar-8b7baa47d143d46d6b21facd9cbc19f025990c3277334ff3-2026-09-13-2026-09-29`.
+Le Worker final certifié est `b398b19c-3cac-4e50-9c24-86902eb03853`; la version
+précédente `ca4a3757-fca5-484e-aff8-47d7801bad3f` reste disponible pour rollback. Aucune variable
+secrète ni fichier `.env` Agenda n’a été créé.
+
 ### Publication D1-first et Agenda OIDC — 2026-09-14
 
 Le gate Cloudflare `e99f9f8f175d282e33ed15e253b8be85c7be5d0019bfafd4ddff7230fcfb649b`

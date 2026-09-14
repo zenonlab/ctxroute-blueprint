@@ -1,5 +1,20 @@
 # Audit Agenda FavLib → TobiRink
 
+## Verdict de production — 14 septembre 2026
+
+Les écarts bloquants historiques ci-dessous sont clos. Le dépôt public exécute
+seul les collecteurs AniList et MangaUpdates; le Worker ne possède plus ces
+clients et reçoit uniquement une génération OIDC sur son audience `workers.dev`.
+Le run `34888271094` a publié 765 événements réels (239 AniList et 526
+MangaUpdates). La génération D1 correspondante est active et deux lectures HTTP
+consécutives ont rendu le même corps, la même révision et le même ETag.
+
+MangaUpdates renvoie réellement des champs `null` et quelques sorties sans
+`series_id`. Le parseur accepte cette forme, mais le collecteur exclut les
+lignes impossibles à rattacher au lieu d’inventer une identité ou d’annuler les
+526 sorties valides. Le test autonome couvre ce cas. Aucun accès à la base
+FavLib, aucune donnée privée et aucun `.env` n’ont été nécessaires.
+
 ## Verdict initial
 
 L'Agenda TobiRink possède désormais une route v2, un chargeur HTTP, une
