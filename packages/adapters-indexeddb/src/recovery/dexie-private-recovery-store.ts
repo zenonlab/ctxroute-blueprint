@@ -1,6 +1,5 @@
 import { validatePrivateSnapshot } from '@tobirink/application';
-import { privateRecoveryJournalSchema } from '@tobirink/application';
-import type { FavoriteOwnerLocalStatePort, PrivateRecoveryJournalPort, PrivateSnapshot, RecoveryStorePort } from '@tobirink/application';
+import type { PrivateSnapshot, RecoveryStorePort } from '@tobirink/application';
 import type { Table } from 'dexie';
 import type { TobirinkDatabase } from '../database';
 
@@ -17,7 +16,7 @@ function snapshotTables(database: TobirinkDatabase): SnapshotTable[] {
 }
 
 export class DexiePrivateRecoveryStore implements RecoveryStorePort {
-  constructor(private readonly database: TobirinkDatabase, private readonly owner?: FavoriteOwnerLocalStatePort, private readonly journal?: PrivateRecoveryJournalPort) {}
+  constructor(private readonly database: TobirinkDatabase) {}
 
   private async readDatabaseSnapshot(): Promise<PrivateSnapshot> {
     const [agenda, favoriteSources, libraries, organizer, progress, reminders, reviews, works] = await this.database.transaction(
@@ -47,44 +46,11 @@ export class DexiePrivateRecoveryStore implements RecoveryStorePort {
   }
 
   async readSnapshot(): Promise<PrivateSnapshot> {
-    const [databaseSnapshot, collectiveOwner] = await Promise.all([this.readDatabaseSnapshot(), this.owner?.read()]);
-    return validatePrivateSnapshot(collectiveOwner === undefined ? databaseSnapshot : { ...databaseSnapshot, collectiveOwner });
+    return validatePrivateSnapshot(await this.readDatabaseSnapshot());
   }
 
   async replaceSnapshot(input: PrivateSnapshot): Promise<void> {
     const snapshot = validatePrivateSnapshot(input);
-    if (snapshot.collectiveOwner === undefined || this.owner === undefined) {
-      await this.writeDatabaseSnapshot(snapshot);
-      return;
-    }
-    if (this.journal === undefined) throw new Error('Private recovery journal is required when restoring owner credentials.');
-    const previousOwner = await this.owner.read();
-    const journalId = crypto.randomUUID();
-    const journal = privateRecoveryJournalSchema.parse(previousOwner === undefined
-      ? { id: journalId, schemaVersion: 1 }
-      : { id: journalId, previousOwner, schemaVersion: 1 });
-    await this.journal.save(journal);
-    try {
-      await this.owner.save(snapshot.collectiveOwner);
-      await this.writeDatabaseSnapshot(snapshot, journal.id);
-    } catch (error) {
-      if (previousOwner !== undefined) await this.owner.save(previousOwner);
-      else if (this.owner.clear !== undefined) await this.owner.clear();
-      await this.journal.clear().catch(() => undefined);
-      throw error;
-    }
-    await this.journal.clear().catch(() => undefined);
-  }
-
-  async recoverInterrupted(): Promise<void> {
-    if (this.owner === undefined || this.journal === undefined) return;
-    const journal = await this.journal.read();
-    if (journal === undefined) return;
-    const committed = await this.database.privateRecoveryReceipts.get(journal.id);
-    if (committed === undefined) {
-      if (journal.previousOwner !== undefined) await this.owner.save(journal.previousOwner);
-      else if (this.owner.clear !== undefined) await this.owner.clear();
-    }
-    await this.journal.clear();
+    await this.writeDatabaseSnapshot(snapshot);
   }
 }

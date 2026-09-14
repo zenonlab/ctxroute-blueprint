@@ -61,17 +61,18 @@
         "note": "Cover fournisseur puis R2 par ID public; curseur durable; association ID→master par ingestion opérationnelle autorisée."
       },
       {
-        "id": "recovery-collective",
-        "label": "Sync et collectif",
+        "id": "recovery-public-cache",
+        "label": "Sync et cache public",
         "focus": [
           "syncedIds",
           "privateStore",
           "sourceEvidence",
           "durableQueue",
-          "collectiveWorker",
-          "collectiveD1"
+          "cacheWorker",
+          "publicD1",
+          "verifiedCollector"
         ],
-        "note": "Sync v2 pour les IDs; export local AES-GCM pour l’état privé. Le mot de passe ne quitte pas l’extension."
+        "note": "Aucune identité produit : claim atomique, proposition d’IDs seulement, promotion par collecteur OIDC; export privé local AES-GCM."
       }
     ]
   },
@@ -194,24 +195,34 @@
       "tag": "IDs · scan borné · rollback"
     },
     {
-      "id": "collectiveWorker",
+      "id": "cacheWorker",
       "type": "cloud",
       "label": "Worker HTTP typé",
       "stage": 1,
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "lots de 50 · collectif opt-in"
+      "tag": "claims publics · gate OIDC"
     },
     {
-      "id": "collectiveD1",
+      "id": "publicD1",
       "type": "database",
-      "label": "D1 cache + collectif",
+      "label": "D1 cache public",
       "stage": 2,
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "IDs / facettes / ambiguïtés owner"
+      "tag": "MISS · PENDING · VERIFIED"
+    },
+    {
+      "id": "verifiedCollector",
+      "type": "security",
+      "label": "Collecteur GitHub OIDC",
+      "stage": 3,
+      "row": 4,
+      "yOffset": 270,
+      "width": 150,
+      "tag": "hydrate IDs · vérifie titres"
     },
     {
       "id": "operationalMedia",
@@ -290,8 +301,8 @@
     {
       "from": "durableQueue",
       "to": "providerAdapters",
-      "label": "titre/ID déclaré · cadence",
-      "classification": "bookmarksInfo borné",
+      "label": "bail ou ID exact",
+      "classification": "PENDING/VERIFIED : arrêt",
       "variant": "dashed",
       "route": "straight",
       "labelAt": [
@@ -365,9 +376,9 @@
     },
     {
       "from": "durableQueue",
-      "to": "collectiveWorker",
-      "label": "clés seules avant fournisseur",
-      "classification": "lot public ≤ 50",
+      "to": "cacheWorker",
+      "label": "lecture, claim puis IDs publics",
+      "classification": "aucun titre privé · PENDING",
       "variant": "security"
     },
     {
@@ -382,12 +393,21 @@
       "labelAt": [700, 805]
     },
     {
-      "from": "collectiveWorker",
-      "to": "collectiveD1",
-      "label": "SQL préparé groupé",
+      "from": "cacheWorker",
+      "to": "publicD1",
+      "label": "claim atomique / promotion",
       "route": "straight",
       "labelAt": [423, 946],
-      "classification": "batch indexé",
+      "classification": "clé unique · état borné",
+      "variant": "security"
+    },
+    {
+      "from": "verifiedCollector",
+      "to": "publicD1",
+      "label": "profils vérifiés OIDC",
+      "route": "straight",
+      "labelAt": [638, 926],
+      "classification": "GitHub OIDC seulement",
       "variant": "security"
     },
     {
@@ -447,7 +467,7 @@
         "Tri par titre, ajout, année, progression ou popularité comparable",
         "Bootstrap sans scan du catalogue; lectures Work/progression par fenêtres ≤ 100",
         "Genres typés et totaux éditoriaux explicites uniquement",
-        "Sync sans titre privé; D1 limité aux fiches fournisseur publiques",
+        "Sync sans titre privé; D1 sert seulement les fiches vérifiées OIDC",
         "URL fournisseur locale; R2 exige licence ou domaine public"
       ]
     }

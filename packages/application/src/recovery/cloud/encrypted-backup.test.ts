@@ -12,18 +12,13 @@ const empty = { agenda: [], favoriteSources: [], libraries: [], progress: [], re
 const privateTitle = 'Titre privé de récupération';
 const privateUrl = 'https://reader.example/private-work';
 const passphrase = 'phrase secrète locale robuste';
-const privateOwnerToken = 'a'.repeat(64);
 
 function sourceStore() {
   const work = createWork({ externalReferences: [], id: workId('work_private'), mediaKind: 'manga', preferredTitle: privateTitle });
   const review = createReview({ id: reviewId('review_private'), matchedWorkId: work.id, sourceLabel: 'reader.example', status: 'resolved', title: privateTitle });
   const source = createFavoriteSource({ bookmarkId: 'bookmark-private', folderPath: ['Privé'], id: favoriteSourceId('source_private'), importedAt: '2026-09-05T09:00:00.000Z', order: 0, reviewId: review.id, title: privateTitle, url: privateUrl });
   const organizer = createOrganizerConfiguration({ folders: [{ conditions: { mediaTypes: ['MANGA'] }, id: 'private-manga', name: 'Manga privé' }], updatedAt: '2026-09-05T09:30:00.000Z' });
-  const collectiveOwner = {
-    registration: { consent: true as const, installationId: '00000000-0000-4000-8000-000000000002', ownerId: '00000000-0000-4000-8000-000000000001', revokeToken: 'b'.repeat(64), token: privateOwnerToken },
-    schemaVersion: 1 as const, sent: {}, status: 'enabled' as const,
-  };
-  return new MemoryRecoveryStore({ ...empty, collectiveOwner, favoriteSources: [source], organizer, reviews: [review], works: [work] });
+  return new MemoryRecoveryStore({ ...empty, favoriteSources: [source], organizer, reviews: [review], works: [work] });
 }
 
 describe('encrypted cloud recovery', () => {
@@ -32,7 +27,6 @@ describe('encrypted cloud recovery', () => {
     expect(blob.serialized).not.toContain(privateTitle);
     expect(blob.serialized).not.toContain(privateUrl);
     expect(blob.serialized).not.toContain(passphrase);
-    expect(blob.serialized).not.toContain(privateOwnerToken);
     expect(parseEncryptedBackupBlob(blob)).toMatchObject({ cipher: 'AES-GCM-256', format: 'tobirink-encrypted-backup', version: 1 });
   });
 
@@ -44,7 +38,6 @@ describe('encrypted cloud recovery', () => {
     expect((await target.readSnapshot()).works[0]?.preferredTitle).toBe(privateTitle);
     expect((await target.readSnapshot()).favoriteSources[0]?.url).toBe(privateUrl);
     expect((await target.readSnapshot()).organizer?.folders[0]?.id).toBe('private-manga');
-    expect((await target.readSnapshot()).collectiveOwner?.registration.token).toBe(privateOwnerToken);
   });
 
   it('leaves local state untouched for a wrong passphrase or altered ciphertext', async () => {

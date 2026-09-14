@@ -34,6 +34,15 @@ describe('private recovery', () => {
     expect(store.replaceCount).toBe(1);
   });
 
+  it('accepts but never restores a retired owner field from an older version 5 export', async () => {
+    const value = await createPrivateExport(new MemoryRecoveryStore(empty), '2026-09-04T10:00:00.000Z');
+    const legacyOwner = { registration: { consent: true, token: 'private' }, schemaVersion: 1 };
+    expect(validatePrivateExport(JSON.stringify({ ...value, collectiveOwner: legacyOwner }))).toEqual(value);
+    const restored = new MemoryRecoveryStore(empty);
+    await importPrivateExport(JSON.stringify({ ...value, collectiveOwner: legacyOwner }), restored, 'replace-private-state');
+    expect(await restored.readSnapshot()).toEqual(empty);
+  });
+
   it('imports a version 1 export with no invented favorite sources', async () => {
     const store = new MemoryRecoveryStore(empty);
     const legacy = { ...empty, exportedAt: '2026-09-04T10:00:00.000Z', format: 'tobirink-private-export', version: 1 };

@@ -1,5 +1,50 @@
 # Plan de correction Agenda
 
+## Incident de collecte partagée — 14 septembre 2026
+
+La demande produit impose une collecte hebdomadaire couvrant deux semaines,
+un rattrapage lorsque la génération manque, et la réutilisation du travail
+entre cron, utilisateurs et enrichissement des métadonnées publiques. Le plan
+`docs/plans/agenda-shared-refresh-repair.json` suit cette correction. Ce besoin
+n'est pas encore satisfait par la production. La correction locale remplace le
+cron Worker par un workflow GitHub Actions hebdomadaire et une ingestion Worker
+authentifiée par OIDC. Les preuves sur fixtures ne certifient pas la collecte
+réelle avant publication et exécution réussie du workflow.
+
+Une réponse `d1-empty` signifie qu'aucune génération n'est publiée. Une
+génération publiée avec zéro événement signifie que sa fenêtre a été vérifiée :
+le chargeur la conserve et l'extension ne relance pas les fournisseurs pour
+cette seule raison. Un ETag ne se réutilise que pour un cache partagé de même
+fenêtre; un 304 sans ce cache est rejeté. La durée du cache client reste pour
+l'instant de 24 heures, distincte de la cadence hebdomadaire demandée.
+
+Implémentation locale ajoutée le 14 septembre 2026 : le workflow
+`agenda-collector.yml` collecte la fenêtre J−1/J+15 chaque lundi à 03:17 UTC.
+Il ne publie rien si une lane échoue. Le Worker vérifie le jeton GitHub OIDC et
+le schéma strict de la génération, dérive une révision SHA-256 idempotente,
+écrit par lots préparés et ne remplace jamais l'actuelle par une génération
+plus ancienne. Rejouer le même lot n'ajoute aucun événement. `GET /v2/releases`
+est désormais une lecture D1 pure et ne déclenche aucune collecte.
+
+L’ingestion Agenda ne contient que des événements publics et ne transmet aucun
+profil hydraté par l’extension. La découverte favorite est une pipeline séparée
+définie par l’ADR-0046 : le premier miss crée un claim `PENDING` sans titre brut;
+le client peut proposer des identifiants publics, mais seul le collecteur GitHub
+OIDC peut hydrater, vérifier puis promouvoir une fiche `VERIFIED`. Il n’existe
+plus de consentement Collectif, owner, appairage ou activation automatique.
+
+Il faut mesurer séparément œuvres catalogue vérifiées, claims en attente et
+sorties Agenda actives. Une ligne `PENDING` prouve seulement qu’un travail a été
+réservé; elle n’est jamais comptée ni servie comme métadonnée fiable.
+
+Le workflow respecte les limites publiques des fournisseurs et s'arrête sur
+un refus explicite. La première exécution réelle doit prouver des réponses
+fournisseur réussies, une génération D1 active et un second GET sans nouvelle
+collecte. Tant que ce cycle n'est pas observé après publication, la production
+reste non certifiée.
+
+## Plan initial et architecture cible
+
 La correction est découpée dans
 `docs/plans/restore-agenda-pipeline.json`. Chaque étape possède son périmètre,
 ses critères, ses tests et son commit. Les étapes 1 à 11 sont locales et

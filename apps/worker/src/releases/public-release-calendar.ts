@@ -1,17 +1,17 @@
 import type { PublicReleaseEventContract } from '@tobirink/application';
 import { publicReleaseEventSchema } from '@tobirink/application';
-import { collectPublicReleaseLanes, commitPublicReleaseGeneration, AniListReleaseCollector, MangaUpdatesReleaseCollector } from './public-release-collectors';
+import { commitPublicReleaseGeneration } from './public-release-collectors';
+import type { PublicReleaseIngestion } from './public-release-ingestion';
 
 export interface PublicReleaseQuery { from?: string; to?: string; cursor?: string; limit: number }
 export interface PublicReleaseCalendarPort {
+  ingest(input: PublicReleaseIngestion): Promise<{ accepted: boolean; count: number; replayed: boolean; revision: string }>;
   query(input: PublicReleaseQuery): Promise<{ entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; nextCursor?: string }>;
-  sync(window: { from: string; to: string }): Promise<{ count: number; failures: readonly string[] }>;
 }
 interface CalendarPage { entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; nextCursor?: string }
 interface ReleaseRow { id: string; provider: string; provider_work_id: string; release_kind: string; sequence_label: string | null; occurrence_kind: string; occurrence_value: string; state: string; source: string; fetched_at: string; parser_version: string; rules_version: string; expires_at: string }
 interface ReleaseGenerationRow { revision: string; generated_at: string }
 interface ReleaseCursor { id: string | null; occurrence: string | null }
-
 function decodeCursor(cursor: string | undefined): ReleaseCursor {
   if (cursor === undefined) return { id: null, occurrence: null };
   const separator = cursor.indexOf('|');
@@ -21,6 +21,16 @@ function decodeCursor(cursor: string | undefined): ReleaseCursor {
 
 export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort {
   constructor(private readonly db: D1Database) {}
+  async ingest(input: PublicReleaseIngestion) {
+    const events = [...input.events].sort((left, right) => left.id.localeCompare(right.id));
+    const digestInput = JSON.stringify({ events, generatedAt: input.generatedAt, schemaVersion: input.schemaVersion, window: input.window });
+    const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(digestInput))), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    const revision = `calendar-${digest.slice(0, 48)}`;
+    const previous = await this.db.prepare("SELECT revision FROM public_release_active_generation WHERE id = 'active'").first<{ revision: string }>();
+    await commitPublicReleaseGeneration(this.db, events, input.window, revision, input.generatedAt);
+    const active = await this.db.prepare("SELECT revision FROM public_release_active_generation WHERE id = 'active'").first<{ revision: string }>();
+    return { accepted: active?.revision === revision, count: events.length, replayed: previous?.revision === revision, revision };
+  }
   async query(input: { from?: string; to?: string; cursor?: string; limit: number }) {
     const cursor = decodeCursor(input.cursor);
     const lowerBound = input.from ?? '0000-01-01';
@@ -34,12 +44,5 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
     const page: CalendarPage = { entries: Object.freeze(entries), revision: generation?.revision ?? 'd1-empty', generatedAt: generation?.generated_at ?? '1970-01-01T00:00:00.000Z' };
     if (nextCursor) page.nextCursor = nextCursor;
     return page;
-  }
-  async sync(window: { from: string; to: string }) {
-    const result = await collectPublicReleaseLanes([new AniListReleaseCollector(), new MangaUpdatesReleaseCollector()], window);
-    if (result.failures.length > 0) return { count: 0, failures: result.failures };
-    const generatedAt = new Date().toISOString();
-    await commitPublicReleaseGeneration(this.db, result.events, window, `calendar-${crypto.randomUUID()}`, generatedAt);
-    return { count: result.events.length, failures: result.failures };
   }
 }

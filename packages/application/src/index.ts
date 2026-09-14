@@ -31,7 +31,6 @@ export type {
   CoverRightsBasis,
   NormalizedCoverMaster,
   PublicCatalogueReadPort,
-  FavoritePublicCacheReadPort,
   PublicCatalogueReference,
   PublicCatalogueTitle,
   PublicCatalogueWork,
@@ -81,8 +80,8 @@ export * from './agenda';
 export * from './releases/release-contracts';
 export * from './releases/provider-release-pages';
 export * from './popup';
-export * from './collective-index';
 export * from './recovery';
 export type { WorkPageQuery } from './ports/storage-port';
 export * from './organizer';
 export * from './favorites';
+export * from './public-discovery';

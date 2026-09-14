@@ -1,5 +1,5 @@
-import { favoriteCollectiveKey, favoriteSourceIdentity, importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
-import type { BookmarkImportPort, FavoriteCollectiveLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoritePublicCacheReadPort, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, ResolutionProvider, StoragePort } from '@tobirink/application';
+import { favoriteIdentityKey, favoriteSourceIdentity, importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
+import type { BookmarkImportPort, FavoriteIdentityLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, PublicDiscoveryClientPort, ResolutionProvider, StoragePort } from '@tobirink/application';
 import { createFavoriteSource } from '@tobirink/domain';
 import type { FavoriteSourceId, LibraryId, Work } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
@@ -9,9 +9,8 @@ import type { ExtensionDiagnosticsPort } from './extension-diagnostics';
 
 export interface FavoriteResolutionRuntimeDependencies {
   readonly beforeInventory?: () => Promise<void>;
-  readonly collective?: FavoriteCollectiveLookupPort;
-  readonly publicCache?: FavoritePublicCacheReadPort;
-  readonly synchronized?: FavoriteCollectiveLookupPort;
+  readonly publicDiscovery?: PublicDiscoveryClientPort;
+  readonly synchronized?: FavoriteIdentityLookupPort;
   readonly bookmarks: BookmarkImportPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
   readonly ensureReady: () => Promise<{ schemaVersion: number }>;
@@ -85,12 +84,12 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
   const prepareResolutionCaches = async () => {
     const page = await dependencies.storage.listFavoriteSources({ afterId: cacheScanAfterId, limit: 100 });
     cacheScanAfterId = page.length === 100 ? page.at(-1)?.id : undefined;
-    const keys = new Map<string, Awaited<ReturnType<typeof favoriteCollectiveKey>>>();
+    const keys = new Map<string, Awaited<ReturnType<typeof favoriteIdentityKey>>>();
     for (const source of page) {
       if (source.presence !== 'observed' || (source.resolution !== undefined && source.resolution.kind !== 'RETRYABLE')) continue;
       const artifact = (await dependencies.storage.getFavoriteParseArtifact(source.id))?.artifact;
       if (artifact?.identityKey !== undefined) {
-        const key = await favoriteCollectiveKey(artifact);
+        const key = await favoriteIdentityKey(artifact);
         keys.set(key.fingerprint, key);
       }
     }
@@ -100,8 +99,6 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
       const batch = prepared.slice(offset, offset + 50);
       await Promise.allSettled([
         dependencies.synchronized?.lookup(batch),
-        dependencies.collective?.lookup(batch),
-        dependencies.publicCache?.prepareFavoriteIdentities?.(batch),
       ]);
     }
   };

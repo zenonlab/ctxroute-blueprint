@@ -82,7 +82,7 @@ traitent immédiatement chaque création, modification, déplacement ou suppress
 ## Consequences
 
 La bibliothèque reflète l’inventaire parsé avant toute réponse réseau. Une panne
-AniList, MangaUpdates, MangaDex, Kitsu ou du collectif ne cache plus les titres.
+AniList, MangaUpdates, MangaDex, Kitsu ou du cache public D1 ne cache plus les titres.
 La pagination continue de lire IndexedDB par lots bornés et ne crée aucun nouvel
 objet persistant. Le contrat de présentation expose l’état et le type inconnu;
 le site et l’extension les affichent sans les faire passer pour un fournisseur.

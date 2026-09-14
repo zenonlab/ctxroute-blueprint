@@ -1,0 +1,206 @@
+{
+  "goalId": "goal-hydration-d1-mutualisation",
+  "title": "Sauvegarder chaque profil hydraté dans D1 et le réutiliser avant les fournisseurs",
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Auditer tous les chemins d’hydratation et la correction candidate",
+      "files": [
+        "apps/extension/runtime/**",
+        "apps/extension/wxt-entrypoints/background.ts",
+        "packages/application/src/favorites/**",
+        "docs/systems/agenda-recovery-plan.md"
+      ],
+      "acceptance": [
+        "Identifier résolution automatique, manuelle, restauration, réparations et profils déjà hydratés.",
+        "Vérifier les effets de l’activation owner automatique; ne pas assimiler l’autorisation produit au consentement individuel de tous les utilisateurs."
+      ],
+      "commands": [
+        "npm run typecheck"
+      ],
+      "status": "TODO"
+    },
+    {
+      "id": "step-2",
+      "title": "Définir le contrat public et les frontières de données",
+      "files": [
+        "packages/application/src/**",
+        "docs/decisions/ADR-0043-cache-first-reinstall-recovery.md",
+        "docs/architecture/src/tobirink.architecture.json",
+        "docs/architecture/src/agenda-release.dataflow.json"
+      ],
+      "acceptance": [
+        "Définir IDs, titres officiels, alias, type, métadonnées, provenance, fraîcheur et couverture selon le contrat média.",
+        "Séparer profil public et associations personnelles; exclure favoris, dossiers, progression et titres personnalisés.",
+        "Mettre à jour l’architecture avant les nouveaux contrats ou modules."
+      ],
+      "commands": [
+        "npm run validate:decisions",
+        "npm run archify:validate -- tobirink.architecture"
+      ],
+      "status": "TODO"
+    },
+    {
+      "id": "step-3",
+      "title": "Stocker et restituer un profil complet dans D1",
+      "files": [
+        "apps/worker/src/catalogue/**",
+        "apps/worker/src/reviews/**",
+        "apps/worker/migrations/**",
+        "packages/adapters-cloudflare/src/**"
+      ],
+      "acceptance": [
+        "Valider les entrées et borner taille, lots et abus.",
+        "Upsert idempotent par identité fournisseur, références croisées sans fusion ambiguë; ne pas écraser un profil complet par un profil incomplet.",
+        "Relecture des informations nécessaires à l’hydratation; migrations additives testées."
+      ],
+      "commands": [
+        "npm run test:worker",
+        "npm run test:d1",
+        "npm run typecheck"
+      ],
+      "status": "TODO"
+    },
+    {
+      "id": "step-4",
+      "title": "Réutiliser D1 avant les appels fournisseurs",
+      "files": [
+        "packages/application/src/favorites/**",
+        "packages/application/src/recovery/**",
+        "packages/adapters-browser/src/catalogue/**",
+        "apps/extension/runtime/**"
+      ],
+      "acceptance": [
+        "Profil D1 complet et frais réutilisé sans appel fournisseur.",
+        "Miss, profil incomplet et expiration conduisent à une hydratation bornée; indisponibilité D1 conserve la reprise locale.",
+        "Coalescer les demandes concurrentes d’une même identité."
+      ],
+      "commands": [
+        "npm run test:contracts",
+        "npm run typecheck"
+      ],
+      "status": "TODO"
+    },
+    {
+      "id": "step-5",
+      "title": "Envoyer les hydratations avec une file durable et rattraper l’existant",
+      "files": [
+        "packages/application/src/**",
+        "packages/adapters-browser/src/**",
+        "packages/adapters-indexeddb/src/**",
+        "apps/extension/runtime/**",
+        "apps/extension/wxt-entrypoints/background.ts"
+      ],
+      "acceptance": [
+        "Chaque chemin d’hydratation réussie programme un profil public à transmettre.",
+        "File persistante, acquittement Worker avant retrait, backoff et reprise après interruption MV3.",
+        "Rattraper les profils déjà hydratés par pages sans retéléchargement fournisseur.",
+        "Dédupliquer les profils indépendamment des associations favorites; préserver les choix individuels."
+      ],
+      "commands": [
+        "npm run test:storage",
+        "npm run test:migrations",
+        "npm run test:tasks",
+        "npm run test:security",
+        "npm run typecheck"
+      ],
+      "status": "TODO"
+    },
+    {
+      "id": "step-6",
+      "title": "Mutualiser l’enrichissement Agenda et la collecte hebdomadaire",
+      "files": [
+        "apps/worker/src/releases/**",
+        "apps/worker/src/index.ts",
+        "packages/application/src/releases/**",
+        "docs/decisions/ADR-0045-public-release-calendar.md",
+        "docs/architecture/src/agenda-release.dataflow.json"
+      ],
+      "acceptance": [
+        "Collecte hebdomadaire sur deux semaines avec rattrapage en absence de génération.",
+        "Vérifier qu’une fenêtre glissante ne neutralise pas la garde hebdomadaire et qu’un bail couvre la collecte réelle.",
+        "Cron et visiteurs partagent la coordination; œuvres découvertes enrichies si missing dans D1.",
+        "Vérifier l’accès fournisseur depuis le collecteur choisi; pas de succès live déduit des fixtures."
+      ],
+      "commands": [
+        "npm run test:agenda",
+        "npm run test:worker",
+        "npm run archify:validate -- agenda-release.dataflow"
+      ],
+      "status": "TODO"
+    },
+    {
+      "id": "step-7",
+      "title": "Certifier hydratation puis réutilisation dans une extension installée",
+      "files": [
+        "apps/extension/scripts/**",
+        "apps/worker/src/**",
+        "packages/**",
+        "scripts/agenda-certification/**"
+      ],
+      "acceptance": [
+        "Parcours isolé extension → hydratation → Worker → D1 → relecture avec métadonnées complètes.",
+        "Deuxième demande et deuxième installation utilisent D1 sans appel fournisseur inutile.",
+        "Tester interruption, panne, reprise, concurrence, rattrapage existant et absence de données privées.",
+        "Chrome et Firefox vérifiés; comparer les exigences Agenda applicables à FavLib."
+      ],
+      "commands": [
+        "npm run test:worker",
+        "npm run test:security",
+        "npm run verify"
+      ],
+      "status": "TODO"
+    },
+    {
+      "id": "step-8",
+      "title": "Finaliser documentation, archives et plan de publication",
+      "files": [
+        "docs/release.md",
+        "docs/systems/agenda-recovery-plan.md",
+        "docs/architecture/src/**",
+        "apps/extension/package.json",
+        "package-lock.json",
+        "build/operations/**"
+      ],
+      "acceptance": [
+        "Documentation fidèle aux comportements effectivement testés.",
+        "Archives versionnées reproductibles avec hashes recalculés; ne pas écraser les versions publiées.",
+        "Plan externe exact couvrant Worker, page download, ZIP et migrations uniquement si nécessaires; rollback documenté.",
+        "Autorisation externe distincte avant application; cette planification n’autorise aucun déploiement."
+      ],
+      "commands": [
+        "npm run validate:docs",
+        "npm run validate:decisions",
+        "npm run archify:validate -- agenda-release.dataflow",
+        "npm run package:extension",
+        "git diff --check"
+      ],
+      "status": "TODO"
+    },
+    {
+      "id": "step-9",
+      "title": "Publier après autorisation et démontrer le résultat réel",
+      "files": [
+        "build/operations/**",
+        "docs/release.md",
+        "docs/progress.md"
+      ],
+      "acceptance": [
+        "Appliquer uniquement les ressources et le digest approuvés après inspection récente.",
+        "Vérifier archives servies et page download; publier ne met pas à jour automatiquement une installation décompressée.",
+        "Hydrater une œuvre réelle dans un profil test autorisé, vérifier D1 puis sa relecture sans doublon ni nouvel appel fournisseur.",
+        "Mesurer séparément profils catalogue et sorties Agenda; ne terminer qu’avec preuves bout en bout."
+      ],
+      "commands": [
+        "npm run infra:inspect",
+        "npm run infra:plan",
+        "npm run infra:apply"
+      ],
+      "status": "TODO"
+    }
+  ],
+  "validationEvidence": [
+    "Plan proposé suite à la demande utilisateur de plan complet; aucune certification ni publication présumée.",
+    "Les anciens goals Agenda restent conservés; leurs preuves ne certifient pas le raccord hydratation → D1."
+  ]
+}

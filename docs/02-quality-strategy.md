@@ -62,7 +62,7 @@ browser or `workerd` test when platform behavior is the risk.
   response after the query changes.
 - Provider provenance, format, genres, status, years, totals, typed popularity,
   filters and derived statistics stay in IndexedDB and extension messages.
-  Sync and collective payload fixtures reject these fields; no synopsis,
+  Sync and public-discovery payload fixtures reject these fields; no synopsis,
   description or other editorial prose is collected.
 - MangaDex tests admit only tags whose declared group is `genre` into the genre
   facet. MangaDex last chapter/volume and MangaUpdates latest chapter remain
@@ -77,9 +77,11 @@ browser or `workerd` test when platform behavior is the risk.
 - WebBridge release packages must contain version `1.0.0`, the exact
   `https://tobirink.com/*` content-script match and the same
   `externally_connectable` match before their SHA-256 is recorded.
-- Collective-index tests prove explicit consent, write/revoke credential
-  separation, nonce replay rejection, daily quota enforcement and immediate
-  revocation; fixtures assert that title, URL, library and progress fields fail.
+- Public-discovery tests prouvent le claim D1 atomique, le bail unique de
+  quinze minutes, l’attente sans consommation de tentative, la proposition
+  limitée aux identifiants fournisseur et la promotion OIDC idempotente.
+  Les anciennes routes de consentement, d’appairage et de cache non vérifié
+  doivent répondre 404.
 - Public-catalogue tests prove that D1 stores only reconstructible work titles
   and provider references, rejects malformed limits and cursors, treats query
   values as bound data, and never exposes a private identifier or URL.
@@ -157,12 +159,12 @@ browser or `workerd` test when platform behavior is the risk.
 ## Favorite correction acceptance
 
 The [v3 plan](systems/favorite-resolution-correction-plan.md) adds zero Review
-at import, NOT_FOUND actionability, human-only no-match, owner isolation,
-distinct-owner confirmations, anti-replay batches, indexed SQL, MV3 checkpoints,
-additive migrations and installed Chromium/Firefox evidence. The synthetic
-clean-room corpus tests the reviewed behavior contract without depending on
-FavLib data. Production readiness additionally requires installed-browser,
-Worker/D1, recovery, security, quota and packaging evidence.
+at import, NOT_FOUND actionability, human-only no-match, indexed SQL, MV3
+checkpoints, additive migrations and installed Chromium/Firefox evidence. Le
+cache public actuel remplace l’ancien modèle owner par `MISS/PENDING/VERIFIED` :
+une seule recherche textuelle concurrente, aucune après vérification, et seule
+une reprise de bail abandonné peut répéter le travail. The synthetic clean-room
+corpus tests the reviewed behavior contract without depending on FavLib data.
 
 ## Inherited tooling boundary
 

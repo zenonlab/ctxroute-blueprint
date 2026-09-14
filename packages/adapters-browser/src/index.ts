@@ -17,7 +17,8 @@ export { WebExtensionBookmarkEventAdapter } from './bookmarks/web-extension-book
 export type { BookmarkMutation, WebExtensionBookmarkEventsApi } from './bookmarks/web-extension-bookmark-event-adapter';
 export * from './bookmarks/web-extension-organizer-adapter';
 export { HttpReviewCandidateAdapter, reviewCandidateResponseByteLimit } from './catalogue/http-review-candidate-adapter';
-export { HttpFavoritePublicCacheAdapter } from './catalogue/http-favorite-public-cache-adapter';
+export { HttpPublicDiscoveryAdapter } from './catalogue/http-public-discovery-adapter';
+export type { PublicDiscoveryFetch } from './catalogue/http-public-discovery-adapter';
 export type { ReviewCandidateFetch } from './catalogue/http-review-candidate-adapter';
 export * from './notifications';
 export * from './preferences/web-extension-quick-preferences-adapter';
@@ -26,4 +27,3 @@ export * from './releases/http-public-release-loader';
 export * from './releases/http-public-release-page-source';
 export * from './popup';
 export * from './recovery/web-extension-provider-identity-sync-adapter';
-export { HttpFavoriteCollectiveAdapter } from './recovery/http-favorite-collective-adapter';

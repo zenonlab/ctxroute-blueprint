@@ -2,7 +2,7 @@ import Dexie from 'dexie';
 import type { Table } from 'dexie';
 import type { AgendaEntry, FavoriteSource, Library, LocalAgendaEvent, LocalNotificationDelivery, LocalReleaseEvidence, OrganizerConfiguration, Progress, PublicReleaseEvent, Reminder, Review, Work } from '@tobirink/domain';
 import { publicReleaseEventSchema } from '@tobirink/application';
-import type { DurableTask, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet } from '@tobirink/application';
+import type { DurableTask, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet, PublicDiscoveryLocalRecord } from '@tobirink/application';
 import { migrateVersion1To2 } from './migrations/v2';
 import type { ProviderIdentityRecoveryRecord } from './recovery/provider-identity-recovery-state-adapter';
 import type { PublicReleaseStagingRecord, PublicReleaseSyncRecord } from './releases/dexie-public-release-fallback-store';
@@ -33,6 +33,7 @@ export class TobirinkDatabase extends Dexie {
   readonly localNotificationDeliveries!: Table<LocalNotificationDelivery, string>;
   readonly publicReleaseSyncState!: Table<PublicReleaseSyncRecord, string>;
   readonly publicReleaseStagingEvents!: Table<PublicReleaseStagingRecord, string>;
+  readonly publicDiscoveryStates!: Table<PublicDiscoveryLocalRecord, string>;
 
   constructor(name: string) {
     super(name);
@@ -165,6 +166,9 @@ export class TobirinkDatabase extends Dexie {
       localAgendaEvents: '&id, workId, occurrence.value, [occurrence.kind+occurrence.value], availability',
       localAgendaProjectionState: '&id',
       localReleaseEvidence: '&id, publicReleaseId, workId, observedAt, [workId+occurrence.value]',
+    });
+    this.version(19).stores({
+      publicDiscoveryStates: '&id, state, retryAt',
     });
   }
 }

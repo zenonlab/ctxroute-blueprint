@@ -4,7 +4,7 @@ import type { ExtensionDiagnosticEvent } from '../../../runtime/extension-diagno
 
 export interface ResolutionStatusProps {
   controller?: { paused: boolean; state: 'idle' | 'inventory' | 'presence' | 'resolving' | 'waiting-provider' | 'blocked' | 'paused' | 'complete' } | undefined;
-  counts?: { observed: number; processing: number; resolved: number; review: number; retryable: number; blocked: number; unsupported: number; internalErrors?: number; collectivePending?: number } | undefined;
+  counts?: { observed: number; processing: number; resolved: number; review: number; retryable: number; blocked: number; unsupported: number; internalErrors?: number; publicDiscoveryPending?: number } | undefined;
   diagnostics?: { enabled: boolean; events: readonly ExtensionDiagnosticEvent[] } | undefined;
   inventory?: { continuationAt?: string; startedAt?: string; status: 'not-started' | 'inventory' | 'presence' | 'complete' } | undefined;
   state: 'loading' | 'running' | 'ready' | 'error';
@@ -73,7 +73,7 @@ export function ResolutionStatus({ controller, counts, diagnostics, inventory, o
         <dt>Résolutions en attente de reprise</dt><dd>{counts.retryable}</dd>
         {counts.blocked ? <><dt>Bloquées après huit tentatives</dt><dd>{counts.blocked}</dd></> : null}
         {counts.internalErrors ? <><dt>Dont erreurs internes</dt><dd>{counts.internalErrors}</dd></> : null}
-        {counts.collectivePending ? <><dt>Dont attente du service collectif</dt><dd>{counts.collectivePending}</dd></> : null}
+        {counts.publicDiscoveryPending ? <><dt>Dont attente du cache public</dt><dd>{counts.publicDiscoveryPending}</dd></> : null}
         <dt>Liens non pris en charge</dt><dd>{counts.unsupported}</dd>
       </dl> : null}
       {diagnostics ? <div className={styles.diagnostics}>

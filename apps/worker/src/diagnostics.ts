@@ -1,6 +1,6 @@
 export const workerDiagnosticsLockValue = 'worker-v1' as const;
 
-export type WorkerRouteFamily = 'catalogue' | 'collective' | 'cover' | 'release' | 'site' | 'unknown';
+export type WorkerRouteFamily = 'catalogue' | 'cover' | 'release' | 'site' | 'unknown';
 
 export interface WorkerDiagnosticEvent {
   readonly schemaVersion: 1;
@@ -17,10 +17,9 @@ interface WorkerDiagnosticBindings {
 }
 
 export function classifyWorkerRoute(pathname: string): WorkerRouteFamily {
-  if (pathname === '/v1/catalogue' || pathname.startsWith('/v1/catalogue/')) return 'catalogue';
-  if (pathname.startsWith('/v2/favorites/') || pathname.startsWith('/v1/collective/')) return 'collective';
+  if (pathname === '/v1/catalogue' || pathname.startsWith('/v1/catalogue/') || pathname.startsWith('/v2/catalogue/')) return 'catalogue';
   if (pathname.startsWith('/v1/media/provider-covers/') || pathname.startsWith('/v1/media/covers/')) return 'cover';
-  if (pathname === '/v1/releases' || pathname.startsWith('/downloads/')) return 'release';
+  if (pathname === '/v1/releases' || pathname === '/v2/releases' || pathname.startsWith('/v2/releases/') || pathname.startsWith('/downloads/')) return 'release';
   if (pathname === '/' || pathname === '/library' || pathname.startsWith('/library/') || pathname === '/agenda' || pathname === '/privacy' || pathname === '/download') return 'site';
   return 'unknown';
 }

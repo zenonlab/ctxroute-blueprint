@@ -1,18 +1,15 @@
 import {
   CloudflareCoverImageAdapter,
-  D1CollectiveIndexAdapter,
-  D1FavoriteCollectiveAdapter,
   D1PublicCatalogueAdapter,
+  D1PublicDiscoveryAdapter,
   R2CoverMasterReadAdapter,
   R2PublicReleaseObjectAdapter,
-  WebCryptoCollectiveCredentialAdapter,
 } from '@tobirink/adapters-cloudflare';
 import type {
-  CollectiveIndexDependencies,
-  FavoriteCollectiveServicePort,
   CoverImageRenderPort,
   CoverMasterReadPort,
   PublicCatalogueReadPort,
+  PublicDiscoveryPort,
   PublicReleaseObjectPort,
 } from '@tobirink/application';
 import type { CloudPolicy } from './cloud-policy';
@@ -21,9 +18,9 @@ import type { PublicReleaseCalendarPort } from './releases/public-release-calend
 import { D1PublicReleaseCalendarAdapter } from './releases/public-release-calendar';
 
 export interface WorkerServices {
-  favoriteCollective: FavoriteCollectiveServicePort;
   catalogue: PublicCatalogueReadPort;
-  collective: CollectiveIndexDependencies & { dailyQuota: number };
+  publicDiscovery: PublicDiscoveryPort;
+  publicDiscoveryRateLimiter?: RateLimit;
   coverImages: CoverImageRenderPort;
   coverMasters: CoverMasterReadPort;
   policy: CloudPolicy;
@@ -36,27 +33,15 @@ export type WorkerRuntime = {
   Variables: { requestId: string; services: WorkerServices };
 };
 
-function dailyQuota(value: string): number {
-  if (!/^\d{1,4}$/u.test(value)) throw new Error('invalid-collective-quota');
-  const quota = Number.parseInt(value, 10);
-  if (quota < 1 || quota > cloudPolicy.collective.maximumDailyQuota) throw new Error('invalid-collective-quota');
-  return quota;
-}
-
 export function createWorkerServices(bindings: Env): WorkerServices {
   return {
-    favoriteCollective: new D1FavoriteCollectiveAdapter(bindings.COLLECTIVE_DB),
-    catalogue: new D1PublicCatalogueAdapter(bindings.COLLECTIVE_DB),
-    collective: {
-      clock: { now: () => new Date().toISOString() },
-      credentials: new WebCryptoCollectiveCredentialAdapter(),
-      dailyQuota: dailyQuota(bindings.COLLECTIVE_DAILY_QUOTA),
-      index: new D1CollectiveIndexAdapter(bindings.COLLECTIVE_DB),
-    },
+    catalogue: new D1PublicCatalogueAdapter(bindings.PUBLIC_DB),
+    publicDiscovery: new D1PublicDiscoveryAdapter(bindings.PUBLIC_DB),
+    publicDiscoveryRateLimiter: bindings.PUBLIC_DISCOVERY_RATE_LIMITER,
     coverImages: new CloudflareCoverImageAdapter(bindings.COVER_IMAGES),
     coverMasters: new R2CoverMasterReadAdapter(bindings.COVER_BUCKET),
     policy: cloudPolicy,
     releases: new R2PublicReleaseObjectAdapter(bindings.RELEASE_SNAPSHOTS),
-    releaseCalendar: new D1PublicReleaseCalendarAdapter(bindings.COLLECTIVE_DB),
+    releaseCalendar: new D1PublicReleaseCalendarAdapter(bindings.PUBLIC_DB),
   };
 }

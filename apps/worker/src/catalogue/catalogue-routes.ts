@@ -1,7 +1,5 @@
 import { Hono } from 'hono';
 import type { WorkerRuntime, WorkerServices } from '../composition';
-import { favoriteCollectiveKeySchema, favoritePublicCacheBatchRequestSchema, favoritePublicCacheBatchResponseSchema, favoritePublicCacheEntrySchema } from '@tobirink/application';
-import { bodyLimit } from 'hono/body-limit';
 
 const publicIdPattern = /^[A-Za-z0-9_-]{1,128}$/u;
 const providerPattern = /^[a-z0-9-]{1,32}$/u;
@@ -83,23 +81,6 @@ export function createCatalogueApp(injected?: CatalogueServices) {
     }
     const work = await routeServices(context, injected).catalogue.resolveReference(provider, externalId);
     return work ? context.json({ work }) : context.json({ error: 'not-found' }, 404);
-  });
-
-  app.get('/v1/catalogue/favorites/resolve', async (context) => {
-    const key = favoriteCollectiveKeySchema.safeParse({
-      fingerprint: context.req.query('fingerprint'), mediaKind: context.req.query('mediaKind'),
-      parserVersion: context.req.query('parserVersion'), siteRulesVersion: context.req.query('siteRulesVersion'),
-    });
-    if (!key.success) return context.json({ error: 'invalid-query' }, 400);
-    const identity = await routeServices(context, injected).catalogue.findFavoriteIdentity(key.data);
-    return identity === undefined ? context.json({ error: 'not-found' }, 404) : context.json({ identity: favoritePublicCacheEntrySchema.parse(identity) });
-  });
-
-  app.post('/v1/catalogue/favorites/resolve-batch', bodyLimit({ maxSize: 65536, onError: (context) => context.json({ error: 'body-too-large' }, 413) }), async (context) => {
-    const request = favoritePublicCacheBatchRequestSchema.safeParse(await context.req.json().catch(() => undefined));
-    if (!request.success) return context.json({ error: 'invalid-query' }, 400);
-    const results = await routeServices(context, injected).catalogue.findFavoriteIdentities(request.data.keys);
-    return context.json(favoritePublicCacheBatchResponseSchema.parse({ results }));
   });
 
   app.get('/v1/catalogue/search', async (context) => {

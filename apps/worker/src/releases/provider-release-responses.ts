@@ -1,4 +1,4 @@
-import { aniListReleasePageSchema, createMangaUpdatesReleaseEvent, mangaUpdatesReleasePageSchema } from '@tobirink/application';
+import { aniListReleasePageSchema, mangaUpdatesReleasePageSchema } from '@tobirink/application';
 import type { AniListReleasePage, MangaUpdatesReleasePage } from '@tobirink/application';
 import { z } from 'zod';
 

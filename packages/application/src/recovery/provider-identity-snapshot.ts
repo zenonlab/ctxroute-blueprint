@@ -1,6 +1,6 @@
 import type { FavoriteProvider } from '@tobirink/domain';
 import { z } from 'zod';
-import { favoritePublicReferenceSchema } from '../collective-index/favorite-collective-lookup';
+import { favoritePublicReferenceSchema } from '../favorites/favorite-identity-lookup';
 
 export const providerSyncPrefix = 'tobirink.provider-ids.';
 export const providerSyncQuota = Object.freeze({ bytes: 102400, items: 512, itemBytes: 8192, writeIntervalMs: 2100 });

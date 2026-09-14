@@ -1,4 +1,4 @@
-import { favoritePublicReferenceSchema } from '../collective-index/favorite-collective-lookup';
+import { favoritePublicReferenceSchema } from '../favorites/favorite-identity-lookup';
 import type { ProviderCandidate } from '@tobirink/domain';
 
 export function providerCoverFallbackPath(candidate: Pick<ProviderCandidate, 'provider' | 'externalId'>): string | undefined {

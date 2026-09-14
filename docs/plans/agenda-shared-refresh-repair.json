@@ -1,0 +1,37 @@
+{
+  "goalId": "goal-agenda-shared-refresh-repair",
+  "title": "Réparer la collecte Agenda et sa mutualisation catalogue",
+  "approved": true,
+  "executionMode": "autonomous",
+  "modeOffered": true,
+  "validationEvidence": [
+    "Go explicite de l'utilisateur après audit des collectes répétées et du calendrier public absent.",
+    "Le correctif local reste séparé des opérations fournisseur et du déploiement à approuver sur ressources exactes."
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Distinguer absence et vide vérifié dans le cache Agenda",
+      "status": "IN_PROGRESS",
+      "acceptance": ["Une génération publiée vide est conservée sans repli fournisseur.", "d1-empty reste une absence; un 304 sans cache partagé de même fenêtre est refusé.", "Les tests ciblés et les typechecks passent; la documentation décrit la limite des preuves."],
+      "files": ["packages/adapters-browser/src/releases/http-public-release-loader.ts", "packages/adapters-browser/src/releases/http-public-release-loader.test.ts", "apps/extension/wxt-entrypoints/background.ts", "docs/systems/agenda-recovery-plan.md", "docs/architecture/src/agenda-release.dataflow.json", "docs/progress.md"],
+      "commands": ["npm test --workspace @tobirink/adapters-browser -- src/releases/http-public-release-loader.test.ts", "npm run typecheck --workspace @tobirink/adapters-browser", "npm run typecheck --workspace @tobirink/extension", "npm run archify:validate -- agenda-release.dataflow", "git diff --check"]
+    },
+    {
+      "id": "step-2",
+      "title": "Définir et implémenter la collecte partagée et le catalogue public",
+      "status": "TODO",
+      "acceptance": ["Cadence hebdomadaire, fenêtre deux semaines et rattrapage absent sont explicites.", "Cron et demande utilisateur réutilisent un travail partagé dédupliqué.", "Les métadonnées publiques et les décisions privées ont des contrats distincts; aucune restriction fournisseur ne doit être contournée."],
+      "files": ["docs/decisions/ADR-0043-cache-first-reinstall-recovery.md", "docs/decisions/ADR-0045-public-release-calendar.md", "docs/systems/agenda-recovery-plan.md", "docs/architecture/src/agenda-release.dataflow.json", "apps/worker/**", "packages/application/**", "packages/adapters-cloudflare/**", "docs/progress.md"],
+      "commands": ["npm run test:worker", "npm run typecheck", "npm run archify:validate -- agenda-release.dataflow", "git diff --check"]
+    },
+    {
+      "id": "step-3",
+      "title": "Préparer la publication et vérifier la collecte réelle",
+      "status": "TODO",
+      "acceptance": ["Les ressources externes et le digest sont approuvés séparément avant mutation.", "Les preuves distinguent nombre d'œuvres catalogue, métadonnées publiques et sorties actives.", "Un cycle fournisseur réel remplit le cache et une seconde demande ne répète pas le travail frais."],
+      "files": ["build/operations/**", "docs/release.md", "docs/progress.md"],
+      "commands": ["npm run infra:inspect", "npm run verify", "Vérifier la production après approbation exacte des opérations"]
+    }
+  ]
+}

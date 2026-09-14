@@ -21,7 +21,7 @@ Choose only the operations intended for the next change:
 ```sh
 npm run infra:plan -- \
   --account <cloudflare-account-id> \
-  --operation d1-migrate:COLLECTIVE_DB \
+  --operation d1-migrate:PUBLIC_DB \
   --operation worker-deploy
 ```
 

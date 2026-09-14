@@ -9275,8 +9275,8 @@
       "schemaVersion": 1,
       "id": "goal-correct-agenda-provider-pipeline",
       "title": "Corriger la pipeline Agenda après audit fournisseur",
-      "status": "ACTIVE",
-      "executionMode": "collaborative",
+      "status": "BLOCKED",
+      "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
         {
@@ -9473,7 +9473,7 @@
         {
           "id": "step-7",
           "title": "Certifier la pipeline corrigée contre FavLib",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Les fixtures couvrent 1501 sorties AniList et 466 sorties MangaUpdates par pages de 40",
             "Chaque interruption MV3 reprend au dernier checkpoint sans doublon",
@@ -9495,16 +9495,17 @@
             "git commit -m test(agenda): certify complete favlib parity"
           ],
           "evidence": [
-            "Corpus synthétique 1 967 sorties: 1 501 AniList et 466 MangaUpdates, 43 réveils avec reprise par checkpoint, aucune duplication.",
-            "npm run verify passe intégralement; Chromium 153 reconstruit un Agenda local anime INSTANT et manga DATE; builds Chrome et Firefox 1.0.25 passent.",
-            "La prédiction manga reprend la garde FavLib: COMPLETED et CANCELLED ne produisent aucune estimation; ONGOING et HIATUS conservent la cadence médiane bornée.",
-            "Le runtime Firefox requis pour le test installé n'est pas présent sur le poste; aucune installation réseau n'a été effectuée sans autorisation dédiée."
+            "Corrected native fetch receiver in eight browser HTTP adapters; regression test added. Adapter suite 86/86 and complete npm run verify pass after the correction.",
+            "Installed Firefox 155 validates the 1.0.27 ZIP (SHA256 9c63df071ea0eda8a9433b29609d89d9b6e8965d0cab40c5e956ab39e1da6a05): health, synthetic anime INSTANT and manga DATE reconstruction, ordinary bookmark exclusion and zero Review. Chromium 153 validates the same local projection.",
+            "FavLib behavioral fixture test passes: 1501 AniList and 466 MangaUpdates events, durable pagination/checkpoints and no duplicates. No live shared-ingestion success inferred from fixtures.",
+            "Version 1.0.27 archives reproduce across two isolated builds: Chrome b6264af7eb573606cc2a4c2f44036e9e2893a08ceb300a5bc387cb0a56c402ea, Firefox 9c63df071ea0eda8a9433b29609d89d9b6e8965d0cab40c5e956ab39e1da6a05.",
+            "Agenda dataflow marks signed ingestion as unimplemented target; structural showcase passes 9/9. Desktop visual-check reports vertical overflow, so full visual acceptance is not claimed. No new release published."
           ]
         },
         {
           "id": "step-8",
           "title": "Publier séparément la pipeline Agenda corrigée",
-          "status": "DONE",
+          "status": "BLOCKED",
           "acceptance": [
             "Une approbation explicite distincte autorise chaque ressource externe exacte",
             "Le collecteur choisi a passé plusieurs smokes AniList depuis son egress réel",
@@ -9525,12 +9526,340 @@
             "git commit -m chore(release): record corrected agenda publication"
           ],
           "evidence": [
-            "Cloudflare gate 3b5a999181355cc0b91e232b4092b777913c1da121c7e3230f52f6488fa4cfd6 applied with the exact allowlist: D1 migration target, two versioned R2 ZIP objects, and Worker tobirink-public-api.",
-            "D1 reported no migrations to apply; both 1.0.25 ZIP uploads completed; Worker deployed at 100 percent as version c1e72fad-1262-4632-8dc5-52326bb1f53a with cron */5 * * * *.",
-            "Remote SHA-256 matches local manifest: Chrome c3bef1105a1b54ae8acf03cdf34d4928b9457af11cf6bc7a8a541dc1bd64cc54 and Firefox ffe508210a2e13f81b76b791a9cb86ad1b1624f279ab69127cd7d6b44ff1a460; both return HTTP 200 with immutable caching.",
-            "Installed Chromium 153 reconstructs a non-empty Agenda with one anime INSTANT and one manga DATE; production route smoke and Playwright connection-state smoke pass; previous Worker d498ddc7-55c5-41b0-890a-c1838a1e9dfa remains listed for rollback.",
-            "npm run archify:validate -- agenda-release.dataflow passes 9/9 with zero errors and warnings; git diff --check passes."
+            "external: AniList server access from Cloudflare was explicitly refused (403 manually blocked, ADR-0045); after another production attempt on 2026-09-14, agenda_last_success_at remains NULL and agenda_retry_at advances to 10:31:21.029Z. GET /v2/releases remains d1-empty.",
+            "Worker 5497b61c-a25d-4ca2-b193-8e747fada840 and 1.0.26 downloads were published earlier. Local 1.0.27 fixes native browser fetch and passes installed Firefox certification, but is not published.",
+            "Shared collector and signed ingestion are unimplemented targets; certifying live shared data requires authorized AniList access. Publication cannot be described as complete from structural tests or populated local fixtures."
           ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-agenda-shared-refresh-repair",
+      "title": "Réparer la collecte Agenda et sa mutualisation catalogue",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Distinguer absence et vide vérifié dans le cache Agenda",
+          "status": "DONE",
+          "acceptance": [
+            "Une génération publiée vide est conservée sans repli fournisseur.",
+            "d1-empty reste une absence; un 304 sans cache partagé de même fenêtre est refusé.",
+            "Les tests ciblés et les typechecks passent; la documentation décrit la limite des preuves."
+          ],
+          "files": [
+            "packages/adapters-browser/src/releases/http-public-release-loader.ts",
+            "packages/adapters-browser/src/releases/http-public-release-loader.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "docs/systems/agenda-recovery-plan.md",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/adapters-browser -- src/releases/http-public-release-loader.test.ts",
+            "npm run typecheck --workspace @tobirink/adapters-browser",
+            "npm run typecheck --workspace @tobirink/extension",
+            "npm run archify:validate -- agenda-release.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "HttpPublicReleaseLoader: 8 tests passent, dont vide publié réutilisé, d1-empty refusé et 304 hors fenêtre/fallback/sans cache refusé.",
+            "Typechecks adapters-browser et extension passent; l'extension accepte un résultat publié vide sans collecter à nouveau les fournisseurs.",
+            "Documentation de l'incident mise à jour; Archify agenda-release.dataflow 9/9, zéro erreur/avertissement; git diff --check passe. Aucun déploiement."
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Définir et implémenter la collecte partagée et le catalogue public",
+          "status": "DONE",
+          "acceptance": [
+            "Cadence hebdomadaire, fenêtre deux semaines et rattrapage absent sont explicites.",
+            "Cron et demande utilisateur réutilisent un travail partagé dédupliqué.",
+            "Les métadonnées publiques et les décisions privées ont des contrats distincts; aucune restriction fournisseur ne doit être contournée."
+          ],
+          "files": [
+            "docs/decisions/ADR-0043-cache-first-reinstall-recovery.md",
+            "docs/decisions/ADR-0045-public-release-calendar.md",
+            "docs/systems/agenda-recovery-plan.md",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "apps/worker/**",
+            "packages/application/**",
+            "packages/adapters-cloudflare/**",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run typecheck",
+            "npm run archify:validate -- agenda-release.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Le collecteur GitHub Actions hebdomadaire produit une génération complète AniList/MangaUpdates et s'authentifie sans secret par OIDC; le Worker vérifie signature JWKS, issuer, audience, dépôt, branche et workflow.",
+            "GET /v2/releases ne déclenche plus aucun fournisseur et le cron Cloudflare est retiré; l'ingestion D1 est strictement bornée, idempotente au replay et refuse de promouvoir une génération plus ancienne.",
+            "npm run verify passe intégralement (61 Worker, 152 extension, 375 application, tous workspaces, Chromium IndexedDB, builds et 0 vulnérabilité); agenda-release.dataflow passe 9/9 et le visual-check sans débordement."
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Préparer la publication et vérifier la collecte réelle",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Les ressources externes et le digest sont approuvés séparément avant mutation.",
+            "Les preuves distinguent nombre d'œuvres catalogue, métadonnées publiques et sorties actives.",
+            "Un cycle fournisseur réel remplit le cache et une seconde demande ne répète pas le travail frais."
+          ],
+          "files": [
+            "build/operations/**",
+            "docs/release.md",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run infra:inspect",
+            "npm run verify",
+            "Vérifier la production après approbation exacte des opérations"
+          ],
+          "evidence": [
+            "Prépublication locale recertifiée le 2026-09-14: npm run verify termine avec code 0, tous workspaces/builds/intégration passent et npm audit trouve 0 vulnérabilité.",
+            "npm run archify:validate -- agenda-release.dataflow passe showcase 9/9 avec zéro erreur et zéro avertissement.",
+            "Inspection Cloudflare distante sans mutation: production reste sur Worker 5497b61c-a25d-4ca2-b193-8e747fada840 et la nouvelle migration 0011_verified_public_discovery.sql est en attente. Le plan D1+Worker a seulement été prévisualisé; aucun apply, déploiement, push ou déclenchement GitHub n'a été exécuté."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-public-cache-without-collective",
+      "title": "Sécuriser le cache public et retirer le Collectif",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Neutraliser la publication collective implicite",
+          "status": "DONE",
+          "acceptance": [
+            "Le runtime n'active jamais le Collectif sans action utilisateur.",
+            "Une contribution favorite ne peut écrire aucune table catalogue.",
+            "Les tests prouvent qu'un choix non confirmé laisse catalogue et cache public inchangés.",
+            "La documentation et le dataflow Agenda décrivent uniquement le comportement réellement implémenté."
+          ],
+          "files": [
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/runtime/favorite-owner-runtime.test.ts",
+            "packages/adapters-cloudflare/src/reviews/d1-favorite-collective-adapter.ts",
+            "apps/worker/src/reviews/favorite-collective-routes.test.ts",
+            "docs/decisions/ADR-0043-cache-first-reinstall-recovery.md",
+            "docs/decisions/ADR-0045-public-release-calendar.md",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/progress.md",
+            ".project/progress.json"
+          ],
+          "commands": [
+            "npm run --workspace @tobirink/worker test -- src/reviews/favorite-collective-routes.test.ts",
+            "npm run --workspace @tobirink/extension test -- runtime/favorite-owner-runtime.test.ts",
+            "npm run archify:validate -- agenda-release.dataflow",
+            "git diff --check",
+            "npm run verify",
+            "git commit -m fix(privacy): block implicit collective publication"
+          ],
+          "evidence": [
+            "Suppression de l'activation automatique au démarrage; seule l'action UI explicite reste temporairement disponible.",
+            "L'adaptateur D1 n'écrit plus catalogue_works, catalogue_titles ni catalogue_external_references depuis une contribution propriétaire.",
+            "Régression Worker: 12/12 tests favorite-collective passent; runtime extension: 8/8.",
+            "npm run verify terminé exit 0: typecheck, 61 tests Worker, 152 extension, 375 application, builds Chrome/Firefox, audit npm 0 vulnérabilité.",
+            "agenda-release.dataflow validé Archify showcase 9/9, 0 erreur, 0 avertissement."
+          ]
+        },
+        {
+          "id": "step-2",
+          "title": "Définir une ingestion publique vérifiée et dédupliquée",
+          "status": "DONE",
+          "acceptance": [
+            "Les clients ne peuvent créer que des demandes en attente et jamais publier un titre.",
+            "Seul un collecteur OIDC vérifie les identifiants fournisseurs et publie les profils.",
+            "Les états MISS PENDING VERIFIED et leur déduplication concurrente sont documentés."
+          ],
+          "files": [
+            "docs/decisions/**",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/tobirink.architecture.json",
+            "docs/systems/**",
+            "docs/progress.md",
+            ".project/progress.json"
+          ],
+          "commands": [
+            "npm run validate:decisions",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run archify:validate -- tobirink.architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "ADR-0046 accepte le protocole sans owner: MISS/PENDING/VERIFIED, bail court unique, proposition cliente limitée aux IDs publics et promotion GitHub OIDC.",
+            "Le document reconnaît qu'une reprise après bail expiré peut répéter une recherche; aucune répétition concurrente ni après VERIFIED.",
+            "favorite-resolution.dataflow et tobirink.architecture passent Archify showcase 9/9, 0 erreur et 0 avertissement.",
+            "Décisions (46), documentation complète et git diff --check passent."
+          ]
+        },
+        {
+          "id": "step-3",
+          "title": "Implémenter le cache public D1 à auteur vérifié",
+          "status": "DONE",
+          "acceptance": [
+            "Une clé publique possède un claim atomique empêchant les traitements concurrents.",
+            "Les écritures VERIFIED exigent GitHub OIDC et un profil fournisseur validé.",
+            "Les répétitions et reprises sont idempotentes et bornées."
+          ],
+          "files": [
+            "apps/worker/src/**",
+            "apps/worker/migrations/**",
+            "packages/application/src/**",
+            "packages/adapters-cloudflare/src/**",
+            ".github/workflows/**",
+            "scripts/**",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/progress.md",
+            ".project/progress.json"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Migration D1 0011 additive: clé composite unique, états PENDING_SEARCH/PENDING_VERIFICATION/VERIFIED, bail et index bornés.",
+            "Routes v2 strictes: claim public limité par RateLimit Cloudflare, proposition limitée aux IDs, lecture/promotion pending protégées par GitHub OIDC à audiences exactes.",
+            "65/65 tests Worker passent, dont concurrence atomique, refus de champs privés, publication OIDC et replay idempotent; 2/2 tests de fingerprint officiel application passent.",
+            "Workflow public-discovery-collector horaire borné à 50 claims, bundle esbuild validé; tous les typechecks et Archify favorite-resolution 9/9 passent. Aucun déploiement."
+          ]
+        },
+        {
+          "id": "step-4",
+          "title": "Rendre l extension D1-first sans propriétaire collectif",
+          "status": "DONE",
+          "acceptance": [
+            "Une même œuvre déjà locale ou présente en D1 ne relance pas sa recherche fournisseur.",
+            "Le premier miss est mémorisé durablement et les réveils MV3 ne dupliquent pas le travail.",
+            "Aucun owner token appairage titre brut URL dossier ou progression n'est transmis."
+          ],
+          "files": [
+            "apps/extension/**",
+            "packages/application/src/**",
+            "packages/adapters-browser/src/**",
+            "packages/adapters-indexeddb/src/**",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/progress.md",
+            ".project/progress.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/extension",
+            "npm run test --workspace @tobirink/adapters-browser",
+            "npm run test --workspace @tobirink/adapters-indexeddb",
+            "npm run typecheck",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Le background compose HttpPublicDiscoveryAdapter avec un store Dexie v19, consulte D1 avant la recherche et ne compose plus aucun runtime owner/Collectif.",
+            "Un PENDING reporte la tâche sans consommer la limite de huit tentatives; un VERIFIED hydrate par ID exact sans recherche textuelle; seul LEASED lance une recherche puis persiste une proposition d’identifiants.",
+            "Typecheck complet et tests de tous les workspaces passent: 379 application, 152 extension, 59 Worker actifs, 88 adapters-browser; contrat IndexedDB Chromium valide."
+          ]
+        },
+        {
+          "id": "step-5",
+          "title": "Retirer les surfaces et protocoles Collectif",
+          "status": "DONE",
+          "acceptance": [
+            "L'UI Collectif, l'appairage, les owners, les routes v1/v2 et leurs adaptateurs ne sont plus livrés.",
+            "Les anciennes sauvegardes restent importables sans restaurer de secrets collectifs.",
+            "Les migrations historiques restent versionnées; toute suppression D1 distante reste une opération séparément approuvée."
+          ],
+          "files": [
+            "apps/extension/entrypoints/options/CollectiveSettings/**",
+            "apps/extension/runtime/favorite-owner-runtime.ts",
+            "apps/extension/runtime/favorite-owner-runtime.test.ts",
+            "apps/extension/runtime/use-favorite-owner.ts",
+            "apps/extension/runtime/owner-messages.ts",
+            "apps/extension/runtime/ExtensionSurface.tsx",
+            "apps/worker/src/reviews/collective-routes.ts",
+            "apps/worker/src/reviews/favorite-collective-routes.ts",
+            "packages/adapters-browser/src/recovery/http-favorite-collective-adapter.ts",
+            "packages/adapters-cloudflare/src/reviews/d1-collective-index-adapter.ts",
+            "packages/adapters-cloudflare/src/reviews/d1-favorite-collective-adapter.ts",
+            "packages/adapters-cloudflare/src/reviews/web-crypto-collective-credential-adapter.ts",
+            "packages/application/src/collective-index/**",
+            "packages/contracts/src/collective-index/**",
+            "packages/application/src/recovery/private-export.ts",
+            "packages/adapters-indexeddb/src/recovery/dexie-private-recovery-store.ts",
+            "docs/**",
+            ".project/progress.json"
+          ],
+          "commands": [
+            "Requérir la confirmation exacte avant chaque suppression de fichier.",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Toutes les surfaces, routes, contrats, adaptateurs et modules Collectif actifs ont été supprimés; les migrations SQL historiques restent conservées.",
+            "Le backup privé v5 n’exporte ni ne restaure plus d’owner; les anciennes archives v5 contenant collectiveOwner restent lisibles mais ce champ est ignoré.",
+            "Aucun test ignoré; les recherches de symboles Collective ne trouvent plus que deux assertions négatives de sécurité."
+          ]
+        },
+        {
+          "id": "step-6",
+          "title": "Certifier absence de fuite et de répétition",
+          "status": "DONE",
+          "acceptance": [
+            "Les tests couvrent concurrence, replay, reprise MV3 et seconde recherche sans fournisseur.",
+            "Les manifests et flux réseau ne contiennent plus le protocole Collectif.",
+            "Tous les gates et diagrammes produit passent."
+          ],
+          "files": [
+            "apps/**",
+            "packages/**",
+            "scripts/**",
+            "docs/**",
+            ".project/progress.json"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run archify:validate -- agenda-release.dataflow",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "npm run verify termine avec code 0 après nettoyage: 142 extension, 48 Worker, 81 navigateur, 375 application, 129 UI et tous les autres workspaces passent.",
+            "Q-08 prouve explicitement qu’un claim D1 PENDING n’appelle pas le fournisseur et ne consomme pas de tentative; l’oracle canonique est cohérent à 82 / 76 / 5 / 1.",
+            "agenda-release.dataflow et favorite-resolution.dataflow passent Archify showcase 9/9 avec zéro erreur et avertissement; git diff --check passe."
+          ]
+        },
+        {
+          "id": "step-7",
+          "title": "Préparer puis publier les ressources exactes",
+          "status": "TODO",
+          "acceptance": [
+            "Le plan Cloudflare exact est revu et approuvé avant application.",
+            "Le workflow GitHub est poussé puis exécuté avec OIDC.",
+            "D1 est rempli par une collecte réelle et une seconde exécution fraîche ne répète pas le travail.",
+            "Le Worker précédent reste disponible pour rollback."
+          ],
+          "files": [
+            "build/operations/**",
+            "docs/release.md",
+            "docs/progress.md",
+            ".project/progress.json"
+          ],
+          "commands": [
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "Appliquer seulement après approbation explicite du digest, du push et des ressources externes.",
+            "Vérifier les routes, D1 et le rollback."
+          ],
+          "evidence": []
         }
       ]
     }

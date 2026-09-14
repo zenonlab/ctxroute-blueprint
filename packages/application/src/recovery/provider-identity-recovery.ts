@@ -1,6 +1,6 @@
 import { createWork, favoriteSourceId, workId } from '@tobirink/domain';
 import { z } from 'zod';
-import { favoriteCollectiveKey, favoritePublicReferenceSchema } from '../collective-index/favorite-collective-lookup';
+import { favoriteIdentityKey, favoritePublicReferenceSchema } from '../favorites/favorite-identity-lookup';
 import { favoriteCandidateWorkId } from '../favorites/favorite-resolution-commit';
 import { favoriteMatcherVersion, hasExactBlockedProviderTaxonomy } from '../favorites/provider-matcher';
 import { FavoriteProviderRetryError, favoriteProviderPolicy } from '../favorites/provider-ports';
@@ -55,7 +55,7 @@ export async function scanHydratedProviderIds(storage: StoragePort, checkpoints:
     if (source.presence !== 'observed' || source.resolution?.kind !== 'RESOLVED' || source.matchedWorkId === undefined) continue;
     const [record, work] = await Promise.all([storage.getFavoriteParseArtifact(source.id), storage.getWork(source.matchedWorkId)]);
     if (record?.artifact.identityKey === undefined || work?.hydration === undefined) continue;
-    const key = await favoriteCollectiveKey(record.artifact);
+    const key = await favoriteIdentityKey(record.artifact);
     const references = work.externalReferences.flatMap((reference) => {
       const parsed = favoritePublicReferenceSchema.safeParse(reference);
       return parsed.success ? [parsed.data] : [];

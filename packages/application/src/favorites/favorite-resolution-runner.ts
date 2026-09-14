@@ -1,16 +1,14 @@
 import { createFavoriteSource, createProviderCandidate, createWork } from '@tobirink/domain';
 import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
-import { favoriteCollectiveKey, favoritePublicReferenceSchema, resolveFavoriteCollectiveIdentity } from '../collective-index/favorite-collective-lookup';
-import type { FavoriteCollectiveLookupPort } from '../collective-index/favorite-collective-lookup';
-import type { FavoritePublicCacheReadPort } from '../ports/cloud-data-ports';
-import type { FavoritePublicCacheEntry } from '../collective-index/favorite-collective-protocol';
+import { favoriteIdentityKey, favoritePublicReferenceSchema, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
+import type { FavoriteIdentityLookupPort } from './favorite-identity-lookup';
 import { blockTask, parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { readLocalFavoriteIdentity } from './local-favorite-identity';
 import { favoriteResolutionVersions } from './resolution-result-schema';
-import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
+import { hasExactBlockedProviderTaxonomy, matchFavoriteTitles } from './provider-matcher';
 import { favoriteProviderDiscoveryTitles, hasFavoriteOvaMarker, hasFavoritePreSerializationMarker, normalizeFavoriteTitle } from './title-normalization';
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-ports';
@@ -18,6 +16,7 @@ import { resolveFavoriteProviderLanes } from './resolve-provider-lanes';
 import { createFavoriteSearchCheckpointPort, searchFavoriteProviderPage } from './provider-search-checkpoint';
 import type { FavoriteSearchCheckpointPort } from './provider-search-checkpoint';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, ResolutionProvider } from './provider-ports';
+import type { PublicDiscoveryClientPort, PublicDiscoveryProfile } from '../public-discovery';
 
 // Cheap local/terminal tasks may drain in one wake; the time budget remains
 // authoritative for provider I/O and MV3 suspension safety.
@@ -66,9 +65,8 @@ export async function repairMissingFavoriteCovers(storage: StoragePort, hydratio
 }
 
 export interface FavoriteResolutionRunnerDependencies {
-  readonly collective?: FavoriteCollectiveLookupPort;
-  readonly publicCache?: FavoritePublicCacheReadPort;
-  readonly synchronized?: FavoriteCollectiveLookupPort;
+  readonly publicDiscovery?: PublicDiscoveryClientPort;
+  readonly synchronized?: FavoriteIdentityLookupPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
   readonly hydration: FavoriteProviderHydrationPorts;
   readonly libraryId: LibraryId;
@@ -86,7 +84,6 @@ export interface FavoriteResolutionSliceResult {
 }
 
 type MutableFavoriteTitleMatchQuery = { -readonly [Key in keyof FavoriteTitleMatchQuery]: FavoriteTitleMatchQuery[Key] };
-type MutableProviderCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 
 function timestamp(value: string): number {
   const parsed = new Date(value);
@@ -106,21 +103,20 @@ function providerTitles(artifact: FavoriteParseArtifact): readonly string[] {
   return Object.freeze([...new Set(titles)]);
 }
 
-function publicCacheCandidate(entry: FavoritePublicCacheEntry, artifact: FavoriteParseArtifact): ProviderCandidate {
-  const priorities = entry.mediaKind === 'ANIME' ? ['anilist', 'kitsu-anime'] : ['mangaupdates', 'mangadex', 'anilist', 'kitsu-manga'];
-  const primary = priorities.flatMap((provider) => entry.references.filter((reference) => reference.provider === provider))[0];
-  if (primary === undefined) throw new Error('PUBLIC_CACHE_IDENTITY_HAS_NO_SUPPORTED_REFERENCE');
-  const value: MutableProviderCandidate = {
+function publicDiscoveryCandidate(profile: PublicDiscoveryProfile): ProviderCandidate {
+  const priorities = profile.mediaKind === 'anime' ? ['anilist', 'kitsu-anime'] : ['mangaupdates', 'mangadex', 'anilist', 'kitsu-manga'];
+  const primary = priorities.flatMap((provider) => profile.references.filter((reference) => reference.provider === provider))[0];
+  if (primary === undefined) throw new Error('PUBLIC_DISCOVERY_HAS_NO_SUPPORTED_REFERENCE');
+  return createProviderCandidate({
+    displayTitle: profile.preferredTitle,
     externalId: primary.externalId,
-    mediaKind: entry.mediaKind,
-    preSerialization: entry.metadata.preSerialization,
+    linkedReferences: profile.references.filter((reference) => reference.provider !== primary.provider),
+    mediaKind: profile.mediaKind === 'anime' ? 'ANIME' : 'MANGA',
+    preSerialization: false,
     provider: primary.provider,
-    titles: providerTitles(artifact),
-  };
-  Object.assign(value, entry.metadata);
-  const linkedReferences = entry.references.filter((reference) => reference.provider !== primary.provider);
-  if (linkedReferences.length > 0) value.linkedReferences = linkedReferences;
-  return createProviderCandidate(value, primary.provider);
+    titleVariants: profile.officialTitles.map((title) => ({ language: title.locale, title: title.title })),
+    titles: profile.officialTitles.map((title) => title.title),
+  }, primary.provider);
 }
 
 function hydrationRetryAt(retryAt: number | undefined, now: string): number {
@@ -134,7 +130,7 @@ async function retryClaim(
   task: DurableTask,
   token: string,
   retryAt: string,
-  reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' | 'COLLECTIVE_UNAVAILABLE' = 'PROVIDER_UNAVAILABLE',
+  reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' | 'PUBLIC_DISCOVERY_PENDING' = 'PROVIDER_UNAVAILABLE',
 ): Promise<'blocked' | 'retried'> {
   const exhausted = task.attempt >= favoriteResolutionAttemptLimit;
   await dependencies.storage.transaction(['favoriteSources', 'favoriteArtifacts', 'favoriteResolutionTasks'], async (session) => {
@@ -154,6 +150,30 @@ async function retryClaim(
     }));
   });
   return exhausted ? 'blocked' : 'retried';
+}
+
+async function deferClaimWithoutAttempt(
+  dependencies: FavoriteResolutionRunnerDependencies,
+  task: DurableTask,
+  token: string,
+  retryAt: string,
+): Promise<'retried'> {
+  await dependencies.storage.transaction(['favoriteSources', 'favoriteArtifacts', 'favoriteResolutionTasks'], async (session) => {
+    const payload = parseFavoriteResolutionTaskPayload(task.payload);
+    const source = await session.getFavoriteSource(payload.sourceId);
+    const record = await session.getFavoriteParseArtifact(payload.sourceId);
+    const current = await session.getFavoriteResolutionTask(task.id);
+    if (!source || !record || record.artifact.semanticFingerprint !== payload.semanticFingerprint
+      || current?.idempotencyKey !== task.idempotencyKey || current.claimToken !== token || current.state !== 'CLAIMED'
+      || current.claimExpiresAt === undefined || current.claimExpiresAt <= dependencies.now()) throw new Error('STALE_PRIVATE_REFERENCE');
+    await session.putFavoriteResolutionTask(retryTask({ ...current, attempt: 0 }, token, retryAt));
+    await session.putFavoriteSource(createFavoriteSource({
+      ...source,
+      resolution: { kind: 'RETRYABLE', reason: 'PUBLIC_DISCOVERY_PENDING' },
+      resolutionVersions: favoriteResolutionVersions(record.artifact),
+    }));
+  });
+  return 'retried';
 }
 
 async function preferMangaUpdatesHydration(
@@ -302,29 +322,14 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     }
     return 'completed';
   }
-  const collectiveKey = await favoriteCollectiveKey(artifact);
-  let synchronizedLookup: Awaited<ReturnType<FavoriteCollectiveLookupPort['lookup']>> | undefined;
+  const identityKey = await favoriteIdentityKey(artifact);
+  let synchronizedLookup: Awaited<ReturnType<FavoriteIdentityLookupPort['lookup']>> | undefined;
   if (dependencies.synchronized !== undefined) {
-    try { synchronizedLookup = await dependencies.synchronized.lookup([collectiveKey]); }
+    try { synchronizedLookup = await dependencies.synchronized.lookup([identityKey]); }
     catch { synchronizedLookup = undefined; }
   }
-  if (dependencies.publicCache !== undefined) {
-    try {
-      const entry = await dependencies.publicCache.findFavoriteIdentity(collectiveKey);
-      const cached = entry === undefined ? undefined : publicCacheCandidate(entry, artifact);
-      if (cached !== undefined && !hasExactBlockedProviderTaxonomy(cached) && isProviderCandidateCompatible(matchQuery, cached)) {
-        const references = [{ provider: cached.provider, externalId: cached.externalId }, ...(cached.linkedReferences ?? [])]
-          .flatMap((reference) => {
-            const parsed = favoritePublicReferenceSchema.safeParse(reference);
-            return parsed.success ? [parsed.data] : [];
-          });
-        await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-public-cache', cached, undefined, { references });
-        return 'completed';
-      }
-    } catch { /* A cache outage never changes provider resolution semantics. */ }
-  }
   const synchronizedPort = synchronizedLookup === undefined ? undefined : { lookup: async () => synchronizedLookup };
-  const synchronized = await resolveFavoriteCollectiveIdentity(synchronizedPort, artifact, dependencies.hydration, false, (reference) => hydrateExplicitReference(dependencies, reference, artifact, checkpoints));
+  const synchronized = await resolveSynchronizedFavoriteIdentity(synchronizedPort, artifact, dependencies.hydration, (reference) => hydrateExplicitReference(dependencies, reference, artifact, checkpoints));
   if (synchronized.kind === 'RETRYABLE') {
     const retryAt = new Date(synchronized.retryAt === undefined ? timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs : Math.max(timestamp(dependencies.now()) + 1_000, synchronized.retryAt)).toISOString();
     return retryClaim(dependencies, task, token, retryAt);
@@ -333,7 +338,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     const candidateSet = synchronized.candidates === undefined ? undefined : {
       candidates: synchronized.candidates,
       digest: `sync:${artifact.semanticFingerprint}:${synchronized.candidates.map(({ externalId, provider }) => `${provider}:${externalId}`).join('|')}`,
-      provenance: 'owner-collective', totalCandidates: synchronized.candidates.length, recordedAt: dependencies.now(),
+      provenance: 'synchronized-identities', totalCandidates: synchronized.candidates.length, recordedAt: dependencies.now(),
     };
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: synchronized.reason }, `review:sync-${synchronized.reason.toLowerCase()}`, undefined, candidateSet);
     return 'completed';
@@ -347,28 +352,27 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:synchronized-association', candidate, undefined, { references: synchronized.references });
     return 'completed';
   }
-  const collective = await resolveFavoriteCollectiveIdentity(dependencies.collective, artifact, dependencies.hydration, local.kind === 'AMBIGUOUS', (reference) => hydrateExplicitReference(dependencies, reference, artifact, checkpoints));
-  const collectiveRetryAt = collective.kind === 'RETRYABLE'
-    ? new Date(collective.retryAt === undefined ? timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs : Math.max(timestamp(dependencies.now()) + 1_000, collective.retryAt)).toISOString()
-    : undefined;
-  if (collective.kind === 'RETRYABLE' && collective.stage === 'HYDRATION' && collectiveRetryAt !== undefined) return retryClaim(dependencies, task, token, collectiveRetryAt);
-  if (collective.kind === 'REVIEW_REQUIRED') {
-    const candidateSet = collective.candidates === undefined ? undefined : {
-      candidates: collective.candidates,
-      digest: `collective:${artifact.semanticFingerprint}:${collective.candidates.map(({ externalId, provider }) => `${provider}:${externalId}`).join('|')}`,
-      provenance: 'owner-collective', totalCandidates: collective.candidates.length, recordedAt: dependencies.now(),
-    };
-    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: collective.reason }, `review:collective-${collective.reason.toLowerCase()}`, undefined, candidateSet);
-    return 'completed';
-  }
-  if (collective.kind === 'RESOLVED') {
-    let candidate = collective.candidate;
-    try { candidate = await preferMangaUpdatesHydration(dependencies, candidate, metadataCheckpoints); } catch (error) {
-      return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString());
+  if (dependencies.publicDiscovery !== undefined) {
+    let discovery;
+    try { discovery = await dependencies.publicDiscovery.resolveOrClaim(identityKey); }
+    catch {
+      return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING');
     }
-    if (hasExactBlockedProviderTaxonomy(candidate)) await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
-    else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:collective-${collective.scope}`, candidate, undefined, { references: collective.references });
-    return 'completed';
+    if (discovery.state === 'PENDING') return deferClaimWithoutAttempt(dependencies, task, token, discovery.retryAt);
+    if (discovery.state === 'MISS') return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING');
+    if (discovery.state === 'VERIFIED') {
+      const cached = publicDiscoveryCandidate(discovery.profile);
+      let candidate: ProviderCandidate | undefined;
+      try { candidate = await hydrateExplicitReference(dependencies, { externalId: cached.externalId, provider: cached.provider }, artifact, checkpoints); }
+      catch (error) { return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString()); }
+      if (candidate === undefined) return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs).toISOString());
+      const references = discovery.profile.references.flatMap((reference) => {
+        const parsed = favoritePublicReferenceSchema.safeParse(reference);
+        return parsed.success ? [parsed.data] : [];
+      });
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-verified-discovery', candidate, undefined, { references });
+      return 'completed';
+    }
   }
   if (local.kind === 'AMBIGUOUS') {
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${local.provenance}`, undefined, {
@@ -417,6 +421,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${provider}:${candidate.externalId}`, candidate);
+  const proposedReferences = [{ provider: candidate.provider, externalId: candidate.externalId }, ...(candidate.linkedReferences ?? [])]
+    .flatMap((reference) => {
+      const parsed = favoritePublicReferenceSchema.safeParse(reference);
+      return parsed.success ? [parsed.data] : [];
+    });
+  if (proposedReferences.length > 0) await dependencies.publicDiscovery?.propose(identityKey, proposedReferences).catch(() => undefined);
   return 'completed';
 }
 

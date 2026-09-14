@@ -20,7 +20,7 @@ export function PrivateRecovery({ onExport, onRestore, state }: PrivateRecoveryP
     <Surface>
       <div className={styles.content}>
         <h2 id="private-recovery-title">Sauvegarde privée chiffrée</h2>
-        <p>Cette archive contient votre bibliothèque, progression, organisation, Review et identité collective. Elle est chiffrée dans l’extension avec votre phrase secrète, qui n’est ni conservée ni envoyée.</p>
+        <p>Cette archive contient votre bibliothèque, progression, organisation et Review. Elle est chiffrée dans l’extension avec votre phrase secrète, qui n’est ni conservée ni envoyée.</p>
         <div className={styles.group}>
           <h3>Exporter</h3>
           <label className={styles.field}>Phrase secrète, 12 caractères minimum<input autoComplete="new-password" disabled={busy} minLength={12} onChange={(event) => setExportPassphrase(event.currentTarget.value)} type="password" value={exportPassphrase} /></label>

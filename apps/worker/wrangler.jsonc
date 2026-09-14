@@ -4,7 +4,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-04",
   "compatibility_flags": ["nodejs_compat"],
-  "triggers": { "crons": ["*/5 * * * *"] },
   "routes": [
     { "pattern": "tobirink.com/*", "zone_name": "tobirink.com" }
   ],
@@ -14,7 +13,7 @@
   },
   "d1_databases": [
     {
-      "binding": "COLLECTIVE_DB",
+      "binding": "PUBLIC_DB",
       "database_name": "tobirink-public",
       "migrations_dir": "migrations"
     }
@@ -32,8 +31,14 @@
   "images": {
     "binding": "COVER_IMAGES"
   },
+  "ratelimits": [
+    {
+      "name": "PUBLIC_DISCOVERY_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "vars": {
-    "COLLECTIVE_DAILY_QUOTA": "100",
     "TOBIRINK_WORKER_DIAGNOSTICS": "worker-v1"
   },
   "observability": {

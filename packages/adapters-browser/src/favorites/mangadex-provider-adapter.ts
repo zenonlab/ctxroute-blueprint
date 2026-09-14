@@ -47,7 +47,7 @@ export const mangaDexSourceAdapter: FavoriteSourceAdapter = {
 };
 
 export class MangaDexFavoriteProviderAdapter implements FavoriteProviderCandidatePort, FavoriteProviderHydrationPort {
-  constructor(private readonly fetcher: FavoriteProviderFetch = fetch, private readonly gate = new FavoriteProviderRateGate('mangadex')) {}
+  constructor(private readonly fetcher: FavoriteProviderFetch = fetch.bind(globalThis), private readonly gate = new FavoriteProviderRateGate('mangadex')) {}
 
   async search(input: FavoriteProviderSearchQuery) {
     const query = assertFavoriteProviderSearchQuery(input);

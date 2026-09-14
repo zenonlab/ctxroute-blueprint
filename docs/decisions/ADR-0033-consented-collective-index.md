@@ -17,7 +17,7 @@ revised: true
 ---
 # ADR-0033 — Collectif SQL owner-scoped et révocable
 
-- Status: accepted
+- Status: superseded by ADR-0046
 - Date: 2026-09-04
 - Revised: 2026-09-12
 

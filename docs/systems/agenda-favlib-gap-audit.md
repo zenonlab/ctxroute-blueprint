@@ -1,6 +1,6 @@
 # Audit Agenda FavLib → TobiRink
 
-## Verdict
+## Verdict initial
 
 L'Agenda TobiRink possède désormais une route v2, un chargeur HTTP, une
 projection et des alarmes, mais la chaîne ne peut toujours pas produire un
@@ -87,3 +87,29 @@ liste d'identifiants au serveur.
 La base FavLib privée n'est pas copiée, exportée, journalisée ou utilisée dans
 les tests. Les validations utiliseront des fixtures anonymisées et
 synthétiques.
+
+## État corrigé et équivalence
+
+La correction remplace les vingt écarts ci-dessus par une chaîne exécutable :
+pagination complète des deux fournisseurs, checkpoint par page, génération
+atomique IndexedDB, jointure locale canonique, projection `DATE | INSTANT` et
+prédiction manga bornée. Le corpus synthétique reproduit 1 501 sorties AniList
+en pages de 50 et 466 sorties MangaUpdates en pages de 40. Chaque appel reprend
+avec une nouvelle instance du source MV3 et la promotion finale contient 1 967
+identités uniques.
+
+| Comportement FavLib | Décision TobiRink | Classement |
+| --- | --- | --- |
+| Fenêtre civile J−1/J+15 | Conservée | équivalent |
+| AniList `pageInfo.hasNextPage`, 50 par page | Conservé avec checkpoint durable et cadence 2,2 s | équivalent renforcé |
+| MangaUpdates paginé | `page`, `per_page` et `total_hits` reçus font autorité | correction volontaire |
+| `release_date` manga | Conservé comme `DATE`, sans heure issue de `time_added` | équivalent renforcé |
+| Historique 12 observations, 8 intervalles | Conservé; intervalle normalisé quand des chapitres sont sautés | correction volontaire |
+| Statut terminé/annulé bloque la prédiction | Le statut éditorial hydraté bloque `COMPLETED` et `CANCELLED`; statuts inconnus restent conservateurs | équivalent renforcé |
+| Projection locale par identifiant fournisseur | Conservée avec alias historique `mangaUpdates` normalisé | équivalent renforcé |
+| Appels fournisseurs directs | Repli MV3 seulement; génération D1 commune prioritaire | amélioration d'efficacité |
+| Export ICS mentionné dans la roadmap | Aucun code FavLib à porter; aucune promesse TobiRink | absence historique expliquée |
+
+Aucune différence non classée ne reste dans le périmètre Agenda. La base
+privée FavLib n'a pas été ouverte; les nombres publics constatés sont reproduits
+uniquement par des événements synthétiques sans titre ni URL utilisateur.

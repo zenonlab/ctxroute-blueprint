@@ -18,7 +18,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-07
-- Revised: 2026-09-13
+- Revised: 2026-09-14
 
 ## Contexte
 
@@ -59,7 +59,8 @@ ses aliases explicitement confirmés, et lie la source atomiquement. Un résulta
 NOT_FOUND terminé garde la saisie manuelle et la confirmation no-match actives.
 
 Ordre : ID/URL exact, règle origine/route, artefact/aliases, fiche locale
-hydratée, lookup owner-scoped via Worker, recherche fournisseur locale,
+hydratée, snapshot privé synchronisé, D1 public `VERIFIED`, puis recherche
+fournisseur locale sous bail unique sur `MISS`,
 Review terminale. AniList anime puis Kitsu Anime après NO_MATCH complet;
 MangaUpdates manga/manhwa/manhua puis MangaDex dans son rôle exact/sorties,
 puis Kitsu Manga. Une référence AniList manga explicite reste hydratable.
@@ -125,12 +126,12 @@ avance d'un alias par réveil lorsque la preuve reste faible ou absente.
 `Retry-After` est persisté et peut reporter le réveil.
 Les aliases mémorisés dans Work doivent eux-mêmes correspondre à la fiche
 hydratée; un libellé libre du favori ne devient pas un alias par simple voisinage.
-Une indisponibilité du collectif n'annule jamais une correspondance locale ou
-fournisseur; la préférence personnelle déjà disponible reste prioritaire. Le
-port collectif strict reçoit seulement une clé SHA-256 liée au titre
-normalisé/type/saison et les versions; ses références équivalentes sont
-hydratées suivant la priorité fournisseur. L'adaptateur HTTP authentifié et
-la distribution effective des règles sont raccordés à l'étape Worker/D1.
+Une indisponibilité D1 n'annule jamais une correspondance locale déjà prouvée.
+Le port public strict reçoit seulement une clé SHA-256 liée au titre
+normalisé/type/saison et les versions. `PENDING` reporte sans fournisseur;
+`VERIFIED` hydrate les références exactes; seul un bail atomique sur `MISS`
+autorise une recherche textuelle et une proposition d'IDs non fiable. La
+promotion exige le collecteur GitHub OIDC conformément à ADR-0046.
 
 Parser, matcher, progression, normalisation, règles, décisions et reçus sont
 versionnés. Brut et transformations restent locaux. Les règles distribuées
@@ -159,8 +160,8 @@ de la file. L'inventaire ne doit pas monopoliser un réveil; après chaque lot,
 le runtime exécute des tranches de résolution jusqu'au budget et persiste une
 continuation lorsque des tâches restent disponibles. Une alarme reprend cette
 continuation même sans événement de favori. Il n'existe pas aujourd'hui de
-queue Worker privée : le Worker traite le collectif et la distribution
-déclarative; une queue Cloudflare privée nécessiterait un ADR séparé.
+queue Worker privée : le Worker sert le cache public D1 vérifié et les données
+publiques; une queue Cloudflare privée nécessiterait un ADR séparé.
 
 Une URL sans route connue ne suffit pas à conclure `IDENTITY_MISSING` lorsque
 le titre du favori ou un slug local fournit une requête bornée. Le parseur doit

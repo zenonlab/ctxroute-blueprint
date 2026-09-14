@@ -17,9 +17,11 @@ testé et projeté.
 Le navigateur possède présence et progression observée; IndexedDB possède
 les transactions privées. Sync restaure les IDs et leurs associations à une
 empreinte normalisée, jamais les titres ni la navigation. Le Worker seul
-possède D1, pour cache public, lookup owner-scoped puis confirmations distinctes. La pipeline
-et ses budgets suivent le plan v3; la section suivante décrit l'ancien runtime,
-qui ne constitue pas le résultat cible.
+possède D1. Le cache public n’a ni owner ni appairage : le client réserve une
+clé `PENDING` et propose seulement des identifiants publics; le collecteur
+GitHub OIDC publie seul `VERIFIED` après hydratation et contrôle des titres
+officiels. La pipeline et ses budgets suivent le plan v3; la section suivante
+décrit l'ancien runtime, qui ne constitue pas le résultat cible.
 
 Les permissions du paquet MV3 sont limitées aux cinq origines HTTPS nécessaires
 à l'exécution : AniList, MangaUpdates, MangaDex, Kitsu et `tobirink.com` pour
@@ -327,7 +329,7 @@ Review. Une purge future demanderait une action produit séparée et explicite.
 Le runner réclame au plus 100 tâches dues et s’arrête après 20 secondes par
 réveil. Le claim de 60 secondes, son expiration et l’`idempotencyKey` sont
 persistés avant l’effet. Le routeur applique l'ordre du plan v3 : ID URL, règle exacte origine/route,
-artefact/aliases, fiche hydratée, D1 owner-scoped via Worker, recherche locale,
+artefact/aliases, fiche hydratée, cache D1 public vérifié, recherche locale,
 puis Review terminale seulement. AniList anime et MangaUpdates manga sont
 prioritaires; Kitsu suit seulement NO_MATCH complet. MangaDex reste exact/sorties.
 Type inconnu : deux lanes indépendantes, ambiguïté inter-types explicite.
@@ -521,7 +523,7 @@ central ne décide silencieusement entre deux analyses.
 | `I-01…I-07` | construction d’identité | oracle d’artefact |
 | `S-01…S-07` | saison | oracle d’artefact |
 | `R-01…R-14` | progression | oracle d’artefact |
-| `Q-01…Q-08` | outbox, scheduler et consentement | tests de suspension/concurrence |
+| `Q-01…Q-08` | outbox, scheduler et claims | tests de suspension/concurrence |
 | `B-01…B-05` | événements et inventaire | tests WebExtension |
 | `O-01…O-02` | corpus synthétique | gate d’équivalence |
 
@@ -570,7 +572,7 @@ Une tâche suit uniquement les transitions suivantes :
 `READY → CLAIMED → EFFECT_RECORDED → COMMITTED`
 
 Depuis `CLAIMED`, une erreur récupérable mène à `RETRY_AT`. Une erreur de
-contrat, un consentement absent ou huit tentatives automatiques mène à
+contrat ou huit tentatives automatiques mène à
 `BLOCKED`. Un claim expiré retourne à `READY` avec la même clé idempotente.
 
 - `READY` : entrée complète, aucun effet réservé;
@@ -651,7 +653,7 @@ nouveau claim après la tâche déjà en cours.
 L’action bornée remet au plus 100 tâches `BLOCKED/AUTOMATIC_ATTEMPT_LIMIT` à
 la tentative zéro, efface uniquement ce résultat automatique et conserve la
 source, l’artefact, l’œuvre et les décisions humaines. Elle ne déclenche pas un
-scan global et ne contourne pas le consentement.
+scan global et ne contourne pas les bornes de claim.
 
 ## Migration depuis Dexie v5
 
@@ -732,8 +734,8 @@ des champs de compatibilité exige une autre ADR après mesure de migration.
   Review;
 - les métriques par défaut sont locales : compte par état, durée par étape,
   profondeur de file, âge du plus vieux retry, motifs agrégés et migrations;
-- une contribution collective reste opt-in, révocable et séparée de la
-  résolution automatique conformément à l’ADR-0033.
+- une demande publique ne contient qu’une empreinte versionnée et, après
+  résolution, des identifiants fournisseur; seul OIDC peut publier `VERIFIED`.
 
 ## Ordre de livraison historique remplacé
 
@@ -857,8 +859,9 @@ ambigus persistés. La validité reste conditionnée au passage du gate racine
 ## Audit de l'installation vivante — 2026-09-11
 
 L'outbox de résolution est locale à IndexedDB. Le Worker ne possède pas de
-consumer ni de Cron pour les tâches privées; ses routes `/v2/favorites/*`
-concernent le collectif owner-scoped et la distribution des règles. Un réveil
+consumer ni de Cron pour les tâches privées; les anciennes routes
+`/v2/favorites/*` concernent le protocole owner-scoped remplacé par l’ADR-0046
+et ne font pas partie de l’architecture cible. Un réveil
 du background effectue l'inventaire puis une seule tranche de huit tâches, ce
 qui explique un compteur élevé de sources « en cours » après un import massif.
 Les curseurs d’inventaire et de présence, la tranche de résolution et l’alarme
@@ -934,12 +937,12 @@ normalisée aux références fournisseur publiques et reste compatible avec les
 listes v1. Sa restauration, son scan de publication et l’inventaire possèdent
 chacun une continuation durable jusqu’à `COMPLETE`; leurs résultats incomplets
 ne sont plus ignorés. Le resolver prépare ensuite, par lots dédupliqués de 50
-clés, l’association sync, le cache owner-scoped et le cache public D1, puis
-seulement les fournisseurs. Le Worker reçoit uniquement empreinte, type et
-versions. Son endpoint strict corrèle chaque résultat à la clé d'entrée et D1
-effectue une seule requête préparée fondée sur `json_each(?1)`, sans N+1. Un
-échec de ce cache public est mémorisé pour la tranche courante et laisse les
-lanes fournisseur avancer sans requête cache par œuvre.
+clés, l’association sync et le cache public D1, puis seulement les fournisseurs.
+Le Worker reçoit uniquement empreinte, type et versions pour le claim. Un seul
+client obtient un bail de recherche; les autres reçoivent `PENDING`. Après
+résolution locale, le client propose uniquement des identifiants publics. Le
+collecteur OIDC vérifie les profils et publie `VERIFIED`; un échec reste
+reprenable sans N+1 ni requête cache par œuvre.
 
 Le producteur de snapshot lit cent œuvres ou sources par page, persiste chaque
 curseur et consomme au plus seize pages dans un réveil. Il publie ainsi les
@@ -952,7 +955,7 @@ zones WebExtension natives avec le même contrat.
 
 Le scénario installé prouve la frontière de reconstruction : il attend un
 manifeste v2 validé, arrête le service worker, supprime `tobirink-private`, coupe
-le cache HTTP collectif et relance le runtime. Les 1 406 sources réapparaissent,
+le cache HTTP public et relance le runtime. Les 1 406 sources réapparaissent,
 l’identité AniList synchronisée est hydratée par ID exact et aucune recherche
 par titre de cette œuvre n’est émise. Le blob synchronisé ne contient que les
 références publiques, empreintes et versions autorisées.
@@ -960,8 +963,8 @@ références publiques, empreintes et versions autorisées.
 ### Sauvegarde privée locale
 
 `storage.sync` ne remplace pas une sauvegarde de l’historique. La page Options
-peut télécharger un fichier chiffré qui contient les huit agrégats privés et
-l’identité collective opaque. L’export v5 reste compatible en lecture avec les
+peut télécharger un fichier chiffré qui contient les huit agrégats privés.
+L’export v5 reste compatible en lecture avec les
 versions 1 à 4. AES-GCM protège tout le contenu et PBKDF2-SHA-256 à 310 000
 itérations enveloppe sa clé de données; ni la phrase secrète ni une valeur
 privée ne paraissent dans le JSON extérieur.
@@ -970,38 +973,38 @@ La restauration exige un fichier, la phrase et une confirmation explicite.
 Elle valide d’abord le ciphertext, le schéma et toutes les références. Une
 transaction Dexie remplace Works, bibliothèques, progression, agenda, rappels,
 Reviews, sources et organisation, puis laisse l’inventaire recréer les
-artefacts et tâches dérivés. L’écriture de l’identité collective utilise un
-journal `storage.local` et un reçu dans la transaction IndexedDB : après une
-suspension MV3, la présence du reçu termine la restauration et son absence
-remet l’identité précédente. Aucun fichier ou mot de passe n’est transmis au
-site, au Worker, à D1, à R2 ou aux fournisseurs.
+artefacts et tâches dérivés. Un reçu dans la transaction IndexedDB permet de
+reprendre après une suspension MV3. Les anciens champs Collectif restent
+lisibles pour compatibilité mais sont ignorés et jamais restaurés. Aucun fichier
+ou mot de passe n’est transmis au site, au Worker, à D1, à R2 ou aux
+fournisseurs.
 
-Après une première résolution, une contribution publique bornée rejoint une
-outbox locale indépendante du commit de l’œuvre. Le Worker réserve un job
-idempotent et écrit avec SQL préparé la fiche fournisseur publique, ses aliases,
-références et faits de tri. Un conflit de références pour une même empreinte
-reste explicite. D1 ne stocke jamais l’URL du favori, son dossier, sa progression,
-une décision humaine, un diagnostic ou un secret. La base publique ne représente
-pas la bibliothèque d’un propriétaire; elle évite de redemander une fiche déjà
-connue.
+Après un premier miss, une demande publique bornée rejoint une outbox locale
+indépendante du commit de l’œuvre. Le Worker réserve atomiquement la clé et
+retourne un bail court à un seul client. Après résolution locale, ce client
+propose uniquement des identifiants fournisseur. La proposition reste
+`PENDING` et n’alimente ni catalogue, ni titre, ni facette.
 
-Quand ce service est joignable, l’extension crée automatiquement une identité
-opaque d’installation dans `storage.local`. Elle authentifie les contributions
-publiques et les nonces sans placer le secret dans `storage.sync`. La fiche
-jointe peut contenir ses titres et facettes fournisseur publics; le titre brut,
-l’URL et le dossier du favori ne font jamais partie du batch.
+Le collecteur GitHub OIDC hydrate ces identifiants et recalcule les empreintes
+des titres officiels. Le Worker publie avec SQL préparé seulement les profils
+qui correspondent exactement, sous état `VERIFIED`. D1 ne stocke jamais le
+titre brut, l’URL du favori, son dossier, sa progression, une décision humaine,
+un owner, une identité d’installation, un diagnostic ou un secret.
+Le workflow de vérification est planifié chaque heure à la minute 23 et traite
+au plus 50 claims par exécution. Deux audiences OIDC distinctes protègent la
+lecture des propositions et leur promotion. La publication du workflow reste
+une opération externe séparément approuvée.
 
-Les références provenant du collectif suivent le même chemin d'hydratation
+Les références provenant du cache vérifié suivent le même chemin d'hydratation
 que les références explicites et les résultats locaux. Le secours HTTP 405
 MangaUpdates conserve l'ID exact, avance par pages avec checkpoint et ne
 transforme jamais une page incomplète en introuvable.
-Si le lookup collectif échoue, la recherche fournisseur peut avancer et
-conserver ses pages localement. Sa décision finale attend toutefois le retour
-du collectif : un choix personnel inaccessible ne doit pas être remplacé
-silencieusement. Une panne d'hydratation après un lookup réussi ne déclenche
-pas de nouvelle décision d'identité.
+Sur `PENDING`, la tâche attend une relecture D1 sans fournisseur. Le seul client
+qui possède le bail peut rechercher et conserver ses pages localement. Une
+panne d'hydratation après un lookup `VERIFIED` ne déclenche pas de nouvelle
+décision d'identité.
 
-Les erreurs internes et l'indisponibilité collective ont des motifs distincts
+Les erreurs internes et l'indisponibilité du cache public ont des motifs distincts
 des pannes fournisseurs. Une tâche valide conserve une reprise datée même
 après une erreur interne. L'échec d'inventaire reste signalé au réveil, mais
 la résolution des sources déjà importées est exécutée avant ce signalement.
@@ -1057,7 +1060,7 @@ Les liens MangaUpdates modernes fournis par MangaDex sont conservés comme
 références publiques validées et utilisés pour hydrater exactement la source
 principale. Les anciens IDs décimaux ne sont pas convertis en IDs API.
 Cette préférence s'applique aux sources explicites, aliases locaux, réponses
-collectives et recherches. Chaque checkpoint est lié au digest de sa requête;
+du snapshot synchronisé, du cache D1 vérifié et des recherches. Chaque checkpoint est lié au digest de sa requête;
 résolution et enrichissement disposent de tranches distinctes pour les cinq
 fournisseurs. Une panne primaire conserve la reprise datée.
 

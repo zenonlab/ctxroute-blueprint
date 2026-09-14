@@ -30,6 +30,7 @@ CREATE TABLE public_release_active_generation (
   revision TEXT NOT NULL REFERENCES public_release_generation(revision)
 ) STRICT;
 
+
 CREATE INDEX public_release_generation_event_cursor_idx
   ON public_release_generation_event (generation_revision, occurrence_value, id);
 

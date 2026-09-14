@@ -9,7 +9,7 @@ import { repairMissingFavoriteCovers, runFavoriteResolutionSlice } from './favor
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { FavoriteProviderRetryError } from './provider-ports';
 import type { FavoriteProviderSearchQuery } from './provider-ports';
-import type { FavoriteCollectiveKey } from '../collective-index/favorite-collective-lookup';
+import type { FavoriteIdentityKey } from './favorite-identity-lookup';
 import { bundledFavoriteSiteRules, createFavoriteSiteAdapters } from './site-rules';
 
 const now = '2026-09-07T12:00:00.000Z';
@@ -80,18 +80,64 @@ describe('runFavoriteResolutionSlice', () => {
     expect((await storage.listFavoriteSources({ limit: 1 }))[0]).toMatchObject({ resolution: { kind: 'RESOLVED' } });
   });
 
-  it('commits a D1 public cache hit before any provider search or hydration', async () => {
+  it('lets the D1 lease holder search once and propose only provider IDs', async () => {
     const { storage, outbox } = await fixture();
-    const search = vi.fn(async () => { throw new Error('provider search must not run'); });
-    const hydrate = vi.fn(async () => { throw new Error('provider hydration must not run'); });
+    const search = vi.fn(async () => createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'leased-search', provider: 'anilist', truncated: false }));
+    const hydrate = vi.fn(async () => candidate);
+    const propose = vi.fn(async () => undefined);
     const result = await runFavoriteResolutionSlice({
       candidates: candidatePorts({ search }), hydration: hydrationPorts({ hydrate }),
       libraryId: libraryId('library_primary'), now: () => now, outbox,
-      publicCache: { findFavoriteIdentity: async () => ({ mediaKind: 'ANIME', metadata: { preSerialization: false }, references: [{ provider: 'anilist', externalId: candidate.externalId }] }) }, storage, token: () => 'public-cache',
+      publicDiscovery: { maintain: async () => undefined, propose, resolveOrClaim: async () => ({ expiresAt: '2026-09-07T12:15:00.000Z', state: 'LEASED' }) },
+      storage, token: () => 'public-cache',
     });
     expect(result).toMatchObject({ completed: 1, retried: 0 });
-    expect(search).not.toHaveBeenCalled(); expect(hydrate).not.toHaveBeenCalled();
+    expect(search).toHaveBeenCalledOnce(); expect(hydrate).toHaveBeenCalledOnce();
+    expect(propose).toHaveBeenCalledWith(expect.objectContaining({ fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u) }), [{ provider: 'anilist', externalId: candidate.externalId }]);
     expect((await storage.listFavoriteSources({ limit: 10 }))[0]).toMatchObject({ resolution: { kind: 'RESOLVED' }, matchedWorkId: favoriteCandidateWorkId(candidate) });
+  });
+
+  it('Q-08 waits for a pending public discovery without searching or exhausting attempts', async () => {
+    const { storage, outbox, task } = await fixture();
+    await storage.putFavoriteResolutionTask({ ...task, attempt: 7 });
+    const search = vi.fn(async () => { throw new Error('provider search must not run'); });
+    const result = await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search }), hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, outbox,
+      publicDiscovery: {
+        maintain: async () => undefined,
+        propose: async () => undefined,
+        resolveOrClaim: async () => ({ retryAt: '2026-09-07T12:05:00.000Z', state: 'PENDING' }),
+      },
+      storage, token: () => 'public-pending',
+    });
+    expect(result).toMatchObject({ blocked: 0, completed: 0, retried: 1 });
+    expect(search).not.toHaveBeenCalled();
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ attempt: 0, availableAt: '2026-09-07T12:05:00.000Z', state: 'RETRY_AT' });
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'PUBLIC_DISCOVERY_PENDING' });
+  });
+
+  it('uses a verified D1 identity without repeating title search', async () => {
+    const { storage, outbox } = await fixture();
+    const search = vi.fn(async () => { throw new Error('provider search must not run'); });
+    const hydrate = vi.fn(async () => candidate);
+    const result = await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search }), hydration: hydrationPorts({ hydrate }),
+      libraryId: libraryId('library_primary'), now: () => now, outbox,
+      publicDiscovery: {
+        maintain: async () => undefined,
+        propose: async () => undefined,
+        resolveOrClaim: async () => ({ profile: {
+          mediaKind: 'anime', officialTitles: [{ locale: 'en', title: 'Frieren' }], preferredTitle: 'Frieren',
+          references: [{ externalId: candidate.externalId, provider: 'anilist' }], workId: 'work_anilist_154587',
+        }, state: 'VERIFIED', verifiedAt: now }),
+      },
+      storage, token: () => 'public-verified',
+    });
+    expect(result).toMatchObject({ completed: 1, retried: 0 });
+    expect(search).not.toHaveBeenCalled();
+    expect(hydrate).toHaveBeenCalledOnce();
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]).toMatchObject({ resolution: { kind: 'RESOLVED' } });
   });
 
   it.each(['none', 'mangadex', 'mangaupdates'])('hydrates the linked primary ID and preserves existing work identity: %s', async (cachedProvider) => {
@@ -124,7 +170,7 @@ describe('runFavoriteResolutionSlice', () => {
     const pages: (string | undefined)[] = [];
     let clock = now;
     const dependencies = {
-      collective: { lookup: async (keys: readonly FavoriteCollectiveKey[]) => keys.map(key => ({ fingerprint: key.fingerprint, kind: 'FOUND' as const, mediaKind: 'MANGA' as const, references: [{ provider: manga.provider, externalId: manga.externalId }], scope: 'owner' as const })) },
+      synchronized: { lookup: async (keys: readonly FavoriteIdentityKey[]) => keys.map(key => ({ fingerprint: key.fingerprint, kind: 'FOUND' as const, mediaKind: 'MANGA' as const, references: [{ provider: manga.provider, externalId: manga.externalId }] })) },
       candidates: { ...candidatePorts(unusedSearch), mangaupdates: { search: async (query: FavoriteProviderSearchQuery) => {
         pages.push(query.cursor);
         return createProviderCandidateEnvelope(query.cursor === undefined
@@ -142,23 +188,17 @@ describe('runFavoriteResolutionSlice', () => {
     expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
   });
 
-  it('commits provider evidence while the optional collective is unavailable', async () => {
+  it('commits provider evidence so a later pass never repeats the search', async () => {
     const { outbox, storage } = await fixture();
     let clock = now;
-    let offline = true;
     let searches = 0;
     const dependencies = {
-      collective: { lookup: async (keys: readonly FavoriteCollectiveKey[]) => {
-        if (offline) throw new Error('D1 unavailable');
-        return keys.map(key => ({ fingerprint: key.fingerprint, kind: 'MISS' as const }));
-      } },
       candidates: candidatePorts({ search: async () => { searches += 1; return createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'saved-evidence', provider: 'anilist', truncated: false }); } }),
       hydration: hydrationPorts({ hydrate: async () => candidate }), libraryId: libraryId('library_primary'), now: () => clock, outbox, storage, token: () => 'd1-outage',
     };
     await runFavoriteResolutionSlice(dependencies);
     expect(searches).toBe(1);
     expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toHaveLength(1);
-    offline = false;
     clock = '2026-09-07T12:16:00.000Z';
     await runFavoriteResolutionSlice(dependencies);
     expect(searches).toBe(1);
@@ -172,12 +212,12 @@ describe('runFavoriteResolutionSlice', () => {
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'BLOCKED', blockedReason: 'AUTOMATIC_ATTEMPT_LIMIT' });
     expect(await storage.readFavoriteResolutionCounts()).toMatchObject({ blocked: 1, observed: 1, processing: 0, retryable: 0, unsupported: 0 });
   });
-  it('uses the owner-scoped lookup before title search and preserves its public references', async () => {
+  it('uses the private synchronized lookup before title search and preserves its public references', async () => {
     const { outbox, storage } = await fixture();
     let searches = 0;
     const references = [{ provider: 'kitsu-anime' as const, externalId: '46474' }, { provider: 'anilist' as const, externalId: candidate.externalId }];
     await runFavoriteResolutionSlice({
-      collective: { lookup: async (keys) => keys.map((key) => ({ fingerprint: key.fingerprint, kind: 'FOUND', mediaKind: 'ANIME', references, scope: 'owner' })) },
+      synchronized: { lookup: async (keys) => keys.map((key) => ({ fingerprint: key.fingerprint, kind: 'FOUND', mediaKind: 'ANIME', references })) },
       candidates: candidatePorts({ search: async () => { searches += 1; throw new Error('unexpected search'); } }),
       hydration: hydrationPorts({ hydrate: async () => candidate }), libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'owner-token',
     });
@@ -187,16 +227,16 @@ describe('runFavoriteResolutionSlice', () => {
     expect(source?.matchedWorkId && await storage.getWork(source.matchedWorkId)).toMatchObject({ externalReferences: references });
     expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
   });
-  it('reconstructs an owner ambiguity into the private Review set before title search', async () => {
+  it('reconstructs synchronized ambiguity into the private Review set before title search', async () => {
     const { outbox, storage } = await fixture();
     const first = { ...candidate, canonicalUrl: 'https://anilist.co/anime/154587', cover: { attribution: 'AniList', url: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/154587.jpg' } };
     const second = { ...candidate, canonicalUrl: 'https://kitsu.app/anime/46474', externalId: '46474', provider: 'kitsu-anime' as const };
     const search = vi.fn(async () => { throw new Error('unexpected search'); });
     await runFavoriteResolutionSlice({
-      collective: { lookup: async (keys) => keys.map((key) => ({ fingerprint: key.fingerprint, identities: [
+      synchronized: { lookup: async (keys) => keys.map((key) => ({ fingerprint: key.fingerprint, identities: [
         { mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: first.externalId }] },
         { mediaKind: 'ANIME' as const, references: [{ provider: 'kitsu-anime' as const, externalId: second.externalId }] },
-      ], kind: 'AMBIGUOUS' as const, scope: 'owner' as const })) },
+      ], kind: 'AMBIGUOUS' as const })) },
       candidates: candidatePorts({ search }),
       hydration: hydrationPorts({ hydrate: async () => first }, { hydrate: async () => second }),
       libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'owner-ambiguity',
@@ -204,7 +244,7 @@ describe('runFavoriteResolutionSlice', () => {
     expect(search).not.toHaveBeenCalled();
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source).toMatchObject({ resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' } });
-    expect(source?.reviewId && await storage.getFavoriteReviewCandidateSet(source.reviewId)).toMatchObject({ candidates: [{ externalId: first.externalId }, { externalId: second.externalId }], provenance: 'owner-collective' });
+    expect(source?.reviewId && await storage.getFavoriteReviewCandidateSet(source.reviewId)).toMatchObject({ candidates: [{ externalId: first.externalId }, { externalId: second.externalId }], provenance: 'synchronized-identities' });
   });
   it('schedules provider Retry-After without asking the fallback provider', async () => {
     const { outbox, storage, task } = await fixture();

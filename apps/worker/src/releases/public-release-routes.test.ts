@@ -46,6 +46,42 @@ function releaseBindings(snapshot: SnapshotFixture = validSnapshot()) {
 }
 
 describe('public release routes', () => {
+  it('requires the exact GitHub identity before accepting an Agenda generation', async () => {
+    const fixture = releaseBindings();
+    const response = await createPublicReleaseApp(fixture.services).request('https://api.example/v2/releases/generations', { method: 'POST' });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'agenda-ingestion-unauthorized' });
+  });
+
+  it('validates and forwards one bounded authenticated Agenda generation', async () => {
+    const fixture = releaseBindings();
+    const generatedAt = new Date().toISOString();
+    const date = generatedAt.slice(0, 10);
+    const received: unknown[] = [];
+    const audiences: string[] = [];
+    const app = createPublicReleaseApp({ ...fixture.services, releaseCalendar: {
+      async ingest(input) { received.push(input); return { accepted: true, count: input.events.length, replayed: false, revision: `calendar-${'a'.repeat(48)}` }; },
+      async query() { return { entries: [], generatedAt, revision }; },
+    } }, async (_token, audience) => { audiences.push(audience); });
+    const payload = {
+      events: [{ expiresAt: new Date(Date.now() + 30 * 86_400_000).toISOString(), id: 'anilist-episode-42-1', occurrence: { kind: 'INSTANT', value: generatedAt }, provenance: { fetchedAt: generatedAt, parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist', providerWorkId: '42', releaseKind: 'episode', sequence: '1', state: 'SCHEDULED' }],
+      generatedAt, nonce: crypto.randomUUID(), schemaVersion: 1, window: { from: date, to: date },
+    };
+    const response = await app.request('https://api.example/v2/releases/generations', { body: JSON.stringify(payload), headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST' });
+    expect(response.status).toBe(201);
+    expect(audiences).toEqual(['https://api.example/v2/releases/generations']);
+    expect(received).toHaveLength(1);
+    expect(await response.json()).toMatchObject({ accepted: true, count: 1, replayed: false });
+  });
+
+  it('rejects private or unknown ingestion fields after authentication', async () => {
+    const fixture = releaseBindings();
+    const app = createPublicReleaseApp(fixture.services, async () => undefined);
+    const response = await app.request('https://api.example/v2/releases/generations', { body: JSON.stringify({ events: [], generatedAt: new Date().toISOString(), nonce: crypto.randomUUID(), schemaVersion: 1, userId: 'private', window: { from: '2026-09-14', to: '2026-09-14' } }), headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST' });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid-agenda-generation' });
+  });
+
   it('returns the same public snapshot regardless of caller headers', async () => {
     const fixture = releaseBindings();
     const app = createPublicReleaseApp(fixture.services);
@@ -92,7 +128,6 @@ describe('public release routes', () => {
     const entries = [release('release_1', '2026-09-05T18:00:00.000Z'), release('release_2', '2026-09-06T18:00:00.000Z')];
     const app = createPublicReleaseApp({ ...fixture.services, releaseCalendar: {
       async query(input) { const start = input.cursor ? 1 : 0; const page = entries.slice(start, start + 1); return start === 0 ? { entries: page, generatedAt: '2026-09-05T08:00:00.000Z', nextCursor: '2026-09-05T18:00:00.000Z|release_1', revision } : { entries: page, generatedAt: '2026-09-05T08:00:00.000Z', revision }; },
-      async sync() { return { count: 0, failures: [] }; },
     } });
     const first = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1');
     // SAFETY: the route contract returns a JSON object with an optional cursor.

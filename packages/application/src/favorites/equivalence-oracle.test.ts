@@ -32,10 +32,10 @@ function fixture(overrides: Partial<FavoriteEquivalenceFixture> = {}): FavoriteE
 }
 
 describe('favorite equivalence corpus', () => {
-  it('contains the exact audited 82 / 77 / 4 / 1 contract', () => {
-    expect(auditFavoriteEquivalenceCorpus()).toEqual({ conserved: 77, corrected: 4, future: 1, total: 82 });
+  it('contains the exact audited 82 / 76 / 5 / 1 contract', () => {
+    expect(auditFavoriteEquivalenceCorpus()).toEqual({ conserved: 76, corrected: 5, future: 1, total: 82 });
     expect(new Set(favoriteEquivalenceCorpus.map((item) => item.id)).size).toBe(82);
-    expect(favoriteEquivalenceCorpus.filter((item) => item.disposition === 'CORRIGER').map((item) => item.id)).toEqual(['U-02', 'U-10', 'B-03', 'O-02']);
+    expect(favoriteEquivalenceCorpus.filter((item) => item.disposition === 'CORRIGER').map((item) => item.id)).toEqual(['U-02', 'U-10', 'Q-08', 'B-03', 'O-02']);
     expect(favoriteEquivalenceCorpus.find((item) => item.id === 'X-01')?.disposition).toBe('FUTUR');
   });
 

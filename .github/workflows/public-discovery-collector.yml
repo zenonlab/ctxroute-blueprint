@@ -1,0 +1,55 @@
+name: Verify public discovery claims
+
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: public-discovery-verification
+  cancel-in-progress: false
+
+jobs:
+  verify-and-promote:
+    name: Verify pending provider identities
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Bundle the typed verifier
+        run: node_modules/.bin/esbuild scripts/public-discovery/collect-and-promote.ts --bundle --format=esm --platform=node --outfile=/tmp/tobirink-public-discovery.mjs
+
+      - name: Request the read-scoped OIDC token
+        id: read-oidc
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          result-encoding: string
+          script: return await core.getIDToken('https://tobirink.com/v2/catalogue/discoveries/pending')
+
+      - name: Request the write-scoped OIDC token
+        id: write-oidc
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          result-encoding: string
+          script: return await core.getIDToken('https://tobirink.com/v2/catalogue/discoveries/promotions')
+
+      - name: Verify and promote pending claims
+        env:
+          DISCOVERY_READ_OIDC_TOKEN: ${{ steps.read-oidc.outputs.result }}
+          DISCOVERY_WRITE_OIDC_TOKEN: ${{ steps.write-oidc.outputs.result }}
+        run: node /tmp/tobirink-public-discovery.mjs

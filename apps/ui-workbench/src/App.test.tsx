@@ -12,7 +12,7 @@ describe('UI workbench', () => {
   it('navigates the complete plan and renders the matching preview', () => {
     render(<App />);
 
-    expect(screen.getByLabelText('27 éléments')).toBeTruthy();
+    expect(screen.getByLabelText('26 éléments')).toBeTruthy();
     fireEvent.change(catalogueSearch(), { target: { value: 'Review' } });
     fireEvent.click(screen.getByRole('button', { name: 'Panneau Review' }));
 

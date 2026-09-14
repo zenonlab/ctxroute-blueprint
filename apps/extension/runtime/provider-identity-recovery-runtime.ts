@@ -1,11 +1,11 @@
 import { finishProviderIdentityScan, readProviderIdentitySnapshots, restoreProviderIdentities, scanHydratedProviderIds } from '@tobirink/application';
-import type { FavoriteCollectiveKey, FavoriteCollectiveLookupResult, ProviderIdentityRecoveryDependencies, ProviderIdentityRestoreResult, ProviderIdentitySyncPort, ProviderIdentitySyncPublisher, ProviderIdentitySyncResult, SyncedProviderAssociation } from '@tobirink/application';
+import type { FavoriteIdentityKey, FavoriteIdentityLookupResult, ProviderIdentityRecoveryDependencies, ProviderIdentityRestoreResult, ProviderIdentitySyncPort, ProviderIdentitySyncPublisher, ProviderIdentitySyncResult, SyncedProviderAssociation } from '@tobirink/application';
 import { workId } from '@tobirink/domain';
 import type { WorkId } from '@tobirink/domain';
 
 export interface ProviderIdentityRecoveryRuntime {
   coverRepairAfterId?(): Promise<WorkId | undefined>;
-  lookup(keys: readonly FavoriteCollectiveKey[]): Promise<readonly FavoriteCollectiveLookupResult[]>;
+  lookup(keys: readonly FavoriteIdentityKey[]): Promise<readonly FavoriteIdentityLookupResult[]>;
   prepare(): Promise<ProviderIdentityRestoreResult>;
   publish(): Promise<ProviderIdentitySyncResult | { readonly kind: 'SCANNING' }>;
   saveCoverRepairAfterId?(afterId: WorkId | undefined): Promise<void>;
@@ -26,7 +26,7 @@ export function createProviderIdentityRecoveryRuntime(dependencies: ProviderIden
           && (key.mediaKind === 'UNKNOWN' || item.mediaKind === key.mediaKind));
         return association === undefined
           ? { fingerprint: key.fingerprint, kind: 'MISS' as const }
-          : { fingerprint: key.fingerprint, kind: 'FOUND' as const, mediaKind: association.mediaKind, references: association.references, scope: 'owner' as const };
+          : { fingerprint: key.fingerprint, kind: 'FOUND' as const, mediaKind: association.mediaKind, references: association.references };
       });
     },
     async prepare() {

@@ -18,7 +18,10 @@ revised: true
 
 ## Contexte
 
-Le snapshot R2 v1 et la route D1 v2 existent, mais D1 reste vide en production.
+Le snapshot R2 v1 et la route D1 v2 existent, mais les dernières lectures
+publiques observées ne montrent aucune génération Agenda active (`d1-empty`).
+Cela ne constitue pas un comptage de toute la base D1, notamment du cache
+`favorite_public_cache`, distinct du catalogue exposé par `/v1/catalogue`.
 Le 13 septembre 2026, AniList a répondu normalement depuis la machine et
 l'extension, tandis que le cron Cloudflare a reçu HTTP 403 avec le message
 `You have been manually blocked`. Espacer davantage le cron ne change pas
@@ -32,14 +35,21 @@ utiles, mais sa formule de terminaison MangaUpdates ne constitue pas un oracle.
 
 ## Décision
 
-La collecte partagée est séparée du Worker HTTP. Un collecteur planifié dont
-l'egress AniList a été vérifié lit deux lanes indépendantes : AniList pour les
+La collecte partagée est séparée du Worker HTTP. Un workflow GitHub Actions
+planifié chaque lundi à 03:17 UTC lit deux lanes indépendantes : AniList pour les
 sorties anime officielles et MangaUpdates pour les sorties manga, manhwa et
-manhua confirmées. Il transmet au Worker des lots signés, bornés, versionnés et
-sans donnée personnelle. Le Worker valide nonce, digest, fenêtre et schéma,
-puis reste l'unique auteur D1. Le fournisseur d'exécution du collecteur n'est
-pas choisi avant un smoke test répété de son egress et une approbation
-opérationnelle distincte.
+manhua confirmées. Il transmet au Worker une génération complète, bornée,
+versionnée et sans donnée personnelle. Un jeton GitHub OIDC court authentifie
+l'émetteur sans secret partagé. Le Worker vérifie signature RS256 auprès du
+JWKS GitHub, issuer, audience, dépôt, branche et identité exacte du workflow,
+valide nonce, digest, fenêtre et schéma, puis reste l'unique auteur D1.
+
+Le cron Cloudflare et la collecte déclenchée par `GET /v2/releases` sont
+supprimés : une lecture publique ne provoque jamais une requête fournisseur.
+Le workflow respecte les cadences et traite tout `403`, `429`, timeout ou lot
+incomplet comme un échec total. Son activation et la première collecte réelle
+restent des opérations publiées et vérifiées séparément; aucun succès n'est
+déduit des fixtures locales.
 
 L'extension possède un repli direct. Quand le calendrier D1 est absent, périmé
 ou incomplet, elle collecte les mêmes fenêtres publiques page par page depuis
@@ -51,14 +61,14 @@ Kitsu reste un repli de résolution et ne produit aucune date Agenda. MangaDex
 conserve son rôle d'identité exacte et de sorties spécialisées sans devenir
 l'autorité générale du calendrier.
 
-D1 reçoit uniquement des événements publics bornés : fournisseur canonique en
-minuscules, identifiant public de l'œuvre, type et numéro textuel de sortie,
+D1 Agenda reçoit uniquement les événements publics bornés : fournisseur
+canonique en minuscules, identifiant public de l'œuvre, type et numéro textuel de sortie,
 occurrence `DATE` ou `INSTANT`, état, provenance, versions et expiration. Une
 migration additive conserve les tables v1. Les écritures sont préparées,
 batchées et idempotentes. Un `403`, `429`, timeout ou résultat incomplet est un
-échec technique et conserve la dernière génération valide. Les titres, URLs,
-favoris, progressions, dossiers, owners, installations, secrets et payloads
-fournisseurs restent exclus.
+échec technique et conserve la dernière génération valide. Les titres, URLs
+de favoris, favoris, progressions, dossiers, owners,
+installations, secrets et payloads fournisseurs restent exclus.
 
 AniList suit `pageInfo.hasNextPage`, au plus 50 éléments par page et une cadence
 minimale de 2,2 secondes. MangaUpdates utilise `page`, `per_page` et
@@ -91,10 +101,11 @@ n'est inventée pour MangaUpdates.
 ## Conséquences
 
 Le calendrier reste mutualisable sans rendre l'utilisateur dépendant de
-l'egress Cloudflare. Le site et WebBridge ne voient toujours qu'une projection
+l'egress Cloudflare. Une collecte hebdomadaire alimente toutes les lectures;
+une recherche utilisateur ne relance pas les fournisseurs Agenda. Le site et WebBridge ne voient toujours qu'une projection
 locale. Les résultats publics restent disponibles hors ligne et les pannes
 fournisseur ne réinitialisent pas le calendrier validé. Le repli direct augmente
 le trafic fournisseur seulement lorsque le cache partagé ne peut pas servir une
-génération complète. Une migration D1 de production, un nouveau collecteur, un
-secret d'ingestion, un cron ou une publication restent derrière la gate
-opérationnelle.
+génération complète. La publication du Worker et du workflow reste derrière
+les gates opérationnelles correspondantes. Aucun secret d'ingestion ou `.env`
+Agenda n'est créé.

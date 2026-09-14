@@ -30,8 +30,9 @@
   tasks. Hydrated works may retain only structured catalogue facts needed for
   local library filters, sorting and statistics: provider provenance, media
   type, format, genres, editorial status, years, unit totals and typed
-  popularity. D1 adds a minimal owner-scoped key/public-ID index through the Worker
-  alongside the existing separate public catalogue. R2 stores rights-approved cover masters. Export/import is
+  popularity. D1 adds a minimal verified key/public-ID discovery cache through
+  the Worker alongside the existing separate public catalogue. It contains no
+  owner, installation identity or private decision. R2 stores rights-approved cover masters. Export/import is
   always available; encrypted cloud recovery is opt-in.
 - Integrations: WebExtension active-tab context, bookmarks, alarms,
   notifications, storage and messaging APIs; browser sync for a bounded
@@ -54,7 +55,8 @@
   is below 1.5 MB compressed; public API p95 target is below 300 ms excluding
   third-party calls.
 - Security: least-privilege manifest permissions, strict CSP, no remotely hosted
-  extension code, validated messages and API payloads, opaque installation secrets only in trusted extension storage.local, and no sensitive values in logs.
+  extension code, validated messages and API payloads, no product owner secret,
+  and no sensitive values in logs.
 - Reliability: local features work offline; migrations are atomic and tested;
   export/import is the v1 recovery path; cloud failures degrade only optional
   public features.
@@ -92,8 +94,9 @@ not become runtime dependencies of Tobirink.
 - Storage: Dexie-backed IndexedDB behind `StoragePort`; `storage.local` only for
   bootstrap, technical preferences and a five-entry, thirty-day, non-authoritative
   popup continuation cache; `storage.sync` only for a bounded
-  provider-ID snapshot; D1 for separate catalogue rows and consented
-  normalized-key/owner/public-ID associations; R2 for image objects and encrypted backup blobs.
+  provider-ID snapshot; D1 for separate catalogue rows and a
+  `MISS/PENDING/VERIFIED` discovery cache promoted only through GitHub OIDC;
+  R2 for image objects and encrypted backup blobs.
   Domain code cannot import any provider.
 - Library analytics: seven stable multi-select facets (genre, editorial status,
   detailed type, format, year, personal progress and provider) and six sorts
@@ -139,9 +142,11 @@ questions, trade-offs, and research anchors used to make these decisions.
   extension views without contacting a remote service.
 - Browser and provider code cannot cross the declared import boundaries; all
   external payloads and extension messages are validated.
-- A collective contribution is opt-in and contains only a normalized-key fingerprint, media type, public identifiers,
-  versions, a nonce and owner authentication; it never contains a title, URL, library or
-  progress value and can be revoked locally with its dedicated secret.
+- Une résolution consulte D1 avant toute recherche textuelle. Un seul client
+  obtient un bail; sa proposition contient uniquement empreinte versionnée et
+  identifiants publics, puis seul le collecteur GitHub OIDC peut publier
+  `VERIFIED`. Aucun consentement produit, owner, appairage, titre brut, URL,
+  bibliothèque ou progression n’entre dans ce protocole.
 - Storage migration, export, import, cache reconstruction, encrypted recovery,
   extension rollback, and optional Worker rollback have executable verification
   before a release.

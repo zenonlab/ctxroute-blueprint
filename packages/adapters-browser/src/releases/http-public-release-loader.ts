@@ -11,10 +11,11 @@ async function parsePage(response: Response): Promise<z.output<typeof pageSchema
   try { return pageSchema.parse(JSON.parse(text)); } catch { throw new Error('public-release-response-invalid'); }
 }
 export class HttpPublicReleaseLoader {
-  constructor(private readonly origin: string, private readonly fetcher: PublicReleaseFetch = fetch, private readonly clock: () => number = Date.now) {}
+  constructor(private readonly origin: string, private readonly fetcher: PublicReleaseFetch = fetch.bind(globalThis), private readonly clock: () => number = Date.now) {}
   async load(cache: PublicReleaseGenerationCachePort, window: { from: string; to: string }): Promise<{ snapshot: PublicReleaseGeneration; source: 'network' | 'cache' }> {
     const cached = await cache.load();
-    if (cached?.source === 'shared' && cached.window.from === window.from && cached.window.to === window.to && this.clock() - Date.parse(cached.generatedAt) < 86_400_000) return { snapshot: publicReleaseGenerationSchema.parse(cached), source: 'cache' };
+    const matchingCache = cached?.source === 'shared' && cached.revision !== 'd1-empty' && cached.window.from === window.from && cached.window.to === window.to ? cached : undefined;
+    if (matchingCache && this.clock() - Date.parse(matchingCache.generatedAt) >= 0 && this.clock() - Date.parse(matchingCache.generatedAt) < 86_400_000) return { snapshot: publicReleaseGenerationSchema.parse(matchingCache), source: 'cache' };
     const events = new Map<string, PublicReleaseGeneration['events'][number]>();
     let cursor: string | undefined;
     let etag: string | undefined;
@@ -24,9 +25,12 @@ export class HttpPublicReleaseLoader {
       const url = new URL('/v2/releases', this.origin);
       url.searchParams.set('from', window.from); url.searchParams.set('to', window.to); url.searchParams.set('limit', '100');
       if (cursor) url.searchParams.set('cursor', cursor);
-      const headers = pageNumber === 1 && cached?.etag ? { 'If-None-Match': cached.etag } : undefined;
+      const headers = pageNumber === 1 && matchingCache ? { 'If-None-Match': matchingCache.etag } : undefined;
       const response = await this.fetcher(url, headers ? { headers } : undefined);
-      if (response.status === 304 && pageNumber === 1 && cached) return { snapshot: publicReleaseGenerationSchema.parse(cached), source: 'cache' };
+      if (response.status === 304) {
+        if (pageNumber !== 1 || !matchingCache) throw new Error('public-release-unexpected-304');
+        return { snapshot: publicReleaseGenerationSchema.parse(matchingCache), source: 'cache' };
+      }
       if (!response.ok) throw new Error(`public-release-http-${response.status}`);
       const responseEtag = response.headers.get('etag');
       if (!responseEtag || (etag !== undefined && responseEtag !== etag)) throw new Error('public-release-etag-mismatch');
@@ -36,7 +40,7 @@ export class HttpPublicReleaseLoader {
       revision = body.revision; generatedAt = body.generatedAt;
       for (const event of body.entries) { if (events.has(event.id)) throw new Error('public-release-duplicate-event'); events.set(event.id, event); }
       if (!body.nextCursor) {
-        if (events.size === 0) throw new Error('public-release-generation-empty');
+        if (revision === 'd1-empty') throw new Error('public-release-generation-empty');
         const snapshot = publicReleaseGenerationSchema.parse({ etag, events: [...events.values()], generatedAt, revision, source: 'shared', window });
         await cache.save(snapshot);
         return { snapshot, source: 'network' };

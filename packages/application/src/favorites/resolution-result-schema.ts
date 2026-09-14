@@ -6,7 +6,7 @@ export const favoriteResolutionResultSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('RESOLVED') }),
   z.strictObject({ kind: z.literal('REVIEW_REQUIRED'), reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']) }),
   z.strictObject({ kind: z.literal('UNSUPPORTED'), reason: z.enum(['IDENTITY_MISSING', 'DETACHED', 'BLOCKED_CONTENT_TAXONOMY']) }),
-  z.strictObject({ kind: z.literal('RETRYABLE'), reason: z.enum(['PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'COLLECTIVE_UNAVAILABLE']) }),
+  z.strictObject({ kind: z.literal('RETRYABLE'), reason: z.enum(['PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'PUBLIC_DISCOVERY_PENDING']) }),
 ]);
 
 export const favoriteResolutionVersionsSchema = z.strictObject({

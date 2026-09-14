@@ -1,10 +1,10 @@
-interface CollectiveTestMigration {
+interface TestMigration {
   name: string;
   queries: string[];
 }
 
 declare namespace Cloudflare {
   interface Env {
-    TEST_MIGRATIONS: CollectiveTestMigration[];
+    TEST_MIGRATIONS: TestMigration[];
   }
 }

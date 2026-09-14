@@ -51,12 +51,12 @@ const definitions: readonly (readonly [id: string, expectedBehavior: string])[] 
   ['R-09', 'adjacent-number-with-alias'], ['R-10', 'intrinsic-title-number'], ['R-11', 'extra-number-after-numeric-identity'], ['R-12', 'ordinal-remains-identity'],
   ['R-13', 'season-number-not-release'], ['R-14', 'season-conflict-keeps-local-release'],
   ['Q-01', 'idempotent-enqueue'], ['Q-02', 'new-fingerprint-new-task'], ['Q-03', 'concurrent-enqueue-converges'], ['Q-04', 'resume-every-checkpoint'],
-  ['Q-05', 'expired-claim-same-idempotency'], ['Q-06', 'persist-provider-retry-date'], ['Q-07', 'hydrate-by-exact-id'], ['Q-08', 'consent-removal-blocks'],
+  ['Q-05', 'expired-claim-same-idempotency'], ['Q-06', 'persist-provider-retry-date'], ['Q-07', 'hydrate-by-exact-id'], ['Q-08', 'pending-public-claim-skips-provider'],
   ['B-01', 'sliced-install-inventory'], ['B-02', 'idempotent-bookmark-events'], ['B-03', 'bookmark-delete-preserves-work'], ['B-04', 'empty-inventory-success'],
   ['B-05', 'scan-failure-preserves-projection'], ['O-01', 'deep-synthetic-oracle'], ['O-02', 'reject-private-corpus'],
 ];
 
-const correctionIds = new Set(['U-02', 'U-10', 'B-03', 'O-02']);
+const correctionIds = new Set(['U-02', 'U-10', 'Q-08', 'B-03', 'O-02']);
 const canonicalIds = new Set(definitions.map(([id]) => id));
 
 function dispositionFor(id: string): FavoriteEquivalenceDisposition {
@@ -95,6 +95,6 @@ export function auditFavoriteEquivalenceCorpus(corpus: readonly FavoriteEquivale
     future: corpus.filter((item) => item.disposition === 'FUTUR').length,
     total: corpus.length,
   });
-  if (audit.total !== 82 || audit.conserved !== 77 || audit.corrected !== 4 || audit.future !== 1) throw new Error('Favorite equivalence corpus must remain 82 / 77 / 4 / 1.');
+  if (audit.total !== 82 || audit.conserved !== 76 || audit.corrected !== 5 || audit.future !== 1) throw new Error('Favorite equivalence corpus must remain 82 / 76 / 5 / 1.');
   return audit;
 }

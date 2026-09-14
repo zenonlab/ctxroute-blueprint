@@ -6,7 +6,7 @@ export type FavoriteResolutionResult =
   | { readonly kind: 'RESOLVED' }
   | { readonly kind: 'REVIEW_REQUIRED'; readonly reason: 'AMBIGUOUS' | 'NOT_FOUND' }
   | { readonly kind: 'UNSUPPORTED'; readonly reason: 'IDENTITY_MISSING' | 'DETACHED' | 'BLOCKED_CONTENT_TAXONOMY' }
-  | { readonly kind: 'RETRYABLE'; readonly reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' | 'AUTOMATIC_ATTEMPT_LIMIT' | 'INTERNAL_FAILURE' | 'COLLECTIVE_UNAVAILABLE' };
+  | { readonly kind: 'RETRYABLE'; readonly reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' | 'AUTOMATIC_ATTEMPT_LIMIT' | 'INTERNAL_FAILURE' | 'PUBLIC_DISCOVERY_PENDING' };
 
 export interface FavoriteResolutionVersions {
   readonly schema: 1;
@@ -46,7 +46,7 @@ function validateResolution(result: FavoriteResolutionResult): void {
     : Object.keys(result).length === 2 && (
       result.kind === 'REVIEW_REQUIRED' && ['AMBIGUOUS', 'NOT_FOUND'].includes(result.reason)
       || result.kind === 'UNSUPPORTED' && ['IDENTITY_MISSING', 'DETACHED', 'BLOCKED_CONTENT_TAXONOMY'].includes(result.reason)
-      || result.kind === 'RETRYABLE' && ['PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'COLLECTIVE_UNAVAILABLE'].includes(result.reason)
+      || result.kind === 'RETRYABLE' && ['PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'PUBLIC_DISCOVERY_PENDING'].includes(result.reason)
     );
   invariant(allowed, 'invalid-favorite-resolution', 'Favorite resolution must have a supported kind and reason.');
 }

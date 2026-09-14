@@ -15,8 +15,6 @@ import { useLocalAgenda } from './use-local-agenda';
 import { useLocalOrganizerSettings } from './use-local-organizer-settings';
 import { useLocalReviewNavigation } from './use-local-review-navigation';
 import { useQuickPreferences } from './use-quick-preferences';
-import { CollectiveSettings } from '../entrypoints/options/CollectiveSettings';
-import { useFavoriteOwner } from './use-favorite-owner';
 import { ResolutionStatus } from '../entrypoints/options/ResolutionStatus';
 import { useResolutionStatus } from './use-resolution-status';
 import { PrivateRecovery } from '../entrypoints/options/PrivateRecovery';
@@ -140,10 +138,9 @@ function AgendaSurface() {
 
 function OptionsSurface() {
   const settings = useLocalOrganizerSettings();
-  const owner = useFavoriteOwner();
   const resolution = useResolutionStatus();
   const recovery = usePrivateRecovery();
-  return <><Settings {...settings} /><ResolutionStatus {...resolution} /><PrivateRecovery onExport={(passphrase) => { void recovery.exportBackup(passphrase); }} onRestore={(file, passphrase) => { void recovery.restoreBackup(file, passphrase); }} state={recovery.state} /><CollectiveSettings {...owner} /></>;
+  return <><Settings {...settings} /><ResolutionStatus {...resolution} /><PrivateRecovery onExport={(passphrase) => { void recovery.exportBackup(passphrase); }} onRestore={(file, passphrase) => { void recovery.restoreBackup(file, passphrase); }} state={recovery.state} /></>;
 }
 
 function PopupSurface() {

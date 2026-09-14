@@ -12,6 +12,7 @@ scope:
   - docs/architecture/src/favorite-resolution.dataflow.json
   - docs/architecture/src/favorite-resolution.lifecycle.json
 review: on-change
+revised: true
 ---
 
 # ADR-0044 — Sauvegarde locale chiffrée de l’état privé
@@ -25,14 +26,15 @@ review: on-change
 associations publiques. Il ne doit pas contenir les titres, URL, dossiers,
 progressions, Reviews ou secrets. Une désinstallation efface aussi
 `storage.local`; la seule synchronisation d’identités ne peut donc pas restaurer
-l’historique privé ni les identifiants opaques du collectif.
+l’historique privé.
 
 ## Décision
 
 Les Réglages proposent un export et une restauration de fichier locaux. La
 version 5 de l’export privé contient les Works, bibliothèques, progressions,
-agenda, rappels, Reviews, sources favorites, organisation et état collectif
-opaque. Les versions 1 à 4 restent importables et n’inventent aucune identité.
+agenda, rappels, Reviews, sources favorites et organisation. Les anciennes
+archives des versions 1 à 5 restent importables; tout ancien champ Collectif
+est accepté pour compatibilité de lecture, puis ignoré et jamais réinstallé.
 
 L’extension chiffre l’export complet avec AES-GCM-256. Une clé de données
 aléatoire chiffre le contenu; PBKDF2-SHA-256 à 310 000 itérations dérive une clé
@@ -43,11 +45,9 @@ est limité à 18 Mio et le texte chiffré à 16 Mio.
 La restauration déchiffre, parse et valide toutes les références avant la
 première mutation. Dexie remplace les huit agrégats restaurables dans une seule
 transaction et efface les checkpoints, tâches et artefacts dérivés afin que la
-réconciliation les reconstruise. L’identité collective est préparée dans
-`storage.local`. Un journal local et un reçu écrit dans la même transaction
-IndexedDB permettent au redémarrage de distinguer une transaction validée
-d’une interruption : sans reçu, l’ancienne identité est restaurée; avec reçu,
-la nouvelle identité est conservée. Le journal est ensuite retiré.
+réconciliation les reconstruise. IndexedDB garantit l’atomicité de ce
+remplacement; aucun journal externe ou état owner n’est nécessaire. Aucun
+secret ou état Collectif historique n’est restauré dans `storage.local`.
 
 L’import exige l’action explicite `replace-private-state`. Une phrase erronée,
 un ciphertext altéré, une référence orpheline ou une erreur d’écriture ne

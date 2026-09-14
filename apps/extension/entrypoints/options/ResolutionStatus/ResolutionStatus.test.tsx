@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { ResolutionStatus } from './index';
 
 describe('ResolutionStatus', () => {
-  it('distinguishes internal and collective waits without calling them provider failures', () => {
-    const html = renderToStaticMarkup(<ResolutionStatus controller={{ paused: false, state: 'presence' }} counts={{ blocked: 0, observed: 3, processing: 0, resolved: 0, retryable: 3, review: 0, unsupported: 0, internalErrors: 1, collectivePending: 2 }} diagnostics={{ enabled: false, events: [] }} inventory={{ continuationAt: '2026-09-12T12:05:00.000Z', status: 'presence' }} onControl={() => undefined} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
+  it('distinguishes internal and public-cache waits without calling them provider failures', () => {
+    const html = renderToStaticMarkup(<ResolutionStatus controller={{ paused: false, state: 'presence' }} counts={{ blocked: 0, observed: 3, processing: 0, resolved: 0, retryable: 3, review: 0, unsupported: 0, internalErrors: 1, publicDiscoveryPending: 2 }} diagnostics={{ enabled: false, events: [] }} inventory={{ continuationAt: '2026-09-12T12:05:00.000Z', status: 'presence' }} onControl={() => undefined} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
     expect(html).toContain('Dont erreurs internes');
-    expect(html).toContain('Dont attente du service collectif');
+    expect(html).toContain('Dont attente du cache public');
     expect(html).toContain('Vérification des favoris encore présents');
     expect(html).toContain('Prochaine reprise automatique');
     expect(html).toContain('Reprendre maintenant');

@@ -1,8 +1,7 @@
 import { createCatalogueApp } from './catalogue/catalogue-routes';
+import { createPublicDiscoveryApp } from './catalogue/public-discovery-routes';
 import { createCoverMediaApp } from './media/cover-routes';
 import { createPublicReleaseApp } from './releases/public-release-routes';
-import { createCollectiveReviewApp } from './reviews/collective-routes';
-import { createFavoriteCollectiveApp } from './reviews/favorite-collective-routes';
 import { createWorkerServices, type WorkerRuntime } from './composition';
 import { boundedDuration, classifyWorkerRoute, emitWorkerDiagnostic, workerMethod } from './diagnostics';
 import { Hono } from 'hono';
@@ -35,8 +34,7 @@ app.use('*', async (context, next) => {
   }
 });
 app.route('/', createCatalogueApp());
-app.route('/', createCollectiveReviewApp());
-app.route('/', createFavoriteCollectiveApp());
+app.route('/', createPublicDiscoveryApp());
 app.route('/', createCoverMediaApp());
 app.route('/', createPublicReleaseApp());
 app.notFound((context) => {
@@ -58,19 +56,4 @@ app.onError((_error, context) => {
   return context.json({ error: 'internal-error' }, 500);
 });
 
-export const scheduled = async (_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> => {
-  const now = new Date();
-  const from = new Date(now.getTime() - 86_400_000).toISOString().slice(0, 10);
-  const to = new Date(now.getTime() + 15 * 86_400_000).toISOString().slice(0, 10);
-  const result = await createWorkerServices(env).releaseCalendar.sync({ from, to });
-  if (result.failures.length > 0) {
-    emitWorkerDiagnostic(env, { durationMs: result.count, method: 'OTHER', requestId: crypto.randomUUID(), routeFamily: 'release', schemaVersion: 1, status: 503, type: 'worker.error' });
-    // A provider outage is a lane failure, not a failed calendar run. The
-    // adapter has already preserved the last valid rows; throwing here makes
-    // Cloudflare report the whole cron as failed and hides those rows from
-    // clients until the next invocation.
-    console.warn(JSON.stringify({ event: 'agenda_sync_lane_failed', failures: result.failures }));
-  }
-};
-
-export default { fetch: app.fetch, scheduled };
+export default { fetch: app.fetch };

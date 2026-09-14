@@ -2,7 +2,6 @@
 scope:
   - packages/application/src/recovery/**
   - packages/application/src/favorites/**
-  - packages/application/src/collective-index/favorite-collective-protocol.ts
   - packages/application/src/ports/cloud-data-ports.ts
   - packages/application/src/ports/capability-ports.ts
   - packages/application/src/use-cases/import-favorite-sources.ts
@@ -10,7 +9,6 @@ scope:
   - packages/adapters-browser/src/catalogue/**
   - packages/adapters-browser/src/recovery/**
   - packages/adapters-cloudflare/src/catalogue/**
-  - packages/adapters-cloudflare/src/reviews/d1-favorite-collective-adapter.ts
   - apps/extension/runtime/**
   - apps/extension/wxt-entrypoints/background.ts
   - apps/worker/migrations/**
@@ -71,18 +69,18 @@ validation du digest, l’adaptateur retire les fragments plus anciens ou
 orphelins avec une écriture espacée; une génération en cours n’est jamais
 collectée.
 
-Le Worker expose un cache public borné. Une lecture par empreinte ou référence
-précède les API fournisseurs. Une contribution contient seulement empreinte,
-versions, type, références et facettes de tri. Le Worker effectue des upserts
-préparés après deux confirmations humaines provenant de propriétaires distincts.
-Les conflits de même empreinte restent non résolus; aucun premier résultat ne
-gagne. Les requêtes et écritures sont limitées par lot, taille et quota.
+Le Worker expose le cache public borné défini par l’ADR-0046. Une lecture par
+empreinte ou référence précède les API fournisseurs. Un client peut seulement
+créer un claim `PENDING` et proposer des identifiants fournisseur publics; il ne
+publie jamais une association, un titre, une facette ou un profil. Un collecteur
+GitHub OIDC hydrate et vérifie ces identifiants avant la seule transition
+`VERIFIED`. L’unicité D1 empêche deux recherches concurrentes; un bail expiré
+autorise une reprise bornée.
 
-D1 conserve les identifiants fournisseurs publics et les facettes utiles au tri
-seulement : format, genres, catégories, statut, années, comptages, popularité et
-pré-sérialisation. Il ne conserve aucun titre, alias, URL, couverture, source,
-dossier, progression, décision privée ou secret. L’extension garde son titre
-local et hydrate ensuite par identifiant lorsque les détails manquent. Les
+Les URLs privées, sources de favoris, titres bruts, dossiers, progressions,
+décisions privées, owners, identifiants d’installation et secrets restent
+exclus. L’extension hydrate ensuite par identifiant lorsque les détails
+locaux manquent. Les
 jaquettes conservent la politique de droits de l’ADR-0026 et restent dans R2.
 Le curseur de réparation des jaquettes est persisté dans IndexedDB afin qu’un
 arrêt MV3 reprenne le prochain lot. L’ingestion R2 reste une opération bornée
@@ -96,9 +94,8 @@ mutations de dossier, impossibles à réduire à une source unique, déclenchent
 l’inventaire complet reprenable. Un audit complet périodique de six heures
 réconcilie aussi les événements perdus pendant l’arrêt du navigateur.
 
-La route déclarative des règles reste publique et peut être rafraîchie sans
-créer de propriétaire. Inscription, lookup propriétaire et contribution ne
-s’exécutent qu’après activation explicite du collectif dans les réglages.
+La route déclarative des règles reste publique. Le cache ne possède ni
+inscription, ni propriétaire, ni appairage, ni réglage Collectif.
 
 La publication vers le cache ne bloque jamais le commit IndexedDB. Une panne D1
 laisse un job local réessayable et n’autorise aucun fallback de décision. Une
@@ -114,7 +111,7 @@ interrompue reste reprenable sans perte locale. La migration D1 est additive et
 ne supprime aucune table ni donnée existante.
 
 Le parcours Chromium installé supprime entièrement IndexedDB après publication
-du manifeste v2, arrête le service worker et coupe le cache collectif. Le
+du manifeste v2, arrête le service worker et coupe le cache public. Le
 redémarrage reconstruit 1 406 sources et réhydrate l’ID AniList exact sans
 recherche textuelle. Les tests communs des adaptateurs couvrent les mêmes
 fragments, digests, rollbacks et restrictions d’accès Chrome/Firefox.

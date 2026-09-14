@@ -4,7 +4,7 @@ import { boundedDuration, classifyWorkerRoute, emitWorkerDiagnostic, workerDiagn
 describe('worker diagnostics', () => {
   it('emits only for the exact lock value and never serializes request content', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
-    const event = { durationMs: 12, method: 'POST' as const, requestId: 'request-1', routeFamily: 'collective' as const, schemaVersion: 1 as const, status: 202, type: 'worker.request' as const };
+    const event = { durationMs: 12, method: 'POST' as const, requestId: 'request-1', routeFamily: 'catalogue' as const, schemaVersion: 1 as const, status: 202, type: 'worker.request' as const };
     emitWorkerDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: 'off' }, event);
     emitWorkerDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: workerDiagnosticsLockValue }, event);
     expect(info).toHaveBeenCalledOnce();
@@ -14,7 +14,9 @@ describe('worker diagnostics', () => {
   });
 
   it('reduces paths methods and durations to bounded technical values', () => {
-    expect(classifyWorkerRoute('/v2/favorites/lookup')).toBe('collective');
+    expect(classifyWorkerRoute('/v2/favorites/lookup')).toBe('unknown');
+    expect(classifyWorkerRoute('/v2/catalogue/discoveries/claims')).toBe('catalogue');
+    expect(classifyWorkerRoute('/v2/releases/generations')).toBe('release');
     expect(classifyWorkerRoute('/library/work_123')).toBe('site');
     expect(classifyWorkerRoute('/private/value')).toBe('unknown');
     expect(workerMethod('DELETE')).toBe('OTHER');

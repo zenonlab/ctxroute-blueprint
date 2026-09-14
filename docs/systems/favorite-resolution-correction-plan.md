@@ -8,6 +8,11 @@ La conformité est démontrée par les contrats TobiRink, le corpus clean-room,
 un différentiel local contre le parseur épinglé et les validations d'intégration;
 elle ne dépend d'aucune base FavLib.
 
+Le protocole Collectif décrit plus bas est conservé comme historique de cette
+correction v3. Il est supersédé par ADR-0046 : le runtime actuel n'a ni owner,
+ni appairage, ni consentement Collectif; D1 suit `MISS/PENDING/VERIFIED` et seul
+le collecteur GitHub OIDC peut promouvoir une association publique fiable.
+
 Référence historique : commit Git `3267de2`, notamment `CLAUDE.md` et
 `docs/adr/0087-architecture-locale-favoris-resolution-agenda.md`. Le dernier
 FavLib local-only n'est pas l'autorité normative. La demande utilisateur
@@ -83,9 +88,9 @@ par défaut ou ses heuristiques non bornées.
 | Présence, placement, progression observée | favoris navigateur | scan et événements; une baisse de progression exige confirmation |
 | Artefacts, œuvres hydratées, tâches, décisions, agenda, caches | IndexedDB extension | transactions, versions, reçus, export privé |
 | Identifiants fournisseurs | snapshot `storage.sync` | IDs seulement; aucune progression ou décision |
-| Bootstrap, préférences, appairage, secrets propriétaire | `storage.local` extension | accès de confiance, jamais sync/site/logs |
-| Clé normalisée ↔ IDs, choix propriétaires, confirmations | D1 via Worker | SQL minimal, aucune copie de catalogue fournisseur |
-| Affichage web | projection WebBridge | aucune autorité ni accès D1, aucun secret propriétaire |
+| Bootstrap et préférences | `storage.local` extension | accès de confiance, jamais sync/site/logs |
+| Empreinte versionnée ↔ IDs publics vérifiés | D1 via Worker | claim atomique, propositions IDs seulement, promotion GitHub OIDC |
+| Affichage web | projection WebBridge | aucune autorité ni accès direct D1, aucun secret produit |
 
 Un retrait navigateur détache la source et retire sa présence active de la
 projection concernée; il ne supprime ni source mémorisée, ni œuvre, ni décision,
@@ -106,8 +111,10 @@ Favoris navigateur → capture transactionnelle → parsing local
   → règle exacte origine/route
   → artefact et aliases locaux validés
   → fiche hydratée compatible
-  → lookup Worker/D1 par empreinte et propriétaire
-  → recherche locale fournisseur puis hydratation exacte
+  → lookup Worker/D1 par empreinte versionnée
+  → `VERIFIED` : hydratation exacte sans recherche
+  → `PENDING` : attente sans fournisseur
+  → `MISS` : bail unique, recherche locale puis proposition d'IDs
   → décision persistée → projections locales
 ```
 
@@ -265,9 +272,12 @@ perdu; export et backup chiffré demeurent des moyens distincts de restauration.
 Les installations concurrentes fusionnent des ensembles d'IDs validés; une
 génération n'est pas une horloge globale atomique de navigateur sync. Une
 collision de génération avec digest différent exige réconciliation/republication,
-jamais « dernier écrivain = vérité ». Une décision owner-scoped n'est pas sync.
+jamais « dernier écrivain = vérité ». Une décision Review privée n'est pas sync.
 
-## Collectif SQL et authentification
+## Historique supersédé — Collectif SQL et authentification
+
+Cette section décrit le protocole livré avant ADR-0046. Elle ne définit plus le
+runtime, les routes ou les exigences de publication actuels.
 
 Migration additive dans `apps/worker/migrations`, tables nouvelles séparées :
 

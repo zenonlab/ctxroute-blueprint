@@ -22,7 +22,7 @@ export function privateStoreTables(database: TobirinkDatabase, stores: readonly 
     reviews: database.reviews,
     works: database.works,
   } satisfies Record<PrivateStoreName, Table>;
-  const selected = [...new Set(stores)].map((store) => tables[store]);
+  const selected: Table[] = [...new Set(stores)].map((store) => tables[store]);
   if (stores.includes('works')) selected.push(database.localAgendaProjectionState);
   return selected;
 }

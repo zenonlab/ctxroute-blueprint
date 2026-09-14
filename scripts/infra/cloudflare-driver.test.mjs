@@ -153,7 +153,7 @@ async function test_load_checked_in_config() {
   const path = fileURLToPath(new URL('../../apps/worker/wrangler.jsonc', import.meta.url));
   assert.deepEqual(await loadCloudflareConfig(path), {
     worker: 'tobirink-public-api',
-    d1: [{ binding: 'COLLECTIVE_DB', name: 'tobirink-public' }],
+    d1: [{ binding: 'PUBLIC_DB', name: 'tobirink-public' }],
     r2: [
       { binding: 'COVER_BUCKET', name: 'tobirink-covers' },
       { binding: 'RELEASE_SNAPSHOTS', name: 'tobirink-public-releases' },

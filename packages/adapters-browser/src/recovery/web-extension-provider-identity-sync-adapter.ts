@@ -1,5 +1,4 @@
-import { favoriteOwnerLocalStateSchema, privateRecoveryJournalSchema, providerIdentitySyncStateSchema, providerSyncStorageValuesSchema, providerSyncWriteValuesSchema } from '@tobirink/application';
-import type { FavoriteOwnerLocalState, FavoriteOwnerLocalStatePort, PrivateRecoveryJournal, PrivateRecoveryJournalPort } from '@tobirink/application';
+import { providerIdentitySyncStateSchema, providerSyncStorageValuesSchema, providerSyncWriteValuesSchema } from '@tobirink/application';
 import type { ProviderIdentitySyncPort, ProviderIdentitySyncState, ProviderIdentitySyncStatePort, ProviderSyncItem, ProviderSyncStorageValues } from '@tobirink/application';
 import { z } from 'zod';
 
@@ -50,46 +49,5 @@ export class WebExtensionProviderIdentitySyncStateAdapter implements ProviderIde
   async save(state: ProviderIdentitySyncState): Promise<void> {
     await this.ready();
     await this.storage.set(providerSyncStorageValuesSchema.parse({ [stateKey]: providerIdentitySyncStateSchema.parse(state) }));
-  }
-}
-
-export class WebExtensionFavoriteOwnerStateAdapter implements FavoriteOwnerLocalStatePort {
-  private readiness: Promise<void> | undefined;
-  constructor(private readonly storage: TrustedProviderIdentityStorageArea, private readonly policy: ProviderIdentityAccessPolicy = 'native-required') {}
-  private ready(): Promise<void> { return this.readiness ??= restrictStorage(this.storage, this.policy); }
-  async clear(): Promise<void> {
-    await this.ready();
-    if (this.storage.remove === undefined) throw new Error('Native storage removal is unavailable.');
-    await this.storage.remove(['tobirink-owner-v2']);
-  }
-  async read(): Promise<FavoriteOwnerLocalState | undefined> {
-    await this.ready();
-    const values = await this.storage.get('tobirink-owner-v2');
-    return values['tobirink-owner-v2'] === undefined ? undefined : favoriteOwnerLocalStateSchema.parse(values['tobirink-owner-v2']);
-  }
-  async save(state: FavoriteOwnerLocalState): Promise<void> {
-    await this.ready();
-    await this.storage.set(providerSyncStorageValuesSchema.parse({ 'tobirink-owner-v2': favoriteOwnerLocalStateSchema.parse(state) }));
-  }
-}
-
-const privateRecoveryJournalKey = 'tobirink-private-recovery-journal-v1';
-export class WebExtensionPrivateRecoveryJournalAdapter implements PrivateRecoveryJournalPort {
-  private readiness: Promise<void> | undefined;
-  constructor(private readonly storage: TrustedProviderIdentityStorageArea, private readonly policy: ProviderIdentityAccessPolicy = 'native-required') {}
-  private ready(): Promise<void> { return this.readiness ??= restrictStorage(this.storage, this.policy); }
-  async clear(): Promise<void> {
-    await this.ready();
-    if (this.storage.remove === undefined) throw new Error('Native storage removal is unavailable.');
-    await this.storage.remove([privateRecoveryJournalKey]);
-  }
-  async read(): Promise<PrivateRecoveryJournal | undefined> {
-    await this.ready();
-    const values = await this.storage.get(privateRecoveryJournalKey);
-    return values[privateRecoveryJournalKey] === undefined ? undefined : privateRecoveryJournalSchema.parse(values[privateRecoveryJournalKey]);
-  }
-  async save(journal: PrivateRecoveryJournal): Promise<void> {
-    await this.ready();
-    await this.storage.set(providerSyncStorageValuesSchema.parse({ [privateRecoveryJournalKey]: privateRecoveryJournalSchema.parse(journal) }));
   }
 }

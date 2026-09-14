@@ -12,15 +12,12 @@ import {
   WebExtensionQuickPreferencesAdapter,
   WebExtensionProviderIdentitySyncAdapter,
   WebExtensionProviderIdentitySyncStateAdapter,
-  WebExtensionFavoriteOwnerStateAdapter,
-  WebExtensionPrivateRecoveryJournalAdapter,
-  HttpFavoriteCollectiveAdapter,
-  HttpFavoritePublicCacheAdapter,
+  HttpPublicDiscoveryAdapter,
   HttpPublicReleaseLoader,
   HttpPublicReleasePageSource,
 } from '@tobirink/adapters-browser';
 import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicDiscoveryStore, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
@@ -36,7 +33,6 @@ import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favor
 import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
 import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda, ProviderIdentitySyncPublisher, providerSyncPrefix, resumePublicReleaseFallback } from '@tobirink/application';
 import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
-import { FavoriteOwnerRuntime } from '../runtime/favorite-owner-runtime';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
 import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, readFavoriteResolutionPaused, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteResolutionPaused } from '../runtime/favorite-resolution-continuation';
 
@@ -81,8 +77,9 @@ export default defineBackground({
     const refreshPublicReleasesOnce = async () => {
       if (configuredSiteOrigin) {
         try {
-          const shared = await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache, releaseWindow());
-          if (shared.snapshot.events.length > 0) { await browser.alarms.clear(agendaReleaseFallbackAlarmName); return 'shared' as const; }
+          await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache, releaseWindow());
+          await browser.alarms.clear(agendaReleaseFallbackAlarmName);
+          return 'shared' as const;
         } catch { /* a direct public-provider fallback resumes below */ }
       }
       const activeFallback = await privateStorage.storage.database.publicReleaseSyncState.get('active');
@@ -106,10 +103,8 @@ export default defineBackground({
     const trustedLocalStorage = import.meta.env.FIREFOX ? browser.storage.local : nativeStorage?.local;
     const trustedSyncStorage = import.meta.env.FIREFOX ? browser.storage.sync : nativeStorage?.sync;
     if (trustedLocalStorage === undefined || trustedSyncStorage === undefined) throw new Error('Trusted extension storage is unavailable.');
-    const ownerState = new WebExtensionFavoriteOwnerStateAdapter(trustedLocalStorage, identityAccessPolicy);
-    const ownerRuntime = configuredSiteOrigin ? new FavoriteOwnerRuntime(ownerState, new HttpFavoriteCollectiveAdapter(configuredSiteOrigin), privateStorage.storage) : undefined;
-    const privateRecovery = new DexiePrivateRecoveryStore(privateStorage.storage.database, ownerState, new WebExtensionPrivateRecoveryJournalAdapter(trustedLocalStorage, identityAccessPolicy));
-    const publicCache = configuredSiteOrigin ? new HttpFavoritePublicCacheAdapter(configuredSiteOrigin) : undefined;
+    const privateRecovery = new DexiePrivateRecoveryStore(privateStorage.storage.database);
+    const publicDiscovery = configuredSiteOrigin ? new HttpPublicDiscoveryAdapter(configuredSiteOrigin, new DexiePublicDiscoveryStore(privateStorage.storage.database)) : undefined;
     const identitySync = new WebExtensionProviderIdentitySyncAdapter(trustedSyncStorage, identityAccessPolicy);
     const identityRecovery = createProviderIdentityRecoveryRuntime({
       checkpoints: new DexieProviderIdentityRecoveryStateAdapter(privateStorage.storage.database),
@@ -127,12 +122,9 @@ export default defineBackground({
     const ensureFavoriteInventoryAuditAlarm = () => browser.alarms.create(favoriteInventoryAuditAlarmName, { periodInMinutes: favoriteInventoryAuditPeriodMinutes });
     const runFavoriteResolution = createFavoriteResolutionRuntime({
       beforeInventory: async () => {
-        await privateRecovery.recoverInterrupted();
-        await ownerRuntime?.refreshRules().catch(() => undefined);
-        await ownerRuntime?.maintain().catch(() => undefined);
+        await publicDiscovery?.maintain().catch(() => undefined);
       },
-      collective: ownerRuntime,
-      publicCache,
+      publicDiscovery,
       bookmarks,
       candidates: providerPorts,
       ensureReady: privateStorage.ensureReady,
@@ -147,7 +139,7 @@ export default defineBackground({
         if (await resolutionPaused()) await browser.alarms.clear(favoriteResolutionContinuationAlarmName);
         else await updateFavoriteResolutionContinuation(browser.alarms, availableAt);
       },
-      get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(ownerRuntime?.rules ?? bundledFavoriteSiteRules)]; },
+      get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage,
       token,
     });
@@ -173,7 +165,6 @@ export default defineBackground({
         return;
       }
       await privateStorage.ensureReady();
-      await privateRecovery.recoverInterrupted();
       const [checkpoint, existing] = await Promise.all([
         privateStorage.storage.getFavoriteInventoryCheckpoint(),
         browser.alarms.get(favoriteResolutionContinuationAlarmName),
@@ -217,7 +208,7 @@ export default defineBackground({
     };
     subscribeFavoriteBookmarkMutations(bookmarkEvents, {
       bookmarks, ensureReady: privateStorage.ensureReady, now,
-      get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(ownerRuntime?.rules ?? bundledFavoriteSiteRules)]; },
+      get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage, token,
     }, reconcileFavorites);
     browser.storage.onChanged.addListener((changes, areaName) => {
@@ -251,7 +242,6 @@ export default defineBackground({
         if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
         try {
           await privateStorage.ensureReady();
-          await privateRecovery.recoverInterrupted();
           if (parsed.data.type === 'recovery.backup.export') {
             const exportedAt = now();
             const blob = await createEncryptedBackup(privateRecovery, exportedAt, parsed.data.passphrase);
@@ -266,18 +256,6 @@ export default defineBackground({
           }
           return { ok: true, status: 'restored' };
         } catch { return { error: 'private-recovery-unavailable', ok: false }; }
-      }
-      if (parsed.data.type === 'owner.action') {
-        if (sender.id !== browser.runtime.id || sender.url?.split(/[?#]/u, 1)[0] !== browser.runtime.getURL('/options.html')) return { error: 'trusted-options-required', ok: false };
-        if (ownerRuntime === undefined) return { ok: true, status: 'unavailable' };
-        try {
-          const action = parsed.data.action;
-          if (action.kind === 'enable') await ownerRuntime.enable();
-          if (action.kind === 'revoke') await ownerRuntime.revoke();
-          if (action.kind === 'redeem') await ownerRuntime.redeem(action.invitation);
-          if (action.kind === 'pair') return { ok: true, status: await ownerRuntime.status(), invitation: await ownerRuntime.pair() };
-          return { ok: true, status: await ownerRuntime.status() };
-        } catch { return { ok: false, error: 'owner-operation-unavailable' }; }
       }
       if (parsed.data.type === 'webbridge.handshake') {
         return webBridgeRuntime(parsed.data, sender, configuredSiteOrigin);

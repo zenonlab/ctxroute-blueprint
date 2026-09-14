@@ -1,6 +1,5 @@
 import { verifyStoragePortContract } from '@tobirink/contracts';
 import { commitTask, importFavoriteSources, readLibraryCatalogue, recordTaskEffect } from '@tobirink/application';
-import type { FavoriteOwnerLocalState, PrivateRecoveryJournal } from '@tobirink/application';
 import {
   agendaEntryId,
   createAgendaEntry,
@@ -157,40 +156,15 @@ try {
   await organizerSnapshots.save(organizerSnapshot);
   if (JSON.stringify(await organizerSnapshots.load()) !== JSON.stringify(organizerSnapshot)) throw new Error('Organizer snapshot did not round-trip through IndexedDB.');
   const recoveryDatabase = new TobirinkDatabase(`tobirink-private-recovery-${Date.now()}`);
-  const originalOwner: FavoriteOwnerLocalState = { registration: { consent: true, installationId: '00000000-0000-4000-8000-000000000002', ownerId: '00000000-0000-4000-8000-000000000001', revokeToken: 'b'.repeat(64), token: 'a'.repeat(64) }, schemaVersion: 1, sent: {}, status: 'revoked' };
-  const replacementOwner: FavoriteOwnerLocalState = { ...originalOwner, registration: { ...originalOwner.registration, token: 'c'.repeat(64) } };
-  let ownerState: FavoriteOwnerLocalState | undefined = originalOwner;
-  let recoveryJournal: PrivateRecoveryJournal | undefined;
-  const owner = { clear: async () => { ownerState = undefined; }, read: async () => ownerState, save: async (state: FavoriteOwnerLocalState) => { ownerState = state; } };
-  const journal = { clear: async () => { recoveryJournal = undefined; }, read: async () => recoveryJournal, save: async (state: PrivateRecoveryJournal) => { recoveryJournal = state; } };
-  const privateRecovery = new DexiePrivateRecoveryStore(recoveryDatabase, owner, journal);
+  const privateRecovery = new DexiePrivateRecoveryStore(recoveryDatabase);
   const originalRecoveryWork = createWork({ externalReferences: [], id: workId('work_recovery_original'), mediaKind: 'manga', preferredTitle: 'Original recovery work' });
   const replacementRecoveryWork = createWork({ externalReferences: [], id: workId('work_recovery_replacement'), mediaKind: 'anime', preferredTitle: 'Replacement recovery work' });
   await recoveryDatabase.works.put(originalRecoveryWork);
   await new DexieProviderIdentityRecoveryStateAdapter(recoveryDatabase).save({ schemaVersion: 1 });
   const initialRecoverySnapshot = await privateRecovery.readSnapshot();
-  if (initialRecoverySnapshot.collectiveOwner?.registration.token !== originalOwner.registration.token) throw new Error('Private recovery omitted the collective owner.');
-  let ownerFailureRejected = false;
-  const failingOwner = { read: owner.read, save: async () => { throw new Error('synthetic owner failure'); } };
-  try {
-    await new DexiePrivateRecoveryStore(recoveryDatabase, failingOwner, journal).replaceSnapshot({ ...initialRecoverySnapshot, collectiveOwner: replacementOwner, works: [replacementRecoveryWork] });
-  } catch { ownerFailureRejected = true; }
-  if (!ownerFailureRejected || await recoveryDatabase.works.get(originalRecoveryWork.id) === undefined) throw new Error('Owner failure mutated the private database.');
-  await privateRecovery.recoverInterrupted();
-  if (recoveryJournal !== undefined || ownerState?.registration.token !== originalOwner.registration.token) throw new Error('Owner failure did not converge through its recovery journal.');
-  await privateRecovery.replaceSnapshot({ ...initialRecoverySnapshot, collectiveOwner: replacementOwner, works: [replacementRecoveryWork] });
+  await privateRecovery.replaceSnapshot({ ...initialRecoverySnapshot, works: [replacementRecoveryWork] });
   if (await recoveryDatabase.works.get(originalRecoveryWork.id) !== undefined || await recoveryDatabase.works.get(replacementRecoveryWork.id) === undefined) throw new Error('Private recovery did not atomically replace Works.');
-  if (ownerState?.registration.token !== replacementOwner.registration.token) throw new Error('Private recovery did not restore the collective owner.');
   if (await recoveryDatabase.providerIdentityRecovery.count() !== 0) throw new Error('Private recovery retained stale derived recovery state.');
-  recoveryJournal = { id: '00000000-0000-4000-8000-000000000003', previousOwner: originalOwner, schemaVersion: 1 };
-  ownerState = replacementOwner;
-  await privateRecovery.recoverInterrupted();
-  if (ownerState.registration.token !== originalOwner.registration.token || recoveryJournal !== undefined) throw new Error('Interrupted private recovery did not roll back its staged owner.');
-  recoveryJournal = { id: '00000000-0000-4000-8000-000000000004', previousOwner: originalOwner, schemaVersion: 1 };
-  ownerState = replacementOwner;
-  await recoveryDatabase.privateRecoveryReceipts.put({ committedAt: '2026-09-12T00:00:00.000Z', id: recoveryJournal.id });
-  await privateRecovery.recoverInterrupted();
-  if (ownerState.registration.token !== replacementOwner.registration.token || recoveryJournal !== undefined) throw new Error('Committed private recovery rolled back its restored owner.');
   await recoveryDatabase.delete();
   document.body.dataset.status = 'passed';
   document.body.textContent = `IndexedDB StoragePort contract passed; 500-work catalogue ${document.body.dataset.catalogueMs} ms; mixed 1400-favorite catalogue ${document.body.dataset.mixedCatalogueMs} ms`;

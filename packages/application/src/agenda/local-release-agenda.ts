@@ -1,4 +1,5 @@
 import { agendaEntryId, createAgendaEntry, predictNextMangaRelease, workId } from '@tobirink/domain';
+import type { ReleaseLifecycleStatus } from '@tobirink/domain';
 import type { AgendaEntry, FavoriteSource, LocalAgendaEvent, LocalReleaseEvidence, Work, WorkId } from '@tobirink/domain';
 import type { StoragePort, StorageReadPort } from '../ports/storage-port';
 import type { PublicReleaseGenerationCachePort } from './public-release-generation';
@@ -26,6 +27,12 @@ function numericSequence(value: string | undefined): number | undefined {
   const parsed = Number(value); return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+function releaseLifecycle(work: Work): ReleaseLifecycleStatus {
+  const status = work.hydration?.candidate.editorialStatus;
+  if (status === 'COMPLETED' || status === 'CANCELLED' || status === 'ONGOING' || status === 'HIATUS') return status;
+  return 'UNKNOWN';
+}
+
 function notifiableEntries(events: readonly LocalAgendaEvent[]): readonly AgendaEntry[] {
   return Object.freeze(events.flatMap((event) => event.occurrence.kind === 'INSTANT' && event.availability !== 'estimated' ? [createAgendaEntry({ availability: event.availability, id: agendaEntryId(`agenda_${event.id}`), occursAt: event.occurrence.value, releaseLabel: event.releaseLabel, workId: workId(event.workId) })] : []));
 }
@@ -51,7 +58,7 @@ export async function projectLocalReleaseAgenda(storage: StoragePort, cache: Pub
   for (const [id] of mangaWorks) {
     const previous = await projection.listEvidence(id, 12);
     const observations = [...previous, ...evidence.filter((item) => item.workId === id)].flatMap((item) => { const chapter = item.releaseKind === 'chapter' ? numericSequence(item.sequence) : undefined; return chapter !== undefined && item.occurrence.kind === 'DATE' && item.state === 'CONFIRMED' ? [{ chapter, releasedOn: item.occurrence.value }] : []; });
-    const prediction = predictNextMangaRelease(observations);
+    const prediction = predictNextMangaRelease(observations, releaseLifecycle(mangaWorks.get(id)!));
     const last = evidence.filter((item) => item.workId === id).at(-1) ?? previous.at(-1);
     if (prediction && last && !events.some((event) => event.workId === id && event.occurrence.kind === 'DATE' && event.occurrence.value === prediction.releasedOn && event.availability !== 'estimated')) events.push(localAgendaEventSchema.parse({ availability: 'estimated', evidenceId: last.id, id: `agenda_prediction_${id}`.slice(0, 128), occurrence: { kind: 'DATE', value: prediction.releasedOn }, releaseLabel: 'Prochaine sortie estimée', workId: id }));
   }

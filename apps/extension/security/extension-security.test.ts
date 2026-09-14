@@ -83,6 +83,7 @@ describe('extension security boundary', () => {
     expect(extensionMessageSchema.safeParse({ target: 'library', token: 'extra', type: 'navigation.open', version: 1 }).success).toBe(false);
     expect(extensionMessageSchema.safeParse({ type: 'health.check', version: 2 }).success).toBe(false);
     expect(extensionMessageSchema.safeParse({ extra: true, type: 'popup.context.read', version: 1 }).success).toBe(false);
+    expect(extensionMessageSchema.safeParse({ action: { kind: 'enable' }, type: 'owner.action', version: 1 }).success).toBe(false);
     expect(extensionMessageSchema.safeParse(null).success).toBe(false);
   });
 
@@ -99,6 +100,7 @@ describe('extension security boundary', () => {
     const background = await readFile('wxt-entrypoints/background.ts', 'utf8');
     const localStorage = await readFile('runtime/local-storage.ts', 'utf8');
     const favoriteResolution = await readFile('runtime/favorite-resolution-runtime.ts', 'utf8');
+    const extensionSurface = await readFile('runtime/ExtensionSurface.tsx', 'utf8');
 
     expect(packageManifest.dependencies['@tobirink/adapters-indexeddb']).toBe('*');
     expect(background).toMatch(/createExtensionLocalStorage\(\)/);
@@ -119,6 +121,8 @@ describe('extension security boundary', () => {
     expect(background).toMatch(/writeLocalReviewDecision\(privateStorage\.storage/);
     expect(background).toMatch(/readLocalSearchSnapshot\(privateStorage\.storage/);
     expect(background).not.toMatch(/HttpReviewCandidateAdapter|fetch\(/);
+    expect(background).not.toMatch(/FavoriteOwnerRuntime|HttpFavoriteCollectiveAdapter|HttpFavoritePublicCacheAdapter|owner\.action/);
+    expect(extensionSurface).not.toMatch(/CollectiveSettings|useFavoriteOwner/);
     expect(background).toMatch(/DexiePublicReleaseGenerationCache\(privateStorage\.storage\.database\)/);
     expect(background).toMatch(/WebExtensionQuickPreferencesAdapter\(browser\.storage\.local\)/);
     expect(background).not.toMatch(/PublicReleaseSnapshotAdapter|loadLatest\(/);

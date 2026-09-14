@@ -20,7 +20,7 @@ function parseJson(text: string): z.output<typeof jsonSchema> {
 }
 
 export class HttpPublicReleasePageSource implements PublicReleasePageSource {
-  constructor(private readonly fetcher: PublicReleaseProviderFetch = fetch, private readonly clock: () => number = Date.now) {}
+  constructor(private readonly fetcher: PublicReleaseProviderFetch = fetch.bind(globalThis), private readonly clock: () => number = Date.now) {}
 
   async collectPage(provider: 'anilist' | 'mangaupdates', page: number, window: { from: string; to: string }): Promise<PublicReleasePageCheckpoint> {
     return provider === 'anilist' ? this.collectAniList(page, window) : this.collectMangaUpdates(page, window);

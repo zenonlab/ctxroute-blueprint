@@ -1,6 +1,4 @@
-import { favoritePublicCacheEntrySchema } from '@tobirink/application';
 import type {
-  FavoriteCollectiveKey,
   PublicCatalogueReadPort,
   PublicCatalogueReference,
   PublicCatalogueTitle,
@@ -86,44 +84,5 @@ export class D1PublicCatalogueAdapter implements PublicCatalogueReadPort {
       WHERE work_id = ?1 ORDER BY provider, external_id LIMIT ?2
     `).bind(workId, limit).all<PublicCatalogueReference>();
     return result.results;
-  }
-  async findFavoriteIdentity(key: FavoriteCollectiveKey) {
-    return (await this.findFavoriteIdentities([key]))[0]?.identity;
-  }
-
-  async findFavoriteIdentities(keys: readonly FavoriteCollectiveKey[]) {
-    if (keys.length < 1 || keys.length > 50) throw new RangeError('Favorite cache lookup requires between 1 and 50 keys.');
-    const rows = await this.database.prepare(`
-      WITH requested AS (
-        SELECT json_extract(value, '$.fingerprint') AS fingerprint,
-          json_extract(value, '$.mediaKind') AS media_kind,
-          json_extract(value, '$.parserVersion') AS parser_version,
-          json_extract(value, '$.siteRulesVersion') AS rules_version
-        FROM json_each(?1)
-      )
-      , matched AS (
-        SELECT requested.fingerprint AS requestedFingerprint, cache.identity_hash AS identityHash,
-          cache.media_kind AS mediaKind, cache.references_json AS referencesJson, cache.metadata_json AS metadataJson,
-          ROW_NUMBER() OVER (PARTITION BY requested.fingerprint ORDER BY cache.identity_hash) AS identityRank
-        FROM requested JOIN favorite_public_cache cache ON cache.fingerprint = requested.fingerprint
-          AND (requested.media_kind = 'UNKNOWN' OR cache.media_kind = requested.media_kind)
-          AND cache.parser_version = requested.parser_version AND cache.rules_version = requested.rules_version
-        WHERE EXISTS (SELECT 1 FROM favorite_keys AS favorite_key
-          JOIN favorite_confirmations confirmation ON confirmation.key_id = favorite_key.key_id
-            AND confirmation.identity_hash = cache.identity_hash AND confirmation.owner_count >= 2
-          WHERE favorite_key.fingerprint = cache.fingerprint
-            AND (favorite_key.media_kind = cache.media_kind OR favorite_key.media_kind = 'UNKNOWN')
-            AND favorite_key.parser_version = cache.parser_version AND favorite_key.rules_version = cache.rules_version)
-      )
-      SELECT requestedFingerprint, identityHash, mediaKind, referencesJson, metadataJson
-      FROM matched WHERE identityRank <= 2 ORDER BY requestedFingerprint, identityHash
-    `).bind(JSON.stringify(keys)).all<{ identityHash: string; mediaKind: string; metadataJson: string; referencesJson: string; requestedFingerprint: string }>();
-    return keys.map((key) => {
-      const matches = rows.results.filter((row) => row.requestedFingerprint === key.fingerprint);
-      if (matches.length !== 1) return { fingerprint: key.fingerprint };
-      const row = matches[0];
-      try { return { fingerprint: key.fingerprint, identity: favoritePublicCacheEntrySchema.parse({ mediaKind: row?.mediaKind, metadata: JSON.parse(row?.metadataJson ?? 'null'), references: JSON.parse(row?.referencesJson ?? 'null') }) }; }
-      catch { return { fingerprint: key.fingerprint }; }
-    });
   }
 }

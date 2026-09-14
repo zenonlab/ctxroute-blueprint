@@ -122,19 +122,21 @@ exists. A work detail bounds localized titles and external references to 32
 rows each. Successful reads are publicly cacheable for five minutes with one
 hour of stale revalidation; invalid and missing resources use `no-store`.
 
-## Consented collective index policy
+## Verified public discovery cache policy
 
-The optional collective index maps normalized-key fingerprints and media to
-public IDs, with owner-scoped preferences and distinct-owner confirmations.
-The extension owns opaque identity and explicitly paired installations. Secrets
-remain in trusted storage.local; D1 stores their hashes. Strict requests carry
-only key fingerprints, media, public IDs, versions, nonces and authentication.
-Worker prepared SQL and atomic batches enforce ownership, quotas, replay and
-idempotent receipts. The site and WebBridge cannot access D1 or credentials.
+The public discovery cache maps versioned normalized-key fingerprints and media
+to verified public provider IDs. It has no owner, installation identity,
+pairing, product consent or client credential. A client can atomically reserve
+one pending search and propose provider IDs only; it cannot publish a title or
+a trusted catalogue result. Concurrent clients see `PENDING`, and `VERIFIED`
+entries are reused without another title search.
 
-The [v3 correction plan](systems/favorite-resolution-correction-plan.md) and
-ADR-0033 define additive tables and indexed bounded queries. Catalogue tables
-remain separate. Only the operational gate may apply production migrations.
+Only the GitHub collector authenticated by OIDC can hydrate the proposed IDs,
+verify an official provider title against the fingerprint and promote the row
+to `VERIFIED`. ADR-0046 defines the bounded requests, leases and idempotent D1
+state transitions. Historical Collective migrations remain versioned but their
+routes and runtimes are retired. Only the operational gate may apply production
+migrations.
 
 ## Image policy
 

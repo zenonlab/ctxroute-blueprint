@@ -63,8 +63,8 @@ répertoire FavLib à l’exécution, au build ou dans ses tests.
 7. Une seule correspondance fournisseur distincte peut être automatique.
    Une ambiguïté ou un introuvable terminal média va en `REVIEW_REQUIRED`.
    Import, panne et unsupported ne créent jamais de Review.
-8. Les décisions Review sont des mutations locales confirmées. La contribution
-   collective reste un consentement séparé, révocable et désactivé par défaut.
+8. Les décisions Review sont des mutations locales confirmées. Le cache public
+   n'accepte que des IDs proposés et seule une vérification OIDC peut publier.
 
 ## Pipeline canonique
 
@@ -79,8 +79,9 @@ Le flux cible est le suivant :
    fournisseur explicite, une tâche avant toute requête fournisseur ; une route
    sans identité devient immédiatement `UNSUPPORTED/IDENTITY_MISSING` avec reçu
    terminal et ne consomme aucun créneau réseau ;
-6. essayer ID/route exacte, artefact/aliases, fiches locales, D1 owner-scoped
-   via Worker puis recherche fournisseur locale selon le plan v3 ;
+6. essayer ID/route exacte, artefact/aliases, fiches locales, snapshot privé
+   synchronisé, puis D1 `VERIFIED`; sur `MISS`, un seul bail autorise une
+   recherche fournisseur locale selon ADR-0046 ;
 7. comparer les candidats avec une politique symétrique et déterministe ;
 8. persister la résolution unique ou publier une Review explicite ;
 9. hydrater par identifiant exact dans une tâche distincte ;
@@ -686,7 +687,7 @@ sont paginées ou découpées en tranches durables. Une installation avec zéro
 favori admissible est un succès vide, pas une erreur. Un échec conserve la
 dernière projection lisible et publie une erreur récupérable.
 
-## Review et collectif
+## Review et découverte publique vérifiée
 
 Le [plan v3](favorite-resolution-correction-plan.md) définit RESOLVED,
 REVIEW_REQUIRED/AMBIGUOUS ou NOT_FOUND, UNSUPPORTED et RETRYABLE. L'import
@@ -698,11 +699,12 @@ La décision humaine relit source, Review et révision en transaction. Un ID/sou
 manuel exact est hydratable sans Work préalable en bibliothèque. Les candidats
 comparables et leur provenance sont conservés; l'ordre ne tranche jamais.
 
-Le collectif suit ADR-0033 : clé hachée, média, IDs publics, versions, nonce et
-authentification propriétaire. Worker seul détenteur D1, consentement révocable,
-préférence owner-scoped avant confirmation partagée de deux owners distincts.
-Aucun titre brut, URL, dossier ou progression; secrets dans storage.local.
-Le site et WebBridge ne participent ni à l'authentification owner ni à D1.
+ADR-0046 remplace le Collectif. La clé publique contient l'empreinte, le média et
+les versions de parsing/règles, sans owner, installation, appairage ou secret.
+Le client peut proposer uniquement des IDs fournisseur après avoir obtenu un
+bail atomique. Seul le collecteur GitHub OIDC hydrate les profils officiels et
+publie `VERIFIED`. Aucun titre brut, URL, dossier, progression ou décision
+privée n'entre dans D1; le site et WebBridge ne participent pas au protocole.
 
 ## Versioning et oracle
 
@@ -830,7 +832,7 @@ terminal. Elles ne sont jamais utilisées pour annoncer une équivalence FavLib.
 | Q-05 | Claim expiré | rejeu avec même idempotency key | CONSERVER | `A87` |
 | Q-06 | Retry-After ou rate reset | prochaine échéance durable exacte | CONSERVER | `PT`, `A87` |
 | Q-07 | Hydratation après résolution | tâche ID exacte, aucun rematch | CONSERVER | `DQ` |
-| Q-08 | Consentement retiré | tâches Review pending bloquées | CONSERVER | `DQ` |
+| Q-08 | Claim D1 déjà en attente | aucun second appel fournisseur avant expiration du bail | CORRIGER | `DQ`, ADR-0046 |
 | B-01 | Installation ou update | inventaire importé par tranches | CONSERVER | `BG` |
 | B-02 | Création/modification/déplacement | convergence idempotente | CONSERVER | `BG` |
 | B-03 | Suppression navigateur | aucune suppression de Work/progression | CORRIGER | `BG`, ADR-0025 |
@@ -875,7 +877,7 @@ MangaUpdates directement.
 - attente longue en mémoire dans le service worker ;
 - scan complet transformé sans tranche durable ;
 - suppression cascade d’une œuvre à partir d’un événement bookmark ;
-- contribution collective sans consentement local actif et revérifié.
+- publication directe par un client d'un titre ou d'une association D1 fiable.
 
 ## Critère de complétude avant codage
 

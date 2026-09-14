@@ -2,6 +2,7 @@ export * from './equivalence-corpus';
 export * from './equivalence-oracle';
 export * from './eligibility';
 export * from './favorite-parser';
+export * from './favorite-identity-lookup';
 export * from './favorite-resolution-runner';
 export * from './local-language-evidence';
 export * from './progression-extraction';

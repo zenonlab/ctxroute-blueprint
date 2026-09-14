@@ -6,8 +6,8 @@ const migrations = await readD1Migrations('./migrations');
 export default defineConfig({
   plugins: [cloudflareTest({
     miniflare: {
-      bindings: { COLLECTIVE_DAILY_QUOTA: '2', TEST_MIGRATIONS: migrations },
-      d1Databases: ['COLLECTIVE_DB'],
+      bindings: { TEST_MIGRATIONS: migrations },
+      d1Databases: ['PUBLIC_DB'],
     },
     wrangler: { configPath: './wrangler.jsonc' },
   })],

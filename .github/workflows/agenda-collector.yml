@@ -1,0 +1,47 @@
+name: Publish public Agenda generation
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: agenda-public-generation
+  cancel-in-progress: false
+
+jobs:
+  collect-and-publish:
+    name: Collect providers and publish generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Bundle the typed collector
+        run: node_modules/.bin/esbuild scripts/agenda-certification/collect-and-publish.ts --bundle --format=esm --platform=node --outfile=/tmp/tobirink-agenda-collector.mjs
+
+      - name: Request the scoped GitHub OIDC token
+        id: oidc
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          result-encoding: string
+          script: return await core.getIDToken('https://tobirink.com/v2/releases/generations')
+
+      - name: Collect and publish the complete generation
+        env:
+          AGENDA_OIDC_TOKEN: ${{ steps.oidc.outputs.result }}
+        run: node /tmp/tobirink-agenda-collector.mjs

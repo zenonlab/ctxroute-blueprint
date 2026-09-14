@@ -61,6 +61,10 @@ automatiques dont l'artefact sémantique a changé, en conservant un reçu compl
 `1.0.25` retire le rescan global au démarrage normal, remplace les lectures
 IndexedDB unitaires de la bibliothèque par des lots `bulkGet`/`anyOf` bornés à
 cent identifiants et calcule le bootstrap avec trois comptes indexés.
+`1.0.26` publie la première correction de mutualisation sans prétendre résoudre
+la collecte Agenda bloquée depuis Cloudflare. `1.0.27` corrige le receiver du
+`fetch` navigateur, déplace la collecte Agenda vers GitHub OIDC et remplace le
+Collectif par le cache public vérifié D1-first de l'ADR-0046.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

@@ -23,14 +23,15 @@
         "note": "Favoris : présence/progression. IndexedDB : fiches structurées, facettes et statistiques privées. Sync : IDs publics seulement."
       },
       {
-        "id": "collective",
-        "label": "Collectif SQL",
+        "id": "public-cache",
+        "label": "Cache public vérifié",
         "focus": [
           "resolution",
           "worker",
-          "d1"
+          "d1",
+          "collector"
         ],
-        "note": "Worker seul sur D1 : HTTP v2, owners/installations, reçus et règles; SQL préparé, batches atomiques, lookup borné."
+        "note": "Sans identité produit ni appairage : claim atomique PENDING, IDs proposés, puis promotion VERIFIED par collecteur GitHub OIDC."
       },
       {
         "id": "presentation",
@@ -83,7 +84,7 @@
       "id": "worker",
       "type": "cloud",
       "label": "Worker HTTP typé",
-      "sublabel": "Règles / collectif / catalogue",
+      "sublabel": "Claims / gate OIDC / catalogue",
       "pos": [
         840,
         350
@@ -97,7 +98,7 @@
       "id": "d1",
       "type": "database",
       "label": "D1 SQL",
-      "sublabel": "Clés / owners / IDs publics",
+      "sublabel": "MISS / PENDING / VERIFIED",
       "pos": [
         1140,
         350
@@ -146,6 +147,20 @@
       ],
       "size": [
         230,
+        70
+      ]
+    },
+    {
+      "id": "collector",
+      "type": "security",
+      "label": "Collecteur GitHub OIDC",
+      "sublabel": "Hydratation ID / preuve officielle",
+      "pos": [
+        1140,
+        90
+      ],
+      "size": [
+        210,
         70
       ]
     },
@@ -222,7 +237,7 @@
       "id": "http",
       "from": "resolution",
       "to": "worker",
-      "label": "lots authentifiés / clés hachées",
+      "label": "empreintes / claims publics",
       "labelAt": [
         750,
         450
@@ -233,13 +248,33 @@
       "id": "sql",
       "from": "worker",
       "to": "d1",
-      "label": "SQL préparé"
+      "label": "PENDING / VERIFIED",
+      "labelAt": [1105, 434]
     },
     {
       "id": "provider",
       "from": "resolution",
       "to": "providers",
-      "label": "identité / métadonnées bornées"
+      "label": "bail D1 ou ID exact · données bornées"
+    },
+    {
+      "id": "verify-provider",
+      "from": "providers",
+      "to": "collector",
+      "label": "profil officiel borné",
+      "labelAt": [1105, 174],
+      "variant": "security"
+    },
+    {
+      "id": "promote",
+      "from": "collector",
+      "to": "worker",
+      "label": "promotion signée",
+      "fromSide": "right",
+      "toSide": "top",
+      "via": [[1370, 125], [1370, 320], [955, 320]],
+      "labelAt": [1320, 300],
+      "variant": "security"
     },
     {
       "id": "project",

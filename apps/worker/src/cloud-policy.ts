@@ -4,10 +4,6 @@ export const cloudPolicy = Object.freeze({
     maximumPageSize: 100,
     maximumRelatedRows: 32,
   },
-  collective: {
-    maximumBodyBytes: 1024,
-    maximumDailyQuota: 1000,
-  },
   cover: {
     immutableCacheControl: 'public, max-age=31536000, immutable',
     masterPrefix: 'covers/masters/sha256',

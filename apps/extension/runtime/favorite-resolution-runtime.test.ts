@@ -3,7 +3,7 @@ import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
 import { createFavoriteResolutionRuntime, reconcileFavoriteBookmarkMutation, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
 import type { ExtensionDiagnosticInput } from './extension-diagnostics';
-import type { FavoriteCollectiveKey, ProviderIdentityRestoreResult } from '@tobirink/application';
+import type { ProviderIdentityRestoreResult } from '@tobirink/application';
 
 const unavailable = { search: async () => { throw new Error('unused'); } };
 const noHydration = { hydrate: async () => undefined };
@@ -17,30 +17,22 @@ function resolutionTaskId(bookmarkId: string): string {
 }
 
 describe('createFavoriteResolutionRuntime', () => {
-  it('groups sync, owner and public-cache keys before claiming provider work', async () => {
+  it('prepares private synchronized identities before claiming provider work', async () => {
     const storage = new MemoryStoragePort();
     const order: string[] = [];
     const synchronized = vi.fn(async (keys: readonly { fingerprint: string }[]) => { order.push('sync'); return keys.map(({ fingerprint }) => ({ fingerprint, kind: 'MISS' as const })); });
-    const collective = vi.fn(async (keys: readonly { fingerprint: string }[]) => { order.push('owner'); return keys.map(({ fingerprint }) => ({ fingerprint, kind: 'MISS' as const })); });
-    const prepareFavoriteIdentities = vi.fn(async (keys: readonly FavoriteCollectiveKey[]) => {
-      order.push('d1');
-      expect(keys).toHaveLength(1);
-      expect(Object.keys(keys[0] ?? {}).sort()).toEqual(['fingerprint', 'mediaKind', 'parserVersion', 'siteRulesVersion']);
-    });
     const claimNext = vi.fn(async () => { order.push('provider'); return undefined; });
     const reconcile = createFavoriteResolutionRuntime({
       bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [{ bookmarkId: 'media-1', folderPath: [], order: 0, title: 'Frieren Chapter 12', url: 'https://reader.example/manga/frieren/chapter/12' }] }) },
-      candidates: unavailableCandidates, collective: { lookup: collective }, ensureReady: async () => ({ schemaVersion: 12 }), hydration: emptyHydration,
+      candidates: unavailableCandidates, ensureReady: async () => ({ schemaVersion: 12 }), hydration: emptyHydration,
       libraryId: libraryId('library_primary'), now: () => '2026-09-12T12:00:00.000Z',
       outbox: { block: vi.fn(), claimNext, nextAvailableAt: async () => undefined, retry: vi.fn() },
-      publicCache: { findFavoriteIdentity: async () => undefined, prepareFavoriteIdentities }, sourceAdapters: [], storage,
+      sourceAdapters: [], storage,
       synchronized: { lookup: synchronized }, token: () => 'cache-first-run',
     });
     await reconcile();
     expect(synchronized).toHaveBeenCalledOnce();
-    expect(collective).toHaveBeenCalledOnce();
-    expect(prepareFavoriteIdentities).toHaveBeenCalledOnce();
-    expect(order.indexOf('provider')).toBeGreaterThan(Math.max(order.indexOf('sync'), order.indexOf('owner'), order.indexOf('d1')));
+    expect(order.indexOf('provider')).toBeGreaterThan(order.indexOf('sync'));
   });
 
   it('continues a 1401-bookmark inventory from its checkpoint until the final batch', async () => {

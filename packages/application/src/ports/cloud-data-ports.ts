@@ -1,7 +1,4 @@
-import type { FavoritePublicReference } from '../collective-index/favorite-collective-lookup';
-import type { FavoriteCollectiveKey } from '../collective-index/favorite-collective-lookup';
-import type { FavoritePublicCacheEntry } from '../collective-index/favorite-collective-protocol';
-import type { FavoritePublicCacheBatchResult } from '../collective-index/favorite-collective-protocol';
+import type { FavoritePublicReference } from '../favorites/favorite-identity-lookup';
 
 export interface PublicCatalogueWork {
   id: string;
@@ -21,19 +18,12 @@ export interface PublicCatalogueReference {
 }
 
 export interface PublicCatalogueReadPort {
-  findFavoriteIdentity(key: FavoriteCollectiveKey): Promise<FavoritePublicCacheEntry | undefined>;
-  findFavoriteIdentities(keys: readonly FavoriteCollectiveKey[]): Promise<readonly FavoritePublicCacheBatchResult[]>;
   findWork(workId: string): Promise<PublicCatalogueWork | undefined>;
   listReferences(workId: string, limit: number): Promise<readonly PublicCatalogueReference[]>;
   listTitles(workId: string, limit: number): Promise<readonly PublicCatalogueTitle[]>;
   listWorksAfter(cursor: { id: string; revision: number }, limit: number): Promise<readonly PublicCatalogueWork[]>;
   resolveReference(provider: string, externalId: string): Promise<PublicCatalogueWork | undefined>;
   searchWorksByTitle(title: string, limit: number): Promise<readonly PublicCatalogueWork[]>;
-}
-
-export interface FavoritePublicCacheReadPort {
-  findFavoriteIdentity(key: FavoriteCollectiveKey): Promise<FavoritePublicCacheEntry | undefined>;
-  prepareFavoriteIdentities?(keys: readonly FavoriteCollectiveKey[]): Promise<void>;
 }
 
 export interface CoverMasterReadPort {

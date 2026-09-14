@@ -84,7 +84,7 @@ function endpoint(provider: KitsuProvider, id?: string): string {
 export class KitsuFavoriteProviderAdapter implements FavoriteProviderCandidatePort, FavoriteProviderHydrationPort {
   constructor(
     private readonly provider: KitsuProvider,
-    private readonly fetcher: FavoriteProviderFetch = fetch,
+    private readonly fetcher: FavoriteProviderFetch = fetch.bind(globalThis),
     private readonly gate = new FavoriteProviderRateGate(provider),
   ) {}
 

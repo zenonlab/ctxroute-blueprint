@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.25`; its published archives match the
+The current production release is `1.0.26`; its published archives match the
 verified local candidates.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
@@ -36,13 +36,32 @@ The production download paths are versioned and fixed to the Worker domain:
 may reference these paths only after the matching ZIPs and SHA-256 manifest have
 been accepted and uploaded through an explicitly approved provider operation.
 
+### Published mutualisation correction — 1.0.26
+
+Candidate `1.0.26` activates the already consented owner runtime for an
+installation without a recorded choice before the inventory maintenance pass.
+It therefore sends each hydrated official profile to the existing authenticated
+Worker contribution path, while preserving an explicit revocation and excluding
+private titles, URLs, folders and progress. These archives are published; the
+new Agenda collector and the local 1.0.27 transport correction are not.
+
+### Correction locale non publiée — cache vérifié sans Collectif
+
+La candidate locale retire des paquets actifs la section Options, les messages
+et les routes HTTP de consentement/appairage. La résolution utilise désormais
+le cache D1 `MISS/PENDING/VERIFIED` : un bail unique autorise une seule recherche
+textuelle concurrente, les autres clients attendent, puis une proposition d’IDs
+reste non fiable jusqu’à sa promotion par le workflow GitHub OIDC. Les archives
+et le Worker corrigés ne sont pas publiés tant que l’opération externe séparée
+n’est pas explicitement autorisée.
+
 ## Release verification
 
 ### Local library performance — 2026-09-13
 
 ### Corrected Agenda publication — 2026-09-13
 
-The corrected Agenda pipeline was published through Cloudflare gate
+The Agenda Worker and extension artifacts were published through Cloudflare gate
 `3b5a999181355cc0b91e232b4092b777913c1da121c7e3230f52f6488fa4cfd6`.
 The exact allowlist contained only the additive D1 migration target,
 the versioned Chrome and Firefox 1.0.25 R2 objects, and
@@ -61,6 +80,26 @@ The installed Chromium 153 smoke reconstructs one anime `INSTANT` entry and
 one manga `DATE` entry. Production pages and API routes return the expected
 statuses, the production Playwright connection-state smoke passes, and the
 Agenda dataflow remains Archify showcase 9/9 with zero errors and warnings.
+
+Certification correction — 2026-09-14: the installed Agenda smoke uses seeded
+events; it does not demonstrate live provider collection. The last observed
+public API responses contained an empty catalogue and `revision: d1-empty`.
+These responses do not count every D1 table. The separate collector and signed
+ingestion described in ADR-0045 are not established as deployed, and weekly
+refresh shared with user requests is not certified. The local cache correction
+documented in `docs/systems/agenda-recovery-plan.md` is not part of the
+published archives above. Artifact publication must not be treated as
+end-to-end Agenda certification.
+
+### Agenda mutualisation deployment — 2026-09-14
+
+The approved gate plan `fbc80ad5c4d55b41742ad032bc34c5f565c9bce0d9b945ef2ff183376d0b096a`
+applied migration `0010_public_release_sync_state.sql` to D1
+`tobirink-public` and deployed Worker version
+`7e5440ab-3acb-4296-9701-54ed710d0ed9` at 100 percent. Post-deployment
+inspection reports no pending migrations. The public routes return HTTP 200;
+the observed catalogue remains empty and `/v2/releases` remains `d1-empty`,
+so this deployment is not evidence of a successful live provider collection.
 
 Candidate `1.0.25` keeps IndexedDB authoritative while replacing per-record
 catalogue reads with bounded `bulkGet` and `anyOf(workIds)` batches. Normal
@@ -651,6 +690,29 @@ validates the strict public schema, hashes both inputs, and writes the immutable
 snapshot before changing `releases/current.json`. D1 is not involved.
 
 ## Rollback
+
+### Agenda certification correction — 2026-09-14
+
+The local 1.0.27 candidate binds the default native `fetch` receiver in the
+browser HTTP adapters. The installed Firefox run exposed the previous
+`fetch called on an object that does not implement interface Window` error.
+The Firefox harness uses Marionette throughout and enables system access only
+for its isolated temporary profile, as required by current Firefox automation.
+Both Firefox 155 and Chromium 153 reconstructed a synthetic anime INSTANT and
+manga DATE after the correction. This proves local projection, not live shared
+provider ingestion. The adapter suite passes 86 tests, including a regression
+test that enforces the native fetch receiver. The complete `npm run verify`
+passed after the transport correction.
+
+Production Worker `5497b61c-a25d-4ca2-b193-8e747fada840` and the published 1.0.26
+archives predate this correction. The 1.0.27 candidate is not published.
+The public Agenda route still returns `d1-empty`. The local 1.0.27/Worker
+candidate now contains a weekly GitHub Actions collector and strict GitHub OIDC
+ingestion; it removes both the Cloudflare cron and provider calls from public
+GET requests. Replays are idempotent and older generations cannot replace the
+active pointer. This architecture is not production-certified until the
+Worker/workflow are published and a real cycle populates D1. No Agenda secret
+or committed `.env` value is required.
 
 Rollback never mutates local user data and is never automatic.
 

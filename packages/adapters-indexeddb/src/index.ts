@@ -7,6 +7,7 @@ export type { IntegrityReport } from './migrations';
 export { DexieTaskStore } from './task-store';
 export { DexieFavoriteResolutionOutbox } from './favorite-resolution/dexie-favorite-resolution-outbox';
 export { DexieProviderRateCheckpointAdapter } from './favorite-resolution/dexie-provider-rate-checkpoint-adapter';
+export { DexiePublicDiscoveryStore } from './favorite-resolution/dexie-public-discovery-store';
 export { DexieOrganizerSnapshotStore } from './organizer-snapshot/dexie-organizer-snapshot-store';
 export { DexiePublicReleaseFallbackStore } from './releases/dexie-public-release-fallback-store';
 export { DexiePublicReleaseGenerationCache } from './releases/dexie-public-release-generation-cache';

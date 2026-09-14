@@ -4,6 +4,30 @@ import { HttpPublicReleaseLoader } from './http-public-release-loader';
 const releaseEvent = (id: string, instant: string) => ({ expiresAt: '2026-11-12T00:00:00.000Z', id, occurrence: { kind: 'INSTANT', value: instant }, provenance: { fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist', providerWorkId: '42', releaseKind: 'episode', state: 'SCHEDULED' });
 
 describe('HttpPublicReleaseLoader', () => {
+  it('stores a published empty window and reuses it without another provider or HTTP request', async () => {
+    const window = { from: '2026-09-12', to: '2026-09-28' };
+    const generation = { etag: '"calendar-verified-empty"', events: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'calendar-verified-empty', source: 'shared' as const, window };
+    const cache = { load: vi.fn().mockResolvedValueOnce(undefined).mockResolvedValue(generation), save: vi.fn() };
+    const fetcher = vi.fn(async () => Response.json({ entries: [], generatedAt: generation.generatedAt, revision: generation.revision }, { headers: { ETag: generation.etag } }));
+    const loader = new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z'));
+    expect((await loader.load(cache, window)).snapshot.events).toEqual([]);
+    expect(cache.save).toHaveBeenCalledWith(generation);
+    expect((await loader.load(cache, window)).source).toBe('cache');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['fallback', 'different-window', 'missing'] as const)('rejects a 304 for a %s cache without sending its ETag', async (kind) => {
+    const window = { from: '2026-09-12', to: '2026-09-28' };
+    const snapshot = { etag: '"other-generation"', events: [], generatedAt: '2026-09-10T00:00:00.000Z', revision: 'other-generation', source: kind === 'fallback' ? 'fallback' as const : 'shared' as const, window: kind === 'different-window' ? { from: '2026-09-01', to: '2026-09-10' } : window };
+    const cache = { load: async () => kind === 'missing' ? undefined : snapshot, save: vi.fn() };
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.headers).toBeUndefined();
+      return new Response(null, { status: 304 });
+    });
+    await expect(new HttpPublicReleaseLoader('https://tobirink.com', fetcher).load(cache, window)).rejects.toThrow('public-release-unexpected-304');
+    expect(cache.save).not.toHaveBeenCalled();
+  });
+
   it('keeps the last good cache on 304 and avoids a write', async () => {
     const snapshot = { etag: '"release-r1-window"', events: [], generatedAt: '2026-09-10T00:00:00.000Z', revision: 'r1', source: 'shared' as const, window: { from: '2026-09-01', to: '2026-10-01' } };
     const cache = { load: async () => snapshot, save: vi.fn() };
