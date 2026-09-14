@@ -9275,7 +9275,7 @@
       "schemaVersion": 1,
       "id": "goal-correct-agenda-provider-pipeline",
       "title": "Corriger la pipeline Agenda après audit fournisseur",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -9505,7 +9505,7 @@
         {
           "id": "step-8",
           "title": "Publier séparément la pipeline Agenda corrigée",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Une approbation explicite distincte autorise chaque ressource externe exacte",
             "Le collecteur choisi a passé plusieurs smokes AniList depuis son egress réel",
@@ -9526,10 +9526,9 @@
             "git commit -m chore(release): record corrected agenda publication"
           ],
           "evidence": [
-            "Architecture corrigée: Discovery automatique D1-first sans recherche/hydratation/couverture fournisseur MV3; Agenda v3 vérifie fenêtre source et fraîcheur.",
-            "D1 Agenda échoue sur ligne active invalide et conserve active + deux sauvegardes; MangaUpdates journalise les compteurs et refuse plus de 5 % sans identité.",
-            "npm run verify passe intégralement; quatre vues Archify passent 9/9; ZIP 1.0.29 reproductibles créés localement.",
-            "Publication Git et plan Cloudflare exact restent à exécuter dans cette étape."
+            "Cloudflare gate 3faa51ed… published both 1.0.29 ZIPs and activated Worker 5d55c52d-3f50-473b-8bdf-62f1d30fa81c at 100%; no D1 migration was pending.",
+            "Public run 34894650534 passed 47 tests and published active generation calendar-0a3ba9d… with 765 events: AniList 239 and MangaUpdates 526; D1 retains 1 active plus 1 staging generation.",
+            "Live /v2 and /v3 return the active revision; repeated /v2 bytes are identical, conditional requests return 304, and remote Chrome/Firefox SHA-256 match the verified 1.0.29 candidates."
           ]
         }
       ]

@@ -789,6 +789,44 @@ The repository gate reads only the canonical files under `build/releases/`,
 validates the strict public schema, hashes both inputs, and writes the immutable
 snapshot before changing `releases/current.json`. D1 is not involved.
 
+### Agenda provider hardening publication — 2026-09-14
+
+Release `1.0.29` and the hardened Agenda pipeline were published through the
+reviewed Cloudflare gate plan
+`3faa51ed4b06bb4e942f7e411a099a48bc3ea15f9b9ab902fb710e495f93e467`.
+Worker version `5d55c52d-3f50-473b-8bdf-62f1d30fa81c` is active at 100%; D1
+reports no pending migration. The public collector source is commit
+`3d2f570819f716c41667160a2e48c80d95c36415` on `main`.
+
+GitHub Actions run
+[`34894650534`](https://github.com/tristan-monticelli/tobirink-public-discovery/actions/runs/34894650534)
+passed its 47 tests and published active generation
+`calendar-0a3ba9d67eecbb853aab521c5b57f199ec2aab49cc646f1c` for
+`2026-09-13` through `2026-09-29`. D1 contains 765 active events: 239 from
+AniList and 526 from MangaUpdates. MangaUpdates received 532 rows and skipped
+6 unidentified rows, below the quality rejection threshold. D1 retains one
+active and one staging generation, within the active-plus-two-backups limit.
+
+Live `/v2/releases` and `/v3/releases` reads returned the same active revision
+and a stable 100-entry first page. The v2 response retains only its legacy
+top-level keys; v3 additionally returns the source window. A repeated v2 read
+was byte-identical with SHA-256
+`47e2a530014663b0def1bc8960436b97587bad5304f6d1d0b115982c35ab3e59`.
+Conditional reads returned HTTP 304 on both routes. Public GET requests read D1
+only; provider collection remains isolated in the scheduled or manually
+dispatched GitHub workflow.
+
+The published archives are byte-identical to the verified local candidates:
+
+- Chrome: 302755 bytes, SHA-256 `78cd2e6755dc0d26d92c209eda082711dd0917b794f41f947e7ed4b5aa6be211`.
+- Firefox: 302807 bytes, SHA-256 `532c5f69c7914e42a0b9cefc80286dbd38d5bdbd74a9d46049ab9c846ae010a7`.
+
+Retain Worker version `b398b19c-3cac-4e50-9c24-86902eb03853` as the immediate
+rollback reference. The successful workflow emitted a non-blocking GitHub
+warning that pinned action releases still declare the deprecated Node.js 20
+action runtime; GitHub executed them on Node.js 24, matching the workflow's
+configured application runtime.
+
 ## Rollback
 
 ### Agenda certification correction — 2026-09-14
