@@ -434,7 +434,20 @@ fn volume(dynamics: &JpcDynamics) -> Result<(&'static str, [f32; 6])> {
     let minimum = (dynamics.volume_min_radius * radius).clamp(0.0, radius);
     match dynamics.volume_type {
         4 => Ok(("point", [0.0; 6])),
-        6 => Ok(("line", [radius, 0.0, 0.0, 0.0, 0.0, 0.0])),
+        // JPA's line volume emits one complete cross-section per division
+        // step. Keep that cardinality in the portable volume contract; the
+        // track callback consumes the resulting particles in fixed groups.
+        6 => Ok((
+            "line",
+            [
+                f32::from(dynamics.volume_size),
+                f32::from(dynamics.division_count),
+                f32::from((dynamics.flags & 0x02 != 0) as u8),
+                0.0,
+                0.0,
+                0.0,
+            ],
+        )),
         1 => Ok(("sphere", [radius, 0.0, 0.0, 0.0, 0.0, 0.0])),
         5 => Ok((
             "disc",
