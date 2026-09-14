@@ -2,7 +2,7 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.26`; its published archives match the
+The current production release is `1.0.27`; its published archives match the
 verified local candidates.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
@@ -45,15 +45,32 @@ Worker contribution path, while preserving an explicit revocation and excluding
 private titles, URLs, folders and progress. These archives are published; the
 new Agenda collector and the local 1.0.27 transport correction are not.
 
-### Correction locale non publiée — cache vérifié sans Collectif
+### Correction publiée — cache vérifié sans Collectif
 
-La candidate locale retire des paquets actifs la section Options, les messages
+La version 1.0.27 retire des paquets actifs la section Options, les messages
 et les routes HTTP de consentement/appairage. La résolution utilise désormais
 le cache D1 `MISS/PENDING/VERIFIED` : un bail unique autorise une seule recherche
 textuelle concurrente, les autres clients attendent, puis une proposition d’IDs
-reste non fiable jusqu’à sa promotion par le workflow GitHub OIDC. Les archives
-et le Worker corrigés ne sont pas publiés tant que l’opération externe séparée
-n’est pas explicitement autorisée.
+reste non fiable jusqu’à sa promotion par le workflow GitHub OIDC. La migration
+D1, les archives et le Worker corrigés ont été publiés le 14 septembre 2026.
+
+### Publication D1-first et Agenda OIDC — 2026-09-14
+
+Le gate Cloudflare `e99f9f8f175d282e33ed15e253b8be85c7be5d0019bfafd4ddff7230fcfb649b`
+a appliqué uniquement la migration `0011_verified_public_discovery.sql`, les
+deux objets R2 versionnés et le Worker `tobirink-public-api`. L'inspection après
+publication ne rapporte plus de migration en attente et déploie la version
+Worker `4f2b30ee-ef24-4ccc-aefb-e880be5fa50e` à 100 % sans cron Cloudflare.
+
+- Chrome : 301668 octets, SHA-256 `0bc6270241192483d9dc5c4d4df7f8a4de0503298f1f7bfb3bcc4dbb2fd0fb94`.
+- Firefox : 301702 octets, SHA-256 `b7d06163183190ba3202f23c5acc131666653f38055037203bd10f180eca81fa`.
+
+Les téléchargements HTTP reproduisent exactement ces empreintes. D1 contient
+la nouvelle table de claims mais encore zéro claim vérifié et zéro génération
+Agenda active. Les runs GitHub `34853308267` et `34853312139` n'ont exécuté
+aucune étape : GitHub les a refusés pour paiement de compte échoué ou limite de
+dépense insuffisante. La collecte réelle reste donc non certifiée jusqu'à la
+résolution de ce blocage externe.
 
 ## Release verification
 
@@ -704,14 +721,14 @@ provider ingestion. The adapter suite passes 86 tests, including a regression
 test that enforces the native fetch receiver. The complete `npm run verify`
 passed after the transport correction.
 
-Production Worker `5497b61c-a25d-4ca2-b193-8e747fada840` and the published 1.0.26
-archives predate this correction. The 1.0.27 candidate is not published.
-The public Agenda route still returns `d1-empty`. The local 1.0.27/Worker
-candidate now contains a weekly GitHub Actions collector and strict GitHub OIDC
+Production Worker `4f2b30ee-ef24-4ccc-aefb-e880be5fa50e` and the published
+1.0.27 archives include this correction. The public Agenda route still returns
+`d1-empty` because GitHub billing prevented both collector jobs from starting.
+The 1.0.27 Worker contains a weekly GitHub Actions collector and strict GitHub OIDC
 ingestion; it removes both the Cloudflare cron and provider calls from public
 GET requests. Replays are idempotent and older generations cannot replace the
-active pointer. This architecture is not production-certified until the
-Worker/workflow are published and a real cycle populates D1. No Agenda secret
+active pointer. This architecture is not production-certified until a real
+cycle populates D1. No Agenda secret
 or committed `.env` value is required.
 
 Rollback never mutates local user data and is never automatic.
