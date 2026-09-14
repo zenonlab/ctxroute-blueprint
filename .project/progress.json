@@ -9633,7 +9633,7 @@
       "schemaVersion": 1,
       "id": "goal-public-cache-without-collective",
       "title": "Sécuriser le cache public et retirer le Collectif",
-      "status": "BLOCKED",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -9840,7 +9840,7 @@
         {
           "id": "step-7",
           "title": "Préparer puis publier les ressources exactes",
-          "status": "BLOCKED",
+          "status": "DONE",
           "acceptance": [
             "Le plan Cloudflare exact est revu et approuvé avant application.",
             "Le workflow GitHub est poussé puis exécuté avec OIDC.",
@@ -9860,9 +9860,9 @@
             "Vérifier les routes, D1 et le rollback."
           ],
           "evidence": [
-            "Commit 1e75b70 poussé sur origin/main; Worker 4f2b30ee, migration 0011 et deux ZIP 1.0.27 restent publiés et vérifiés.",
-            "Trois cycles de runs GitHub ont été refusés avant toute étape avec le même diagnostic Billing; les derniers sont 34855014417 et 34855018391.",
-            "external: D1 reste à 0 claim/0 VERIFIED; seule la correction du paiement ou de la limite GitHub peut permettre le collecteur OIDC."
+            "Public MIT collector repository main=f208aca; GitHub run 34879839965 claimed 1 and published 1 through exact OIDC.",
+            "D1 request is VERIFIED; repeat run 34879931399 and post-deploy run 34880368092 both claimed 0 with attempt_count and timestamps unchanged.",
+            "Worker 5ed013e0 deployed; monorepo npm run verify and public-discovery Archify showcase 9/9 pass; private commit 3032275 pushed."
           ]
         }
       ]
