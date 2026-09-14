@@ -44,6 +44,15 @@ jobs:
           result-encoding: string
           script: return await core.getIDToken('https://tobirink-public-api.choukky.workers.dev/v3/catalogue/discoveries/results')
 
+      - name: Validate public OIDC identity
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          CLAIM_TOKEN: ${{ steps.claim-oidc.outputs.result }}
+        with:
+          script: |
+            const claims = JSON.parse(Buffer.from(process.env.CLAIM_TOKEN.split('.')[1], 'base64url').toString('utf8'));
+            core.info(JSON.stringify({ aud: claims.aud, event_name: claims.event_name, ref: claims.ref, repository: claims.repository, workflow_ref: claims.workflow_ref }));
+
       - name: Resolve and publish
         env:
           DISCOVERY_API_BASE_URL: https://tobirink-public-api.choukky.workers.dev
