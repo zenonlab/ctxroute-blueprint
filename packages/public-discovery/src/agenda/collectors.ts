@@ -82,7 +82,11 @@ export class MangaUpdatesAgendaCollector implements PublicAgendaCollector {
       if (body.page !== requestedPage) throw new Error('mangaupdates-page-mismatch');
       if (body.results.length === 0 && events.size < body.total_hits) throw new Error('mangaupdates-pagination-incomplete');
       const fetchedAt = new Date().toISOString();
-      const pageEvents = body.results.map((item) => createMangaUpdatesAgendaEvent(item, fetchedAt));
+      const pageEvents: PublicAgendaReleaseEvent[] = [];
+      for (const item of body.results) {
+        try { pageEvents.push(createMangaUpdatesAgendaEvent(item, fetchedAt)); }
+        catch (error) { if (!(error instanceof Error) || error.message !== 'mangaupdates-series-id-missing') throw error; }
+      }
       for (const event of pageEvents) events.set(event.id, event);
       const hasNextPage = body.page * body.per_page < body.total_hits;
       await this.saveCheckpoint(hasNextPage ? { complete: false, events: Object.freeze(pageEvents), nextPage: body.page + 1, notBefore: this.clock() + 3_000, page: body.page, provider: this.provider } : { complete: true, events: Object.freeze(pageEvents), page: body.page, provider: this.provider });

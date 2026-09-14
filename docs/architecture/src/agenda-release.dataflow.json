@@ -46,7 +46,7 @@
     { "id": "localSurfaces", "type": "frontend", "label": "Extension et WebBridge", "sublabel": "Agenda · rappels", "stage": 4, "row": 3, "yOffset": -200, "width": 160, "tag": "lecture locale" }
   ],
   "flows": [
-    { "from": "providerApis", "to": "scheduledCollector", "label": "pages validées", "classification": "AniList INSTANT · MU DATE", "variant": "emphasis", "route": "auto" },
+    { "from": "providerApis", "to": "scheduledCollector", "label": "pages validées", "classification": "sorties identifiables", "variant": "emphasis", "route": "auto" },
     { "from": "scheduledCollector", "to": "syncGate", "label": "lot + jeton court", "classification": "fenêtre J−1/J+15", "variant": "security", "route": "auto", "labelAt": [315, 200] },
     { "from": "syncGate", "to": "workerIngest", "label": "identité vérifiée", "classification": "RS256 · JWKS GitHub", "variant": "security", "route": "auto", "labelAt": [430, 314] },
     { "from": "workerIngest", "to": "releaseD1", "label": "génération préparée", "classification": "staging puis pointeur actif", "variant": "security", "route": "auto", "labelAt": [530, 200] },

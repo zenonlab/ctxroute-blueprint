@@ -7,8 +7,8 @@ type ProviderJson = z.output<typeof jsonSchema>;
 const scalarSchema = z.union([z.string().trim().min(1).max(128), z.number().finite()]);
 const nullableScalarSchema = scalarSchema.nullable().optional();
 const mangaUpdatesRecordSchema = z.object({ chapter: nullableScalarSchema, chapter_number: nullableScalarSchema, id: nullableScalarSchema, release_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u), release_id: nullableScalarSchema, volume: nullableScalarSchema, volume_number: nullableScalarSchema }).passthrough();
-const mangaUpdatesSeriesSchema = z.object({ id: scalarSchema.optional(), series_id: scalarSchema.optional() }).passthrough();
-export const mangaUpdatesAgendaResultSchema = z.object({ metadata: z.object({ series: mangaUpdatesSeriesSchema.optional() }).passthrough().optional(), record: mangaUpdatesRecordSchema, series: mangaUpdatesSeriesSchema.optional(), series_id: scalarSchema.optional() }).passthrough();
+const mangaUpdatesSeriesSchema = z.object({ id: nullableScalarSchema, series_id: nullableScalarSchema }).passthrough();
+export const mangaUpdatesAgendaResultSchema = z.object({ metadata: z.object({ series: mangaUpdatesSeriesSchema.nullable().optional() }).passthrough().nullable().optional(), record: mangaUpdatesRecordSchema, series: mangaUpdatesSeriesSchema.nullable().optional(), series_id: nullableScalarSchema }).passthrough();
 export const mangaUpdatesAgendaPageSchema = z.object({ page: z.number().int().positive(), per_page: z.number().int().min(1).max(100), results: z.array(mangaUpdatesAgendaResultSchema).max(100), total_hits: z.number().int().nonnegative() }).passthrough();
 export const aniListAgendaPageSchema = z.object({ data: z.object({ Page: z.object({ airingSchedules: z.array(z.object({ airingAt: z.number().int().positive(), episode: z.number().int().positive(), media: z.object({ id: z.number().int().positive() }) })).max(50), pageInfo: z.object({ hasNextPage: z.boolean() }) }) }) });
 

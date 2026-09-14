@@ -40,4 +40,16 @@ describe('public Agenda collectors', () => {
     });
     await expect(new MangaUpdatesAgendaCollector(fetcher, async () => undefined).collect({ from: '2026-09-12', to: '2026-09-28' })).rejects.toThrow('mangaupdates-429');
   });
+
+  it('skips a MangaUpdates release that has no series identity', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({
+      page: 1, per_page: 40, total_hits: 2,
+      results: [
+        { metadata: { series: { series_id: null } }, record: { chapter: '1', id: 10, release_date: '2026-09-13', volume: null } },
+        { metadata: { series: { series_id: 42 } }, record: { chapter: '2', id: 11, release_date: '2026-09-13', volume: null } },
+      ],
+    }));
+    const events = await new MangaUpdatesAgendaCollector(fetcher, async () => undefined).collect({ from: '2026-09-12', to: '2026-09-28' });
+    expect(events.map((item) => item.providerWorkId)).toEqual(['42']);
+  });
 });
