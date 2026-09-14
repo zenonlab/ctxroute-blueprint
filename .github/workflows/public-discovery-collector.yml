@@ -1,8 +1,8 @@
-name: Verify public discovery claims
+name: Collect public discovery requests
 
 on:
   schedule:
-    - cron: '23 * * * *'
+    - cron: '23 3 * * *'
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   verify-and-promote:
-    name: Verify pending provider identities
+    name: Resolve pending works through all provider lanes
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,22 +34,22 @@ jobs:
       - name: Bundle the typed verifier
         run: node_modules/.bin/esbuild scripts/public-discovery/collect-and-promote.ts --bundle --format=esm --platform=node --outfile=/tmp/tobirink-public-discovery.mjs
 
-      - name: Request the read-scoped OIDC token
-        id: read-oidc
+      - name: Request the claim-scoped OIDC token
+        id: claim-oidc
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           result-encoding: string
-          script: return await core.getIDToken('https://tobirink.com/v2/catalogue/discoveries/pending')
+          script: return await core.getIDToken('https://tobirink.com/v3/catalogue/discoveries/collector/claims')
 
-      - name: Request the write-scoped OIDC token
-        id: write-oidc
+      - name: Request the result-scoped OIDC token
+        id: result-oidc
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           result-encoding: string
-          script: return await core.getIDToken('https://tobirink.com/v2/catalogue/discoveries/promotions')
+          script: return await core.getIDToken('https://tobirink.com/v3/catalogue/discoveries/results')
 
-      - name: Verify and promote pending claims
+      - name: Resolve and publish the batch
         env:
-          DISCOVERY_READ_OIDC_TOKEN: ${{ steps.read-oidc.outputs.result }}
-          DISCOVERY_WRITE_OIDC_TOKEN: ${{ steps.write-oidc.outputs.result }}
+          DISCOVERY_CLAIM_OIDC_TOKEN: ${{ steps.claim-oidc.outputs.result }}
+          DISCOVERY_RESULT_OIDC_TOKEN: ${{ steps.result-oidc.outputs.result }}
         run: node /tmp/tobirink-public-discovery.mjs

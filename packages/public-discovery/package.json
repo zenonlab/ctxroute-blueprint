@@ -1,0 +1,12 @@
+{
+  "name": "@tobirink/public-discovery",
+  "version": "0.1.0",
+  "description": "Portable, provider-agnostic public discovery batch orchestrator.",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": { "zod": "4.5.4" },
+  "devDependencies": { "typescript": "5.9.3", "vitest": "4.1.11" }
+}

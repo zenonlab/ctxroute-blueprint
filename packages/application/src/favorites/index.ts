@@ -8,6 +8,8 @@ export * from './local-language-evidence';
 export * from './progression-extraction';
 export * from './provider-matcher';
 export * from './provider-ports';
+export * from './resolve-provider-lanes';
+export * from './public-discovery-resolution';
 export { providerCandidateSchema } from './provider-search-checkpoint';
 export * from './resolution-result-schema';
 export * from './season-extraction';

@@ -1,0 +1,43 @@
+import { describe, expect, it, vi } from 'vitest';
+import { publicDiscoveryProviderSchema, runPublicDiscoveryBatch, type PublicDiscoveryClaimBatch, type PublicDiscoveryResultBatch } from '.';
+
+const key = {
+  fingerprint: 'a'.repeat(64), mediaKind: 'ANIME' as const,
+  parserVersion: 'favorite-parser-v5', siteRulesVersion: 'site-rules-v1',
+};
+const claims: PublicDiscoveryClaimBatch = {
+  claimToken: 'c'.repeat(48),
+  requests: [{
+    attempt: 1, key,
+    query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Sousou no Frieren'] },
+    requestDigest: 'b'.repeat(64), schemaVersion: 2,
+  }],
+  schemaVersion: 2,
+};
+
+describe('runPublicDiscoveryBatch', () => {
+  it('closes the portable contract over every configured provider family', () => {
+    expect(publicDiscoveryProviderSchema.options).toEqual(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']);
+  });
+  it('publishes a validated terminal resolution', async () => {
+    const publish = vi.fn(async (_batch: PublicDiscoveryResultBatch) => ({ published: 1, replayed: 0 }));
+    const report = await runPublicDiscoveryBatch({
+      gateway: { claim: async () => claims, publish }, limit: 20,
+      nonce: () => '550e8400-e29b-41d4-a716-446655440000', now: () => '2026-09-14T10:00:00.000Z',
+      resolver: { resolve: async () => ({ reason: 'no provider match', state: 'NOT_FOUND' }) },
+    });
+    expect(report).toEqual({ claimed: 1, failed: 0, published: 1, replayed: 0 });
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ claimToken: claims.claimToken, results: [expect.objectContaining({ key })] }));
+  });
+
+  it('isolates transient resolver failures without publishing them', async () => {
+    const publish = vi.fn();
+    const report = await runPublicDiscoveryBatch({
+      gateway: { claim: async () => claims, publish }, limit: 1,
+      nonce: () => '550e8400-e29b-41d4-a716-446655440000', now: () => '2026-09-14T10:00:00.000Z',
+      resolver: { resolve: async () => { throw new Error('provider unavailable'); } },
+    });
+    expect(report).toEqual({ claimed: 1, failed: 1, published: 0, replayed: 0 });
+    expect(publish).not.toHaveBeenCalled();
+  });
+});

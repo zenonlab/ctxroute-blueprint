@@ -1,50 +1,34 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PublicDiscoveryKey, PublicDiscoveryLocalRecord, PublicDiscoveryLocalStore } from '@tobirink/application';
+import type { PublicDiscoveryKey } from '@tobirink/application';
 import { HttpPublicDiscoveryAdapter } from './http-public-discovery-adapter';
 
 const key: PublicDiscoveryKey = {
-  fingerprint: 'a'.repeat(64),
-  mediaKind: 'ANIME',
-  parserVersion: '5',
-  siteRulesVersion: '3',
+  fingerprint: 'a'.repeat(64), mediaKind: 'ANIME', parserVersion: '5', siteRulesVersion: '3',
 };
-
-class MemoryDiscoveryStore implements PublicDiscoveryLocalStore {
-  record?: PublicDiscoveryLocalRecord;
-  async read(): Promise<PublicDiscoveryLocalRecord | undefined> { return this.record; }
-  async save(record: PublicDiscoveryLocalRecord): Promise<void> { this.record = structuredClone(record); }
-  async listProposalPending(): Promise<readonly PublicDiscoveryLocalRecord[]> {
-    return this.record?.state === 'PROPOSAL_PENDING' ? [this.record] : [];
-  }
-}
+const query = { discoveryTitles: ['Frieren'], mediaKind: 'ANIME' as const, sourceTitles: ['Sousou no Frieren'] };
 
 describe('HttpPublicDiscoveryAdapter', () => {
-  it('persists one lease and never claims the same work twice while it is active', async () => {
-    const local = new MemoryDiscoveryStore();
-    const fetcher = vi.fn(async (_input: string, init: RequestInit) => init.method === 'GET'
-      ? Response.json({ state: 'MISS' })
-      : Response.json({ expiresAt: '2026-09-14T12:15:00.000Z', leaseToken: 'x'.repeat(32), state: 'LEASED' }, { status: 201 }));
-    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', local, fetcher, () => Date.parse('2026-09-14T12:00:00.000Z'));
-
-    await expect(adapter.resolveOrClaim(key)).resolves.toEqual({ expiresAt: '2026-09-14T12:15:00.000Z', state: 'LEASED' });
-    await expect(adapter.resolveOrClaim(key)).resolves.toEqual({ expiresAt: '2026-09-14T12:15:00.000Z', state: 'LEASED' });
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(local.record).toMatchObject({ leaseToken: 'x'.repeat(32), state: 'LEASED' });
-  });
-
-  it('proposes only the public key, lease and provider IDs', async () => {
-    const local = new MemoryDiscoveryStore();
-    local.record = { expiresAt: '2026-09-14T12:15:00.000Z', id: 'lease', key, leaseToken: 'x'.repeat(32), retryAt: '2026-09-14T12:15:00.000Z', state: 'LEASED' };
+  it('creates a server request after a D1 miss without receiving a provider lease', async () => {
     const bodies: unknown[] = [];
     const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
+      if (init.method === 'GET') return Response.json({ state: 'MISS' });
       bodies.push(JSON.parse(String(init.body)));
-      return Response.json({ proposalDigest: 'b'.repeat(64), state: 'PENDING' }, { status: 202 });
+      return Response.json({ retryAt: '2026-09-14T12:15:00.000Z', state: 'PENDING' }, { status: 202 });
     });
-    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', local, fetcher, () => Date.parse('2026-09-14T12:01:00.000Z'));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    await expect(adapter.resolveOrRequest(key, query)).resolves.toEqual({ retryAt: '2026-09-14T12:15:00.000Z', state: 'PENDING' });
+    expect(bodies).toEqual([{ key, query, schemaVersion: 2 }]);
+    expect(JSON.stringify(bodies)).not.toMatch(/lease|consent|collective|bookmark|folder|progress/iu);
+  });
 
-    await adapter.propose(key, [{ externalId: '154587', provider: 'anilist' }]);
-    expect(bodies).toEqual([{ key, leaseToken: 'x'.repeat(32), references: [{ externalId: '154587', provider: 'anilist' }], schemaVersion: 1 }]);
-    expect(JSON.stringify(bodies)).not.toContain('Frieren');
-    expect(local.record).toMatchObject({ state: 'PENDING' });
+  it('returns a full D1 profile without a second request', async () => {
+    const profile = {
+      candidate: { externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Frieren'] },
+      references: [{ externalId: '154587', provider: 'anilist' }], workId: 'work_anilist_154587',
+    };
+    const fetcher = vi.fn(async () => Response.json({ profile, state: 'VERIFIED', verifiedAt: '2026-09-14T12:00:00.000Z' }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    await expect(adapter.resolveOrRequest(key, query)).resolves.toMatchObject({ profile, state: 'VERIFIED' });
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 });

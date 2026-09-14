@@ -2,8 +2,9 @@
 
 ## Build a release candidate
 
-The current production release is `1.0.27`; its published archives match the
-verified local candidates.
+The current production release is `1.0.27`; its published archives remain
+unchanged. The repository source is the verified but unpublished `1.0.28`
+candidate.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -53,6 +54,19 @@ le cache D1 `MISS/PENDING/VERIFIED` : un bail unique autorise une seule recherch
 textuelle concurrente, les autres clients attendent, puis une proposition d’IDs
 reste non fiable jusqu’à sa promotion par le workflow GitHub OIDC. La migration
 D1, les archives et le Worker corrigés ont été publiés le 14 septembre 2026.
+
+### Candidate locale — découverte serveur portable 1.0.28
+
+La version `1.0.28` remplace, pour la découverte automatique, le bail de
+recherche confié à l’extension par une demande D1 v2 dédupliquée. Le composant
+portable `@tobirink/public-discovery`, appelé par GitHub Actions, possède seul
+l’orchestration des lanes AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu
+Manga. Il publie une fiche complète ou une issue terminale via OIDC.
+
+Cette candidate et la migration `0012_server_public_discovery.sql` ne sont pas
+publiées. Le workflow est configuré pour un run quotidien ou manuel, mais les
+runs du dépôt restent bloqués avant exécution par l’état de facturation GitHub
+déjà observé. Aucun secret partagé ou fichier `.env` n’est requis.
 
 ### Publication D1-first et Agenda OIDC — 2026-09-14
 

@@ -77,9 +77,12 @@ browser or `workerd` test when platform behavior is the risk.
 - WebBridge release packages must contain version `1.0.0`, the exact
   `https://tobirink.com/*` content-script match and the same
   `externally_connectable` match before their SHA-256 is recorded.
-- Public-discovery tests prouvent le claim D1 atomique, le bail unique de
-  quinze minutes, l’attente sans consommation de tentative, la proposition
-  limitée aux identifiants fournisseur et la promotion OIDC idempotente.
+- Public-discovery v2 tests prouvent la création D1 atomique et dédupliquée,
+  l’attente sans consommation de tentative MV3, le claim réservé au collecteur
+  OIDC, la publication terminale d’un profil complet et son rejeu idempotent.
+  Les tests du runner prouvent qu’un MISS, un PENDING et un VERIFIED ne lancent
+  aucune recherche ou hydratation fournisseur dans la découverte automatique
+  de l’extension.
   Les anciennes routes de consentement, d’appairage et de cache non vérifié
   doivent répondre 404.
 - Public-catalogue tests prove that D1 stores only reconstructible work titles
@@ -161,9 +164,10 @@ browser or `workerd` test when platform behavior is the risk.
 The [v3 plan](systems/favorite-resolution-correction-plan.md) adds zero Review
 at import, NOT_FOUND actionability, human-only no-match, indexed SQL, MV3
 checkpoints, additive migrations and installed Chromium/Firefox evidence. Le
-cache public actuel remplace l’ancien modèle owner par `MISS/PENDING/VERIFIED` :
-une seule recherche textuelle concurrente, aucune après vérification, et seule
-une reprise de bail abandonné peut répéter le travail. The synthetic clean-room
+cache public actuel remplace l’ancien modèle owner par
+`MISS/PENDING/PROCESSING/VERIFIED/NOT_FOUND/AMBIGUOUS` : une demande D1 unique,
+aucune recherche après une issue terminale, et seule une reprise de claim
+collecteur abandonné peut répéter le travail. The synthetic clean-room
 corpus tests the reviewed behavior contract without depending on FavLib data.
 
 ## Inherited tooling boundary

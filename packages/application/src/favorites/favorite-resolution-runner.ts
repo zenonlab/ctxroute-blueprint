@@ -13,10 +13,11 @@ import { favoriteProviderDiscoveryTitles, hasFavoriteOvaMarker, hasFavoritePreSe
 import type { FavoriteTitleMatchQuery } from './provider-matcher';
 import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-ports';
 import { resolveFavoriteProviderLanes } from './resolve-provider-lanes';
-import { createFavoriteSearchCheckpointPort, searchFavoriteProviderPage } from './provider-search-checkpoint';
+import { createFavoriteSearchCheckpointPort, providerCandidateSchema, searchFavoriteProviderPage } from './provider-search-checkpoint';
 import type { FavoriteSearchCheckpointPort } from './provider-search-checkpoint';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, ResolutionProvider } from './provider-ports';
-import type { PublicDiscoveryClientPort, PublicDiscoveryProfile } from '../public-discovery';
+import type { PublicDiscoveryRequestClientPort } from '../public-discovery';
+import { requestPublicFavoriteDiscovery } from './public-discovery-resolution';
 
 // Cheap local/terminal tasks may drain in one wake; the time budget remains
 // authoritative for provider I/O and MV3 suspension safety.
@@ -65,7 +66,7 @@ export async function repairMissingFavoriteCovers(storage: StoragePort, hydratio
 }
 
 export interface FavoriteResolutionRunnerDependencies {
-  readonly publicDiscovery?: PublicDiscoveryClientPort;
+  readonly publicDiscovery?: PublicDiscoveryRequestClientPort;
   readonly synchronized?: FavoriteIdentityLookupPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;
   readonly hydration: FavoriteProviderHydrationPorts;
@@ -101,22 +102,6 @@ function providerTitles(artifact: FavoriteParseArtifact): readonly string[] {
   const titles = [artifact.displayTitle, ...(artifact.aliases ?? []).map((alias) => alias.value)]
     .filter((title): title is string => title !== undefined);
   return Object.freeze([...new Set(titles)]);
-}
-
-function publicDiscoveryCandidate(profile: PublicDiscoveryProfile): ProviderCandidate {
-  const priorities = profile.mediaKind === 'anime' ? ['anilist', 'kitsu-anime'] : ['mangaupdates', 'mangadex', 'anilist', 'kitsu-manga'];
-  const primary = priorities.flatMap((provider) => profile.references.filter((reference) => reference.provider === provider))[0];
-  if (primary === undefined) throw new Error('PUBLIC_DISCOVERY_HAS_NO_SUPPORTED_REFERENCE');
-  return createProviderCandidate({
-    displayTitle: profile.preferredTitle,
-    externalId: primary.externalId,
-    linkedReferences: profile.references.filter((reference) => reference.provider !== primary.provider),
-    mediaKind: profile.mediaKind === 'anime' ? 'ANIME' : 'MANGA',
-    preSerialization: false,
-    provider: primary.provider,
-    titleVariants: profile.officialTitles.map((title) => ({ language: title.locale, title: title.title })),
-    titles: profile.officialTitles.map((title) => title.title),
-  }, primary.provider);
 }
 
 function hydrationRetryAt(retryAt: number | undefined, now: string): number {
@@ -254,6 +239,33 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   const explicit = artifact.sourceEvidence.explicitProviderReference;
+  if (dependencies.publicDiscovery !== undefined) {
+    const identityKey = await favoriteIdentityKey(artifact);
+    let discovery;
+    try { discovery = await requestPublicFavoriteDiscovery(dependencies.publicDiscovery, identityKey, artifact); }
+    catch { return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING'); }
+    if (discovery.state === 'MISS') return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING');
+    if (discovery.state === 'PENDING') return deferClaimWithoutAttempt(dependencies, task, token, discovery.retryAt);
+    if (discovery.state === 'NOT_FOUND') {
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:d1-not-found');
+      return 'completed';
+    }
+    if (discovery.state === 'AMBIGUOUS') {
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:d1-ambiguous');
+      return 'completed';
+    }
+    const candidate = providerCandidateSchema.parse(discovery.profile.candidate);
+    if (hasExactBlockedProviderTaxonomy(candidate)) {
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
+      return 'completed';
+    }
+    const references = discovery.profile.references.flatMap((reference) => {
+      const parsed = favoritePublicReferenceSchema.safeParse(reference);
+      return parsed.success ? [parsed.data] : [];
+    });
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-verified-discovery', candidate, undefined, { references });
+    return 'completed';
+  }
   if (explicit !== undefined) {
     const reference = { externalId: explicit.externalId, provider: explicit.provider } as const;
     const hydration = dependencies.hydration[reference.provider];
@@ -352,28 +364,6 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     else await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:synchronized-association', candidate, undefined, { references: synchronized.references });
     return 'completed';
   }
-  if (dependencies.publicDiscovery !== undefined) {
-    let discovery;
-    try { discovery = await dependencies.publicDiscovery.resolveOrClaim(identityKey); }
-    catch {
-      return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING');
-    }
-    if (discovery.state === 'PENDING') return deferClaimWithoutAttempt(dependencies, task, token, discovery.retryAt);
-    if (discovery.state === 'MISS') return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING');
-    if (discovery.state === 'VERIFIED') {
-      const cached = publicDiscoveryCandidate(discovery.profile);
-      let candidate: ProviderCandidate | undefined;
-      try { candidate = await hydrateExplicitReference(dependencies, { externalId: cached.externalId, provider: cached.provider }, artifact, checkpoints); }
-      catch (error) { return retryClaim(dependencies, task, token, new Date(hydrationRetryAt(error instanceof FavoriteProviderRetryError ? error.retryAt : undefined, dependencies.now())).toISOString()); }
-      if (candidate === undefined) return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs).toISOString());
-      const references = discovery.profile.references.flatMap((reference) => {
-        const parsed = favoritePublicReferenceSchema.safeParse(reference);
-        return parsed.success ? [parsed.data] : [];
-      });
-      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-verified-discovery', candidate, undefined, { references });
-      return 'completed';
-    }
-  }
   if (local.kind === 'AMBIGUOUS') {
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, `review:${local.provenance}`, undefined, {
       candidates: local.candidates.slice(0, 6), digest: `${local.provenance}:${artifact.semanticFingerprint}`, provenance: local.provenance, totalCandidates: local.candidates.length, recordedAt: dependencies.now(),
@@ -421,12 +411,6 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, `resolved:${provider}:${candidate.externalId}`, candidate);
-  const proposedReferences = [{ provider: candidate.provider, externalId: candidate.externalId }, ...(candidate.linkedReferences ?? [])]
-    .flatMap((reference) => {
-      const parsed = favoritePublicReferenceSchema.safeParse(reference);
-      return parsed.success ? [parsed.data] : [];
-    });
-  if (proposedReferences.length > 0) await dependencies.publicDiscovery?.propose(identityKey, proposedReferences).catch(() => undefined);
   return 'completed';
 }
 

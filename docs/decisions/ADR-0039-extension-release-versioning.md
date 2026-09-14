@@ -65,6 +65,9 @@ cent identifiants et calcule le bootstrap avec trois comptes indexés.
 la collecte Agenda bloquée depuis Cloudflare. `1.0.27` corrige le receiver du
 `fetch` navigateur, déplace la collecte Agenda vers GitHub OIDC et remplace le
 Collectif par le cache public vérifié D1-first de l'ADR-0046.
+`1.0.28` retire la recherche fournisseur de la découverte automatique MV3 :
+l’extension lit ou crée une demande D1 v2, puis consomme la fiche complète
+produite par le composant Discovery appelé via GitHub Actions OIDC.
 The
 version in `apps/extension/package.json` remains the single WXT and archive
 version source; the lockfile and release tests follow it. Existing archives are

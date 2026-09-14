@@ -23,7 +23,7 @@
         "id": "boundaries",
         "label": "Frontières",
         "focus": ["extension", "worker", "publicD1", "github", "providers"],
-        "note": "Aucun compte, consentement, Collectif ou appel AniList direct depuis l’extension."
+        "note": "Aucun compte, consentement, Collectif ou appel fournisseur direct dans la découverte automatique."
       }
     ]
   },
@@ -63,13 +63,13 @@
       "stage": 2,
       "row": 1,
       "width": 140,
-      "tag": "PENDING · VERIFIED"
+      "tag": "PENDING · TERMINAL"
     },
     {
       "id": "github",
       "type": "security",
       "label": "Composant Discovery",
-      "sublabel": "appelé par GitHub Actions OIDC",
+      "sublabel": "ports claim · resolve · publish",
       "stage": 3,
       "row": 2,
       "yOffset": -30,
@@ -188,7 +188,7 @@
       "title": "MISS D1",
       "items": [
         "D1 conserve une seule requête PENDING par clé",
-        "Le composant appelé par GitHub Actions hydrate la fiche",
+        "Le prochain run quotidien ou manuel hydrate la fiche",
         "Le résultat VERIFIED répond aux prochaines lectures"
       ]
     },
@@ -197,7 +197,7 @@
       "title": "Périmètre",
       "items": [
         "Aucun utilisateur, compte, consentement ou Collectif",
-        "L’extension ne possède aucun accès direct aux APIs fournisseurs",
+        "La découverte automatique de l’extension n’appelle aucune API fournisseur",
         "Une panne fournisseur garde la requête en attente pour reprise"
       ]
     }

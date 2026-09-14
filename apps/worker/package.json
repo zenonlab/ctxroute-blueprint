@@ -7,13 +7,14 @@
   "scripts": {
     "cf-typegen": "wrangler types",
     "test": "vitest run",
-    "test:security": "vitest run src/reviews",
+    "test:security": "vitest run src/catalogue/public-discovery-routes.test.ts src/releases/github-oidc.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tobirink/adapters-cloudflare": "*",
     "@tobirink/application": "*",
     "@tobirink/contracts": "*",
+    "@tobirink/public-discovery": "*",
     "hono": "4.13.7"
   },
   "devDependencies": {

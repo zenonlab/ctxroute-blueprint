@@ -9,6 +9,7 @@
   "dependencies": {
     "@tobirink/application": "*",
     "@tobirink/domain": "*",
+    "@tobirink/public-discovery": "*",
     "zod": "4.5.4"
   }
 }

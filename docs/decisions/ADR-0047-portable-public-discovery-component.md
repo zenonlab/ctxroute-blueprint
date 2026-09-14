@@ -12,12 +12,14 @@ scope:
   - apps/extension/wxt.config.ts
   - docs/architecture/src/public-discovery.dataflow.json
 review: on-change
+revised: true
 ---
 
 # ADR-0047 — Composant portable de découverte publique
 
 - Status: accepted
 - Date: 2026-09-14
+- Revised: 2026-09-14
 
 ## Contexte
 
@@ -61,3 +63,13 @@ l’extension, le Worker ou le moteur. GitHub Actions reste la composition
 opérationnelle initiale et son OIDC garde l’autorité de publication. Le package
 portable n’accorde à lui seul aucun accès à D1 ou aux fournisseurs : ces
 capacités viennent exclusivement des ports fournis par le dépôt qui l’appelle.
+
+La première implémentation matérialise ce contrat en version `2`, avec des lots
+de cinquante demandes au maximum et les issues terminales `VERIFIED`,
+`NOT_FOUND` et `AMBIGUOUS`.
+
+Le workflow initial sonde la file une fois par jour à 03:23 UTC et accepte un
+déclenchement manuel. Une demande est donc dédupliquée dans D1 immédiatement,
+mais sa fiche peut rester `PENDING` jusqu’au prochain passage. Cette cadence
+borne le nombre de runs GitHub Actions; elle ne constitue pas une garantie de
+gratuité et peut être révisée indépendamment du package.

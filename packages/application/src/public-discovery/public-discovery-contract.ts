@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { PublicDiscoveryQuery, PublicDiscoveryReadState } from '@tobirink/public-discovery';
 
 const fingerprintSchema = z.string().regex(/^[a-f0-9]{64}$/u);
 const versionSchema = z.string().min(1).max(32).regex(/^[A-Za-z0-9._-]+$/u);
@@ -87,6 +88,10 @@ export interface PublicDiscoveryClientPort {
   maintain(): Promise<void>;
   propose(key: PublicDiscoveryKey, references: readonly PublicDiscoveryReference[]): Promise<void>;
   resolveOrClaim(key: PublicDiscoveryKey): Promise<PublicDiscoveryClientState>;
+}
+
+export interface PublicDiscoveryRequestClientPort {
+  resolveOrRequest(key: PublicDiscoveryKey, query: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState>;
 }
 
 export interface PublicDiscoveryPort {

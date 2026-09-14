@@ -1,5 +1,5 @@
 import { favoriteIdentityKey, favoriteSourceIdentity, importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
-import type { BookmarkImportPort, FavoriteIdentityLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, PublicDiscoveryClientPort, ResolutionProvider, StoragePort } from '@tobirink/application';
+import type { BookmarkImportPort, FavoriteIdentityLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, PublicDiscoveryRequestClientPort, ResolutionProvider, StoragePort } from '@tobirink/application';
 import { createFavoriteSource } from '@tobirink/domain';
 import type { FavoriteSourceId, LibraryId, Work } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
@@ -9,7 +9,7 @@ import type { ExtensionDiagnosticsPort } from './extension-diagnostics';
 
 export interface FavoriteResolutionRuntimeDependencies {
   readonly beforeInventory?: () => Promise<void>;
-  readonly publicDiscovery?: PublicDiscoveryClientPort;
+  readonly publicDiscovery?: PublicDiscoveryRequestClientPort;
   readonly synchronized?: FavoriteIdentityLookupPort;
   readonly bookmarks: BookmarkImportPort;
   readonly candidates: Readonly<Record<ResolutionProvider, FavoriteProviderCandidatePort>>;

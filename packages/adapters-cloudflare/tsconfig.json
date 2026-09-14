@@ -7,7 +7,8 @@
     "noEmit": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@tobirink/application": ["../application/src/index.ts"]
+      "@tobirink/application": ["../application/src/index.ts"],
+      "@tobirink/public-discovery": ["../public-discovery/src/index.ts"]
     },
     "strict": true,
     "target": "ES2022"

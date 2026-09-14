@@ -17,7 +17,7 @@ import {
   HttpPublicReleasePageSource,
 } from '@tobirink/adapters-browser';
 import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicDiscoveryStore, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
@@ -104,7 +104,7 @@ export default defineBackground({
     const trustedSyncStorage = import.meta.env.FIREFOX ? browser.storage.sync : nativeStorage?.sync;
     if (trustedLocalStorage === undefined || trustedSyncStorage === undefined) throw new Error('Trusted extension storage is unavailable.');
     const privateRecovery = new DexiePrivateRecoveryStore(privateStorage.storage.database);
-    const publicDiscovery = configuredSiteOrigin ? new HttpPublicDiscoveryAdapter(configuredSiteOrigin, new DexiePublicDiscoveryStore(privateStorage.storage.database)) : undefined;
+    const publicDiscovery = configuredSiteOrigin ? new HttpPublicDiscoveryAdapter(configuredSiteOrigin) : undefined;
     const identitySync = new WebExtensionProviderIdentitySyncAdapter(trustedSyncStorage, identityAccessPolicy);
     const identityRecovery = createProviderIdentityRecoveryRuntime({
       checkpoints: new DexieProviderIdentityRecoveryStateAdapter(privateStorage.storage.database),
@@ -121,9 +121,7 @@ export default defineBackground({
     const ensureAgendaNextAlarm = () => browser.alarms.create(agendaNextAlarmName, { delayInMinutes: 1 });
     const ensureFavoriteInventoryAuditAlarm = () => browser.alarms.create(favoriteInventoryAuditAlarmName, { periodInMinutes: favoriteInventoryAuditPeriodMinutes });
     const runFavoriteResolution = createFavoriteResolutionRuntime({
-      beforeInventory: async () => {
-        await publicDiscovery?.maintain().catch(() => undefined);
-      },
+      beforeInventory: async () => undefined,
       publicDiscovery,
       bookmarks,
       candidates: providerPorts,

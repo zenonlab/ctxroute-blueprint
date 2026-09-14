@@ -80,21 +80,20 @@ describe('runFavoriteResolutionSlice', () => {
     expect((await storage.listFavoriteSources({ limit: 1 }))[0]).toMatchObject({ resolution: { kind: 'RESOLVED' } });
   });
 
-  it('lets the D1 lease holder search once and propose only provider IDs', async () => {
+  it('sends the cleaned request to D1 and never searches providers in the extension', async () => {
     const { storage, outbox } = await fixture();
     const search = vi.fn(async () => createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'leased-search', provider: 'anilist', truncated: false }));
     const hydrate = vi.fn(async () => candidate);
-    const propose = vi.fn(async () => undefined);
+    const resolveOrRequest = vi.fn(async () => ({ retryAt: '2026-09-07T12:15:00.000Z', state: 'PENDING' as const }));
     const result = await runFavoriteResolutionSlice({
       candidates: candidatePorts({ search }), hydration: hydrationPorts({ hydrate }),
       libraryId: libraryId('library_primary'), now: () => now, outbox,
-      publicDiscovery: { maintain: async () => undefined, propose, resolveOrClaim: async () => ({ expiresAt: '2026-09-07T12:15:00.000Z', state: 'LEASED' }) },
+      publicDiscovery: { resolveOrRequest },
       storage, token: () => 'public-cache',
     });
-    expect(result).toMatchObject({ completed: 1, retried: 0 });
-    expect(search).toHaveBeenCalledOnce(); expect(hydrate).toHaveBeenCalledOnce();
-    expect(propose).toHaveBeenCalledWith(expect.objectContaining({ fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u) }), [{ provider: 'anilist', externalId: candidate.externalId }]);
-    expect((await storage.listFavoriteSources({ limit: 10 }))[0]).toMatchObject({ resolution: { kind: 'RESOLVED' }, matchedWorkId: favoriteCandidateWorkId(candidate) });
+    expect(result).toMatchObject({ completed: 0, retried: 1 });
+    expect(search).not.toHaveBeenCalled(); expect(hydrate).not.toHaveBeenCalled();
+    expect(resolveOrRequest).toHaveBeenCalledWith(expect.objectContaining({ fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u) }), expect.objectContaining({ discoveryTitles: ['frieren'], sourceTitles: ['frieren'] }));
   });
 
   it('Q-08 waits for a pending public discovery without searching or exhausting attempts', async () => {
@@ -105,9 +104,7 @@ describe('runFavoriteResolutionSlice', () => {
       candidates: candidatePorts({ search }), hydration: hydrationPorts(unusedHydration),
       libraryId: libraryId('library_primary'), now: () => now, outbox,
       publicDiscovery: {
-        maintain: async () => undefined,
-        propose: async () => undefined,
-        resolveOrClaim: async () => ({ retryAt: '2026-09-07T12:05:00.000Z', state: 'PENDING' }),
+        resolveOrRequest: async () => ({ retryAt: '2026-09-07T12:05:00.000Z', state: 'PENDING' }),
       },
       storage, token: () => 'public-pending',
     });
@@ -125,10 +122,8 @@ describe('runFavoriteResolutionSlice', () => {
       candidates: candidatePorts({ search }), hydration: hydrationPorts({ hydrate }),
       libraryId: libraryId('library_primary'), now: () => now, outbox,
       publicDiscovery: {
-        maintain: async () => undefined,
-        propose: async () => undefined,
-        resolveOrClaim: async () => ({ profile: {
-          mediaKind: 'anime', officialTitles: [{ locale: 'en', title: 'Frieren' }], preferredTitle: 'Frieren',
+        resolveOrRequest: async () => ({ profile: {
+          candidate,
           references: [{ externalId: candidate.externalId, provider: 'anilist' }], workId: 'work_anilist_154587',
         }, state: 'VERIFIED', verifiedAt: now }),
       },
@@ -136,7 +131,7 @@ describe('runFavoriteResolutionSlice', () => {
     });
     expect(result).toMatchObject({ completed: 1, retried: 0 });
     expect(search).not.toHaveBeenCalled();
-    expect(hydrate).toHaveBeenCalledOnce();
+    expect(hydrate).not.toHaveBeenCalled();
     expect((await storage.listFavoriteSources({ limit: 1 }))[0]).toMatchObject({ resolution: { kind: 'RESOLVED' } });
   });
 
