@@ -36,3 +36,7 @@ git subtree split --prefix=packages/public-discovery -b export/public-discovery
 
 The workflow runs only on a daily schedule or manual dispatch. It never runs
 for pull requests and receives only `contents: read` plus `id-token: write`.
+Its API base URL is the existing Worker's `workers.dev` endpoint so Cloudflare
+Bot Fight Mode on the public website cannot challenge the GitHub runner. Both
+write routes still require an audience-specific GitHub OIDC token bound to the
+exact public repository, `main` branch and workflow file.

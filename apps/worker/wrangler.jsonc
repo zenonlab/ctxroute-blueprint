@@ -4,6 +4,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-09-04",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
   "routes": [
     { "pattern": "tobirink.com/*", "zone_name": "tobirink.com" }
   ],

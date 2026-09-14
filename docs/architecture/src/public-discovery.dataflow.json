@@ -69,7 +69,7 @@
       "id": "github",
       "type": "security",
       "label": "Repo public Discovery",
-      "sublabel": "moteur · 5 sources · Actions",
+      "sublabel": "Actions · entrée workers.dev",
       "stage": 3,
       "row": 2,
       "yOffset": -30,
@@ -158,8 +158,8 @@
     {
       "from": "github",
       "to": "verifiedD1",
-      "label": "profil public validé + OIDC",
-      "classification": "repo · main · workflow exacts",
+      "label": "profil public validé via Worker",
+      "classification": "workers.dev · OIDC repo/main/workflow/audience exacts",
       "variant": "security",
       "route": "auto",
       "labelAt": [820, 300]
@@ -199,6 +199,7 @@
         "Aucun utilisateur, compte, consentement ou Collectif",
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
         "D1 et le code Worker restent privés; seul le collecteur MIT est public",
+        "GitHub utilise workers.dev pour éviter le challenge Bot Fight Mode du site",
         "Les refus edge exposent seulement statut, cf-ray et type de réponse; jamais le jeton OIDC"
       ]
     }

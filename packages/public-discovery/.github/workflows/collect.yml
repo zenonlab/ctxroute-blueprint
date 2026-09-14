@@ -35,17 +35,18 @@ jobs:
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           result-encoding: string
-          script: return await core.getIDToken('https://tobirink.com/v3/catalogue/discoveries/collector/claims')
+          script: return await core.getIDToken('https://tobirink-public-api.choukky.workers.dev/v3/catalogue/discoveries/collector/claims')
 
       - name: Request result token
         id: result-oidc
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           result-encoding: string
-          script: return await core.getIDToken('https://tobirink.com/v3/catalogue/discoveries/results')
+          script: return await core.getIDToken('https://tobirink-public-api.choukky.workers.dev/v3/catalogue/discoveries/results')
 
       - name: Resolve and publish
         env:
+          DISCOVERY_API_BASE_URL: https://tobirink-public-api.choukky.workers.dev
           DISCOVERY_CLAIM_OIDC_TOKEN: ${{ steps.claim-oidc.outputs.result }}
           DISCOVERY_RESULT_OIDC_TOKEN: ${{ steps.result-oidc.outputs.result }}
         run: node dist/run.js
