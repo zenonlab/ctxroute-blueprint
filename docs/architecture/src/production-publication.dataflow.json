@@ -32,7 +32,7 @@
     { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.30", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
     { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 2, "tag": "fail closed" },
     { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP versionnés", "stage": 2, "row": 3, "tag": "R2" },
-    { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "production" },
+    { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "7278372d" },
     { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "liens 1.0.30", "stage": 3, "row": 0, "tag": "HTTP 200" },
     { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 3, "tag": "HTTP 200" },
     { "id": "productionEvidence", "type": "security", "label": "Preuve production", "sublabel": "statuts + hashes", "stage": 4, "row": 2, "tag": "concordants" }
@@ -55,7 +55,8 @@
         "Le build Worker dérive toujours la page de la version extension courante",
         "Les deux archives 1.0.30 publiques reproduisent leurs hashes locaux",
         "La page publique pointe vers les mêmes objets R2 versionnés",
-        "Les lectures Agenda restent servies depuis D1"
+        "Les lectures Agenda restent servies depuis D1",
+        "Worker 7278372d-1d2e-4a7c-960a-58b96d6a9b1c actif à 100 %"
       ]
     },
     {

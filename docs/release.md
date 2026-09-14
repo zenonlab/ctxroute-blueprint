@@ -2,8 +2,8 @@
 
 ## Build a release candidate
 
-The current production archives remain immutable. The repository source is the
-unpublished `1.0.30` candidate.
+The current production archives remain immutable. The repository source and
+the published production archives are `1.0.30`.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -132,9 +132,9 @@ publiés : Chrome `78cd2e6755dc0d26d92c209eda082711dd0917b794f41f947e7ed4b5aa6be
 `532c5f69c7914e42a0b9cefc80286dbd38d5bdbd74a9d46049ab9c846ae010a7`
 (302807 octets).
 
-### Candidate sans egress fournisseur MV3 — 1.0.30
+### Version publiée sans repli Agenda fournisseur MV3 — 1.0.30
 
-Le candidat `1.0.30` retire le dernier repli Agenda direct depuis l'extension.
+La version `1.0.30` retire le dernier repli Agenda direct depuis l'extension.
 Le background lit exclusivement `/v3/releases`; si D1 est temporairement
 indisponible, il peut conserver une génération partagée de moins de huit jours,
 mais ne contacte jamais AniList ni MangaUpdates. La collecte et l'hydratation
@@ -147,6 +147,28 @@ Chrome `993297b5610e1f6e949ec289f4697f9f15e8f0b85b52ce6d12a54edfe2717b99`
 (300959 octets). Chromium 153 certifie le ZIP Chrome exact avec Agenda D1 et
 zéro appel fournisseur; Firefox 155 certifie le ZIP Firefox exact avec les
 sorties anime `INSTANT` et manga `DATE`.
+
+La publication Cloudflare a été appliquée par le gate exact
+`593b389092ef1a8e05deba18bde2d04534c956754ae2181e1294b1e9e03ed63a`.
+Son allowlist contenait uniquement les deux objets R2 `1.0.30` et le Worker;
+aucune action D1 n'était autorisée ou nécessaire. Le premier apply a refusé
+avant mutation un état fournisseur devenu différent du preview, puis le plan
+recalculé a publié les deux archives et la version Worker
+`7278372d-1d2e-4a7c-960a-58b96d6a9b1c`, active à 100 %.
+
+Les deux téléchargements de production renvoient HTTP 200, un contenu ZIP,
+un cache immutable et exactement les empreintes ci-dessus. `GET /v3/releases`
+renvoie HTTP 200 avec la révision active
+`calendar-0a3ba9d67eecbb853aab521c5b57f199ec2aab49cc646f1c`; la relecture avec son
+ETag renvoie HTTP 304. D1 contient 765 événements actifs, dont 239 AniList et
+526 MangaUpdates, et aucune migration n'est en attente. Le dernier workflow
+Agenda public observé, run `34894650534`, est réussi.
+
+Cette absence d'egress fournisseur concerne les parcours automatiques de
+Discovery et Agenda. Une décision Review manuelle contenant un identifiant ou
+une URL fournisseur explicite peut encore demander volontairement
+l'hydratation exacte à AniList, MangaUpdates, MangaDex ou Kitsu; elle n'est pas
+une recherche automatique de titre.
 
 ### Publication D1-first et Agenda OIDC — 2026-09-14
 

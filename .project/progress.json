@@ -9275,7 +9275,7 @@
       "schemaVersion": 1,
       "id": "goal-correct-agenda-provider-pipeline",
       "title": "Corriger la pipeline Agenda après audit fournisseur",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -9505,7 +9505,7 @@
         {
           "id": "step-8",
           "title": "Publier séparément la pipeline Agenda corrigée",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Une approbation explicite distincte autorise chaque ressource externe exacte",
             "Le collecteur choisi a passé plusieurs smokes AniList depuis son egress réel",
@@ -9526,9 +9526,9 @@
             "git commit -m chore(release): record corrected agenda publication"
           ],
           "evidence": [
-            "Extension 1.0.30 removes the composed Agenda provider fallback; security regression and architecture/dataflow views prove extension -> D1 only, with AniList/MangaUpdates owned by the public GitHub workflow.",
-            "npm run verify passes completely: 143 extension, 60 Worker, 85 browser adapter, 375 application tests, all typechecks, performance, integration, audit 0 vulnerabilities and Archify showcase.",
-            "Exact archives certified: Chrome 993297b5... (Chromium 153, D1 Agenda and zero provider calls) and Firefox 7757cf81... (Firefox 155, anime INSTANT and manga DATE). D1 audit found no synthetic test rows. Remaining: commit/push, immutable 1.0.30 R2 publication, merge, Worker deploy and production verification."
+            "Cloudflare gate 593b3890 published only both immutable 1.0.30 ZIPs and Worker 7278372d; no D1 action.",
+            "Production ZIP hashes match, /v3/releases serves 765 D1 events with stable ETag/304, and public Agenda run 34894650534 succeeded.",
+            "npm run verify and all three relevant Archify showcase validations pass; rollback versions d498ddc7 and 5d55c52d remain inspectable."
           ]
         }
       ]

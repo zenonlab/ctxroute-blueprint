@@ -41,7 +41,7 @@
       "id": "extension",
       "type": "frontend",
       "label": "Extension MV3 1.0.30",
-      "sublabel": "IndexedDB privé · zéro egress fournisseur",
+      "sublabel": "IndexedDB privé · zéro egress auto",
       "pos": [50, 330],
       "size": [230, 72]
     },
