@@ -30,4 +30,14 @@ describe('public discovery HTTP gateway', () => {
     const gateway = createPublicDiscoveryHttpGateway({ baseUrl: 'http://public.example', claimToken, resultToken });
     await expect(gateway.claim(1)).rejects.toThrow('HTTPS');
   });
+
+  it('reports safe Cloudflare diagnostics without reflecting credentials', async () => {
+    const fetcher = vi.fn(async () => new Response('<html>challenge</html>', {
+      headers: { 'cf-mitigated': 'challenge', 'cf-ray': 'test-ray', 'content-type': 'text/html', server: 'cloudflare' },
+      status: 403,
+    }));
+    const gateway = createPublicDiscoveryHttpGateway({ baseUrl: 'https://tobirink.test', claimToken, fetcher, resultToken });
+    await expect(gateway.claim(1)).rejects.toThrow('discovery-api-403 (cf-challenge, cf-ray=test-ray, content-type=text/html, server=cloudflare)');
+    await expect(gateway.claim(1)).rejects.not.toThrow(claimToken);
+  });
 });

@@ -12,6 +12,16 @@ export interface PublicDiscoveryHttpGatewayOptions {
 const responseByteLimit = 64 * 1024;
 type DiscoveryRequestBody = Readonly<{ limit: number }> | PublicDiscoveryResultBatch;
 
+function responseFailure(response: Response): Error {
+  const details = [
+    response.headers.get('cf-mitigated') === 'challenge' ? 'cf-challenge' : undefined,
+    response.headers.get('cf-ray') === null ? undefined : `cf-ray=${response.headers.get('cf-ray')}`,
+    response.headers.get('content-type') === null ? undefined : `content-type=${response.headers.get('content-type')}`,
+    response.headers.get('server') === null ? undefined : `server=${response.headers.get('server')}`,
+  ].filter((detail): detail is string => detail !== undefined);
+  return new Error(`discovery-api-${response.status}${details.length === 0 ? '' : ` (${details.join(', ')})`}`);
+}
+
 async function boundedJsonText(response: Response): Promise<string> {
   const declared = Number(response.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > responseByteLimit) throw new Error('discovery-response-too-large');
@@ -53,7 +63,7 @@ export function createPublicDiscoveryHttpGateway(options: PublicDiscoveryHttpGat
       redirect: 'error',
       signal: AbortSignal.timeout(30_000),
     });
-    if (!response.ok) throw new Error(`discovery-api-${response.status}`);
+    if (!response.ok) throw responseFailure(response);
     return response;
   };
   return {

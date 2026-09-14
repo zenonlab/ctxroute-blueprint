@@ -198,7 +198,8 @@
       "items": [
         "Aucun utilisateur, compte, consentement ou Collectif",
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
-        "Le Worker et D1 restent privés; seul le collecteur MIT est public"
+        "D1 et le code Worker restent privés; seul le collecteur MIT est public",
+        "Les refus edge exposent seulement statut, cf-ray et type de réponse; jamais le jeton OIDC"
       ]
     }
   ]
