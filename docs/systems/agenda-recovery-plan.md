@@ -2,14 +2,13 @@
 
 ## Incident de collecte partagée — 14 septembre 2026
 
-La demande produit impose une collecte hebdomadaire couvrant deux semaines,
-un rattrapage lorsque la génération manque, et la réutilisation du travail
-entre cron, utilisateurs et enrichissement des métadonnées publiques. Le plan
-`docs/plans/agenda-shared-refresh-repair.json` suit cette correction. Ce besoin
-n'est pas encore satisfait par la production. La correction locale remplace le
-cron Worker par un workflow GitHub Actions hebdomadaire et une ingestion Worker
-authentifiée par OIDC. Les preuves sur fixtures ne certifient pas la collecte
-réelle avant publication et exécution réussie du workflow.
+La demande produit impose une collecte hebdomadaire couvrant deux semaines et
+la réutilisation du travail entre tous les utilisateurs. Le plan
+`docs/plans/agenda-shared-refresh-repair.json` a livré un workflow GitHub
+Actions hebdomadaire et une ingestion Worker authentifiée par OIDC. Au
+15 septembre 2026, le dernier passage planifié du collecteur public a réussi et
+`GET /v3/releases` sert la génération D1 active. Les preuves locales restent
+distinctes de cette observation de production.
 
 Une réponse `d1-empty` signifie qu'aucune génération n'est publiée. Une
 génération publiée avec zéro événement signifie que sa fenêtre a été vérifiée :
@@ -18,7 +17,7 @@ cette seule raison. Un ETag ne se réutilise que pour un cache partagé de même
 fenêtre; un 304 sans ce cache est rejeté. La durée du cache client reste pour
 l'instant de 24 heures, distincte de la cadence hebdomadaire demandée.
 
-Implémentation locale ajoutée le 14 septembre 2026 : le workflow
+Implémentation publiée le 14 septembre 2026 : le workflow
 `agenda-collector.yml` collecte la fenêtre J−1/J+15 chaque lundi à 03:17 UTC.
 Il ne publie rien si une lane échoue. Le Worker vérifie le jeton GitHub OIDC et
 le schéma strict de la génération, dérive une révision SHA-256 idempotente,
@@ -35,15 +34,16 @@ le client peut proposer des identifiants publics, mais seul le collecteur GitHub
 OIDC peut hydrater, vérifier puis promouvoir une fiche `VERIFIED`. Il n’existe
 plus de consentement Collectif, owner, appairage ou activation automatique.
 
-Il faut mesurer séparément œuvres catalogue vérifiées, claims en attente et
-sorties Agenda actives. Une ligne `PENDING` prouve seulement qu’un travail a été
-réservé; elle n’est jamais comptée ni servie comme métadonnée fiable.
+Les routes Catalogue v2 répondent `410`; cette retraite est indépendante de la
+compatibilité Agenda de `GET /v2/releases`. Il faut mesurer séparément les
+œuvres catalogue vérifiées, les demandes en attente et les sorties Agenda
+actives. Une ligne `PENDING` prouve seulement qu’un travail a été réservé; elle
+n’est jamais comptée ni servie comme métadonnée fiable.
 
 Le workflow respecte les limites publiques des fournisseurs et s'arrête sur
-un refus explicite. La première exécution réelle doit prouver des réponses
-fournisseur réussies, une génération D1 active et un second GET sans nouvelle
-collecte. Tant que ce cycle n'est pas observé après publication, la production
-reste non certifiée.
+un refus explicite. La collecte planifiée réussie et la génération D1 active
+certifient le chemin publié; un nouvel incident doit encore être diagnostiqué
+séparément entre collecte, ingestion et lecture.
 
 ## Plan initial et architecture cible
 
@@ -87,9 +87,9 @@ AniList produit des événements `INSTANT`. MangaUpdates produit des événement
 une heure de sortie. Les numéros de sortie restent des chaînes bornées afin de
 conserver décimales, suffixes et plages.
 
-La reconstruction après reset est : favoris navigateur → IDs
-`storage.sync` → identités D1 via Worker → hydratation locale → calendrier
-public → projection → alarmes. La génération active et les deux précédentes
+La reconstruction après reset est : favoris navigateur → demandes Discovery
+v3 via Worker → identités publiques vérifiées D1 → calendrier public →
+projection locale → alarmes. La génération active et les deux précédentes
 restent récupérables. Le chargeur partagé refuse une génération âgée d'au moins
 huit jours ou dont la fenêtre ne couvre pas la requête; il échoue fermé sans
 appel fournisseur MV3 ni altération de D1.

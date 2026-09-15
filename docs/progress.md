@@ -35,3 +35,7 @@
 ## Borner WebBridge et renforcer la confiance OIDC — DONE
 
 - [x] **Plafonner les sessions locales et le cache JWKS** — DONE _(evidence: WebBridge tests 7/7 prove 32-session LRU, 64 IDs per session, 512 IDs globally, closed quotas and expired-session purge behavior., OIDC tests prove immutable repository 1370309060 and owner 239743354, 3-second abort, 5-minute cache reuse/expiry, kid rotation and 16-key rejection; security suites pass Extension 9/9 and Worker 15/15., All workspace typechecks and npm run verify pass; npm audit reports 0 vulnerabilities and Chrome/Firefox MV3 builds succeed.)_
+
+## Aligner l’identité produit, la confidentialité et les preuves publiques — DONE
+
+- [x] **Corriger les métadonnées et la documentation produit active** — DONE _(evidence: Web 13/13, toutes les suites workspace et tous les typechecks passent; Extension 148/148, Worker 65/65, Application 378/378., npm run verify réussit intégralement, builds Chrome/Firefox inclus; npm audit rapporte 0 vulnérabilité et npm ls est propre., Archify valide et matérialise les diagrammes en showcase 9/9 sans erreur ni avertissement; production-surface artefact e3d5d6a1adcdbfa60a081463bea01ed32c2e18c33c3fdeb9dc9b6ddf19e209c2, extension-delivery artefact d4cfc9cb3835e6a0566c0daf1f58af9ef2ef55e4880223b819852dd668783188.)_

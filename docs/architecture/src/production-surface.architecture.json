@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "Surface de production TobiRink",
-    "subtitle": "Workbench public, données locales et artefacts 1.0.0",
+    "subtitle": "Workbench public, données locales et artefacts 1.0.30",
     "visual_preset": "blueprint",
     "animation": "trace",
     "quality_profile": "showcase",
@@ -23,7 +23,7 @@
       },
       {
         "id": "releaseDelivery",
-        "label": "Livraison 1.0.0",
+        "label": "Livraison 1.0.30",
         "focus": ["browser", "worker", "releaseBucket"],
         "note": "Deux routes versionnées diffusent les ZIP Chrome et Firefox vérifiés depuis R2."
       }
@@ -36,8 +36,8 @@
     { "id": "edge", "type": "cloud", "label": "Edge TobiRink", "sublabel": "HTTPS + domaine", "pos": [260, 300], "size": [150, 64], "tag": "Cloudflare" },
     { "id": "worker", "type": "backend", "label": "Worker public", "sublabel": "routes + politiques", "pos": [480, 300], "size": [160, 64], "tag": "tobirink-public-api" },
     { "id": "staticAssets", "type": "frontend", "label": "Assets Workbench", "sublabel": "export statique", "pos": [740, 90], "size": [158, 64], "tag": "66 fichiers" },
-    { "id": "releaseBucket", "type": "database", "label": "Releases R2", "sublabel": "2 ZIP versionnés", "pos": [740, 245], "size": [158, 64], "tag": "1.0.0" },
-    { "id": "publicCatalogue", "type": "database", "label": "Catalogue D1", "sublabel": "références publiques", "pos": [740, 400], "size": [158, 64], "tag": "aucune migration" },
+    { "id": "releaseBucket", "type": "database", "label": "Releases R2", "sublabel": "2 ZIP versionnés", "pos": [740, 245], "size": [158, 64], "tag": "1.0.30" },
+    { "id": "publicCatalogue", "type": "database", "label": "Catalogue D1", "sublabel": "Discovery v3 · Agenda", "pos": [740, 400], "size": [158, 64], "tag": "migrations versionnées" },
     { "id": "coverMedia", "type": "cloud", "label": "Médias couvertures", "sublabel": "R2 + Images", "pos": [740, 555], "size": [158, 64], "tag": "public" },
     { "id": "verification", "type": "security", "label": "Preuves production", "sublabel": "HTTP + SHA-256", "pos": [1040, 300], "size": [170, 64], "tag": "concordantes" }
   ],
@@ -58,8 +58,8 @@
     { "id": "releasesToVerification", "from": "releaseBucket", "to": "verification", "variant": "security", "route": "orthogonal-h" }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Production active", "items": ["Le Worker sert les cinq routes publiques", "Les deux ZIP 1.0.0 répondent avec les hashes attendus", "Les routes inconnues restent en 404"] },
+    { "dot": "emerald", "title": "Production active", "items": ["Le Worker sert Discovery v3 et Agenda v3", "Les deux ZIP 1.0.30 répondent avec les hashes attendus", "Les routes Catalogue v2 répondent en 410"] },
     { "dot": "cyan", "title": "Propriété des données", "items": ["IndexedDB demeure l’autorité des données membres", "Le site ne possède aucun accès direct au stockage navigateur", "D1, R2 et Images contiennent uniquement des ressources publiques"] },
-    { "dot": "amber", "title": "Rollback", "items": ["Les versions Worker précédentes restent adressables", "Aucune migration D1 n’accompagne cette publication", "Les objets R2 sont versionnés et ne sont pas supprimés automatiquement"] }
+    { "dot": "amber", "title": "Rollback", "items": ["Les versions Worker précédentes restent adressables", "Les migrations D1 sont additives et versionnées", "Les objets R2 sont versionnés et ne sont pas supprimés automatiquement"] }
   ]
 }

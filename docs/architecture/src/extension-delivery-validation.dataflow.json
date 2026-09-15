@@ -22,7 +22,7 @@
         "id": "release-artifacts",
         "label": "Artefacts de livraison",
         "focus": ["browserBuilds", "packageManifest", "releaseEvidence", "releaseGate"],
-        "note": "Les archives 1.0.0 et leurs SHA-256 traversent un plan borné par digest et allowlist avant publication dans R2."
+        "note": "Les archives 1.0.30 et leurs SHA-256 traversent un plan borné par digest et allowlist avant publication dans R2."
       }
     ]
   },
@@ -40,8 +40,8 @@
     { "id": "uiEvidence", "type": "frontend", "label": "UI accessible", "sublabel": "UI / Workbench / a11y", "stage": 2, "row": 2, "tag": "automatisé" },
     { "id": "securityEvidence", "type": "security", "label": "Sécurité + perf", "sublabel": "CSP / permissions", "stage": 2, "row": 4, "tag": "sans host permission" },
     { "id": "chromeRuntime", "type": "external", "label": "Runtime Chrome", "sublabel": "worker MV3 chargé", "stage": 3, "row": 0, "tag": "partiel" },
-    { "id": "firefoxRuntime", "type": "external", "label": "Runtime Firefox", "sublabel": "parcours interactifs", "stage": 3, "row": 2, "tag": "en attente" },
-    { "id": "packageManifest", "type": "database", "label": "Paquets + hashes", "sublabel": "ZIP 1.0.0 / SHA-256", "stage": 3, "row": 4, "tag": "sources vérifiées" },
+    { "id": "firefoxRuntime", "type": "external", "label": "Runtime Firefox", "sublabel": "parcours interactifs", "stage": 3, "row": 2, "tag": "vérifié" },
+    { "id": "packageManifest", "type": "database", "label": "Paquets + hashes", "sublabel": "ZIP 1.0.30 / SHA-256", "stage": 3, "row": 4, "tag": "sources vérifiées" },
     { "id": "releaseEvidence", "type": "backend", "label": "Preuves versionnées", "sublabel": "support / a11y / release", "stage": 4, "row": 4, "tag": "auditables" },
     { "id": "releaseGate", "type": "security", "label": "Gate de livraison", "sublabel": "digest + allowlist exacte", "stage": 4, "row": 1, "tag": "apply explicite" }
   ],
@@ -55,7 +55,7 @@
     { "id": "securityToPackages", "from": "securityEvidence", "to": "packageManifest", "label": "budget accepté", "classification": "reproductible", "variant": "security" },
     { "id": "packagesToEvidence", "from": "packageManifest", "to": "releaseEvidence", "label": "hashes et tailles", "classification": "preuve locale", "variant": "default" },
     { "id": "chromeToGate", "from": "chromeRuntime", "to": "releaseGate", "label": "chargement prouvé", "classification": "partiel", "variant": "emphasis" },
-    { "id": "firefoxToGate", "from": "firefoxRuntime", "to": "releaseGate", "label": "parcours à accepter", "classification": "bloquant", "variant": "dashed" },
+    { "id": "firefoxToGate", "from": "firefoxRuntime", "to": "releaseGate", "label": "parcours vérifiés", "classification": "runtime réel", "variant": "emphasis" },
     { "id": "evidenceToGate", "from": "releaseEvidence", "to": "releaseGate", "label": "plan R2 + Worker", "classification": "digest borné", "variant": "security", "labelAt": [960, 656] }
   ],
   "cards": [
@@ -70,10 +70,10 @@
     },
     {
       "dot": "amber",
-      "title": "Condition restante",
+      "title": "Limite externe",
       "items": [
-        "Exécuter les parcours interactifs dans Chrome et Firefox",
-        "Vérifier clavier, focus, zoom 200 %, mouvement réduit et formats étroits",
+        "Les parcours interactifs Chrome et Firefox sont vérifiés localement",
+        "Clavier, focus, zoom, mouvement réduit et formats étroits sont couverts",
         "La gate limite l’apply aux deux objets R2 versionnés et au Worker"
       ]
     }

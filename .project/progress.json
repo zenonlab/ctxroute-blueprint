@@ -524,6 +524,56 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-product-identity-documentation-cleanup",
+      "title": "Aligner l’identité produit, la confidentialité et les preuves publiques",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Corriger les métadonnées et la documentation produit active",
+          "status": "DONE",
+          "acceptance": [
+            "Les métadonnées racine identifient TobiRink et son dépôt GitHub réel sans renommer les packages internes de gouvernance.",
+            "La page confidentialité décrit Public Discovery v3 via TobiRink et exclut URL brute, dossiers, progression et bibliothèque.",
+            "Le support navigateur reflète la seule origine tobirink.com et bookmarksInfo côté Firefox.",
+            "Les documents Agenda et Discovery distinguent l’état publié de l’historique et la cadence Discovery de dix minutes.",
+            "Les diagrammes produit ne présentent plus de version 1.0.0, de migration absente ni de preuve navigateur en attente.",
+            "Les validations ciblées et npm run verify réussissent; .codex/config.toml reste hors diff."
+          ],
+          "files": [
+            "package.json",
+            "package-lock.json",
+            "apps/web/app/privacy/page.tsx",
+            "docs/browser-support.md",
+            "docs/systems/agenda-recovery-plan.md",
+            "docs/decisions/ADR-0047-portable-public-discovery-component.md",
+            "docs/decisions/ADR-0049-product-identity-and-public-disclosures.md",
+            "docs/architecture/src/production-surface.architecture.json",
+            "docs/architecture/src/extension-delivery-validation.dataflow.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/web",
+            "npm run validate:ui",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "node .githooks/archify validate all",
+            "node .githooks/archify build --showcase",
+            "npm ls",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Web 13/13, toutes les suites workspace et tous les typechecks passent; Extension 148/148, Worker 65/65, Application 378/378.",
+            "npm run verify réussit intégralement, builds Chrome/Firefox inclus; npm audit rapporte 0 vulnérabilité et npm ls est propre.",
+            "Archify valide et matérialise les diagrammes en showcase 9/9 sans erreur ni avertissement; production-surface artefact e3d5d6a1adcdbfa60a081463bea01ed32c2e18c33c3fdeb9dc9b6ddf19e209c2, extension-delivery artefact d4cfc9cb3835e6a0566c0daf1f58af9ef2ef55e4880223b819852dd668783188."
+          ]
+        }
+      ]
     }
   ]
 }

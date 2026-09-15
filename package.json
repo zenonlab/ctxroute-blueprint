@@ -1,7 +1,7 @@
 {
-  "name": "ctxroute-blueprint",
+  "name": "tobirink",
   "version": "1.0.0",
-  "description": "Architecture-first, stack-neutral GitHub template with CTXRoute-powered agent context.",
+  "description": "Local-first browser extension for manga and anime libraries, progress, agenda, reminders, and discovery.",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -10,10 +10,10 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zenonlab/ctxroute-blueprint.git"
+    "url": "git+https://github.com/tristan-monticelli/Tobirink.git"
   },
-  "homepage": "https://github.com/zenonlab/ctxroute-blueprint#readme",
-  "bugs": "https://github.com/zenonlab/ctxroute-blueprint/issues",
+  "homepage": "https://github.com/tristan-monticelli/Tobirink#readme",
+  "bugs": "https://github.com/tristan-monticelli/Tobirink/issues",
   "type": "module",
   "engines": {
     "node": ">=22.13.0",

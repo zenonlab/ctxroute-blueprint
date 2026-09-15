@@ -78,8 +78,9 @@ maximum et les issues terminales `VERIFIED`, `NOT_FOUND` et `AMBIGUOUS`. Le
 passage depuis l’ancien numéro interne `2` renomme les symboles et tables
 actifs sans modifier les clés ni perdre les demandes déjà matérialisées.
 
-Le workflow initial sonde la file une fois par jour à 03:23 UTC et accepte un
-déclenchement manuel. Une demande est donc dédupliquée dans D1 immédiatement,
-mais sa fiche peut rester `PENDING` jusqu’au prochain passage. Cette cadence
-borne le nombre de runs GitHub Actions; elle ne constitue pas une garantie de
-gratuité et peut être révisée indépendamment du package.
+Le workflow déployé sonde encore la file une fois par jour à 03:23 UTC et
+accepte un déclenchement manuel. Une demande est donc dédupliquée dans D1
+immédiatement, mais sa fiche peut rester `PENDING` jusqu'au prochain passage.
+Le clone public local prépare une cadence de dix minutes; elle ne devient pas
+effective avant un push et un run planifié réussis, chacun vérifié séparément.
+La cadence borne le nombre de runs GitHub Actions sans garantir leur gratuité.
