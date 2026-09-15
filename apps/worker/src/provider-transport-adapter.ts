@@ -19,6 +19,11 @@ export interface ProviderTransportAdapterOptions {
   readonly now?: () => number;
 }
 
+type GatewayAdapterInput = {
+  readonly origin: string;
+  readonly secret: string;
+} & ProviderTransportAdapterOptions;
+
 function bytes(value: string): number {
   return new TextEncoder().encode(value).byteLength;
 }
@@ -50,6 +55,15 @@ export function isAllowedProviderTarget(target: string, method: ProviderMethod):
     return path !== null && onlyQueryKeys(url, new Set(['filter[text]', 'page[limit]', 'page[offset]', `fields[${path[1]}]`]));
   }
   return false;
+}
+
+export function requiresProviderGateway(target: string, method: ProviderMethod): boolean {
+  let url: URL;
+  try { url = new URL(target); } catch { return false; }
+  if (url.origin === 'https://graphql.anilist.co') return method === 'POST' && url.pathname === '/' && url.search === '';
+  if (url.origin !== 'https://api.mangaupdates.com' || url.search !== '') return false;
+  if (method === 'POST') return ['/v1/releases/search', '/v1/series/search'].includes(url.pathname);
+  return method === 'GET' && /^\/v1\/series\/[1-9]\d{0,18}$/u.test(url.pathname);
 }
 
 function assertGatewayOrigin(value: string | undefined): string {
@@ -93,7 +107,7 @@ export class SignedGatewayProviderTransportAdapter implements ProviderTransportP
   private readonly origin: string;
   private readonly secret: string;
 
-  constructor(input: { readonly origin: string; readonly secret: string } & ProviderTransportAdapterOptions) {
+  constructor(input: GatewayAdapterInput) {
     this.origin = assertGatewayOrigin(input.origin);
     this.secret = assertGatewaySecret(input.secret);
     this.fetcher = input.fetcher ?? fetch.bind(globalThis);
@@ -140,11 +154,36 @@ export class SignedGatewayProviderTransportAdapter implements ProviderTransportP
   }
 }
 
+export class SelectiveGatewayProviderTransportAdapter implements ProviderTransportPort {
+  private readonly direct: DirectProviderTransportAdapter;
+  private readonly gateway: SignedGatewayProviderTransportAdapter;
+
+  constructor(input: GatewayAdapterInput) {
+    this.direct = new DirectProviderTransportAdapter(input.fetcher);
+    this.gateway = new SignedGatewayProviderTransportAdapter(input);
+  }
+
+  fetch(target: string, init: RequestInit): Promise<Response> {
+    const method = methodOf(init);
+    if (!isAllowedProviderTarget(target, method)) throw new TypeError('provider-transport-target');
+    return requiresProviderGateway(target, method)
+      ? this.gateway.fetch(target, init)
+      : this.direct.fetch(target, init);
+  }
+}
+
 export function createProviderTransportAdapter(bindings: ProviderTransportBindings, options: ProviderTransportAdapterOptions = {}): ProviderTransportPort {
   const mode = bindings.PROVIDER_TRANSPORT_MODE ?? 'direct';
   if (mode === 'direct') return new DirectProviderTransportAdapter(options.fetcher);
   if (mode === 'gateway') {
     return new SignedGatewayProviderTransportAdapter({
+      ...options,
+      origin: assertGatewayOrigin(bindings.PROVIDER_GATEWAY_ORIGIN),
+      secret: assertGatewaySecret(bindings.PROVIDER_GATEWAY_HMAC_KEY),
+    });
+  }
+  if (mode === 'selective-gateway') {
+    return new SelectiveGatewayProviderTransportAdapter({
       ...options,
       origin: assertGatewayOrigin(bindings.PROVIDER_GATEWAY_ORIGIN),
       secret: assertGatewaySecret(bindings.PROVIDER_GATEWAY_HMAC_KEY),

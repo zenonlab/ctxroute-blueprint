@@ -59,7 +59,7 @@
   },
   "vars": {
     "PROVIDER_GATEWAY_ORIGIN": "https://tobirink-provider-gateway.tobirink.deno.net",
-    "PROVIDER_TRANSPORT_MODE": "gateway",
+    "PROVIDER_TRANSPORT_MODE": "selective-gateway",
     "TOBIRINK_WORKER_DIAGNOSTICS": "worker-v1"
   },
   "observability": {

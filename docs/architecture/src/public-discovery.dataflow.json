@@ -23,7 +23,7 @@
         "id": "boundaries",
         "label": "Frontières",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers"],
-        "note": "Le collecteur dépend d’un port stable; la gate sélectionne la passerelle signée exigée par le blocage AniList depuis Cloudflare."
+        "note": "La gate route AniList et MangaUpdates via Deno; MangaDex et Kitsu restent directs."
       }
     ]
   },
@@ -91,7 +91,7 @@
       "id": "transportPort",
       "type": "security",
       "label": "ProviderTransportPort",
-      "sublabel": "gate direct | gateway signé",
+      "sublabel": "gate par endpoint",
       "stage": 4,
       "row": 2,
       "yOffset": 20,
@@ -180,11 +180,11 @@
     {
       "from": "collector",
       "to": "transportPort",
-      "label": "requête via le port",
-      "classification": "gateway explicite · direct rollback",
+      "label": "AniList/MU via HMAC",
+      "classification": "MangaDex/Kitsu directs",
       "variant": "security",
       "route": "straight",
-      "labelAt": [853, 448]
+      "labelAt": [833, 448]
     },
     {
       "from": "transportPort",
@@ -245,7 +245,7 @@
         "D1, le collecteur et le code Worker restent dans le dépôt principal privé",
         "Le collecteur dépend uniquement de ProviderTransportPort, comme le métier dépend du port D1",
         "Le mode direct reste disponible comme rollback mais le smoke réel reçoit HTTP 403 depuis Cloudflare",
-        "Le mode gateway HMAC isolé est actif; les routes externes OIDC de claim et résultat répondent 410"
+        "Le mode selective-gateway est actif; Deno ne reçoit qu’AniList et MangaUpdates"
       ]
     }
   ]

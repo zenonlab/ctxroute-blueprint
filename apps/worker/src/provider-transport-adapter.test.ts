@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createProviderTransportAdapter, DirectProviderTransportAdapter, isAllowedProviderTarget } from './provider-transport-adapter';
+import {
+  createProviderTransportAdapter,
+  DirectProviderTransportAdapter,
+  isAllowedProviderTarget,
+  requiresProviderGateway,
+  SelectiveGatewayProviderTransportAdapter,
+} from './provider-transport-adapter';
 
 const anilist = 'https://graphql.anilist.co';
 
@@ -62,6 +68,37 @@ describe('provider transport adapter gate', () => {
     expect(JSON.parse(requestBody).nonce).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
   });
 
+  it('routes only blocked provider endpoints through the signed gateway', async () => {
+    const calls: string[] = [];
+    const transport = createProviderTransportAdapter({
+      PROVIDER_GATEWAY_HMAC_KEY: '0123456789abcdef0123456789abcdef',
+      PROVIDER_GATEWAY_ORIGIN: 'https://gateway.example',
+      PROVIDER_TRANSPORT_MODE: 'selective-gateway',
+    }, {
+      fetcher: async (input) => { calls.push(input); return Response.json({ ok: true }); },
+      nonce: () => '123e4567-e89b-42d3-a456-426614174000',
+      now: () => Date.parse('2026-09-15T12:00:00.000Z'),
+    });
+    expect(transport).toBeInstanceOf(SelectiveGatewayProviderTransportAdapter);
+
+    await transport.fetch(anilist, { body: '{}', method: 'POST' });
+    await transport.fetch('https://api.mangaupdates.com/v1/series/search', { body: '{}', method: 'POST' });
+    await transport.fetch('https://api.mangaupdates.com/v1/series/123', { method: 'GET' });
+    await transport.fetch('https://api.mangaupdates.com/v1/releases/search', { body: '{}', method: 'POST' });
+    await transport.fetch('https://api.mangadex.org/manga?title=Naruto&limit=1', { method: 'GET' });
+    await transport.fetch('https://kitsu.io/api/edge/anime?filter%5Btext%5D=Naruto&page%5Blimit%5D=1', { method: 'GET' });
+
+    expect(calls).toEqual([
+      'https://gateway.example/v1/provider-fetch',
+      'https://gateway.example/v1/provider-fetch',
+      'https://gateway.example/v1/provider-fetch',
+      'https://gateway.example/v1/provider-fetch',
+      'https://api.mangadex.org/manga?title=Naruto&limit=1',
+      'https://kitsu.io/api/edge/anime?filter%5Btext%5D=Naruto&page%5Blimit%5D=1',
+    ]);
+    expect(requiresProviderGateway('https://api.mangaupdates.com/v1/releases/search', 'POST')).toBe(true);
+  });
+
   it('rejects redirects explicitly in both transports', async () => {
     const redirect = async () => new Response(null, { headers: { Location: 'https://example.com' }, status: 302 });
     const direct = createProviderTransportAdapter({}, { fetcher: redirect });
@@ -80,6 +117,7 @@ describe('provider transport adapter gate', () => {
     [{ PROVIDER_TRANSPORT_MODE: 'gateway' }, 'provider-gateway-origin-required'],
     [{ PROVIDER_GATEWAY_ORIGIN: 'http://gateway.example', PROVIDER_TRANSPORT_MODE: 'gateway' }, 'provider-gateway-origin'],
     [{ PROVIDER_GATEWAY_ORIGIN: 'https://gateway.example', PROVIDER_TRANSPORT_MODE: 'gateway' }, 'provider-gateway-secret-required'],
+    [{ PROVIDER_GATEWAY_ORIGIN: 'https://gateway.example', PROVIDER_TRANSPORT_MODE: 'selective-gateway' }, 'provider-gateway-secret-required'],
   ])('fails closed for invalid gate configuration %#', (bindings, message) => {
     expect(() => createProviderTransportAdapter(bindings)).toThrow(message);
   });

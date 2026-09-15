@@ -65,11 +65,11 @@ Deno.test('forwards a valid signed AniList request with fixed product headers', 
   assert(response.headers.get('x-ratelimit-remaining') === '29');
 });
 
-Deno.test('uses the JSON:API accept header required by Kitsu', async () => {
-  let init: RequestInit | undefined;
+Deno.test('forwards MangaUpdates and rejects direct-only provider targets', async () => {
+  let target = '';
   const handler = createProviderGatewayHandler({
-    fetcher: (_input, requestInit) => {
-      init = requestInit;
+    fetcher: (input) => {
+      target = input;
       return Promise.resolve(Response.json({ data: [] }));
     },
     nonceStore: memoryNonceStore(),
@@ -77,12 +77,14 @@ Deno.test('uses the JSON:API accept header required by Kitsu', async () => {
     secret,
   });
   const response = await handler(await gatewayRequest({
-    body: null,
-    method: 'GET',
-    target: 'https://kitsu.io/api/edge/anime?filter%5Btext%5D=Naruto&page%5Blimit%5D=1',
+    body: '{}',
+    target: 'https://api.mangaupdates.com/v1/series/search',
   }));
   assert(response.status === 200);
-  assert(new Headers(init?.headers).get('accept') === 'application/vnd.api+json');
+  assert(target === 'https://api.mangaupdates.com/v1/series/search');
+  assert(isAllowedProviderTarget('https://api.mangaupdates.com/v1/releases/search', 'POST'));
+  assert(!isAllowedProviderTarget('https://api.mangadex.org/manga?title=Naruto&limit=1', 'GET'));
+  assert(!isAllowedProviderTarget('https://kitsu.io/api/edge/anime?filter%5Btext%5D=Naruto&page%5Blimit%5D=1', 'GET'));
 });
 
 Deno.test('rejects a replay before a second provider call', async () => {
@@ -111,7 +113,7 @@ Deno.test('rejects tampering, stale envelopes and arbitrary targets', async () =
   assert((await handler(await gatewayRequest({ issuedAt: '2026-09-15T11:58:59.999Z' }))).status === 400);
   assert((await handler(await gatewayRequest({ target: 'https://example.com/' }))).status === 400);
   assert(!isAllowedProviderTarget('https://graphql.anilist.co/other', 'POST'));
-  assert(isAllowedProviderTarget('https://api.mangaupdates.com/v1/releases/search', 'POST'));
+  assert(isAllowedProviderTarget('https://api.mangaupdates.com/v1/series/123', 'GET'));
 });
 
 Deno.test('bounds request and upstream response bodies', async () => {

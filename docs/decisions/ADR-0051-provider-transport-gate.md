@@ -41,10 +41,14 @@ implémentations réseau dans la composition Worker, comme le port D1 sépare le
 métier de son adaptateur Cloudflare. Les résolveurs et collecteurs reçoivent
 uniquement la fonction liée à ce port.
 
-La gate `PROVIDER_TRANSPORT_MODE` accepte seulement `direct` ou `gateway` et
+La gate `PROVIDER_TRANSPORT_MODE` accepte `direct`, `gateway` ou
+`selective-gateway` et
 échoue fermée pour toute autre valeur. `direct` est la valeur versionnée par
 défaut et n’exige ni proxy ni secret. `gateway` exige une origine HTTPS sans
-chemin ni credentials et un secret HMAC de 32 à 256 octets. Changer de
+chemin ni credentials et un secret HMAC de 32 à 256 octets.
+`selective-gateway` applique la décision à chaque endpoint : AniList et
+MangaUpdates (`/v1/series/search`, `/v1/series/{id}` et
+`/v1/releases/search`) utilisent Deno; MangaDex et Kitsu restent directs. Changer de
 passerelle modifie seulement ces bindings et repasse par la gate de déploiement
 Cloudflare; le consumer et les fournisseurs restent inchangés.
 
@@ -55,8 +59,9 @@ l'inventaire Queue dans l'empreinte d'inspection et traduit leur création avant
 le déploiement Worker. Un nom absent de la configuration, un changement d'état
 entre plan et application ou une cible absente de l'allowlist invalide le plan.
 
-Les deux adaptateurs limitent les cibles aux opérations exactes AniList,
-MangaUpdates, MangaDex et Kitsu. La couche HTTP portable conserve un timeout,
+Les adaptateurs limitent les cibles aux opérations exactes AniList,
+MangaUpdates, MangaDex et Kitsu. En mode sélectif, la gateway réduit sa propre
+allowlist aux seuls endpoints qui doivent la traverser. La couche HTTP portable conserve un timeout,
 interdit les redirections et borne les réponses à 512 Kio. Le client gateway
 borne son enveloppe à 64 Kio et la signe; aucun serveur proxy, registre de nonce
 ou endpoint public générique n’est conservé dans ce dépôt.
@@ -84,13 +89,18 @@ passent exclusivement par la gate fournisseur dédiée.
 ## Conséquences
 
 Le mode direct peut être essayé sans coût ni nouvelle ressource, puis remplacé
-par une passerelle sans modifier le flux métier. La gate rend la configuration
+par une passerelle complète ou sélective sans modifier le flux métier. La gate rend la configuration
 invalide visible au démarrage du traitement au lieu de basculer silencieusement.
 Le retest distant du 15 septembre 2026 confirme cinq réponses AniList HTTP 403
 depuis l’adaptateur direct Cloudflare. La gateway Deno répond 200 pour AniList
 et MangaUpdates, mène Discovery à `VERIFIED` et produit une génération Agenda
-active de 711 événements. `gateway` est donc le mode de production; `direct`
-reste un rollback explicite sans bascule silencieuse.
+active de 711 événements. Un test ultérieur a montré que MangaUpdates Discovery
+retourne HTTP 403 en direct. La tentative de laisser seulement MangaUpdates
+Agenda en direct a ensuite échoué en production avec
+`agenda-collection-incomplete`, tandis que les cinq pages AniList traversaient
+la gateway en HTTP 200; tous les endpoints MangaUpdates repassent donc par Deno.
+`selective-gateway` est donc le mode de production; `gateway` reste le rollback
+sûr et `direct` un diagnostic explicite sans bascule silencieuse.
 
 Sources de décision consultées le 15 septembre 2026 :
 

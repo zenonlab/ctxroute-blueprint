@@ -1,0 +1,39 @@
+{
+  "goalId": "goal-route-only-anilist-through-deno",
+  "stepId": "route-anilist-only",
+  "title": "Router uniquement les endpoints fournisseur bloqués via Deno",
+  "status": "IN_PROGRESS",
+  "acceptance": [
+    "AniList et tous les endpoints MangaUpdates utilisent la gateway signée.",
+    "MangaDex et Kitsu utilisent le transport direct Cloudflare.",
+    "La gateway Deno refuse les cibles réservées au transport direct.",
+    "Les tests, npm run verify, npm ls --all et les trois vues Archify passent.",
+    "Les smokes réels prouvent Discovery AniList et MangaUpdates terminales, Agenda AniList et MangaUpdates, v3 en 200 et routes retirées en 410.",
+    "Le déploiement Deno et Worker passe par les gates, puis le commit vérifié est poussé sans .codex/config.toml."
+  ],
+  "files": [
+    "apps/worker/src/provider-transport-adapter.ts",
+    "apps/worker/src/provider-transport-adapter.test.ts",
+    "apps/worker/wrangler.jsonc",
+    "apps/provider-gateway/src/index.ts",
+    "apps/provider-gateway/src/index.test.ts",
+    "docs/decisions/ADR-0051-provider-transport-gate.md",
+    "docs/architecture/src/public-pipeline.architecture.json",
+    "docs/architecture/src/public-discovery.dataflow.json",
+    "docs/architecture/src/agenda-release.dataflow.json",
+    "docs/release.md",
+    "docs/plans/route-hybrid-provider-egress-start.json",
+    "docs/plans/route-hybrid-provider-egress-done.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "commands": [
+    "Modifier uniquement les fichiers listés avec apply_patch.",
+    "Exécuter les tests ciblés Worker et Deno, npm run verify et npm ls --all.",
+    "Valider public-pipeline.architecture, public-discovery.dataflow et agenda-release.dataflow en showcase.",
+    "Planifier et appliquer la gateway Deno puis le Worker Cloudflare via leurs gates approuvées.",
+    "Tester Discovery AniList, Discovery MangaUpdates, Agenda v3 et les routes retirées en trafic réel.",
+    "Créer le commit fix(gateway): route blocked provider endpoints puis pousser HEAD vers main."
+  ],
+  "evidence": []
+}

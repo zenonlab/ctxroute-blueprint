@@ -42,10 +42,6 @@ function json(status: number, code: string): Response {
   });
 }
 
-function onlyQueryKeys(url: URL, allowed: ReadonlySet<string>): boolean {
-  return [...url.searchParams.keys()].every((key) => allowed.has(key));
-}
-
 export function isAllowedProviderTarget(target: string, method: ProviderMethod): boolean {
   let url: URL;
   try {
@@ -58,14 +54,6 @@ export function isAllowedProviderTarget(target: string, method: ProviderMethod):
   if (url.origin === 'https://api.mangaupdates.com') {
     if (method === 'POST' && ['/v1/releases/search', '/v1/series/search'].includes(url.pathname)) return url.search === '';
     return method === 'GET' && /^\/v1\/series\/[1-9]\d{0,18}$/u.test(url.pathname) && url.search === '';
-  }
-  if (url.origin === 'https://api.mangadex.org' && method === 'GET') {
-    const pathAllowed = url.pathname === '/manga' || /^\/manga\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(url.pathname);
-    return pathAllowed && onlyQueryKeys(url, new Set(['title', 'limit', 'offset', 'includes[]']));
-  }
-  if (url.origin === 'https://kitsu.io' && method === 'GET') {
-    const path = /^\/api\/edge\/(anime|manga)(\/\d+)?$/u.exec(url.pathname);
-    return path !== null && onlyQueryKeys(url, new Set(['filter[text]', 'page[limit]', 'page[offset]', `fields[${path[1]}]`]));
   }
   return false;
 }
@@ -144,7 +132,7 @@ function parseEnvelope(raw: Uint8Array, now: number): GatewayEnvelope | undefine
 function providerHeaders(envelope: GatewayEnvelope): Headers {
   const origin = new URL(envelope.target).origin;
   const headers = new Headers({
-    Accept: origin === 'https://kitsu.io' ? 'application/vnd.api+json' : 'application/json',
+    Accept: 'application/json',
   });
   if (envelope.method === 'POST') headers.set('Content-Type', 'application/json');
   if (origin === 'https://graphql.anilist.co') {

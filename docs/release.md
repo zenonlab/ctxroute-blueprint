@@ -2,22 +2,22 @@
 
 ## Collecteurs natifs et gateway Deno certifiés — 15 septembre 2026
 
-Le Worker traite désormais Discovery dès le signal Queue et collecte Agenda
-toutes les dix minutes. AniList refuse l’egress Cloudflare direct en HTTP 403;
-`PROVIDER_TRANSPORT_MODE=gateway` traverse donc la gateway Deno HMAC/KV
-allowlistée. Un test réel a mené AniList ID 20 à `VERIFIED`; le cron de 17:30
-UTC a promu `calendar-d2732f2f2531eaa1ba6ae4af172670f92ab35abdedea38df`
-avec 711 événements, dont 225 AniList et 486 MangaUpdates.
+Le Worker traite Discovery dès le signal Queue et collecte Agenda toutes les
+dix minutes. La gate `selective-gateway` route AniList et tous les endpoints
+MangaUpdates par la gateway Deno HMAC/KV; MangaDex et Kitsu restent en HTTPS
+direct depuis Cloudflare. Ce périmètre est fondé sur le trafic réel : AniList
+et MangaUpdates Discovery sont bloqués en direct, et la tentative
+MangaUpdates Agenda directe a produit `agenda-collection-incomplete` alors que
+les cinq pages AniList traversaient déjà Deno en HTTP 200.
 
-La certification finale après l'essai de routage sélectif conserve le Worker
-`28226f17-f805-4da7-98d9-6c21a8680792` à 100 % et la gateway Deno
-`sxbj3m7zt0zc`. Le routage « Deno uniquement pour AniList » a été annulé :
-Discovery MangaUpdates reçoit HTTP 403 depuis l'egress Cloudflare direct. Une
-nouvelle demande AniList ID 1 est passée de `PENDING` à `VERIFIED` le
-15 septembre à 19:31 UTC. Agenda v3 expose la génération
-`calendar-57a1574653ac08a739f3d58bb7f05e2ca86a7f34a380eeec`, produite à
-19:30 UTC, avec des entrées MangaUpdates; les trois routes d'ingestion externe
-et Catalogue v2 répondent toujours 410.
+La certification finale publie la gateway Deno `fgxmg2ayyank` et le Worker
+`ad9b8641-6825-4953-9551-cb193f233940`. Deux demandes neuves, AniList ID 1 et
+MangaUpdates ID `22195008066`, sont passées de `PENDING` à `VERIFIED` à
+20:50:13 UTC. Le cron de 20:50 UTC a promu
+`calendar-3c0b7a698d38537c2adec26871f6eebf38d5532c9012e67e` avec 752
+événements sur huit pages : 225 AniList et 527 MangaUpdates. Discovery v3 et
+Agenda v3 répondent 200; Catalogue v2 et les trois routes d’ingestion externe
+répondent 410.
 
 L'inventaire de secrets ne contient qu'un nom de secret runtime dans chaque
 service : `PROVIDER_GATEWAY_HMAC_KEY` côté Worker et côté gateway. Le jeton
