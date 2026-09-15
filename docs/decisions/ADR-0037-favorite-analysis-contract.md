@@ -31,15 +31,13 @@ revues, précisée puis remplacée par le contrat TobiRink du 2026-09-08.
 ## Décision
 
 La version `source-adapter-v3` réanalyse aussi les routes de sortie racine
-bornées, sans supposer manga lorsque la catégorie manque. Les checkpoints
-sont séparés par fournisseur et usage (résolution ou métadonnées), liés au
-digest de la requête, et couvrent les cinq fournisseurs. Les références
-croisées modernes MangaDex→MangaUpdates sont converties depuis le slug base36;
-un ancien identifiant décimal `series.html` ne devient jamais un ID API.
-L'hydratation MangaUpdates exacte reste prioritaire. Une panne de recherche
-garde la résolution réessayable; une panne d'enrichissement ne retire jamais
-une identité déjà prouvée. Kitsu utilise des champs JSON:API distincts pour
-Anime et Manga afin que le fallback reste réellement interrogeable.
+bornées, sans supposer manga lorsque la catégorie manque. Ces adaptateurs de
+source sont des parseurs locaux et n'effectuent aucun fetch. Les checkpoints
+fournisseur, la recherche et l'hydratation des cinq fournisseurs appartiennent
+au collecteur Public Discovery portable exécuté par GitHub Actions. Les
+références croisées modernes MangaDex→MangaUpdates sont converties depuis le
+slug base36; un ancien identifiant décimal `series.html` ne devient jamais un
+ID API.
 
 Le [plan de correction v3](../systems/favorite-resolution-correction-plan.md)
 possède la pipeline, les 30 écarts, migrations et critères d'équivalence.
@@ -58,23 +56,20 @@ fiche préalable en bibliothèque. Le commit relit la révision, crée la fiche 
 ses aliases explicitement confirmés, et lie la source atomiquement. Un résultat
 NOT_FOUND terminé garde la saisie manuelle et la confirmation no-match actives.
 
-Ordre : ID/URL exact, règle origine/route, artefact/aliases, fiche locale
-hydratée, snapshot privé synchronisé, D1 public `VERIFIED`, puis recherche
-fournisseur locale sous bail unique sur `MISS`,
-Review terminale. AniList anime puis Kitsu Anime après NO_MATCH complet;
-MangaUpdates manga/manhwa/manhua puis MangaDex dans son rôle exact/sorties,
-puis Kitsu Manga. Une référence AniList manga explicite reste hydratable.
+Ordre dans l'extension : ID/URL exact, règle origine/route, artefact/aliases,
+fiche locale hydratée, snapshot privé synchronisé, puis D1 public `VERIFIED` ou
+Review terminale. Un `MISS` produit une demande v3; le collecteur GitHub route
+ensuite AniList anime puis Kitsu Anime après NO_MATCH complet, et
+MangaUpdates manga/manhwa/manhua puis MangaDex et Kitsu Manga. Une référence
+AniList manga explicite reste hydratable par le collecteur.
 Type inconnu : lanes indépendantes, aucune validation unilatérale si l'autre
 lane manque; deux identités de types différents imposent Review.
 
 Panne, 403, 429, timeout et réponse incomplète n'autorisent pas le fallback.
 Un 403 ne prouve ni un arrêt documenté du fournisseur ni un NO_MATCH.
-Le transport navigateur retire seulement l'en-tête Origin des requêtes XHR
-vers l'origine exacte `https://api.mangaupdates.com/v1/` au moyen d'une règle
-déclarative embarquée. Cette compatibilité existait dans FavLib; les sondes
-du 11 septembre 2026 répondent 403 avec Origin et 200 sans cet en-tête.
-La permission `declarativeNetRequestWithHostAccess` réutilise l'accès hôte
-déjà accordé; aucun relais Worker ou titre stocké côté serveur n'est ajouté.
+Le transport fournisseur n'existe pas dans le navigateur. La compatibilité
+MangaUpdates est confinée au collecteur GitHub, qui n'a pas besoin d'une règle
+déclarative MV3 pour modifier l'en-tête Origin.
 La version 2 des règles embarquées reconnaît les routes Comix `/title/`
 avec un préfixe opaque de cinq caractères et le segment optionnel
 `identifiant-chapter-numéro`. Ces deux formats sont des options fermées du
@@ -119,19 +114,19 @@ saison corroborée unique termine immédiatement la recherche. Un résultat faib
 continue sur les aliases bornés. Le fallback reçoit `NO_MATCH` seulement après
 l'épuisement de cette fenêtre; une erreur de transport reste `RETRYABLE`.
 
-L'implémentation locale v3 utilise des checkpoints par fournisseur dans
-l'artefact privé, liés au fingerprint, à la version de fenêtre et au claim
-courant. Elle retient au plus 20 identités au meilleur niveau de preuve et
-avance d'un alias par réveil lorsque la preuve reste faible ou absente.
-`Retry-After` est persisté et peut reporter le réveil.
+Le collecteur v3 utilise des checkpoints par fournisseur liés au digest de la
+demande et au claim courant. Il retient au plus 20 identités au meilleur niveau
+de preuve et avance de façon bornée sur les aliases. `Retry-After` reporte la
+reprise serveur sans ouvrir de permission fournisseur dans MV3.
 Les aliases mémorisés dans Work doivent eux-mêmes correspondre à la fiche
 hydratée; un libellé libre du favori ne devient pas un alias par simple voisinage.
 Une indisponibilité D1 n'annule jamais une correspondance locale déjà prouvée.
-Le port public strict reçoit seulement une clé SHA-256 liée au titre
-normalisé/type/saison et les versions. `PENDING` reporte sans fournisseur;
-`VERIFIED` hydrate les références exactes; seul un bail atomique sur `MISS`
-autorise une recherche textuelle et une proposition d'IDs non fiable. La
-promotion exige le collecteur GitHub OIDC conformément à ADR-0046.
+Le port public strict reçoit seulement une clé SHA-256 versionnée et une requête
+bornée. Une saisie manuelle utilise une clé dédiée incluant le fournisseur et
+l'identifiant afin de ne pas entrer en conflit avec la requête par titre.
+`PENDING` reporte sans fournisseur dans l'extension; `VERIFIED` contient le
+profil exact hydraté. Seul le collecteur GitHub OIDC peut réclamer puis publier
+conformément à ADR-0046.
 
 Parser, matcher, progression, normalisation, règles, décisions et reçus sont
 versionnés. Brut et transformations restent locaux. Les règles distribuées
@@ -181,9 +176,8 @@ artefact, type, progression, identité, décision et raison. Le bilan 77/4/1
 décrit les décisions prises sur ce corpus; il ne mesure pas une bibliothèque
 privée et ne revendique pas une parité avec le produit historique.
 
-Le réseau fournisseur est exécuté par l'extension avec disclosure
-`bookmarksInfo` Firefox. Seuls titre analysé ou ID exact sont transmis aux
-fournisseurs; seul le payload minimal ADR-0033 va au Worker. URL brute,
+Le réseau fournisseur est exécuté hors extension par le collecteur GitHub.
+MV3 transmet au Worker seulement les titres bornés ou l'ID exact; URL brute,
 dossiers, progression et historique ne quittent pas le stockage privé.
 `npm run verify`, tests installés Chromium/Firefox, migrations, SQL, quotas,
 MV3, WebBridge et ZIP reproductibles sont requis avant publication séparée.

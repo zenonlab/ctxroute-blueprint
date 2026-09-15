@@ -19,3 +19,11 @@
 ## Aligner les contrats internes Public Discovery sur v3 — DONE
 
 - [x] **Renommer le runtime, les tables et le schéma filaire vers v3** — DONE _(evidence: Contrat portable 51/51, adaptateur navigateur 3/3 et Worker 65/65 passent avec schemaVersion 3 et noms V3., Migration 0015 renomme les tables actives vers _v3; test D1 prouve la conservation d’une ligne PENDING et la disparition de l’ancien nom., Le test FAILED réarme par POST identique puis réclame attempt 1; audit rg ne trouve des marqueurs v2 que dans transitions, test négatif et routes 410.)_
+
+## Préparer le collecteur public v3 à cadence dix minutes — DONE
+
+- [x] **Synchroniser et vérifier le dépôt public localement** — DONE _(evidence: Clone public local propre sur refactor/public-discovery-v3; commit 51742d9 sans push, dispatch ni mutation fournisseur., Sources alignées exactement sur packages/public-discovery/src; contrat v3, listes 4+4 et état UNAVAILABLE couverts par 51 tests., npm ci --ignore-scripts, npm run verify et npm ls réussissent; workflow */10 et workflow_dispatch conservé; lockfile inchangé.)_
+
+## Retirer les fournisseurs du runtime de l’extension — ACTIVE
+
+- [ ] **Acheminer les identités manuelles par Public Discovery v3** — IN_PROGRESS _(evidence: Manual Review uses a provider+ID-specific SHA-256 key and Public Discovery v3; PENDING and exact VERIFIED behavior covered by 7 application and 25 extension targeted tests., Chrome/Firefox manifests expose only https://tobirink.com/*, no declarativeNetRequest permission/resource; executable background bundles contain none of the four provider API origins., npm run verify passed fully and npm audit found 0 vulnerabilities; npm ls remains the known TypeScript/@types-node baseline assigned to dependency step 6.)_

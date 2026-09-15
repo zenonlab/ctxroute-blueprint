@@ -121,16 +121,17 @@ deviennent éligibles après trente jours. Ces échéances n’autorisent aucune
 suppression automatique : toute purge D1 exige sauvegarde, plan borné et
 approbation destructive séparée.
 
-L’extension consulte d’abord IndexedDB, puis `storage.sync`, puis D1. Un
+L’extension consulte d’abord IndexedDB, puis D1. Un
 `VERIFIED` fournit directement le candidat hydraté complet utilisé pour écrire
 le Work local. `PENDING` programme une relecture sans fournisseur. `NOT_FOUND`
 et `AMBIGUOUS` terminent la tâche en Review locale sans relancer le composant.
-Quand Public Discovery est configuré, le chemin automatique de découverte et
-la réparation automatique de couvertures ne consultent aucun adaptateur de
-recherche ou d'hydratation fournisseur. Le background conserve des adaptateurs
-distincts uniquement pour le repli Agenda public et pour les actions manuelles
-qui affichent explicitement leur effet réseau; leur présence au composition
-root ne les autorise jamais comme repli implicite d'un état D1.
+Le chemin automatique, la réparation de couvertures et les actions manuelles ne
+consultent aucun adaptateur de recherche ou d'hydratation fournisseur dans
+l'extension. Une référence manuelle exacte utilise une clé dédiée incluant
+fournisseur et identifiant, puis suit le même cycle D1/GitHub. `PENDING` conserve
+la Review; seul un profil `VERIFIED` qui contient cette référence peut être
+commité localement. Les parseurs d'URL fournisseur restent locaux et sans
+réseau; aucun adaptateur réseau fournisseur n'est composé par le background.
 
 Le protocole ne possède aucun réglage Collectif, appairage ou consentement
 produit spécifique. La permission navigateur native `bookmarks` et la

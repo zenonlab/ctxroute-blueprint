@@ -1,5 +1,5 @@
 import { providerCoverFallbackPath, readAgendaPeriod, readLibraryBootstrapSummary, readLibraryCatalogue, readLocalReleaseAgenda, readReviewQueue } from '@tobirink/application';
-import type { FavoriteProviderHydrationPorts, LocalReleaseAgendaPort, StoragePort } from '@tobirink/application';
+import type { LocalReleaseAgendaPort, PublicDiscoveryRequestClientPort, StoragePort } from '@tobirink/application';
 import { libraryId, workId } from '@tobirink/domain';
 import type { FavoriteSource, WorkId } from '@tobirink/domain';
 import type { LibraryCatalogueItem } from '@tobirink/application';
@@ -104,7 +104,7 @@ function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCa
   };
 }
 
-export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: FavoriteProviderHydrationPorts, localAgenda?: LocalReleaseAgendaPort): WebBridgeRequestHandler {
+export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscovery?: PublicDiscoveryRequestClientPort, localAgenda?: LocalReleaseAgendaPort): WebBridgeRequestHandler {
   return async (request: WebRequest): Promise<WebBridgeValue> => {
     if (request.type === 'bootstrap.read') {
       const [library, review] = await Promise.all([
@@ -172,7 +172,7 @@ export function createWebBridgeRequestHandler(storage: StoragePort, hydration?: 
       return mapReviewSnapshot(await readLocalReviewCandidateSnapshot(storage, primaryLibraryId, queue.items[0].id));
     }
     if (request.type === 'review.decision.write') {
-      await writeLocalReviewDecision(storage, primaryLibraryId, request.command, hydration);
+      await writeLocalReviewDecision(storage, primaryLibraryId, request.command, publicDiscovery);
       return { candidates: [], context: 'local' };
     }
     return { error: 'unsupported-web-request' };

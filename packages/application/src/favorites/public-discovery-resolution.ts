@@ -2,6 +2,7 @@ import type { FavoriteParseArtifact } from '@tobirink/domain';
 import type { PublicDiscoveryKey } from '../public-discovery';
 import type { PublicDiscoveryRequestClientPort } from '../public-discovery';
 import type { PublicDiscoveryQuery, PublicDiscoveryReadState } from '@tobirink/public-discovery';
+import type { FavoritePublicReference } from './favorite-identity-lookup';
 import { favoriteProviderDiscoveryTitles, hasFavoriteOvaMarker, hasFavoritePreSerializationMarker, normalizeFavoriteTitle } from './title-normalization';
 
 function cleanedTitles(artifact: FavoriteParseArtifact): readonly string[] {
@@ -19,8 +20,9 @@ export async function requestPublicFavoriteDiscovery(
   port: PublicDiscoveryRequestClientPort,
   key: PublicDiscoveryKey,
   artifact: FavoriteParseArtifact,
+  options?: { readonly explicitProviderReference?: FavoritePublicReference },
 ): Promise<PublicDiscoveryReadState> {
-  const explicit = artifact.sourceEvidence.explicitProviderReference;
+  const explicit = options?.explicitProviderReference ?? artifact.sourceEvidence.explicitProviderReference;
   const sourceTitles = [...cleanedTitles(artifact)].slice(0, 4);
   if (sourceTitles.length === 0 && explicit !== undefined) sourceTitles.push(explicit.externalId);
   if (sourceTitles.length === 0) return { state: 'MISS' };

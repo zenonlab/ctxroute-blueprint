@@ -15,7 +15,7 @@ const generatedManifestSchema = z.object({
     }),
   }).optional(),
   content_security_policy: z.object({ extension_pages: z.string() }),
-  declarative_net_request: z.object({ rule_resources: z.array(z.object({ id: z.string(), enabled: z.boolean(), path: z.string() })) }),
+  declarative_net_request: z.never().optional(),
   host_permissions: z.array(z.string()).optional(),
   externally_connectable: z.object({ matches: z.array(z.string()).min(1) }),
   content_scripts: z.array(z.object({ matches: z.array(z.string()).min(1) })),
@@ -39,20 +39,12 @@ describe('extension security boundary', () => {
     ['firefox-mv3', firefoxManifest],
   ])('generates a bounded %s manifest', async (_target, loadManifest) => {
     const value = await loadManifest();
-    const allowed = new Set(['activeTab', 'alarms', 'bookmarks', 'notifications', 'sidePanel', 'storage', 'declarativeNetRequestWithHostAccess']);
+    const allowed = new Set(['activeTab', 'alarms', 'bookmarks', 'notifications', 'sidePanel', 'storage']);
     expect(value.manifest_version).toBe(3);
-    expect(value.permissions).toContain('declarativeNetRequestWithHostAccess');
-    expect(value.declarative_net_request.rule_resources).toEqual([{ id: 'mangaupdates_transport', enabled: true, path: 'rules/mangaupdates-transport.json' }]);
-    const rules = JSON.parse(await readFile(`.output/${_target}/rules/mangaupdates-transport.json`, 'utf8'));
-    expect(rules).toEqual([{ id: 1, priority: 1, action: { type: 'modifyHeaders', requestHeaders: [{ header: 'origin', operation: 'remove' }] }, condition: { urlFilter: '|https://api.mangaupdates.com/v1/', resourceTypes: ['xmlhttprequest'] } }]);
+    expect(value.permissions).not.toContain('declarativeNetRequestWithHostAccess');
+    expect(value.declarative_net_request).toBeUndefined();
     if (_target === 'chrome-mv3') expect(value.minimum_chrome_version).toBe('140');
-    expect(value.host_permissions ?? []).toEqual([
-      'https://api.mangadex.org/*',
-      'https://api.mangaupdates.com/*',
-      'https://graphql.anilist.co/*',
-      'https://kitsu.io/*',
-      'https://tobirink.com/*',
-    ]);
+    expect(value.host_permissions ?? []).toEqual(['https://tobirink.com/*']);
     expect(value.externally_connectable.matches).toEqual(['https://tobirink.com/*']);
     expect(value.content_scripts).toEqual([
       expect.objectContaining({ matches: ['https://tobirink.com/*'] }),
@@ -104,6 +96,7 @@ describe('extension security boundary', () => {
 
     expect(packageManifest.dependencies['@tobirink/adapters-indexeddb']).toBe('*');
     expect(background).toMatch(/createExtensionLocalStorage\(\)/);
+    expect(background).not.toMatch(/createFavoriteProviderPorts|FavoriteProviderAdapter|ProviderIdentityRecoveryRuntime/);
     expect(background).toMatch(/await privateStorage\.ensureReady\(\)/);
     expect(background).toMatch(/browser\.runtime\.onInstalled\.addListener/);
     expect(favoriteResolution).toMatch(/readBookmarkBatch\(checkpoint\.cursor, 100\)/);

@@ -1,6 +1,6 @@
 import { createFavoriteObservation } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
-import { favoriteIdentityKey, favoriteIdentityKeySchema, favoriteIdentityLookupResultSchema, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
+import { favoriteIdentityKey, favoriteIdentityKeySchema, favoriteIdentityLookupResultSchema, favoriteManualIdentityKey, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
 import { parseFavoriteObservation } from './favorite-parser';
 import { extractFavoriteSourceEvidence } from './source-evidence';
 
@@ -18,6 +18,15 @@ describe('synchronized favorite identity lookup', () => {
     expect(await favoriteIdentityKey({ ...artifact, raw: { title: 'Private rename', url: 'https://example.invalid/private' } })).toEqual(key);
     expect((await favoriteIdentityKey({ ...artifact, season: 2 })).fingerprint).not.toBe(key.fingerprint);
     expect(() => favoriteIdentityKeySchema.parse({ ...key, title: input.title })).toThrow();
+  });
+
+  it('uses a distinct stable key for each explicit manual provider identity', async () => {
+    const titleKey = await favoriteIdentityKey(artifact);
+    const manual = await favoriteManualIdentityKey(artifact, { externalId: '1', provider: 'anilist' });
+    expect(manual).toMatchObject({ mediaKind: artifact.mediaKind, parserVersion: artifact.parserVersion, siteRulesVersion: artifact.sourceAdapterVersion });
+    expect(manual.fingerprint).not.toBe(titleKey.fingerprint);
+    expect(await favoriteManualIdentityKey({ ...artifact, raw: { title: 'Private rename', url: 'https://private.invalid/value' } }, { externalId: '1', provider: 'anilist' })).toEqual(manual);
+    expect((await favoriteManualIdentityKey(artifact, { externalId: '2', provider: 'anilist' })).fingerprint).not.toBe(manual.fingerprint);
   });
 
   it('hydrates one synchronized identity by provider priority', async () => {

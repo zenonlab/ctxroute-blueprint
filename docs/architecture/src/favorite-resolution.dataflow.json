@@ -72,7 +72,7 @@
           "publicD1",
           "verifiedCollector"
         ],
-        "note": "Aucune identité produit : claim atomique, proposition d’IDs seulement, promotion par collecteur OIDC; export privé local AES-GCM."
+        "note": "Automatique ou manuel : demande v3 sans owner, hydratation par collecteur OIDC et profil VERIFIED; export privé local AES-GCM."
       }
     ]
   },
@@ -212,7 +212,7 @@
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "MISS · PENDING · VERIFIED"
+      "tag": "MISS · PENDING · UNAVAILABLE · terminal"
     },
     {
       "id": "verifiedCollector",

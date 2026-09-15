@@ -38,15 +38,17 @@ and agenda surfaces. Contextual reprise belongs to the popup and product pages;
 no additional persistent contextual surface is packaged.
 
 Generate permissions from `wxt.config.ts`. Allow only `storage`, `bookmarks`,
-`alarms` and `notifications`. Bound host permissions to the exact HTTPS origins
-of AniList GraphQL, MangaUpdates API and Kitsu; these permissions enable only
-the catalogue adapters composed by the background. Keep extension scripts under
-`script-src 'self'` with object embedding disabled.
+`alarms`, `notifications` and the interaction capabilities required by the
+installed surface. The public Tobirink origin is the sole host permission. The
+extension has no host permission for AniList, MangaUpdates, MangaDex or Kitsu,
+no declarative network-request permission and no provider transport rule. Keep
+extension scripts under `script-src 'self'` with object embedding disabled.
 Firefox builds declare the stable signing identifier `tobirink@tobirink.local`
 and `data_collection_permissions.required: [bookmarksInfo]`. Resolution sends
-only a parsed title or an explicit provider identifier to the selected public
-catalogue. Raw bookmark URLs, folders, progress and the resulting local library
-are not transmitted.
+only bounded titles or an explicit provider identifier to Public Discovery v3
+on the Tobirink Worker. GitHub's OIDC collector owns provider access. Raw
+bookmark URLs, folders, progress and the resulting local library are not
+transmitted.
 
 The background entrypoint owns WebExtension API access. Browser globals are
 read only inside its `main` callback. Its message router accepts only a closed,

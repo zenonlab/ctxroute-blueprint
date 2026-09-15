@@ -34,12 +34,26 @@ export interface FavoriteIdentityLookupPort {
   lookup(keys: readonly FavoriteIdentityKey[]): Promise<readonly FavoriteIdentityLookupResult[]>;
 }
 
+async function sha256Fingerprint(value: readonly (string | number | null)[]): Promise<string> {
+  const encoded = new TextEncoder().encode(JSON.stringify(value));
+  const digest = await crypto.subtle.digest('SHA-256', encoded);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export async function favoriteIdentityKey(artifact: FavoriteParseArtifact): Promise<FavoriteIdentityKey> {
   if (!artifact.identityKey) throw new Error('Identity lookup requires a parsed identity.');
   const identity = artifact.season === undefined ? artifact.identityKey : stripFavoriteSeasonSuffix(artifact.identityKey, artifact.season);
-  const encoded = new TextEncoder().encode(JSON.stringify([1, artifact.mediaKind, artifact.season ?? null, identity]));
-  const digest = await crypto.subtle.digest('SHA-256', encoded);
-  return favoriteIdentityKeySchema.parse({ fingerprint: [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join(''), mediaKind: artifact.mediaKind, parserVersion: artifact.parserVersion, siteRulesVersion: artifact.sourceAdapterVersion });
+  return favoriteIdentityKeySchema.parse({ fingerprint: await sha256Fingerprint([1, artifact.mediaKind, artifact.season ?? null, identity]), mediaKind: artifact.mediaKind, parserVersion: artifact.parserVersion, siteRulesVersion: artifact.sourceAdapterVersion });
+}
+
+export async function favoriteManualIdentityKey(artifact: FavoriteParseArtifact, reference: FavoritePublicReference): Promise<FavoriteIdentityKey> {
+  const exact = favoritePublicReferenceSchema.parse(reference);
+  return favoriteIdentityKeySchema.parse({
+    fingerprint: await sha256Fingerprint([2, artifact.mediaKind, exact.provider, exact.externalId]),
+    mediaKind: artifact.mediaKind,
+    parserVersion: artifact.parserVersion,
+    siteRulesVersion: artifact.sourceAdapterVersion,
+  });
 }
 
 type SynchronizedIdentity =

@@ -10,13 +10,10 @@ import {
   WebExtensionPopupContinuationCacheAdapter,
   WebExtensionNotificationAdapter,
   WebExtensionQuickPreferencesAdapter,
-  WebExtensionProviderIdentitySyncAdapter,
-  WebExtensionProviderIdentitySyncStateAdapter,
   HttpPublicDiscoveryAdapter,
   HttpPublicReleaseLoader,
 } from '@tobirink/adapters-browser';
-import type { TrustedProviderIdentityStorageArea } from '@tobirink/adapters-browser';
-import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexieProviderRateCheckpointAdapter, DexieProviderIdentityRecoveryStateAdapter, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
+import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
 import { libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
@@ -29,13 +26,22 @@ const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() || '
 import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favoriteInventoryAuditPeriodMinutes, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
-import { createFavoriteProviderPorts } from '../runtime/favorite-provider-runtime';
-import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda, ProviderIdentitySyncPublisher, providerSyncPrefix } from '@tobirink/application';
-import { createProviderIdentityRecoveryRuntime } from '../runtime/provider-identity-recovery-runtime';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda } from '@tobirink/application';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
 import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, readFavoriteResolutionPaused, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteResolutionPaused } from '../runtime/favorite-resolution-continuation';
 
 const primaryLibraryId = libraryId('library_primary');
+const providerNetworkDisabled = Object.freeze({
+  hydrate: async () => { throw new Error('Provider network is disabled in the extension.'); },
+  search: async () => { throw new Error('Provider network is disabled in the extension.'); },
+});
+const disabledProviderPorts = Object.freeze({
+  anilist: providerNetworkDisabled,
+  'kitsu-anime': providerNetworkDisabled,
+  'kitsu-manga': providerNetworkDisabled,
+  mangadex: providerNetworkDisabled,
+  mangaupdates: providerNetworkDisabled,
+});
 interface FavoriteStatusInventory {
   continuationAt?: string;
   startedAt?: string;
@@ -79,25 +85,9 @@ export default defineBackground({
     };
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const resolutionPaused = () => readFavoriteResolutionPaused(browser.storage.local);
-    const providerPorts = createFavoriteProviderPorts(new DexieProviderRateCheckpointAdapter(privateStorage.storage));
-    const identityAccessPolicy = import.meta.env.FIREFOX ? 'firefox-background-only' : 'native-required';
-    // SAFETY: the optional shape is checked below before either native storage area is passed to an adapter.
-    const nativeStorage = (globalThis as typeof globalThis & { chrome?: { storage?: { local?: TrustedProviderIdentityStorageArea; sync?: TrustedProviderIdentityStorageArea } } }).chrome?.storage;
-    const trustedLocalStorage = import.meta.env.FIREFOX ? browser.storage.local : nativeStorage?.local;
-    const trustedSyncStorage = import.meta.env.FIREFOX ? browser.storage.sync : nativeStorage?.sync;
-    if (trustedLocalStorage === undefined || trustedSyncStorage === undefined) throw new Error('Trusted extension storage is unavailable.');
     const privateRecovery = new DexiePrivateRecoveryStore(privateStorage.storage.database);
-    const publicDiscovery = configuredSiteOrigin ? new HttpPublicDiscoveryAdapter(configuredSiteOrigin) : undefined;
-    const identitySync = new WebExtensionProviderIdentitySyncAdapter(trustedSyncStorage, identityAccessPolicy);
-    const identityRecovery = createProviderIdentityRecoveryRuntime({
-      checkpoints: new DexieProviderIdentityRecoveryStateAdapter(privateStorage.storage.database),
-      hydration: providerPorts,
-      now,
-      publisher: new ProviderIdentitySyncPublisher(identitySync, new WebExtensionProviderIdentitySyncStateAdapter(trustedLocalStorage, identityAccessPolicy), Date.now),
-      storage: privateStorage.storage,
-      sync: identitySync,
-    });
-    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, providerPorts, releaseAgenda);
+    const publicDiscovery = new HttpPublicDiscoveryAdapter(configuredSiteOrigin);
+    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, publicDiscovery, releaseAgenda);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const ensureAgendaReconcileAlarm = () => browser.alarms.create(agendaReconcileAlarmName, { periodInMinutes: agendaReconcileAlarmPeriodMinutes });
@@ -107,13 +97,11 @@ export default defineBackground({
       beforeInventory: async () => undefined,
       publicDiscovery,
       bookmarks,
-      candidates: providerPorts,
+      candidates: disabledProviderPorts,
       ensureReady: privateStorage.ensureReady,
       diagnostics,
-      hydration: providerPorts,
+      hydration: disabledProviderPorts,
       libraryId: primaryLibraryId,
-      identityRecovery,
-      synchronized: identityRecovery,
       now,
       outbox: resolutionOutbox,
       updateContinuation: async (availableAt) => {
@@ -192,11 +180,6 @@ export default defineBackground({
       get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage, token,
     }, reconcileFavorites);
-    browser.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === 'sync' && Object.keys(changes).some((key) => key.startsWith(providerSyncPrefix) && key.endsWith('.manifest'))) {
-        void reconcileFavorites().catch(() => undefined);
-      }
-    });
     const resumeNotifications = async () => {
       await privateStorage.ensureReady();
       await refreshPublicReleases();
@@ -291,7 +274,7 @@ export default defineBackground({
       if (parsed.data.type === 'review.decision.write') {
         try {
           await privateStorage.ensureReady();
-          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data, providerPorts);
+          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data, publicDiscovery);
           return { ok: true, status: review.status };
         } catch (error) {
           return { error: error instanceof Error && /conflict|stale/u.test(error.message) ? 'conflict' : 'unavailable', ok: false };

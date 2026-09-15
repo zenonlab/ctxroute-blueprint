@@ -290,6 +290,126 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-public-discovery-public-v3",
+      "title": "Préparer le collecteur public v3 à cadence dix minutes",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Synchroniser et vérifier le dépôt public localement",
+          "status": "DONE",
+          "acceptance": [
+            "A clean local clone of tristan-monticelli/tobirink-public-discovery is created under ignored build/external and uses branch refactor/public-discovery-v3.",
+            "Its Discovery contracts and tests use schemaVersion 3, V3 type names and four-title limits, matching the monorepo portable package.",
+            "The collect workflow schedule is */10 * * * * and workflow_dispatch remains available.",
+            "npm ci and npm run verify pass in the standalone clone with no dependency changes.",
+            "The public repository diff is audited and committed locally as refactor(discovery): align collector with v3.",
+            "No push, workflow dispatch, provider call, deletion or modification of .codex/config.toml occurs."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "build/external/tobirink-public-discovery/.github/workflows/collect.yml",
+            "build/external/tobirink-public-discovery/src/contracts.ts",
+            "build/external/tobirink-public-discovery/src/contracts.test.ts",
+            "build/external/tobirink-public-discovery/src/collector.ts",
+            "build/external/tobirink-public-discovery/src/collector.test.ts",
+            "build/external/tobirink-public-discovery/src/http-gateway.test.ts",
+            "build/external/tobirink-public-discovery/src/provider-kit.ts",
+            "build/external/tobirink-public-discovery/src/resolver.ts",
+            "build/external/tobirink-public-discovery/src/resolver.test.ts"
+          ],
+          "commands": [
+            "gh repo clone tristan-monticelli/tobirink-public-discovery build/external/tobirink-public-discovery",
+            "git switch -c refactor/public-discovery-v3",
+            "synchronize packages/public-discovery/src into the standalone clone without deletion",
+            "npm ci",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m refactor(discovery): align collector with v3"
+          ],
+          "evidence": [
+            "Clone public local propre sur refactor/public-discovery-v3; commit 51742d9 sans push, dispatch ni mutation fournisseur.",
+            "Sources alignées exactement sur packages/public-discovery/src; contrat v3, listes 4+4 et état UNAVAILABLE couverts par 51 tests.",
+            "npm ci --ignore-scripts, npm run verify et npm ls réussissent; workflow */10 et workflow_dispatch conservé; lockfile inchangé."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-extension-d1-only-discovery",
+      "title": "Retirer les fournisseurs du runtime de l’extension",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Acheminer les identités manuelles par Public Discovery v3",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Le background MV3 n’instancie aucun adaptateur de recherche ou d’hydratation AniList, MangaUpdates, MangaDex ou Kitsu.",
+            "Une décision Review manuelle parse localement une référence exacte, utilise une clé dédiée fournisseur+ID, demande Public Discovery v3 et reste pending tant que D1 n’est pas VERIFIED.",
+            "Seul un profil VERIFIED contenant la référence exacte peut être matérialisé localement, avec contrôle de révision avant et pendant la transaction.",
+            "Les manifests Chrome et Firefox ne contiennent aucune des quatre permissions hôte fournisseur, aucune permission declarativeNetRequestWithHostAccess et aucune ressource DNR; l’origine Tobirink reste la seule host permission.",
+            "Le fichier de règle MangaUpdates orphelin n’est pas supprimé sans confirmation destructive exacte et aucune version n’est publiée.",
+            "ADR et diagrammes décrivent le flux D1/GitHub et Archify passe le profil showcase.",
+            "Les tests ciblés, builds Chrome/Firefox, npm run verify, npm ls et git diff --check réussissent.",
+            "Le changement vérifié est commité sur la branche courante avec fix(extension): route manual discovery through D1, sans toucher .codex/config.toml."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/decisions/ADR-0031-wxt-extension-shell.md",
+            "docs/decisions/ADR-0034-favorite-source-authority.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
+            "packages/application/src/favorites/favorite-identity-lookup.ts",
+            "packages/application/src/favorites/favorite-identity-lookup.test.ts",
+            "packages/application/src/favorites/public-discovery-resolution.ts",
+            "packages/application/src/favorites/public-discovery-resolution.test.ts",
+            "apps/extension/wxt.config.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/runtime/local-review-runtime.ts",
+            "apps/extension/runtime/local-review-runtime.test.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/runtime/web-bridge-adapter.test.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/security/extension-security.test.ts"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application -- src/favorites/favorite-identity-lookup.test.ts src/favorites/public-discovery-resolution.test.ts",
+            "npm test --workspace @tobirink/extension -- runtime/local-review-runtime.test.ts runtime/web-bridge-adapter.test.ts runtime/favorite-resolution-runtime.test.ts",
+            "npm run test:security --workspace @tobirink/extension",
+            "npm run build --workspace @tobirink/extension",
+            "npm run build:firefox --workspace @tobirink/extension",
+            "inspect generated Chrome and Firefox manifests and bundles for provider origins",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run archify:validate -- favorite-source-boundaries.architecture",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run verify",
+            "npm ls",
+            "git diff --check",
+            "git commit -m fix(extension): route manual discovery through D1"
+          ],
+          "evidence": [
+            "Manual Review uses a provider+ID-specific SHA-256 key and Public Discovery v3; PENDING and exact VERIFIED behavior covered by 7 application and 25 extension targeted tests.",
+            "Chrome/Firefox manifests expose only https://tobirink.com/*, no declarativeNetRequest permission/resource; executable background bundles contain none of the four provider API origins.",
+            "npm run verify passed fully and npm audit found 0 vulnerabilities; npm ls remains the known TypeScript/@types-node baseline assigned to dependency step 6.",
+            "Archify favorite-resolution and favorite-source-boundaries pass showcase 9/9; artifacts SHA-256 32d657d63a7b705b8fe7f73f7665402bc28e346902579eaa4bbd5dcf3315a18d and a8bd63748cf88a1e9ca0f4493d950589537372eed05de2a3f869201960ee2489."
+          ]
+        }
+      ]
     }
   ]
 }

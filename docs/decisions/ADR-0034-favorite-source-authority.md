@@ -86,12 +86,14 @@ six Review candidates cross the message boundary. A Review candidate is shown
 from the persisted comparable provider set with its provenance, provider cover
 and controlled R2 fallback derived from the public provider ID. It does not
 require an artificial resolved Review or a pre-existing library Work.
-Candidate, manual local identifier/source, and no-match decisions re-read the
-pending Review, its source, revision and exact selected identity inside one
-IndexedDB transaction. A manual public ID/source is hydrated exactly before
-commit; it need not already belong to the library. A stale revision, invalid
-identity or ambiguous manual match fails closed. Previous and next only move
-the in-memory cursor. A timed defer is not a Review decision.
+Candidate and no-match decisions re-read the pending Review, its source,
+revision and exact selected identity inside one IndexedDB transaction. A manual
+public ID/source is parsed locally, assigned a key distinct from title-only
+discovery, then submitted to Public Discovery v3. `PENDING` leaves the Review
+actionable; only a `VERIFIED` profile containing the requested reference can be
+committed. The transaction checks the revision again, so a stale revision,
+invalid identity or mismatched profile fails closed. Previous and next only
+move the in-memory cursor. A timed defer is not a Review decision.
 The dormant HTTP candidate adapter remains uncomposed; no D1 call or host
 permission is introduced by local search.
 
