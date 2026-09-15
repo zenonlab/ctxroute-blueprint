@@ -686,6 +686,60 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-certify-provider-free-extension-1-0-31",
+      "title": "Certifier la candidate extension 1.0.31 sans fournisseur",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Versionner, packager et certifier 1.0.31 localement",
+          "status": "DONE",
+          "acceptance": [
+            "apps/extension/package.json et le lockfile portent exactement 1.0.31.",
+            "Les documents distinguent 1.0.30 publiée de 1.0.31 candidate non publiée.",
+            "Les deux ZIP 1.0.31 contiennent exactement 20 fichiers, leur manifeste n’accorde que https://tobirink.com/* et ne contient aucune règle DNR ou origine fournisseur.",
+            "Deux builds isolés reproduisent byte pour byte les ZIP Chrome et Firefox; tailles et SHA-256 sont enregistrés dans docs/release.md.",
+            "ADR-0039, ADR-0050, stratégie qualité et diagramme de livraison décrivent la candidate sans fournisseur; Archify passe showcase 9/9.",
+            "npm run verify, npm ls --all et git diff --check réussissent.",
+            "Le commit local chore(release): certify provider-free extension 1.0.31 exclut .codex/config.toml.",
+            "Aucun push, upload R2, déploiement Worker, publication store ou suppression distante."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "docs/02-quality-strategy.md",
+            "docs/release.md",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/decisions/ADR-0050-retire-extension-provider-fallbacks.md",
+            "docs/architecture/src/extension-delivery-validation.dataflow.json"
+          ],
+          "commands": [
+            "apply_patch updates the listed architecture, version and documentation files",
+            "npm install --package-lock-only --ignore-scripts",
+            "npm run package:extension",
+            "node scripts/release/package-extension.mjs --verify-isolated",
+            "inspect release-manifest.json, ZIP entries and generated manifests",
+            "node .githooks/archify validate extension-delivery-validation.dataflow",
+            "npm run verify",
+            "npm ls --all --parseable",
+            "git diff --check",
+            "git commit -m chore(release): certify provider-free extension 1.0.31"
+          ],
+          "evidence": [
+            "Candidate 1.0.31: Chrome 291601 octets SHA-256 a4bf87ecc73f03566ad84d8a6b2d8ee61dae0fe6e1cbf3f9f1897afb81dbd390; Firefox 291642 octets SHA-256 01657bc68988fc97360881f7a2f6bd431e52d82dbfc95440fb0ca58a545e3358.",
+            "Deux builds isolés byte-identiques; 20 fichiers chacun, manifestes uniquement https://tobirink.com/*, aucun DNR ni origine fournisseur dans le background.",
+            "npm run verify, npm ls --all, validations ADR/docs et git diff --check réussissent; npm audit 0 vulnérabilité.",
+            "Archify extension-delivery showcase 9/9 sans diagnostic; artefact 89d9adad28d29d1e29ac7d9677ffa4f26ee20ca0fcfdf13165e12115f343c04a."
+          ]
+        }
+      ]
     }
   ]
 }

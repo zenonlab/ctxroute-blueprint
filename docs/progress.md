@@ -47,3 +47,7 @@
 ## Retirer les fallbacks fournisseur morts de l’extension — DONE
 
 - [x] **Supprimer les runtimes directs et préserver la compatibilité IndexedDB** — DONE _(evidence: Dix fichiers legacy supprimés; aucun symbole fournisseur/fallback actif trouvé hors tests négatifs., Chrome et Firefox MV3 construits à 20 fichiers, uniquement https://tobirink.com/*, sans DNR., Migration IndexedDB v19 Chromium réussie; npm run verify, npm ls --all, npm audit et git diff --check réussissent.)_
+
+## Certifier la candidate extension 1.0.31 sans fournisseur — DONE
+
+- [x] **Versionner, packager et certifier 1.0.31 localement** — DONE _(evidence: Candidate 1.0.31: Chrome 291601 octets SHA-256 a4bf87ecc73f03566ad84d8a6b2d8ee61dae0fe6e1cbf3f9f1897afb81dbd390; Firefox 291642 octets SHA-256 01657bc68988fc97360881f7a2f6bd431e52d82dbfc95440fb0ca58a545e3358., Deux builds isolés byte-identiques; 20 fichiers chacun, manifestes uniquement https://tobirink.com/*, aucun DNR ni origine fournisseur dans le background., npm run verify, npm ls --all, validations ADR/docs et git diff --check réussissent; npm audit 0 vulnérabilité.)_

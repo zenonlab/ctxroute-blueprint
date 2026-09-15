@@ -74,7 +74,7 @@ browser or `workerd` test when platform behavior is the risk.
   blob, proves zero replacements after wrong-passphrase and tamper failures,
   and verifies that the R2 adapter rejects plaintext before storage access.
 - Every extension message and external payload is rejected on schema mismatch.
-- WebBridge release packages must contain version `1.0.30`, the exact
+- WebBridge release packages must contain the current candidate version `1.0.31`, the exact
   `https://tobirink.com/*` content-script match and the same
   `externally_connectable` match before their SHA-256 is recorded.
 - Public Discovery tests prouvent la création D1 atomique et dédupliquée,
@@ -101,7 +101,7 @@ browser or `workerd` test when platform behavior is the risk.
 - Manifest permissions correspond to documented user flows. The only host
   permission is the configured TobiRink origin; no provider origin, domain
   wildcard, DNR ruleset or undocumented origin is accepted.
-- The packaged-Chrome Playwright journey unpacks the produced `1.0.30` ZIP into
+- The packaged-Chrome Playwright journey unpacks the produced `1.0.31` ZIP into
   an isolated profile, creates a synthetic bookmark through the real extension,
   proves Public Discovery cache-first resolution and production WebBridge rendering, then
   reloads the private library offline without injecting a bridge mock.

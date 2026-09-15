@@ -21,6 +21,7 @@ scope:
   - docs/architecture/src/favorite-source-boundaries.architecture.json
   - docs/architecture/src/extension-delivery-validation.dataflow.json
 review: on-change
+revised: true
 ---
 
 # ADR-0050 — Retrait des fallbacks fournisseur de l’extension
@@ -57,7 +58,9 @@ favoris restent purs et sans réseau.
 ## Conséquences
 
 Les archives Chrome et Firefox ne contiennent plus la règle DNR orpheline et
-leur nombre de fichiers diminue d’une unité. Une panne D1 rend la découverte ou
+leur nombre de fichiers diminue d’une unité. La première candidate qui
+matérialise cette frontière exhaustive est `1.0.31`; elle reste locale jusqu’à
+une publication R2 explicitement approuvée. Une panne D1 rend la découverte ou
 l’Agenda indisponible selon leurs contrats de cache; elle ne déclenche jamais
 un appel fournisseur depuis MV3. Les suppressions restent récupérables par
 revert du commit et n’effacent aucune base IndexedDB installée à distance.

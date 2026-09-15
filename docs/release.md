@@ -2,8 +2,9 @@
 
 ## Build a release candidate
 
-The current production archives remain immutable. The repository source and
-the published production archives are `1.0.30`.
+The current production archives remain immutable. The published production
+archives are `1.0.30`; the repository source is the unpublished `1.0.31`
+candidate.
 `apps/extension/package.json` is the only
 version source: WXT reads it for both manifests, the packager reads it for ZIP
 names, and the download page derives its two public links from it.
@@ -169,6 +170,27 @@ Discovery et Agenda. Une décision Review manuelle contenant un identifiant ou
 une URL fournisseur explicite peut encore demander volontairement
 l'hydratation exacte à AniList, MangaUpdates, MangaDex ou Kitsu; elle n'est pas
 une recherche automatique de titre.
+
+### Candidate sans fournisseur MV3 — 1.0.31
+
+La candidate locale `1.0.31` ferme aussi le dernier chemin manuel direct : un
+identifiant fournisseur explicite produit une demande Public Discovery v3 et
+attend la fiche D1 publiée par le collecteur GitHub OIDC. Les runtimes de
+restauration d’identité, le fallback Agenda exporté et la règle DNR
+MangaUpdates ont été supprimés. Les deux manifestes n’accordent comme origine
+que `https://tobirink.com/*` et ne déclarent aucun ruleset DNR.
+
+Deux constructions isolées reproduisent exactement les archives de vingt
+fichiers :
+
+- Chrome : 291601 octets, SHA-256
+  `a4bf87ecc73f03566ad84d8a6b2d8ee61dae0fe6e1cbf3f9f1897afb81dbd390`.
+- Firefox : 291642 octets, SHA-256
+  `01657bc68988fc97360881f7a2f6bd431e52d82dbfc95440fb0ca58a545e3358`.
+
+Cette candidate n’est pas publiée. La production, les liens de téléchargement
+et le rollback restent en `1.0.30` jusqu’à une opération R2 et un déploiement
+Worker explicitement approuvés et vérifiés.
 
 ### Publication D1-first et Agenda OIDC — 2026-09-14
 
