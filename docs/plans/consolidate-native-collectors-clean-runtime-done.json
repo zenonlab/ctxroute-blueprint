@@ -1,0 +1,10 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "push-and-redeploy-clean-runtime",
+  "status": "DONE",
+  "evidence": [
+    "origin/main pointe sur bb1a93be503517ad5715ebd72fb6879b4286da14 et exclut la modification utilisateur .codex/config.toml.",
+    "Cloudflare sert à 100 % la version Worker 28226f17-f805-4da7-98d9-6c21a8680792; D1 n'a aucune migration restante et les deux Queues configurées existent.",
+    "Trafic réel: AniList ID 1 passe de PENDING à VERIFIED, Agenda v3 répond 200 avec la génération calendar-57a1574653ac08a739f3d58bb7f05e2ca86a7f34a380eeec, et les routes retirées répondent 410."
+  ]
+}

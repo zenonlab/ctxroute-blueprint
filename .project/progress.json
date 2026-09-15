@@ -1085,7 +1085,7 @@
       "schemaVersion": 1,
       "id": "goal-consolidate-native-collectors-and-retire-github",
       "title": "Consolider les collecteurs natifs et retirer GitHub Actions",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": false,
       "steps": [
@@ -1304,7 +1304,7 @@
         {
           "id": "push-and-redeploy-clean-runtime",
           "title": "Pousser et redéployer le runtime nettoyé",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le push fast-forward exclut .codex/config.toml.",
             "Le Worker déployé correspond au commit certifié.",
@@ -1321,7 +1321,11 @@
             "npm run infra:apply avec digest vérifié",
             "recertifier les routes et le trafic"
           ],
-          "evidence": []
+          "evidence": [
+            "origin/main pointe sur bb1a93be503517ad5715ebd72fb6879b4286da14 et exclut la modification utilisateur .codex/config.toml.",
+            "Cloudflare sert à 100 % la version Worker 28226f17-f805-4da7-98d9-6c21a8680792; D1 n'a aucune migration restante et les deux Queues configurées existent.",
+            "Trafic réel: AniList ID 1 passe de PENDING à VERIFIED, Agenda v3 répond 200 avec la génération calendar-57a1574653ac08a739f3d58bb7f05e2ca86a7f34a380eeec, et les routes retirées répondent 410."
+          ]
         },
         {
           "id": "delete-public-repository",
@@ -1356,7 +1360,7 @@
         {
           "id": "final-audit-and-secret-inventory",
           "title": "Auditer le résultat et inventorier les secrets obsolètes",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Aucun runtime ou workflow GitHub Actions actif ne subsiste.",
             "Tous les tests, audits et Archify passent.",
@@ -1377,7 +1381,62 @@
             "auditer les références avec rg",
             "git status --short --branch"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify réussit intégralement: 273 tests de gouvernance passent, 1 est ignoré, tous les workspaces passent, les deux builds MV3 passent et npm audit trouve 0 vulnérabilité.",
+            "npm ci --ignore-scripts rétablit le lien workspace Deno puis npm ls --all réussit; agenda-release.dataflow passe Archify showcase 9/9 sans erreur ni avertissement.",
+            "Aucun workflow GitHub Actions ni runtime github-oidc actif ne subsiste; le dépôt public répond 404 et les seuls secrets runtime sont PROVIDER_GATEWAY_HMAC_KEY côté Worker et Deno.",
+            "AGENTS.md, CLAUDE.md et .codex/hooks.json restent inchangés; .codex/config.toml demeure la seule modification utilisateur exclue."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-route-only-anilist-through-deno",
+      "title": "Limiter la gateway Deno aux appels AniList",
+      "status": "BLOCKED",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "route-anilist-only",
+          "title": "Router AniList via Deno et les autres fournisseurs directement",
+          "status": "BLOCKED",
+          "acceptance": [
+            "Le Worker envoie uniquement graphql.anilist.co à la gateway signée.",
+            "MangaUpdates, MangaDex et Kitsu utilisent le transport direct Cloudflare.",
+            "La gateway Deno refuse toute cible autre qu'AniList.",
+            "Les tests, npm run verify et Archify passent.",
+            "Les smokes réels prouvent AniList via Deno, MangaUpdates direct, Discovery et Agenda."
+          ],
+          "files": [
+            "apps/worker/src/provider-transport-adapter.ts",
+            "apps/worker/src/provider-transport-adapter.test.ts",
+            "apps/worker/wrangler.jsonc",
+            "apps/provider-gateway/src/index.ts",
+            "apps/provider-gateway/src/index.test.ts",
+            "docs/decisions/ADR-0051-provider-transport-gate.md",
+            "docs/architecture/src/public-pipeline.architecture.json",
+            "docs/architecture/src/public-discovery.dataflow.json",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/release.md",
+            "docs/plans/route-only-anilist-through-deno.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Modifier uniquement les fichiers listés avec apply_patch.",
+            "Exécuter les tests ciblés Worker et Deno.",
+            "Exécuter npm run verify et valider Archify en showcase.",
+            "Déployer la gateway Deno puis le Worker Cloudflare via leurs gates approuvées.",
+            "Vérifier AniList, MangaUpdates, Discovery et Agenda en trafic réel.",
+            "Créer le commit refactor(gateway): route only anilist through deno et le pousser sur main."
+          ],
+          "evidence": [
+            "external: Discovery MangaUpdates retourne provider-http-403 lorsque son appel sort directement de Cloudflare; le routage AniList-only ne peut donc pas préserver le trafic réel.",
+            "L'essai a été annulé: Worker 28226f17-f805-4da7-98d9-6c21a8680792 restauré à 100 % et gateway Deno sxbj3m7zt0zc restaurée.",
+            "Le runtime restauré est sain: une nouvelle demande AniList ID 1 est passée de PENDING à VERIFIED et Agenda v3 expose une génération MangaUpdates produite à 19:30 UTC."
+          ]
         }
       ]
     }

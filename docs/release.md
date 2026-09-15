@@ -9,6 +9,23 @@ allowlistée. Un test réel a mené AniList ID 20 à `VERIFIED`; le cron de 17:3
 UTC a promu `calendar-d2732f2f2531eaa1ba6ae4af172670f92ab35abdedea38df`
 avec 711 événements, dont 225 AniList et 486 MangaUpdates.
 
+La certification finale après l'essai de routage sélectif conserve le Worker
+`28226f17-f805-4da7-98d9-6c21a8680792` à 100 % et la gateway Deno
+`sxbj3m7zt0zc`. Le routage « Deno uniquement pour AniList » a été annulé :
+Discovery MangaUpdates reçoit HTTP 403 depuis l'egress Cloudflare direct. Une
+nouvelle demande AniList ID 1 est passée de `PENDING` à `VERIFIED` le
+15 septembre à 19:31 UTC. Agenda v3 expose la génération
+`calendar-57a1574653ac08a739f3d58bb7f05e2ca86a7f34a380eeec`, produite à
+19:30 UTC, avec des entrées MangaUpdates; les trois routes d'ingestion externe
+et Catalogue v2 répondent toujours 410.
+
+L'inventaire de secrets ne contient qu'un nom de secret runtime dans chaque
+service : `PROVIDER_GATEWAY_HMAC_KEY` côté Worker et côté gateway. Le jeton
+`DENO_DEPLOY_TOKEN` utilisé pour l'opération était uniquement injecté dans une
+session locale désormais fermée; il n'est pas un secret runtime. Le dépôt
+GitHub supprimé ne contenait ni secret ni variable Actions. Aucun secret
+obsolète distant n'a donc été trouvé à supprimer.
+
 Les sept workflows du dépôt principal, le vérificateur GitHub OIDC et les
 clients de collecte externes sont retirés. Les routes historiques
 `POST /v2/releases/generations`, `POST /v3/catalogue/discoveries/collector/claims`

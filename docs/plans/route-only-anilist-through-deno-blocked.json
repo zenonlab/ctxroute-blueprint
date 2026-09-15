@@ -1,0 +1,10 @@
+{
+  "goalId": "goal-route-only-anilist-through-deno",
+  "stepId": "route-anilist-only",
+  "status": "BLOCKED",
+  "evidence": [
+    "external: Discovery MangaUpdates retourne provider-http-403 lorsque son appel sort directement de Cloudflare; le routage AniList-only ne peut donc pas préserver le trafic réel.",
+    "L'essai a été annulé: Worker 28226f17-f805-4da7-98d9-6c21a8680792 restauré à 100 % et gateway Deno sxbj3m7zt0zc restaurée.",
+    "Le runtime restauré est sain: une nouvelle demande AniList ID 1 est passée de PENDING à VERIFIED et Agenda v3 expose une génération MangaUpdates produite à 19:30 UTC."
+  ]
+}

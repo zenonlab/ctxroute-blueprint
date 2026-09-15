@@ -1,0 +1,47 @@
+{
+  "goalId": "goal-route-only-anilist-through-deno",
+  "title": "Limiter la gateway Deno aux appels AniList",
+  "approved": true,
+  "executionMode": "collaborative",
+  "validationEvidence": [
+    "Le mode gateway actuel route les quatre fournisseurs par Deno; l'utilisateur a approuvé explicitement le périmètre AniList-only et les deux redéploiements.",
+    "AniList répond 403 depuis Cloudflare direct tandis que MangaUpdates dispose d'un chemin direct allowlisté déjà testé localement.",
+    "Les versions de rollback sont Deno pbcbbjp6gzys et Worker 28226f17-f805-4da7-98d9-6c21a8680792."
+  ],
+  "steps": [
+    {
+      "id": "route-anilist-only",
+      "title": "Router AniList via Deno et les autres fournisseurs directement",
+      "acceptance": [
+        "Le Worker envoie uniquement graphql.anilist.co à la gateway signée.",
+        "MangaUpdates, MangaDex et Kitsu utilisent le transport direct Cloudflare.",
+        "La gateway Deno refuse toute cible autre qu'AniList.",
+        "Les tests, npm run verify et Archify passent.",
+        "Les smokes réels prouvent AniList via Deno, MangaUpdates direct, Discovery et Agenda."
+      ],
+      "files": [
+        "apps/worker/src/provider-transport-adapter.ts",
+        "apps/worker/src/provider-transport-adapter.test.ts",
+        "apps/worker/wrangler.jsonc",
+        "apps/provider-gateway/src/index.ts",
+        "apps/provider-gateway/src/index.test.ts",
+        "docs/decisions/ADR-0051-provider-transport-gate.md",
+        "docs/architecture/src/public-pipeline.architecture.json",
+        "docs/architecture/src/public-discovery.dataflow.json",
+        "docs/architecture/src/agenda-release.dataflow.json",
+        "docs/release.md",
+        "docs/plans/route-only-anilist-through-deno.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Modifier uniquement les fichiers listés avec apply_patch.",
+        "Exécuter les tests ciblés Worker et Deno.",
+        "Exécuter npm run verify et valider Archify en showcase.",
+        "Déployer la gateway Deno puis le Worker Cloudflare via leurs gates approuvées.",
+        "Vérifier AniList, MangaUpdates, Discovery et Agenda en trafic réel.",
+        "Créer le commit refactor(gateway): route only anilist through deno et le pousser sur main."
+      ]
+    }
+  ]
+}

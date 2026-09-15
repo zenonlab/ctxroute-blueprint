@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "final-audit-and-secret-inventory",
+  "status": "DONE",
+  "evidence": [
+    "npm run verify réussit intégralement: 273 tests de gouvernance passent, 1 est ignoré, tous les workspaces passent, les deux builds MV3 passent et npm audit trouve 0 vulnérabilité.",
+    "npm ci --ignore-scripts rétablit le lien workspace Deno puis npm ls --all réussit; agenda-release.dataflow passe Archify showcase 9/9 sans erreur ni avertissement.",
+    "Aucun workflow GitHub Actions ni runtime github-oidc actif ne subsiste; le dépôt public répond 404 et les seuls secrets runtime sont PROVIDER_GATEWAY_HMAC_KEY côté Worker et Deno.",
+    "AGENTS.md, CLAUDE.md et .codex/hooks.json restent inchangés; .codex/config.toml demeure la seule modification utilisateur exclue."
+  ]
+}
