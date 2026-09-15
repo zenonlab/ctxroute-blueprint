@@ -48,8 +48,8 @@
     {
       "id": "worker",
       "type": "cloud",
-      "label": "API TobiRink",
-      "sublabel": "lecture ou création",
+      "label": "API TobiRink v3",
+      "sublabel": "lecture ou création · v2 retiré",
       "stage": 1,
       "row": 1,
       "width": 140,

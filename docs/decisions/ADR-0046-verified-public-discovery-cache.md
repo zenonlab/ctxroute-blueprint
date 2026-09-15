@@ -44,7 +44,7 @@ GitHub Actions. Un résultat fonctionnel, y compris introuvable ou ambigu, doit
 
 ## Décision
 
-Le protocole public v2 utilise une clé versionnée composée de l’empreinte
+Le protocole public v3 utilise une clé versionnée composée de l’empreinte
 SHA-256 du titre canonique local, du type média, de la version du parseur et de
 la version des règles. La demande contient aussi au plus quatre titres de
 découverte nettoyés et bornés, plus les marqueurs publics nécessaires au
@@ -63,13 +63,13 @@ Une lecture renvoie exactement un état :
 - `AMBIGUOUS` : plusieurs identités restent crédibles et sont conservées pour
   une Review locale sans nouvelle recherche fournisseur.
 
-Sur `MISS`, le Worker crée atomiquement la demande v2 ou retourne la ligne
+Sur `MISS`, le Worker crée atomiquement la demande v3 ou retourne la ligne
 concurrente déjà créée. L’extension ne reçoit aucun bail, ne propose aucun
 identifiant et n’appelle aucun fournisseur. Une seconde soumission de la même
 clé doit porter le même digest de requête; un contenu différent est refusé au
 lieu d’écraser le travail existant.
 
-Le composant portable de l’ADR-0047 lit les demandes en attente via une source
+Le composant portable de l’ADR-0047 lit les demandes v3 en attente via une source
 injectée. Il route la recherche vers AniList, MangaUpdates, MangaDex, Kitsu
 Anime ou Kitsu Manga selon le type média, applique le matcher versionné, puis
 hydrate l’identifiant exact retenu. Il produit exactement un résultat
@@ -112,6 +112,11 @@ D1 reçoit immédiatement une ligne `PENDING` après le premier miss accepté,
 puis un résultat terminal seulement après le cycle OIDC. Les lectures suivantes
 réutilisent ce résultat; les requêtes concurrentes attendent. Aucune extension
 ne contacte AniList, MangaUpdates, MangaDex ou Kitsu pour cette découverte.
+
+Les anciennes routes `/v2/catalogue/discoveries` et leurs sous-routes sont
+retirées et répondent `410 Gone`. L’ingestion, la lecture et la création de
+demande utilisent exclusivement v3; aucune identité OIDC privée v2 n’est
+conservée.
 
 Le cache ne représente aucune bibliothèque et ne peut pas restaurer la
 progression privée. Les anciennes tables et migrations Collectif restent

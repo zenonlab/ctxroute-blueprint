@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-publish-public-discovery-v2-retirement",
+  "title": "Publier le retrait du protocole Public Discovery v2",
+  "status": "ACTIVE",
+  "executionMode": "collaborative",
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Vérifier, versionner, pousser et déployer le Worker",
+      "status": "TODO",
+      "acceptance": [
+        "npm run verify passe sur le diff final.",
+        "Le commit exclut la modification utilisateur .codex/config.toml et est poussé sur origin/main.",
+        "La gate Cloudflare autorise uniquement worker-deploy pour tobirink-public-api.",
+        "En production, toutes les routes Public Discovery v2 répondent 410 et les routes v3 et Agenda restent opérationnelles."
+      ],
+      "files": [
+        ".project/progress.json",
+        ".project/progress-archive-2026-09-15.json",
+        "apps/worker/src/catalogue/public-discovery-routes.ts",
+        "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+        "apps/worker/src/diagnostics.ts",
+        "apps/worker/src/diagnostics.test.ts",
+        "apps/worker/src/releases/github-oidc.ts",
+        "apps/worker/src/releases/github-oidc.test.ts",
+        "docs/architecture/src/blueprint.architecture.json",
+        "docs/architecture/src/public-discovery.dataflow.json",
+        "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+        "docs/progress.md",
+        "scripts/progress-cli.mjs",
+        "scripts/progress-core.mjs",
+        "docs/plans/disable-legacy-public-discovery-v2.json",
+        "docs/plans/disable-legacy-public-discovery-v2-update.json",
+        "docs/plans/publish-public-discovery-v2-retirement.json"
+      ],
+      "commands": [
+        "npm run verify",
+        "git diff --check",
+        "git commit -m fix(discovery): retire legacy v2 routes",
+        "git push origin main",
+        "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+        "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation worker-deploy",
+        "npm run infra:apply -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow worker:tobirink-public-api",
+        "Production HTTP verification for v2, v3 and Agenda"
+      ],
+      "evidence": []
+    }
+  ],
+  "validationEvidence": [
+    "npm run verify",
+    "origin/main contains the verified commit",
+    "Cloudflare gate receipt permits only worker:tobirink-public-api",
+    "Production v2 410 and v3/Agenda success responses"
+  ],
+  "approved": true
+}

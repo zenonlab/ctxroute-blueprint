@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-tobirink-disable-legacy-public-discovery-v2",
+  "title": "Désactiver le protocole legacy Public Discovery v2",
+  "status": "DONE",
+  "executionMode": "collaborative",
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Répondre 410 aux routes v2 et retirer leur identité OIDC",
+      "status": "DONE",
+      "acceptance": [
+        "Toutes les routes /v2/catalogue/discoveries et sous-routes répondent 410 Gone.",
+        "Le flux v3 de lecture, demande et collecte reste inchangé.",
+        "L'identité OIDC privée associée à la promotion v2 n'est plus acceptée.",
+        "Les tests de routes et de sécurité reflètent le retrait v2."
+      ],
+      "files": [
+        "apps/worker/src/catalogue/public-discovery-routes.ts",
+        "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+        "apps/worker/src/diagnostics.ts",
+        "apps/worker/src/diagnostics.test.ts",
+        "apps/worker/src/releases/github-oidc.ts",
+        "apps/worker/src/releases/github-oidc.test.ts",
+        "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+        "docs/architecture/src/public-discovery.dataflow.json"
+      ],
+      "commands": [
+        "npm run test:worker",
+        "npm run typecheck",
+        "npm run validate:decisions",
+        "npm run validate:docs -- --all",
+        "npm run archify:validate -- public-discovery.dataflow",
+        "git diff --check"
+      ],
+      "evidence": [
+        "Progress history archived to .project/progress-archive-2026-09-15.json",
+        "Worker tests 57/57 and all workspace typechecks pass",
+        "All legacy v2 route tests return 410; v3 remains covered",
+        "Archify public-discovery dataflow passes showcase 9/9 with 0 errors and 0 warnings",
+        "npm run validate:decisions, npm run validate:docs -- --all and git diff --check pass"
+      ]
+    }
+  ],
+  "validationEvidence": [
+    "npm run test:worker",
+    "npm run typecheck",
+    "npm run validate:docs -- --all",
+    "Archify public-discovery showcase",
+    "git diff --check"
+  ],
+  "approved": true
+}

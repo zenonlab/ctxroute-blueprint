@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, open } from 'node:fs/promises';
+import { mkdir, readFile, rename, open, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
@@ -11,6 +11,17 @@ const SECRET = /(api[_-]?key|secret|password|token|private[_-]?key|authorization
 
 export const emptyProgress = () => ({ schemaVersion: 1, goals: [] });
 export const progressRevision = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+
+export async function archiveCompletedProgress(root = process.cwd(), archiveName = 'progress-archive-2026-09-15.json') {
+  const sourcePath = resolve(root, PROGRESS_PATH); const archivePath = resolve(root, '.project', archiveName);
+  const source = await readFile(sourcePath, 'utf8'); const current = JSON.parse(source);
+  if (!Array.isArray(current.goals) || current.goals.some(goal => goal.status !== 'DONE')) throw new Error('only completed Progress goals can be archived');
+  try { await readFile(archivePath); throw new Error('Progress archive already exists'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  await writeFile(archivePath, source, { encoding: 'utf8', mode: 0o600 });
+  await atomicWrite(sourcePath, `${JSON.stringify(emptyProgress(), null, 2)}\n`);
+  await atomicWrite(resolve(root, PROGRESS_VIEW_PATH), renderProgress(emptyProgress()));
+  return { archivedGoals: current.goals.length, archivePath: relative(root, archivePath) };
+}
 
 export async function readProgress(root = process.cwd()) {
   try {

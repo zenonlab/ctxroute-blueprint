@@ -15,7 +15,7 @@ describe('worker diagnostics', () => {
 
   it('reduces paths methods and durations to bounded technical values', () => {
     expect(classifyWorkerRoute('/v2/favorites/lookup')).toBe('unknown');
-    expect(classifyWorkerRoute('/v2/catalogue/discoveries/claims')).toBe('catalogue');
+    expect(classifyWorkerRoute('/v3/catalogue/discoveries/collector/claims')).toBe('catalogue');
     expect(classifyWorkerRoute('/v2/releases/generations')).toBe('release');
     expect(classifyWorkerRoute('/v3/releases')).toBe('release');
     expect(classifyWorkerRoute('/library/work_123')).toBe('site');
