@@ -1,0 +1,118 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "title": "Consolider les collecteurs natifs et retirer GitHub Actions",
+  "approved": true,
+  "executionMode": "autonomous",
+  "validationEvidence": [
+    "Autorité autonome explicitement confirmée pour les neuf étapes du plan joint.",
+    "Le dépôt principal contient deux commits locaux certifiés pour les collecteurs et le transport isolé.",
+    "Les Queues cibles sont absentes et le dépôt public reste le producteur actif avant bascule.",
+    "La cible destructive est exactement tristan-monticelli/tobirink-public-discovery.",
+    "La modification utilisateur .codex/config.toml reste exclue."
+  ],
+  "steps": [
+    {
+      "id": "inventory-and-backup",
+      "title": "Inventorier et sauvegarder le dépôt public",
+      "acceptance": [
+        "Le commit 51742d9, les références, workflows, runs et publications sont inventoriés.",
+        "Un git bundle ignoré et son SHA-256 sont vérifiés.",
+        "La parité métier avec packages/public-discovery est établie sans mutation distante."
+      ],
+      "files": ["docs/plans/consolidate-native-collectors.json", "docs/plans/consolidate-native-collectors-step-update.json", "docs/release.md", "build/backups/tobirink-public-discovery.bundle.b64", ".project/progress.json", "docs/progress.md"],
+      "commands": ["gh repo view et gh api en lecture seule", "git clone --mirror et git bundle create", "décoder puis vérifier le git bundle et son SHA-256", "comparer les sources publiques et principales", "npm run validate:docs -- --all", "git commit -m docs(operations): inventory public collector retirement"]
+    },
+    {
+      "id": "gate-cloudflare-queues",
+      "title": "Étendre la gate Cloudflare aux deux Queues",
+      "acceptance": [
+        "La gate accepte uniquement tobirink-public-discovery et sa DLQ.",
+        "Plan, digest, refus hors allowlist, bindings et dry-run sont testés.",
+        "ADR et dataflows Archify sont validés en showcase."
+      ],
+      "files": ["scripts/infra/cloudflare-driver.mjs", "scripts/infra/cloudflare-driver.test.mjs", "scripts/infra/tobirink-provider-gate.mjs", "scripts/infra/provider-gate-core.mjs", "scripts/infra/provider-gate-core.test.mjs", "apps/worker/wrangler.jsonc", "docs/decisions/ADR-0051-provider-transport-gate.md", "docs/architecture/src/public-discovery.dataflow.json", "docs/architecture/src/agenda-release.dataflow.json", ".project/progress.json", "docs/progress.md"],
+      "commands": ["modifier les fichiers avec apply_patch", "tester les gates infra", "npm exec -- wrangler deploy --dry-run --config apps/worker/wrangler.jsonc", "npm run archify:validate -- public-discovery.dataflow", "npm run archify:validate -- agenda-release.dataflow", "npm run verify", "git commit -m feat(infra): gate native collector queues"]
+    },
+    {
+      "id": "publish-native-runtime",
+      "title": "Pousser, provisionner et déployer le runtime direct",
+      "acceptance": [
+        "Le tip certifié est poussé en fast-forward sur main.",
+        "Les deux Queues sont créées via la gate et liées au Worker.",
+        "Le Worker est déployé en mode direct sans gateway ni nouveau secret."
+      ],
+      "files": ["apps/worker/wrangler.jsonc", "scripts/infra/cloudflare-driver.mjs", "docs/release.md", ".project/progress.json", "docs/progress.md"],
+      "commands": ["git push origin HEAD:main", "npm run infra:inspect", "npm run infra:plan", "npm run infra:apply avec digest vérifié", "npm exec -- wrangler queues list"]
+    },
+    {
+      "id": "certify-live-traffic",
+      "title": "Certifier Discovery et Agenda en trafic réel",
+      "acceptance": [
+        "Un miss Discovery évolue de PENDING vers un état terminal via Queue.",
+        "Retries, DLQ et latence sont observables et bornés.",
+        "Agenda produit AniList et MangaUpdates sans écraser le dernier succès sur échec.",
+        "Les routes v2 restent 410 et les routes v3 restent disponibles."
+      ],
+      "files": ["docs/release.md", "docs/architecture/src/traffic.dataflow.json", ".project/progress.json", "docs/progress.md"],
+      "commands": ["tester les routes publiques avec un cas contrôlé", "inspecter les logs Worker et les Queues", "interroger D1 en lecture seule", "npm run archify:validate -- traffic.dataflow"]
+    },
+    {
+      "id": "conditional-provider-gateway",
+      "title": "Ajouter une gateway isolée seulement si AniList bloque Cloudflare",
+      "acceptance": [
+        "L'étape est omise si le mode direct fonctionne.",
+        "Sinon la gateway est HMAC, anti-rejeu, bornée et strictement allowlistée.",
+        "Le service gratuit passe les smoke tests AniList, MangaUpdates et Discovery complet."
+      ],
+      "files": ["apps/provider-gateway/package.json", "apps/provider-gateway/src/index.ts", "apps/provider-gateway/src/index.test.ts", "scripts/infra/provider-gateway-driver.mjs", "scripts/infra/tobirink-provider-gate.mjs", "package.json", "package-lock.json", "docs/decisions/ADR-0051-provider-transport-gate.md", "docs/architecture/src/public-discovery.dataflow.json", ".project/progress.json", "docs/progress.md"],
+      "commands": ["modifier les fichiers avec apply_patch", "installer uniquement une dépendance explicitement nécessaire", "tester la gateway", "planifier et appliquer via la gate fournisseur", "npm run verify", "git commit -m feat(gateway): add isolated provider egress"]
+    },
+    {
+      "id": "remove-github-runtime-and-actions",
+      "title": "Retirer le runtime GitHub OIDC et les sept workflows",
+      "acceptance": [
+        "Les routes et clients propres au collecteur GitHub sont retirés ou terminalisés en 410.",
+        "Les sept workflows sont supprimés après équivalence des gates locales.",
+        "Les collecteurs et fournisseurs portables restent dans le dépôt principal.",
+        "Aucune référence active à GitHub OIDC ou au dépôt public ne subsiste.",
+        "Verify, audit, packaging et Archify passent."
+      ],
+      "files": [".github/workflows/agenda-collector.yml", ".github/workflows/public-discovery-collector.yml", ".github/workflows/cloudflare.yml", ".github/workflows/validate.yml", ".github/workflows/docker-publish.yml", ".github/workflows/code-review-graph.yml", ".github/workflows/code-review-graph-comment.yml", "apps/worker/src/releases/github-oidc.ts", "apps/worker/src/releases/github-oidc.test.ts", "apps/worker/src/releases/public-release-routes.ts", "apps/worker/src/catalogue/public-discovery-routes.ts", "packages/public-discovery/src/cli.ts", "packages/public-discovery/src/http-gateway.ts", "packages/public-discovery/src/http-gateway.test.ts", "packages/public-discovery/src/run.ts", "docs/release.md", "docs/operations/cloudflare.env.example", "docs/architecture/src/public-pipeline.architecture.json", "docs/architecture/src/public-discovery.dataflow.json", "docs/architecture/src/agenda-release.dataflow.json", "docs/decisions/ADR-0045-public-release-calendar.md", "docs/decisions/ADR-0047-portable-public-discovery-component.md", ".project/progress.json", "docs/progress.md"],
+      "commands": ["supprimer uniquement les fichiers listés avec apply_patch", "rechercher les références obsolètes avec rg", "npm run verify", "npm ls --all", "npm audit --audit-level=high", "npm run package:extension", "valider les trois vues Archify", "git commit -m refactor(operations): retire GitHub Actions collectors"]
+    },
+    {
+      "id": "push-and-redeploy-clean-runtime",
+      "title": "Pousser et redéployer le runtime nettoyé",
+      "acceptance": [
+        "Le push fast-forward exclut .codex/config.toml.",
+        "Le Worker déployé correspond au commit certifié.",
+        "Discovery, Agenda, D1 et Queue fonctionnent sans GitHub Actions."
+      ],
+      "files": ["docs/release.md", ".project/progress.json", "docs/progress.md"],
+      "commands": ["git push origin HEAD:main", "npm run infra:plan", "npm run infra:apply avec digest vérifié", "recertifier les routes et le trafic"]
+    },
+    {
+      "id": "delete-public-repository",
+      "title": "Supprimer le dépôt public devenu inutile",
+      "acceptance": [
+        "Le bundle contient 51742d9 et aucune dépendance active ne vise le dépôt.",
+        "Le dépôt exact tristan-monticelli/tobirink-public-discovery est supprimé.",
+        "GitHub répond 404 et le trafic Cloudflare reste sain."
+      ],
+      "files": ["build/backups/tobirink-public-discovery.bundle.b64", "docs/release.md", ".project/progress.json", "docs/progress.md"],
+      "commands": ["décoder et vérifier le git bundle", "gh repo view pour la dernière vérification", "gh repo delete tristan-monticelli/tobirink-public-discovery --yes", "vérifier le 404", "recertifier le Worker"]
+    },
+    {
+      "id": "final-audit-and-secret-inventory",
+      "title": "Auditer le résultat et inventorier les secrets obsolètes",
+      "acceptance": [
+        "Aucun runtime ou workflow GitHub Actions actif ne subsiste.",
+        "Tous les tests, audits et Archify passent.",
+        "Les secrets obsolètes sont nommés sans suppression implicite.",
+        "La doctrine et le travail utilisateur sont préservés."
+      ],
+      "files": ["docs/release.md", "docs/progress.md", ".project/progress.json", "docs/plans/consolidate-native-collectors.json"],
+      "commands": ["npm run verify", "npm ls --all", "npm audit --audit-level=high", "npm run archify:validate -- all", "auditer les références avec rg", "git status --short --branch"]
+    }
+  ]
+}

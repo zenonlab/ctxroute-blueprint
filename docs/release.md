@@ -1,5 +1,29 @@
 # Extension packaging and rollback
 
+## Sauvegarde du collecteur public avant retrait — 15 septembre 2026
+
+Le dépôt public `tristan-monticelli/tobirink-public-discovery` possède une
+seule branche `main`, sans tag, release, environnement, secret Actions,
+variable Actions, fork, étoile ni issue ouverte. Son tip est exactement
+`51742d92602d91e66a45e7a62b6d687dbd566219`. Les 17 runs conservés se
+répartissent entre Discovery (13 : 4 succès, 9 échecs) et Agenda (4 : 2 succès,
+2 échecs); aucun run n'a encore utilisé le tip `51742d9`.
+
+Une sauvegarde complète a été créée sous
+`build/backups/tobirink-public-discovery.bundle.b64`. Ce fichier ignoré encode
+un Git bundle autonome de 72 824 octets. Après décodage, `git bundle verify`
+confirme l'historique complet, `main`, `HEAD` et le tip `51742d9`; son SHA-256
+est `c41e16372290150a7c3937aa3fa7bf2588b4dc743fa75beee0ac1721aca796e2`.
+
+Les 27 sources publiques sont présentes dans `packages/public-discovery` : 24
+sont byte-identiques. Les trois différences sont les injections du
+`ProviderTransportPort` dans `agenda/collectors.ts`, `resolver.ts` et
+`index.ts`; le dépôt principal ajoute également le port et son test. Le seul
+écart de manifeste est TypeScript `7.0.2` dans le workspace contre `5.9.3`
+dans l'export public. Le dépôt principal contient donc la version métier la
+plus récente; la suppression distante reste interdite avant la certification
+Cloudflare et sa propre étape destructive.
+
 ## Build a release candidate
 
 The current production archives remain immutable. The published production

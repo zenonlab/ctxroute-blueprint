@@ -1,0 +1,27 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "inventory-and-backup",
+  "status": "DONE",
+  "files": [
+    "docs/plans/consolidate-native-collectors.json",
+    "docs/plans/consolidate-native-collectors-step-update.json",
+    "docs/release.md",
+    "build/backups/tobirink-public-discovery.bundle.b64",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "commands": [
+    "gh repo view et gh api en lecture seule",
+    "git clone --mirror et git bundle create",
+    "décoder puis vérifier le git bundle et son SHA-256",
+    "comparer les sources publiques et principales",
+    "npm run validate:docs -- --all",
+    "git commit -m docs(operations): inventory public collector retirement"
+  ],
+  "evidence": [
+    "Bundle encodé ignoré: 97 101 octets; décodé 72 824 octets, historique complet, main et HEAD sur 51742d9; SHA-256 c41e16372290150a7c3937aa3fa7bf2588b4dc743fa75beee0ac1721aca796e2.",
+    "Inventaire distant: une branche main, aucun tag, release, environnement, secret ou variable Actions, fork, étoile ou issue ouverte; 17 runs historiques.",
+    "Parité: 27/27 sources publiques présentes dans le main, 24 byte-identiques; trois écarts expliqués par ProviderTransportPort et deux fichiers main-only.",
+    "npm run validate:docs -- --all, validate:decisions (51 ADR, 449 scopes), git diff --check et git bundle verify réussis."
+  ]
+}

@@ -83,3 +83,15 @@
 ## Isoler et rendre interchangeable le transport fournisseur — DONE
 
 - [x] **Retirer le proxy embarqué et composer un port de transport sélectionnable** — DONE _(evidence: ProviderTransportPort sépare les collecteurs des adaptateurs direct et gateway; la gate refuse mode, cible, origine ou secret invalides et direct est la valeur Wrangler par défaut., Le serveur provider-proxy et son test sont supprimés; rg ne trouve plus aucun symbole PROVIDER_PROXY, createSignedProviderProxyFetch ou createProviderProxyHandler dans apps et packages., Public Discovery 52/52 et Worker 78/78 passent; npm run verify final, npm ls --all, typechecks, intégration, Chrome/Firefox MV3 et npm audit à 0 vulnérabilité réussissent.)_
+
+## Consolider les collecteurs natifs et retirer GitHub Actions — ACTIVE
+
+- [x] **Inventorier et sauvegarder le dépôt public** — DONE _(evidence: Bundle encodé ignoré: 97 101 octets; décodé 72 824 octets, historique complet, main et HEAD sur 51742d9; SHA-256 c41e16372290150a7c3937aa3fa7bf2588b4dc743fa75beee0ac1721aca796e2., Inventaire distant: une branche main, aucun tag, release, environnement, secret ou variable Actions, fork, étoile ou issue ouverte; 17 runs historiques., Parité: 27/27 sources publiques présentes dans le main, 24 byte-identiques; trois écarts expliqués par ProviderTransportPort et deux fichiers main-only.)_
+- [ ] **Étendre la gate Cloudflare aux deux Queues** — PENDING
+- [ ] **Pousser, provisionner et déployer le runtime direct** — PENDING
+- [ ] **Certifier Discovery et Agenda en trafic réel** — PENDING
+- [ ] **Ajouter une gateway isolée seulement si AniList bloque Cloudflare** — PENDING
+- [ ] **Retirer le runtime GitHub OIDC et les sept workflows** — PENDING
+- [ ] **Pousser et redéployer le runtime nettoyé** — PENDING
+- [ ] **Supprimer le dépôt public devenu inutile** — PENDING
+- [ ] **Auditer le résultat et inventorier les secrets obsolètes** — PENDING
