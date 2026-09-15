@@ -21,13 +21,13 @@ export const publicDiscoveryReferenceV2Schema = z.strictObject({
 });
 
 export const publicDiscoveryQuerySchema = z.strictObject({
-  discoveryTitles: z.array(titleSchema).min(1).max(16),
+  discoveryTitles: z.array(titleSchema).min(1).max(4),
   explicitProviderReference: publicDiscoveryReferenceV2Schema.optional(),
   mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA', 'UNKNOWN']),
   preSerialization: z.boolean().optional(),
   season: z.number().int().positive().max(1000).optional(),
   sourceFormat: z.string().trim().min(1).max(64).optional(),
-  sourceTitles: z.array(titleSchema).max(16),
+  sourceTitles: z.array(titleSchema).max(4),
 });
 
 export const publicDiscoveryRequestSchema = z.strictObject({

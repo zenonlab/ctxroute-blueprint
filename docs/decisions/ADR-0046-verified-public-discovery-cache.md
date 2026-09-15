@@ -23,7 +23,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-14
-- Revised: 2026-09-14
+- Revised: 2026-09-15
 - Supersedes: le protocole Collectif, les owners et les confirmations humaines de l’ADR-0043; l’identité collective de l’ADR-0044
 
 ## Contexte
@@ -46,8 +46,8 @@ GitHub Actions. Un résultat fonctionnel, y compris introuvable ou ambigu, doit
 
 Le protocole public v3 utilise une clé versionnée composée de l’empreinte
 SHA-256 du titre canonique local, du type média, de la version du parseur et de
-la version des règles. La demande contient aussi au plus quatre titres de
-découverte nettoyés et bornés, plus les marqueurs publics nécessaires au
+la version des règles. La demande contient deux listes contenant chacune au
+plus quatre titres nettoyés et bornés, plus les marqueurs publics nécessaires au
 matching : média, saison, format OVA et prépublication. Ces titres et leur
 empreinte sont devinables et ne sont pas présentés comme anonymes. Le Worker et
 D1 ne leur associent aucun owner, installation, compte, URL, dossier,
@@ -99,6 +99,22 @@ Chaque écriture du catalogue et l’écriture terminale sont conditionnées dan
 même batch D1 par le bail non expiré, son token, le digest de demande et
 l’absence de conflit de référence fournisseur. L’adaptateur n’accepte la
 publication que si `meta.changes` vaut exactement `1` pour l’UPDATE terminal.
+
+La publication `VERIFIED` matérialise aussi un index canonique unique sur la
+version de normalisation, le titre normalisé et le type `anime` ou `manga`.
+Toutes les variantes du profil sont vérifiées ensemble : une variante déjà
+attribuée à une autre œuvre du même type rejette atomiquement la publication.
+Le même titre reste permis entre anime et manga. Un rejeu terminal fiable
+matérialise l’index manquant sans rappeler de fournisseur.
+
+Au plus 5 000 demandes peuvent être simultanément `PENDING` ou `PROCESSING`.
+Une nouvelle clé au-delà de cette borne reçoit `503`; une clé existante reste
+lisible et rejouable. Après terminalisation, `request_json` devient `{}` et le
+résultat terminal est conservé comme cache. Les nonces reçoivent une échéance
+à sept jours, les échecs `FAILED` à trente jours et les révisions orphelines
+deviennent éligibles après trente jours. Ces échéances n’autorisent aucune
+suppression automatique : toute purge D1 exige sauvegarde, plan borné et
+approbation destructive séparée.
 
 L’extension consulte d’abord IndexedDB, puis `storage.sync`, puis D1. Un
 `VERIFIED` fournit directement le candidat hydraté complet utilisé pour écrire

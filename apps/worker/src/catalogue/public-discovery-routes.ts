@@ -88,7 +88,10 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyTok
     const requestDigest = await digest(JSON.stringify(parsed.data));
     try {
       return noStore(await v2Port(services).request({ ...parsed.data, requestDigest }, new Date().toISOString()), 202);
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === 'public-discovery-capacity-unavailable') {
+        return noStore({ error: 'discovery-capacity-unavailable' }, 503);
+      }
       return noStore({ error: 'request-conflict' }, 409);
     }
   });

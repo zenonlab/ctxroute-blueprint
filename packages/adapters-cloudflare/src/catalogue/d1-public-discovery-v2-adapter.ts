@@ -12,6 +12,11 @@ import {
   type PublicDiscoveryResultBatch,
   type PublicDiscoveryVerifiedProfile,
 } from '@tobirink/public-discovery';
+import { favoriteTitlePreparationVersion, normalizeFavoriteTitle } from '@tobirink/application';
+
+export const publicDiscoveryPendingLimit = 5_000;
+const failedRetentionMilliseconds = 30 * 86_400_000;
+const nonceRetentionMilliseconds = 7 * 86_400_000;
 
 type SqlValue = null | number | string;
 interface Statement {
@@ -39,6 +44,11 @@ interface DiscoveryRow {
   state: 'PENDING' | 'PROCESSING' | 'FAILED' | 'VERIFIED' | 'NOT_FOUND' | 'AMBIGUOUS';
   verifiedAt: string | null;
 }
+interface CanonicalFacts {
+  mediaKind: 'anime' | 'manga';
+  normalizedTitles: readonly string[];
+  workId: string;
+}
 export interface PublicDiscoveryV2Port {
   claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
   publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ published: number; replayed: number }>;
@@ -48,6 +58,11 @@ export interface PublicDiscoveryV2Port {
 
 function keyValues(key: PublicDiscoveryKeyV2): [string, string, string, string] {
   return [key.fingerprint, key.mediaKind, key.parserVersion, key.siteRulesVersion];
+}
+function futureIso(now: string, milliseconds: number): string {
+  const timestamp = Date.parse(now);
+  if (!Number.isFinite(timestamp)) throw new TypeError('invalid-public-discovery-time');
+  return new Date(timestamp + milliseconds).toISOString();
 }
 function stateFromRow(row: DiscoveryRow | null, now: string): PublicDiscoveryReadState {
   if (!row) return { state: 'MISS' };
@@ -67,7 +82,11 @@ function stateFromRow(row: DiscoveryRow | null, now: string): PublicDiscoveryRea
 }
 
 export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
-  constructor(private readonly database: PublicDiscoveryV2D1Database) {}
+  constructor(private readonly database: PublicDiscoveryV2D1Database, private readonly pendingLimit = publicDiscoveryPendingLimit) {
+    if (!Number.isSafeInteger(pendingLimit) || pendingLimit < 1 || pendingLimit > publicDiscoveryPendingLimit) {
+      throw new RangeError('public-discovery-pending-limit-out-of-range');
+    }
+  }
 
   private row(key: PublicDiscoveryKeyV2): Promise<DiscoveryRow | null> {
     return this.database.prepare(`SELECT attempt_count AS attemptCount, claim_token_hash AS claimTokenHash,
@@ -81,20 +100,22 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
   private async failExhaustedKey(key: PublicDiscoveryKeyV2, now: string): Promise<void> {
     await this.database.prepare(`UPDATE public_discovery_requests_v2 SET
       state = 'FAILED', failure_reason = 'ATTEMPT_LIMIT', failed_at = ?5,
-      claim_token_hash = NULL, lease_until = NULL, retry_at = ?5, updated_at = ?5
+      claim_token_hash = NULL, lease_until = NULL, retry_at = ?5, updated_at = ?5,
+      purge_after = ?6
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
         AND state = 'PROCESSING' AND attempt_count >= 8 AND lease_until <= ?5
-      RETURNING fingerprint`).bind(...keyValues(key), now).first();
+      RETURNING fingerprint`).bind(...keyValues(key), now, futureIso(now, failedRetentionMilliseconds)).first();
   }
 
   private async failExhaustedBatch(now: string, limit: number): Promise<void> {
     await this.database.prepare(`UPDATE public_discovery_requests_v2 SET
       state = 'FAILED', failure_reason = 'ATTEMPT_LIMIT', failed_at = ?1,
-      claim_token_hash = NULL, lease_until = NULL, retry_at = ?1, updated_at = ?1
+      claim_token_hash = NULL, lease_until = NULL, retry_at = ?1, updated_at = ?1,
+      purge_after = ?3
       WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v2
         WHERE state = 'PROCESSING' AND attempt_count >= 8 AND lease_until <= ?1
         ORDER BY updated_at, fingerprint LIMIT ?2)
-      RETURNING fingerprint`).bind(now, limit).all();
+      RETURNING fingerprint`).bind(now, limit, futureIso(now, failedRetentionMilliseconds)).all();
   }
 
   async read(key: PublicDiscoveryKeyV2, now: string): Promise<PublicDiscoveryReadState> {
@@ -108,16 +129,21 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
     await this.database.prepare(`INSERT INTO public_discovery_requests_v2(
       fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
       state, retry_at, created_at, updated_at
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7)
+    ) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7
+    WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4)
+      OR (SELECT COUNT(*) FROM public_discovery_requests_v2 INDEXED BY public_discovery_v2_pending
+        WHERE state IN ('PENDING', 'PROCESSING')) < ?8
     ON CONFLICT(fingerprint, media_kind, parser_version, rules_version) DO UPDATE SET
       state = 'PENDING', claim_token_hash = NULL, lease_until = NULL, attempt_count = 0,
       failure_reason = NULL, failed_at = NULL, result_json = NULL, verified_at = NULL,
-      retry_at = excluded.retry_at, updated_at = excluded.updated_at
+      retry_at = excluded.retry_at, updated_at = excluded.updated_at, purge_after = NULL
     WHERE public_discovery_requests_v2.state = 'FAILED'
       AND public_discovery_requests_v2.request_digest = excluded.request_digest`)
-      .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now).first();
+      .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now, this.pendingLimit).first();
     const row = await this.row(request.key);
-    if (!row || row.requestDigest !== request.requestDigest) throw new Error('public-discovery-request-conflict');
+    if (!row) throw new Error('public-discovery-capacity-unavailable');
+    if (row.requestDigest !== request.requestDigest) throw new Error('public-discovery-request-conflict');
     return stateFromRow(row, now);
   }
 
@@ -140,10 +166,28 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
   }
 
   private publicationGuardValues(result: PublicDiscoveryResult, profile: PublicDiscoveryVerifiedProfile | undefined, tokenDigest: string, now: string): SqlValue[] {
+    const canonical = profile ? this.canonicalFacts(profile) : undefined;
     return [
       ...keyValues(result.key), tokenDigest, result.requestDigest, now,
       JSON.stringify(profile?.references ?? []), profile?.workId ?? '',
+      JSON.stringify(canonical?.normalizedTitles ?? []), favoriteTitlePreparationVersion,
+      canonical?.mediaKind ?? 'anime', canonical?.workId ?? '',
     ];
+  }
+
+  private canonicalFacts(profile: PublicDiscoveryVerifiedProfile): CanonicalFacts {
+    const normalizedTitles = [...new Set([
+      profile.candidate.displayTitle,
+      ...profile.candidate.titles,
+    ].filter((title): title is string => title !== undefined)
+      .map((title) => normalizeFavoriteTitle(title).normalized)
+      .filter((title) => title.length > 0))];
+    if (normalizedTitles.length === 0) throw new Error('public-discovery-canonical-title-missing');
+    return {
+      mediaKind: profile.candidate.mediaKind === 'ANIME' ? 'anime' : 'manga',
+      normalizedTitles,
+      workId: profile.workId,
+    };
   }
 
   private catalogueStatements(profile: PublicDiscoveryVerifiedProfile, verifiedAt: string, guardValues: SqlValue[]): Statement[] {
@@ -158,7 +202,10 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
             JOIN json_each(?) AS proposed
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
-            WHERE existing.work_id <> ?)`).bind(revision, verifiedAt, ...guardValues),
+            WHERE existing.work_id <> ?)
+          AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
+            JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
+            WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`).bind(revision, verifiedAt, ...guardValues),
       this.database.prepare(`INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision)
         SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
@@ -168,6 +215,9 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
             WHERE existing.work_id <> ?)
+          AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
+            JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
+            WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
         ON CONFLICT(work_id) DO UPDATE SET media_kind = excluded.media_kind,
         preferred_title = excluded.preferred_title, revision = excluded.revision`)
         .bind(profile.workId, candidate.mediaKind === 'ANIME' ? 'anime' : 'manga', candidate.displayTitle ?? candidate.titles[0] ?? candidate.externalId, revision, ...guardValues),
@@ -179,8 +229,26 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
             JOIN json_each(?) AS proposed
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
-            WHERE existing.work_id <> ?)`)
+            WHERE existing.work_id <> ?)
+          AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
+            JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
+            WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`)
         .bind(profile.workId, 'und', title, ...guardValues)),
+      ...this.canonicalFacts(profile).normalizedTitles.map((normalizedTitle) => this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
+          normalization_version, normalized_title, media_kind, work_id, created_at)
+        SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
+          fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
+          AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
+          AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
+            JOIN json_each(?) AS proposed
+              ON existing.provider = json_extract(proposed.value, '$.provider')
+              AND existing.external_id = json_extract(proposed.value, '$.externalId')
+            WHERE existing.work_id <> ?)
+          AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
+            JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
+            WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
+        ON CONFLICT(normalization_version, normalized_title, media_kind) DO NOTHING`)
+        .bind(favoriteTitlePreparationVersion, normalizedTitle, candidate.mediaKind === 'ANIME' ? 'anime' : 'manga', profile.workId, verifiedAt, ...guardValues)),
       ...profile.references.map((reference) => this.database.prepare(`INSERT INTO catalogue_external_references(provider, external_id, work_id)
         SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
@@ -190,14 +258,47 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
             WHERE existing.work_id <> ?)
+          AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
+            JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
+            WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
         ON CONFLICT(provider, external_id) DO NOTHING`).bind(reference.provider, reference.externalId, profile.workId, ...guardValues)),
     ];
+  }
+
+  private async materializeCanonicalReplay(result: PublicDiscoveryResult, profile: PublicDiscoveryVerifiedProfile, resultJson: string, createdAt: string): Promise<void> {
+    const canonical = this.canonicalFacts(profile);
+    const guard = [
+      ...keyValues(result.key), result.requestDigest, resultJson,
+      JSON.stringify(canonical.normalizedTitles), favoriteTitlePreparationVersion,
+      canonical.mediaKind, canonical.workId,
+    ];
+    const outcomes = await this.database.batch(canonical.normalizedTitles.map((normalizedTitle) => this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
+        normalization_version, normalized_title, media_kind, work_id, created_at)
+      SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
+        fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
+        AND state = 'VERIFIED' AND request_digest = ? AND result_json = ?)
+        AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
+          JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
+          WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
+      ON CONFLICT(normalization_version, normalized_title, media_kind) DO NOTHING`)
+      .bind(favoriteTitlePreparationVersion, normalizedTitle, canonical.mediaKind, canonical.workId, createdAt, ...guard)));
+    if (outcomes.some((outcome) => !outcome.success)) throw new Error('public-discovery-batch-failed');
+    const conflict = await this.database.prepare(`SELECT 1 AS conflict FROM catalogue_canonical_titles_v1 AS existing
+      JOIN json_each(?1) AS proposed ON existing.normalized_title = proposed.value
+      WHERE existing.normalization_version = ?2 AND existing.media_kind = ?3 AND existing.work_id <> ?4 LIMIT 1`)
+      .bind(JSON.stringify(canonical.normalizedTitles), favoriteTitlePreparationVersion, canonical.mediaKind, canonical.workId).first();
+    if (conflict) throw new Error('public-discovery-canonical-title-conflict');
   }
 
   private async publishOne(result: PublicDiscoveryResult, tokenDigest: string, verifiedAt: string, now: string): Promise<'published' | 'replayed'> {
     const row = await this.row(result.key);
     const resultJson = JSON.stringify(result.resolution);
-    if (row && row.state === result.resolution.state && row.requestDigest === result.requestDigest && row.resultJson === resultJson) return 'replayed';
+    if (row && row.state === result.resolution.state && row.requestDigest === result.requestDigest && row.resultJson === resultJson) {
+      if (result.resolution.state === 'VERIFIED') {
+        await this.materializeCanonicalReplay(result, publicDiscoveryVerifiedProfileSchema.parse(result.resolution.profile), resultJson, verifiedAt);
+      }
+      return 'replayed';
+    }
     if (!row || row.state !== 'PROCESSING' || row.claimTokenHash !== tokenDigest || row.requestDigest !== result.requestDigest) throw new Error('stale-public-discovery-result');
     const profile = result.resolution.state === 'VERIFIED'
       ? publicDiscoveryVerifiedProfileSchema.parse(result.resolution.profile)
@@ -206,14 +307,17 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
     const statements = profile ? this.catalogueStatements(profile, verifiedAt, guardValues) : [];
     statements.push(this.database.prepare(`UPDATE public_discovery_requests_v2 SET
       state = ?, result_json = ?, verified_at = ?, retry_at = ?,
-      claim_token_hash = NULL, lease_until = NULL, updated_at = ?
+      claim_token_hash = NULL, lease_until = NULL, updated_at = ?, request_json = '{}', purge_after = NULL
       WHERE fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
         AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?
         AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
           JOIN json_each(?) AS proposed
             ON existing.provider = json_extract(proposed.value, '$.provider')
             AND existing.external_id = json_extract(proposed.value, '$.externalId')
-          WHERE existing.work_id <> ?)`)
+          WHERE existing.work_id <> ?)
+        AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
+          JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
+          WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`)
       .bind(result.resolution.state, resultJson, verifiedAt, verifiedAt, verifiedAt, ...guardValues));
     const outcomes = await this.database.batch(statements);
     const terminal = outcomes.at(-1);
@@ -232,6 +336,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
       .bind(batch.nonce).first<{ resultDigest: string }>();
     if (nonce) {
       if (nonce.resultDigest !== resultDigest) throw new Error('public-discovery-nonce-conflict');
+      for (const result of batch.results) await this.publishOne(result, tokenDigest, batch.verifiedAt, now);
       return { published: 0, replayed: batch.results.length };
     }
     let published = 0;
@@ -240,8 +345,9 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
       if (await this.publishOne(result, tokenDigest, batch.verifiedAt, now) === 'published') published += 1;
       else replayed += 1;
     }
-    await this.database.prepare('INSERT INTO public_discovery_result_nonces_v2(nonce, result_digest, created_at) VALUES (?1, ?2, ?3)')
-      .bind(batch.nonce, resultDigest, batch.verifiedAt).first();
+    await this.database.prepare(`INSERT INTO public_discovery_result_nonces_v2(nonce, result_digest, created_at, purge_after)
+      VALUES (?1, ?2, ?3, ?4)`)
+      .bind(batch.nonce, resultDigest, batch.verifiedAt, futureIso(now, nonceRetentionMilliseconds)).first();
     return { published, replayed };
   }
 }

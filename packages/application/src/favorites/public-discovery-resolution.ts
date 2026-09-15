@@ -2,12 +2,17 @@ import type { FavoriteParseArtifact } from '@tobirink/domain';
 import type { PublicDiscoveryKey } from '../public-discovery';
 import type { PublicDiscoveryRequestClientPort } from '../public-discovery';
 import type { PublicDiscoveryQuery, PublicDiscoveryReadState } from '@tobirink/public-discovery';
-import { favoriteProviderDiscoveryTitles, hasFavoriteOvaMarker, hasFavoritePreSerializationMarker } from './title-normalization';
+import { favoriteProviderDiscoveryTitles, hasFavoriteOvaMarker, hasFavoritePreSerializationMarker, normalizeFavoriteTitle } from './title-normalization';
 
 function cleanedTitles(artifact: FavoriteParseArtifact): readonly string[] {
   const titles = [artifact.displayTitle, ...(artifact.aliases ?? []).map((alias) => alias.value)]
     .filter((title): title is string => title !== undefined);
-  return [...new Set(titles)];
+  const unique = new Map<string, string>();
+  for (const title of titles) {
+    const normalized = normalizeFavoriteTitle(title).normalized;
+    if (normalized.length > 0 && !unique.has(normalized)) unique.set(normalized, title);
+  }
+  return [...unique.values()];
 }
 
 export async function requestPublicFavoriteDiscovery(
@@ -16,7 +21,7 @@ export async function requestPublicFavoriteDiscovery(
   artifact: FavoriteParseArtifact,
 ): Promise<PublicDiscoveryReadState> {
   const explicit = artifact.sourceEvidence.explicitProviderReference;
-  const sourceTitles = [...cleanedTitles(artifact)];
+  const sourceTitles = [...cleanedTitles(artifact)].slice(0, 4);
   if (sourceTitles.length === 0 && explicit !== undefined) sourceTitles.push(explicit.externalId);
   if (sourceTitles.length === 0) return { state: 'MISS' };
   const query: PublicDiscoveryQuery = {

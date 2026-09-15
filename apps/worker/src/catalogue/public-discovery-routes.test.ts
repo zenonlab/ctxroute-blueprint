@@ -15,15 +15,15 @@ async function jsonDigest(value: DiscoverySubmission): Promise<string> {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function verifiedResult(key: ReturnType<typeof discoveryKey>, requestDigest: string, workMarker: string, externalId = workMarker) {
+function verifiedResult(key: ReturnType<typeof discoveryKey>, requestDigest: string, workMarker: string, externalId = workMarker, title = `Work ${workMarker}`) {
   return {
     key,
     requestDigest,
     resolution: {
       profile: {
         candidate: {
-          displayTitle: `Work ${workMarker}`, externalId, mediaKind: 'ANIME' as const,
-          preSerialization: false, provider: 'anilist' as const, titles: [`Work ${workMarker}`],
+          displayTitle: title, externalId, mediaKind: 'ANIME' as const,
+          preSerialization: false, provider: 'anilist' as const, titles: [title],
         },
         references: [{ externalId, provider: 'anilist' as const }],
         workId: `work_${workMarker}`,
@@ -61,6 +61,23 @@ describe('verified public discovery cache', () => {
       expect.objectContaining({ state: 'PENDING' }), expect.objectContaining({ state: 'PENDING' }),
     ]);
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ count: 1 });
+  });
+
+  it('returns 503 for a new key after the global active-request ceiling while preserving replays', async () => {
+    const active = await env.PUBLIC_DB.prepare(`SELECT COUNT(*) AS count FROM public_discovery_requests_v2
+      WHERE state IN ('PENDING', 'PROCESSING')`).first<{ count: number }>();
+    const adapter = new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB, (active?.count ?? 0) + 2);
+    const app = createPublicDiscoveryApp({ publicDiscovery: new D1PublicDiscoveryAdapter(env.PUBLIC_DB), publicDiscoveryV2: adapter });
+    const submit = (marker: string) => app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+      body: JSON.stringify({ key: discoveryKey(marker), query: { discoveryTitles: [`Work ${marker}`], mediaKind: 'ANIME', sourceTitles: [`Work ${marker}`] }, schemaVersion: 2 }),
+      headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect((await submit('a')).status).toBe(202);
+    expect((await submit('b')).status).toBe(202);
+    expect((await submit('a')).status).toBe(202);
+    const saturated = await submit('c');
+    expect(saturated.status).toBe(503);
+    await expect(saturated.json()).resolves.toEqual({ error: 'discovery-capacity-unavailable' });
   });
 
   it('lets only the OIDC collector claim and terminally resolve a v3 request', async () => {
@@ -136,6 +153,64 @@ describe('verified public discovery cache', () => {
       profile: { candidate: { episodeCount: 28, genres: ['Adventure'], provider: 'anilist' } }, state: 'VERIFIED',
     });
     expect(await env.PUBLIC_DB.prepare('SELECT preferred_title AS title FROM catalogue_works WHERE work_id = ?1').bind('work_anilist_154587').first()).toEqual({ title: 'Frieren' });
+    expect((await env.PUBLIC_DB.prepare(`SELECT normalized_title AS normalizedTitle, media_kind AS mediaKind, work_id AS workId
+      FROM catalogue_canonical_titles_v1 WHERE normalization_version = ?1 ORDER BY normalized_title`)
+      .bind('favorite-title-preparation-v2').all()).results).toEqual([
+        { mediaKind: 'anime', normalizedTitle: 'frieren', workId: 'work_anilist_154587' },
+        { mediaKind: 'anime', normalizedTitle: 'sousou no frieren', workId: 'work_anilist_154587' },
+      ]);
+    expect(await env.PUBLIC_DB.prepare('SELECT request_json AS requestJson FROM public_discovery_requests_v2 WHERE fingerprint = ?1')
+      .bind(key.fingerprint).first()).toEqual({ requestJson: '{}' });
+    const nonce = await env.PUBLIC_DB.prepare('SELECT purge_after AS purgeAfter FROM public_discovery_result_nonces_v2 WHERE nonce = ?1')
+      .bind(payload.nonce).first<{ purgeAfter: string }>();
+    expect(Date.parse(nonce?.purgeAfter ?? '') - Date.parse(verifiedAt)).toBeGreaterThan(6 * 86_400_000);
+  });
+
+  it('rejects a normalized-title collision atomically', async () => {
+    const adapter = new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB);
+    const token = 'c'.repeat(48);
+    const tokenDigest = 'd'.repeat(64);
+    const verifiedAt = '2026-09-15T12:00:00.000Z';
+    const publish = async (marker: string, title: string) => {
+      const key = discoveryKey(marker);
+      const submission = { key, query: { discoveryTitles: [title], mediaKind: 'ANIME' as const, sourceTitles: [title] }, schemaVersion: 2 as const };
+      const requestDigest = await jsonDigest(submission);
+      await adapter.request({ ...submission, requestDigest }, verifiedAt);
+      await adapter.claimBatch({ claimToken: token, leaseUntil: '2026-09-15T13:00:00.000Z', limit: 50, now: verifiedAt, tokenDigest });
+      return adapter.publishBatch({
+        claimToken: token, nonce: crypto.randomUUID(), results: [verifiedResult(key, requestDigest, marker, marker, title)], schemaVersion: 2, verifiedAt,
+      }, tokenDigest, marker.repeat(64), verifiedAt);
+    };
+    await expect(publish('1', 'L’Épopée')).resolves.toEqual({ published: 1, replayed: 0 });
+    await expect(publish('2', 'L Epopee')).rejects.toThrow('stale-public-discovery-result');
+    expect(await env.PUBLIC_DB.prepare('SELECT work_id AS workId FROM catalogue_canonical_titles_v1 WHERE normalized_title = ?1 AND media_kind = ?2')
+      .bind('l epopee', 'anime').first()).toEqual({ workId: 'work_1' });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_works WHERE work_id = ?1').bind('work_2').first()).toEqual({ count: 0 });
+    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(discoveryKey('2').fingerprint).first()).toEqual({ state: 'PROCESSING' });
+  });
+
+  it('backfills the canonical index when an exact historical terminal result is replayed', async () => {
+    const key = discoveryKey('4');
+    const requestDigest = '4'.repeat(64);
+    const verifiedAt = '2026-09-15T12:00:00.000Z';
+    const result = verifiedResult(key, requestDigest, 'historical', 'historical', 'Épopée historique');
+    await env.PUBLIC_DB.batch([
+      env.PUBLIC_DB.prepare('INSERT INTO catalogue_revisions(revision, published_at) VALUES (?1, ?2)').bind(4, verifiedAt),
+      env.PUBLIC_DB.prepare('INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES (?1, ?2, ?3, ?4)')
+        .bind('work_historical', 'anime', 'Épopée historique', 4),
+      env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v2(
+        fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
+        state, result_json, retry_at, verified_at, created_at, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, '{}', 'VERIFIED', ?6, ?7, ?7, ?7, ?7)`)
+        .bind(...Object.values(key), requestDigest, JSON.stringify(result.resolution), verifiedAt),
+    ]);
+    const replay = await new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB).publishBatch({
+      claimToken: 'c'.repeat(48), nonce: crypto.randomUUID(), results: [result], schemaVersion: 2, verifiedAt,
+    }, 'd'.repeat(64), 'e'.repeat(64), verifiedAt);
+    expect(replay).toEqual({ published: 0, replayed: 1 });
+    expect(await env.PUBLIC_DB.prepare(`SELECT work_id AS workId FROM catalogue_canonical_titles_v1
+      WHERE normalization_version = ?1 AND normalized_title = ?2 AND media_kind = ?3`)
+      .bind('favorite-title-preparation-v2', 'epopee historique', 'anime').first()).toEqual({ workId: 'work_historical' });
   });
 
   it.each([
@@ -227,7 +302,9 @@ describe('verified public discovery cache', () => {
     }
     const exhaustedAt = '2026-09-15T08:00:00.000Z';
     await expect(adapter.read(key, exhaustedAt)).resolves.toEqual({ reason: 'ATTEMPT_LIMIT', state: 'UNAVAILABLE' });
-    expect(await env.PUBLIC_DB.prepare('SELECT attempt_count AS attemptCount, state FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ attemptCount: 8, state: 'FAILED' });
+    expect(await env.PUBLIC_DB.prepare('SELECT attempt_count AS attemptCount, purge_after AS purgeAfter, state FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({
+      attemptCount: 8, purgeAfter: '2026-10-15T08:00:00.000Z', state: 'FAILED',
+    });
     await expect(adapter.request({ ...request, requestDigest: 'e'.repeat(64) }, exhaustedAt)).rejects.toThrow('public-discovery-request-conflict');
     const app = createPublicDiscoveryApp({ publicDiscovery: new D1PublicDiscoveryAdapter(env.PUBLIC_DB), publicDiscoveryV2: adapter });
     const retry = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {

@@ -103,6 +103,22 @@ unknown paths keep their explicit JSON/404 behavior. Versioned downloads stream
 from `tobirink-public-releases` with immutable caching, attachment disposition,
 ETag, and content-type metadata.
 
+## Public Discovery retention
+
+D1 records deletion eligibility without deleting data automatically:
+
+- result nonces: seven days after ingestion;
+- `FAILED` requests: thirty days after terminal failure;
+- terminal request payloads: replaced immediately by `{}` while their bounded
+  result cache remains retained;
+- catalogue revisions no longer referenced by a work: eligible after thirty
+  days, determined at purge time.
+
+A purge is a destructive provider operation. Before running one, export and
+verify a D1 backup, inspect exact row counts, prepare bounded `DELETE`
+statements for only the eligible rows, and obtain explicit approval for those
+targets. The migration and runtime added here never execute those deletions.
+
 ## Replacing the provider
 
 Keep the core unchanged. Implement another driver with the same `inspect`,

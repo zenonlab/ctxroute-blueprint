@@ -150,6 +150,12 @@ describe('public D1 catalogue', () => {
     `).bind('frieren', 6).all<{ detail: string }>();
     expect(titleSearch.results.map(({ detail }) => detail).join(' ')).toContain('catalogue_titles_by_title');
 
+    const canonicalResolution = await env.PUBLIC_DB.prepare(`
+      EXPLAIN QUERY PLAN SELECT work_id FROM catalogue_canonical_titles_v1
+      WHERE normalization_version = ?1 AND normalized_title = ?2 AND media_kind = ?3 LIMIT 1
+    `).bind('favorite-title-preparation-v2', 'frieren', 'anime').all<{ detail: string }>();
+    expect(canonicalResolution.results.map(({ detail }) => detail).join(' ')).toContain('sqlite_autoindex_catalogue_canonical_titles_v1_1');
+
     const measuredTitleSearch = await env.PUBLIC_DB.prepare(`
       SELECT DISTINCT work_id FROM catalogue_titles INDEXED BY catalogue_titles_by_title
       WHERE title = ?1 COLLATE NOCASE ORDER BY work_id LIMIT ?2

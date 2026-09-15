@@ -77,9 +77,14 @@ browser or `workerd` test when platform behavior is the risk.
 - WebBridge release packages must contain version `1.0.0`, the exact
   `https://tobirink.com/*` content-script match and the same
   `externally_connectable` match before their SHA-256 is recorded.
-- Public-discovery v2 tests prouvent la création D1 atomique et dédupliquée,
+- Public Discovery tests prouvent la création D1 atomique et dédupliquée,
   l’attente sans consommation de tentative MV3, le claim réservé au collecteur
   OIDC, la publication terminale d’un profil complet et son rejeu idempotent.
+  Les contrats refusent une cinquième entrée dans chacune des deux listes de
+  titres. Les tests D1 réels vérifient le plafond global actif et sa réponse
+  `503`, l’expurgation terminale de `request_json`, les échéances des nonces et
+  des échecs, l’index canonique versionné, son plan de requête et le rejet sans
+  écriture partielle d’une collision de titre normalisé.
   Les tests du runner prouvent qu’un MISS, un PENDING et un VERIFIED ne lancent
   aucune recherche ou hydratation fournisseur dans la découverte automatique
   de l’extension.

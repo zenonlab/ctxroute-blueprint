@@ -82,6 +82,14 @@ describe('runFavoriteResolutionSlice', () => {
 
   it('sends the cleaned request to D1 and never searches providers in the extension', async () => {
     const { storage, outbox } = await fixture();
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    const artifactRecord = source && await storage.getFavoriteParseArtifact(source.id);
+    if (!artifactRecord) throw new Error('Expected favorite parse artifact.');
+    await storage.putFavoriteParseArtifact({ ...artifactRecord, artifact: {
+      ...artifactRecord.artifact,
+      aliases: ['FRIEREN', 'Fern', 'Sousou no Frieren', 'Frieren Beyond Journey', 'Journey End', 'Elf Mage']
+        .map((value) => ({ provenance: 'stable-url-slug' as const, value })),
+    } });
     const search = vi.fn(async () => createProviderCandidateEnvelope({ candidates: [candidate], complete: true, digest: 'leased-search', provider: 'anilist', truncated: false }));
     const hydrate = vi.fn(async () => candidate);
     const resolveOrRequest = vi.fn(async () => ({ retryAt: '2026-09-07T12:15:00.000Z', state: 'PENDING' as const }));
@@ -93,7 +101,10 @@ describe('runFavoriteResolutionSlice', () => {
     });
     expect(result).toMatchObject({ completed: 0, retried: 1 });
     expect(search).not.toHaveBeenCalled(); expect(hydrate).not.toHaveBeenCalled();
-    expect(resolveOrRequest).toHaveBeenCalledWith(expect.objectContaining({ fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u) }), expect.objectContaining({ discoveryTitles: ['frieren'], sourceTitles: ['frieren'] }));
+    expect(resolveOrRequest).toHaveBeenCalledWith(expect.objectContaining({ fingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u) }), expect.objectContaining({
+      discoveryTitles: ['frieren', 'Fern', 'Sousou no Frieren', 'sousounofrieren'],
+      sourceTitles: ['frieren', 'Fern', 'Sousou no Frieren', 'Frieren Beyond Journey'],
+    }));
   });
 
   it('Q-08 waits for a pending public discovery without searching or exhausting attempts', async () => {

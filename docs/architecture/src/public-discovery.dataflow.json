@@ -59,7 +59,7 @@
       "id": "publicD1",
       "type": "database",
       "label": "D1 catalogue public",
-      "sublabel": "bail et tentatives bornés",
+      "sublabel": "file bornée · index canonique",
       "stage": 2,
       "row": 1,
       "width": 140,
@@ -123,7 +123,7 @@
       "from": "worker",
       "to": "publicD1",
       "label": "lecture ou création atomique",
-      "classification": "clé unique · déduplication",
+      "classification": "4 + 4 titres · 5 000 actifs max",
       "variant": "security",
       "route": "straight",
       "labelAt": [423, 316]
@@ -188,10 +188,11 @@
       "title": "MISS D1",
       "items": [
         "D1 conserve une seule requête PENDING par clé",
+        "Titre normalisé + média possède un unique workId versionné",
         "Un bail PROCESSING empêche tout second collecteur concurrent",
         "La huitième tentative expirée devient FAILED puis UNAVAILABLE",
         "Un POST identique est requis pour remettre FAILED à PENDING",
-        "Le résultat VERIFIED répond aux prochaines lectures"
+        "Le résultat VERIFIED répond aux prochaines lectures; request_json devient {}"
       ]
     },
     {
@@ -199,6 +200,7 @@
       "title": "Périmètre",
       "items": [
         "Aucun utilisateur, compte, consentement ou Collectif",
+        "Nonces 7 jours · FAILED 30 jours · résultats terminaux conservés",
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
         "D1 et le code Worker restent privés; seul le collecteur MIT est public",
         "GitHub utilise workers.dev pour éviter le challenge Bot Fight Mode du site",
