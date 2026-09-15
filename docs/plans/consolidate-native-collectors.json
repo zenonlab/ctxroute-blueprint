@@ -30,7 +30,7 @@
         "Plan, digest, refus hors allowlist, bindings et dry-run sont testés.",
         "ADR et dataflows Archify sont validés en showcase."
       ],
-      "files": ["scripts/infra/cloudflare-driver.mjs", "scripts/infra/cloudflare-driver.test.mjs", "scripts/infra/tobirink-provider-gate.mjs", "scripts/infra/provider-gate-core.mjs", "scripts/infra/provider-gate-core.test.mjs", "apps/worker/wrangler.jsonc", "docs/decisions/ADR-0051-provider-transport-gate.md", "docs/architecture/src/public-discovery.dataflow.json", "docs/architecture/src/agenda-release.dataflow.json", ".project/progress.json", "docs/progress.md"],
+      "files": ["scripts/infra/cloudflare-driver.mjs", "scripts/infra/cloudflare-driver.test.mjs", "scripts/infra/cloudflare-queue-driver.test.mjs", "scripts/infra/tobirink-provider-gate.mjs", "scripts/infra/provider-gate-core.mjs", "scripts/infra/provider-gate-core.test.mjs", "apps/worker/wrangler.jsonc", "docs/decisions/ADR-0051-provider-transport-gate.md", "docs/architecture/src/public-discovery.dataflow.json", "docs/architecture/src/agenda-release.dataflow.json", "docs/plans/consolidate-native-collectors-gate-update.json", ".project/progress.json", "docs/progress.md"],
       "commands": ["modifier les fichiers avec apply_patch", "tester les gates infra", "npm exec -- wrangler deploy --dry-run --config apps/worker/wrangler.jsonc", "npm run archify:validate -- public-discovery.dataflow", "npm run archify:validate -- agenda-release.dataflow", "npm run verify", "git commit -m feat(infra): gate native collector queues"]
     },
     {

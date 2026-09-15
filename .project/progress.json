@@ -1124,7 +1124,7 @@
         {
           "id": "gate-cloudflare-queues",
           "title": "Étendre la gate Cloudflare aux deux Queues",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "La gate accepte uniquement tobirink-public-discovery et sa DLQ.",
             "Plan, digest, refus hors allowlist, bindings et dry-run sont testés.",
@@ -1133,6 +1133,7 @@
           "files": [
             "scripts/infra/cloudflare-driver.mjs",
             "scripts/infra/cloudflare-driver.test.mjs",
+            "scripts/infra/cloudflare-queue-driver.test.mjs",
             "scripts/infra/tobirink-provider-gate.mjs",
             "scripts/infra/provider-gate-core.mjs",
             "scripts/infra/provider-gate-core.test.mjs",
@@ -1140,6 +1141,7 @@
             "docs/decisions/ADR-0051-provider-transport-gate.md",
             "docs/architecture/src/public-discovery.dataflow.json",
             "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/plans/consolidate-native-collectors-gate-update.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
@@ -1152,7 +1154,13 @@
             "npm run verify",
             "git commit -m feat(infra): gate native collector queues"
           ],
-          "evidence": []
+          "evidence": [
+            "Tests infra 23/23: opérations dérivées de wrangler.jsonc, inventaire lié au compte, refus de cible inconnue et traduction exacte Queue.",
+            "Inspection distante confirme les deux Queues absentes; le plan réel contient exactement deux queue-create puis worker-deploy avec digest aa8ba694a7a4844a657cb5f5db484b068a7a66439e95ab1325dacd751ae80b8c.",
+            "Dry-run Wrangler reconnaît Queue, D1, R2, Images, Assets, rate limit et PROVIDER_TRANSPORT_MODE direct sans mutation distante.",
+            "Archify showcase 9/9 sans diagnostic: Agenda e76a1cdd62dd249fa3affc3d40d22148a8331b7514b830247c30fad1f2551d85 et Discovery 764fa2e487fb93a7e0eb54727ced742ac6a649860224c27583ca477468015a51.",
+            "npm run verify réussit intégralement avec tous les tests, builds MV3, audit 0 vulnérabilité et documentation livrée."
+          ]
         },
         {
           "id": "publish-native-runtime",

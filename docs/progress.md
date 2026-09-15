@@ -87,7 +87,7 @@
 ## Consolider les collecteurs natifs et retirer GitHub Actions — ACTIVE
 
 - [x] **Inventorier et sauvegarder le dépôt public** — DONE _(evidence: Bundle encodé ignoré: 97 101 octets; décodé 72 824 octets, historique complet, main et HEAD sur 51742d9; SHA-256 c41e16372290150a7c3937aa3fa7bf2588b4dc743fa75beee0ac1721aca796e2., Inventaire distant: une branche main, aucun tag, release, environnement, secret ou variable Actions, fork, étoile ou issue ouverte; 17 runs historiques., Parité: 27/27 sources publiques présentes dans le main, 24 byte-identiques; trois écarts expliqués par ProviderTransportPort et deux fichiers main-only.)_
-- [ ] **Étendre la gate Cloudflare aux deux Queues** — PENDING
+- [x] **Étendre la gate Cloudflare aux deux Queues** — DONE _(evidence: Tests infra 23/23: opérations dérivées de wrangler.jsonc, inventaire lié au compte, refus de cible inconnue et traduction exacte Queue., Inspection distante confirme les deux Queues absentes; le plan réel contient exactement deux queue-create puis worker-deploy avec digest aa8ba694a7a4844a657cb5f5db484b068a7a66439e95ab1325dacd751ae80b8c., Dry-run Wrangler reconnaît Queue, D1, R2, Images, Assets, rate limit et PROVIDER_TRANSPORT_MODE direct sans mutation distante.)_
 - [ ] **Pousser, provisionner et déployer le runtime direct** — PENDING
 - [ ] **Certifier Discovery et Agenda en trafic réel** — PENDING
 - [ ] **Ajouter une gateway isolée seulement si AniList bloque Cloudflare** — PENDING

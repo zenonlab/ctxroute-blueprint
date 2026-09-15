@@ -9,6 +9,7 @@ scope:
   - docs/architecture/src/public-discovery.dataflow.json
   - docs/architecture/src/agenda-release.dataflow.json
 review: on-change
+revised: true
 ---
 
 # ADR-0051 — Isoler et sélectionner le transport fournisseur
@@ -40,6 +41,13 @@ défaut et n’exige ni proxy ni secret. `gateway` exige une origine HTTPS sans
 chemin ni credentials et un secret HMAC de 32 à 256 octets. Changer de
 passerelle modifie seulement ces bindings et repasse par la gate de déploiement
 Cloudflare; le consumer et les fournisseurs restent inchangés.
+
+La gate opérationnelle Cloudflare dérive également les deux ressources Queue
+du seul `wrangler.jsonc`. Elle expose uniquement les opérations de création
+`tobirink-public-discovery` et `tobirink-public-discovery-dlq`, inclut
+l'inventaire Queue dans l'empreinte d'inspection et traduit leur création avant
+le déploiement Worker. Un nom absent de la configuration, un changement d'état
+entre plan et application ou une cible absente de l'allowlist invalide le plan.
 
 Les deux adaptateurs limitent les cibles aux opérations exactes AniList,
 MangaUpdates, MangaDex et Kitsu. La couche HTTP portable conserve un timeout,

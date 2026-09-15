@@ -38,14 +38,21 @@ export async function loadCloudflareConfig(path) {
     binding: requiredString(item.binding, 'r2-binding'),
     name: requiredString(item.bucket_name, 'r2-name'),
   }));
+  const queueNames = new Set();
+  for (const producer of parsed.queues?.producers ?? []) queueNames.add(requiredQueueName(producer.queue));
+  for (const consumer of parsed.queues?.consumers ?? []) {
+    queueNames.add(requiredQueueName(consumer.queue));
+    if (consumer.dead_letter_queue !== undefined) queueNames.add(requiredQueueName(consumer.dead_letter_queue));
+  }
   if (d1.length === 0) throw new Error('missing-d1-resource');
-  return { worker, d1, r2 };
+  return { worker, d1, r2, queues: [...queueNames].sort().map(name => ({ name })) };
 }
 
 export function createCloudflareDriver({ config, workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild }) {
   validateCloudflareConfig(config);
   const operations = new Map([
     ...releasePublishOperations(config),
+    ...config.queues.map(queue => [`queue-create:${queue.name}`, { kind: 'queue-create', target: `queue:${queue.name}`, queue: queue.name }]),
     ['worker-deploy', { kind: 'worker-deploy', target: `worker:${config.worker}` }],
     ...config.d1.map(database => [`d1-migrate:${database.binding}`, { kind: 'd1-migrate', target: `d1:${database.name}`, binding: database.binding }]),
   ]);
@@ -60,11 +67,12 @@ export function createCloudflareDriver({ config, workerDirectory, releaseDirecto
     },
     async inspect(accountId) {
       requiredString(accountId, 'account-id');
-      const [identity, deployment, migrations, buckets] = await Promise.all([
+      const [identity, deployment, migrations, buckets, queues] = await Promise.all([
         run(['whoami', '--account', accountId, '--json'], { cwd: workerDirectory }),
         run(['deployments', 'status', '--name', config.worker, '--json'], { cwd: workerDirectory }),
         Promise.all(config.d1.map(database => run(['d1', 'migrations', 'list', database.binding, '--remote'], { cwd: workerDirectory }))),
         Promise.all(config.r2.map(bucket => run(['r2', 'bucket', 'info', bucket.name, '--json'], { cwd: workerDirectory }))),
+        config.queues.length === 0 ? Promise.resolve('') : run(['queues', 'list'], { accountId, cwd: workerDirectory }),
       ]);
       return {
         driverId: DRIVER_ID,
@@ -73,6 +81,7 @@ export function createCloudflareDriver({ config, workerDirectory, releaseDirecto
         deployment: parseJson(deployment, 'invalid-deployment-response'),
         migrations: config.d1.map((database, index) => ({ binding: database.binding, name: database.name, output: migrations[index].trim() })),
         buckets: config.r2.map((bucket, index) => ({ binding: bucket.binding, name: bucket.name, info: parseJson(buckets[index], 'invalid-r2-response') })),
+        queues: { configured: config.queues.map(queue => queue.name), output: queues.trim() },
       };
     },
     async preview(requestedActions) {
@@ -108,6 +117,7 @@ export function createCloudflareDriver({ config, workerDirectory, releaseDirecto
 }
 
 function mutationArguments(action) {
+  if (action.kind === 'queue-create') return ['queues', 'create', action.queue];
   if (action.kind === 'worker-deploy') return ['deploy'];
   if (action.kind === 'd1-migrate') return ['d1', 'migrations', 'apply', action.binding, '--remote'];
   if (action.kind === 'r2-publish') {
@@ -118,13 +128,15 @@ function mutationArguments(action) {
   throw new Error(`unsupported-action-kind:${action.kind}`);
 }
 
-async function runWrangler(args, { cwd }) {
+async function runWrangler(args, { accountId, cwd }) {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const environment = { ...process.env, WRANGLER_SEND_METRICS: 'false' };
+  if (accountId !== undefined) environment.CLOUDFLARE_ACCOUNT_ID = accountId;
   const { stdout } = await execFileAsync(npm, ['exec', '--', 'wrangler', ...args], {
     cwd,
     encoding: 'utf8',
     maxBuffer: 4 * 1024 * 1024,
-    env: { ...process.env, WRANGLER_SEND_METRICS: 'false' },
+    env: environment,
   });
   return stdout;
 }
@@ -167,17 +179,19 @@ function findAction(operations, expected) {
 }
 
 function operationPriority(action) {
-  if (action.kind === 'd1-migrate') return 0;
-  if (action.kind === 'r2-publish' || action.kind === 'r2-release-snapshot') return 1;
-  if (action.kind === 'r2-release-pointer') return 2;
-  return 3;
+  if (action.kind === 'queue-create') return 0;
+  if (action.kind === 'd1-migrate') return 1;
+  if (action.kind === 'r2-publish' || action.kind === 'r2-release-snapshot') return 2;
+  if (action.kind === 'r2-release-pointer') return 3;
+  return 4;
 }
 
 export function validateCloudflareConfig(config) {
-  if (!config || !Array.isArray(config.d1) || !Array.isArray(config.r2)) throw new Error('invalid-cloudflare-config');
+  if (!config || !Array.isArray(config.d1) || !Array.isArray(config.r2) || !Array.isArray(config.queues)) throw new Error('invalid-cloudflare-config');
   requiredString(config.worker, 'worker-name');
   config.d1.forEach(item => { requiredString(item.binding, 'd1-binding'); requiredString(item.name, 'd1-name'); });
   config.r2.forEach(item => { requiredString(item.binding, 'r2-binding'); requiredString(item.name, 'r2-name'); });
+  config.queues.forEach(item => requiredQueueName(item.name));
 }
 
 function parseJson(value, error) {
@@ -186,5 +200,10 @@ function parseJson(value, error) {
 
 function requiredString(value, field) {
   if (value !== String(value) || value.length === 0) throw new Error(`invalid-${field}`);
+  return value;
+}
+
+function requiredQueueName(value) {
+  if (value !== String(value) || value.length > 63 || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(value)) throw new Error('invalid-queue-name');
   return value;
 }

@@ -69,12 +69,12 @@
       "id": "queue",
       "type": "messagebus",
       "label": "Cloudflare Queue",
-      "sublabel": "signal sans titre ni identité",
+      "sublabel": "signal opaque · DLQ ×8",
       "stage": 2,
       "row": 2,
       "yOffset": 20,
       "width": 140,
-      "tag": "déclenchement immédiat"
+      "tag": "ressources gated"
     },
     {
       "id": "collector",

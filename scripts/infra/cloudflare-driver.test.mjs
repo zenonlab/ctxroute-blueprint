@@ -9,6 +9,7 @@ const config = {
   worker: 'public-api',
   d1: [{ binding: 'CATALOGUE_DB', name: 'public-catalogue' }],
   r2: [{ binding: 'COVERS', name: 'public-covers' }],
+  queues: [],
 };
 const extensionRoot = fileURLToPath(new URL('../../apps/extension', import.meta.url));
 const releaseVersion = JSON.parse(readFileSync(resolve(extensionRoot, 'package.json'), 'utf8')).version;
@@ -44,6 +45,7 @@ async function test_inspect_read_only_resources() {
   const state = await driver.inspect('account-1');
   assert.equal(state.accountId, 'account-1');
   assert.deepEqual(state.migrations, [{ binding: 'CATALOGUE_DB', name: 'public-catalogue', output: 'No migrations to apply' }]);
+  assert.deepEqual(state.queues, { configured: [], output: '' });
   assert.deepEqual(calls, [
     ['whoami', '--account', 'account-1', '--json'],
     ['deployments', 'status', '--name', 'public-api', '--json'],
@@ -178,6 +180,10 @@ async function test_load_checked_in_config() {
     r2: [
       { binding: 'COVER_BUCKET', name: 'tobirink-covers' },
       { binding: 'RELEASE_SNAPSHOTS', name: 'tobirink-public-releases' },
+    ],
+    queues: [
+      { name: 'tobirink-public-discovery' },
+      { name: 'tobirink-public-discovery-dlq' },
     ],
   });
 }

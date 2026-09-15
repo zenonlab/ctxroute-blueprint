@@ -36,7 +36,7 @@
   "nodes": [
     { "id": "scheduledTrigger", "type": "cloud", "label": "Cron Worker", "sublabel": "lundi 03:17 UTC", "stage": 0, "row": 0, "width": 145, "tag": "signal seulement" },
     { "id": "providerApis", "type": "external", "label": "APIs fournisseurs", "sublabel": "AniList · MangaUpdates", "stage": 0, "row": 1, "width": 145, "tag": "données publiques" },
-    { "id": "queue", "type": "messagebus", "label": "Cloudflare Queue", "sublabel": "agenda-refresh · sans événement", "stage": 1, "row": 0, "width": 175, "tag": "at-least-once" },
+    { "id": "queue", "type": "messagebus", "label": "Cloudflare Queue", "sublabel": "agenda-refresh · DLQ après 8 retries", "stage": 1, "row": 0, "width": 175, "tag": "ressources gated" },
     { "id": "transportPort", "type": "security", "label": "ProviderTransportPort", "sublabel": "gate direct | gateway signé", "stage": 1, "row": 1, "width": 175, "tag": "adaptateurs isolés" },
     { "id": "collector", "type": "backend", "label": "Consumer Worker", "sublabel": "deux lanes · lot complet", "stage": 2, "row": 0, "width": 165, "tag": "ack ou retry" },
     { "id": "releaseD1", "type": "database", "label": "D1 Agenda", "sublabel": "générations · événements DATE/INSTANT", "stage": 2, "row": 1, "width": 175, "tag": "pointeur actif atomique" },
