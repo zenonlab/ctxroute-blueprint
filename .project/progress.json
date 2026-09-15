@@ -574,6 +574,44 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-public-pipeline-cadence-accuracy",
+      "title": "Distinguer la cadence Discovery déployée de la cible locale",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Corriger la cadence dans le diagramme de pipeline publique",
+          "status": "DONE",
+          "acceptance": [
+            "Le chemin déployé indique Discovery quotidien à 03:23 UTC.",
+            "La cible locale dix minutes est identifiée comme non poussée et non active.",
+            "Archify passe showcase 9/9 sans diagnostic et les validations documentaires réussissent.",
+            "Le commit exclut .codex/config.toml et aucune opération externe n’a lieu."
+          ],
+          "files": [
+            "docs/architecture/src/public-pipeline.architecture.json",
+            "docs/decisions/ADR-0049-product-identity-and-public-disclosures.md"
+          ],
+          "commands": [
+            "node .githooks/archify validate public-pipeline.architecture",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run build:docs",
+            "git diff --check",
+            "git commit -m docs(architecture): distinguish deployed discovery cadence"
+          ],
+          "evidence": [
+            "Le diagramme distingue Discovery quotidien 03:23 UTC déployé et cible dix minutes locale non poussée.",
+            "Archify showcase passe 9/9 sans diagnostic; artefact public-pipeline 8f88a348680d90c136b5e01ef6377f295a8cceb2174950c90f0018f25ef0304e.",
+            "Validations ADR/docs et build documentaire réussissent; le npm run verify complet du commit précédent est vert."
+          ]
+        }
+      ]
     }
   ]
 }

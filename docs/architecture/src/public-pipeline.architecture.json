@@ -16,7 +16,7 @@
         "id": "collector-path",
         "label": "Collecte OIDC",
         "focus": ["providers", "github", "worker", "d1"],
-        "note": "Les workflows publics publient par OIDC avec IDs immuables; JWKS est limité, temporisé et mis en cache cinq minutes."
+        "note": "Les workflows publics publient par OIDC avec IDs immuables; Agenda est hebdomadaire et Discovery reste quotidien à 03:23 UTC."
       }
     ]
   },
@@ -33,7 +33,7 @@
       "id": "github",
       "type": "security",
       "label": "GitHub Actions OIDC",
-      "sublabel": "Agenda hebdomadaire · Discovery dix minutes",
+      "sublabel": "Agenda hebdo · Discovery quotidien",
       "pos": [400, 80],
       "size": [250, 72]
     },
@@ -86,7 +86,7 @@
     { "id": "worker-archives", "from": "worker", "to": "r2", "label": "lecture des archives immuables" }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Pipeline vérifiée", "items": ["Discovery terminal réutilisé", "Agenda AniList + MangaUpdates actif", "Aucun protocole Collectif actif"] },
+    { "dot": "emerald", "title": "Pipeline vérifiée", "items": ["Discovery terminal réutilisé", "Agenda AniList + MangaUpdates actif", "Aucun protocole Collectif actif", "Cible Discovery dix minutes préparée localement, non poussée"] },
     { "dot": "cyan", "title": "Cycle de vie borné", "items": ["Agenda frais moins de huit jours", "Fenêtre source vérifiée", "JWKS: 64 KiB, 16 clés, timeout 3 s, cache 5 min", "Active + deux sauvegardes D1"] }
   ]
 }

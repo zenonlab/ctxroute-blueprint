@@ -7,7 +7,9 @@ scope:
   - docs/systems/agenda-recovery-plan.md
   - docs/architecture/src/production-surface.architecture.json
   - docs/architecture/src/extension-delivery-validation.dataflow.json
+  - docs/architecture/src/public-pipeline.architecture.json
 review: on-change
+revised: true
 ---
 
 # ADR-0049 — Identité produit et déclarations publiques

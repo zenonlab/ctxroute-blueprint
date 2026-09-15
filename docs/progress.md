@@ -39,3 +39,7 @@
 ## Aligner l’identité produit, la confidentialité et les preuves publiques — DONE
 
 - [x] **Corriger les métadonnées et la documentation produit active** — DONE _(evidence: Web 13/13, toutes les suites workspace et tous les typechecks passent; Extension 148/148, Worker 65/65, Application 378/378., npm run verify réussit intégralement, builds Chrome/Firefox inclus; npm audit rapporte 0 vulnérabilité et npm ls est propre., Archify valide et matérialise les diagrammes en showcase 9/9 sans erreur ni avertissement; production-surface artefact e3d5d6a1adcdbfa60a081463bea01ed32c2e18c33c3fdeb9dc9b6ddf19e209c2, extension-delivery artefact d4cfc9cb3835e6a0566c0daf1f58af9ef2ef55e4880223b819852dd668783188.)_
+
+## Distinguer la cadence Discovery déployée de la cible locale — DONE
+
+- [x] **Corriger la cadence dans le diagramme de pipeline publique** — DONE _(evidence: Le diagramme distingue Discovery quotidien 03:23 UTC déployé et cible dix minutes locale non poussée., Archify showcase passe 9/9 sans diagnostic; artefact public-pipeline 8f88a348680d90c136b5e01ef6377f295a8cceb2174950c90f0018f25ef0304e., Validations ADR/docs et build documentaire réussissent; le npm run verify complet du commit précédent est vert.)_
