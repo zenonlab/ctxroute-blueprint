@@ -10,7 +10,7 @@ describe('provider transport adapter gate', () => {
     expect(transport).toBeInstanceOf(DirectProviderTransportAdapter);
 
     await transport.fetch(anilist, { body: '{}', method: 'POST' });
-    expect(fetcher).toHaveBeenCalledExactlyOnceWith(anilist, expect.objectContaining({ cache: 'no-store', redirect: 'error' }));
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(anilist, expect.objectContaining({ cache: 'no-store', redirect: 'manual' }));
   });
 
   it('refuses arbitrary direct targets before network access', async () => {
@@ -42,6 +42,37 @@ describe('provider transport adapter gate', () => {
       body: '{"query":"query"}', issuedAt: '2026-09-15T12:00:00.000Z', method: 'POST',
       nonce: '123e4567-e89b-42d3-a456-426614174000', target: anilist, version: 1,
     });
+  });
+
+  it('generates a nonce with the bound Worker crypto implementation', async () => {
+    let requestBody = '';
+    const transport = createProviderTransportAdapter({
+      PROVIDER_GATEWAY_HMAC_KEY: '0123456789abcdef0123456789abcdef',
+      PROVIDER_GATEWAY_ORIGIN: 'https://gateway.example',
+      PROVIDER_TRANSPORT_MODE: 'gateway',
+    }, {
+      fetcher: async (_input, init) => {
+        requestBody = String(init.body);
+        return Response.json({ ok: true });
+      },
+      now: () => Date.parse('2026-09-15T12:00:00.000Z'),
+    });
+
+    await transport.fetch(anilist, { body: '{}', method: 'POST' });
+    expect(JSON.parse(requestBody).nonce).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+  });
+
+  it('rejects redirects explicitly in both transports', async () => {
+    const redirect = async () => new Response(null, { headers: { Location: 'https://example.com' }, status: 302 });
+    const direct = createProviderTransportAdapter({}, { fetcher: redirect });
+    await expect(direct.fetch(anilist, { body: '{}', method: 'POST' })).rejects.toThrow('provider-transport-redirect');
+
+    const gateway = createProviderTransportAdapter({
+      PROVIDER_GATEWAY_HMAC_KEY: '0123456789abcdef0123456789abcdef',
+      PROVIDER_GATEWAY_ORIGIN: 'https://gateway.example',
+      PROVIDER_TRANSPORT_MODE: 'gateway',
+    }, { fetcher: redirect, nonce: () => '123e4567-e89b-42d3-a456-426614174000' });
+    await expect(gateway.fetch(anilist, { body: '{}', method: 'POST' })).rejects.toThrow('provider-gateway-fetch');
   });
 
   it.each([

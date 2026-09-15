@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -9,6 +9,7 @@ import { isReleaseArtifactAction, releaseMutationArguments, releaseRevisionFromA
 
 const execFileAsync = promisify(execFile);
 const DRIVER_ID = 'cloudflare-wrangler';
+const PROVIDER_GATEWAY_SECRET = 'PROVIDER_GATEWAY_HMAC_KEY';
 
 function releasePublishOperations(config) {
   const releaseBucket = config.r2.find(resource => resource.binding === 'RELEASE_SNAPSHOTS');
@@ -48,11 +49,12 @@ export async function loadCloudflareConfig(path) {
   return { worker, d1, r2, queues: [...queueNames].sort().map(name => ({ name })) };
 }
 
-export function createCloudflareDriver({ config, workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild }) {
+export function createCloudflareDriver({ config, workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET] }) {
   validateCloudflareConfig(config);
   const operations = new Map([
     ...releasePublishOperations(config),
     ...config.queues.map(queue => [`queue-create:${queue.name}`, { kind: 'queue-create', target: `queue:${queue.name}`, queue: queue.name }]),
+    ['worker-secret-set:PROVIDER_GATEWAY_HMAC_KEY', { kind: 'worker-secret-set', target: `worker-secret:${config.worker}/${PROVIDER_GATEWAY_SECRET}` }],
     ['worker-deploy', { kind: 'worker-deploy', target: `worker:${config.worker}` }],
     ...config.d1.map(database => [`d1-migrate:${database.binding}`, { kind: 'd1-migrate', target: `d1:${database.name}`, binding: database.binding }]),
   ]);
@@ -109,7 +111,9 @@ export function createCloudflareDriver({ config, workerDirectory, releaseDirecto
       const results = [];
       for (const action of selected) {
         const args = mutationArguments(action);
-        results.push({ kind: action.kind, target: action.target, output: (await run(args, { cwd: workerDirectory })).trim() });
+        const input = action.kind === 'worker-secret-set' ? `${assertGatewaySecret(gatewaySecret)}\n` : undefined;
+        const output = await run(args, { cwd: workerDirectory, input });
+        results.push({ kind: action.kind, target: action.target, output: redact(output, gatewaySecret).trim() });
       }
       return results;
     },
@@ -119,6 +123,7 @@ export function createCloudflareDriver({ config, workerDirectory, releaseDirecto
 function mutationArguments(action) {
   if (action.kind === 'queue-create') return ['queues', 'create', action.queue];
   if (action.kind === 'worker-deploy') return ['deploy'];
+  if (action.kind === 'worker-secret-set') return ['secret', 'put', PROVIDER_GATEWAY_SECRET, '--name', action.target.split('/')[0].slice('worker-secret:'.length)];
   if (action.kind === 'd1-migrate') return ['d1', 'migrations', 'apply', action.binding, '--remote'];
   if (action.kind === 'r2-publish') {
     return ['r2', 'object', 'put', `${action.bucket}/downloads/${action.artifact}`, '--file', action.source, '--content-type', 'application/zip', '--content-disposition', `attachment; filename="${action.artifact}"`, '--cache-control', 'public, max-age=31536000, immutable', '--remote', '--force'];
@@ -128,17 +133,42 @@ function mutationArguments(action) {
   throw new Error(`unsupported-action-kind:${action.kind}`);
 }
 
-async function runWrangler(args, { accountId, cwd }) {
+async function runWrangler(args, { accountId, cwd, input }) {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const environment = { ...process.env, WRANGLER_SEND_METRICS: 'false' };
   if (accountId !== undefined) environment.CLOUDFLARE_ACCOUNT_ID = accountId;
-  const { stdout } = await execFileAsync(npm, ['exec', '--', 'wrangler', ...args], {
+  const options = {
     cwd,
     encoding: 'utf8',
     maxBuffer: 4 * 1024 * 1024,
     env: environment,
-  });
+  };
+  if (input !== undefined) return runWranglerWithInput(npm, ['exec', '--', 'wrangler', ...args], { ...options, input });
+  const { stdout } = await execFileAsync(npm, ['exec', '--', 'wrangler', ...args], options);
   return stdout;
+}
+
+function runWranglerWithInput(command, args, { cwd, env, input, maxBuffer }) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = spawn(command, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    const collect = (current, chunk) => {
+      const next = current + chunk;
+      if (Buffer.byteLength(next) > maxBuffer) child.kill();
+      return next;
+    };
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', chunk => { stdout = collect(stdout, chunk); });
+    child.stderr.on('data', chunk => { stderr = collect(stderr, chunk); });
+    child.on('error', rejectPromise);
+    child.on('close', code => {
+      if (code === 0) resolvePromise(stdout);
+      else rejectPromise(new Error(`wrangler exited ${code}: ${stderr}`));
+    });
+    child.stdin.end(input);
+  });
 }
 
 async function runWebBuild({ workerDirectory }) {
@@ -183,7 +213,19 @@ function operationPriority(action) {
   if (action.kind === 'd1-migrate') return 1;
   if (action.kind === 'r2-publish' || action.kind === 'r2-release-snapshot') return 2;
   if (action.kind === 'r2-release-pointer') return 3;
+  if (action.kind === 'worker-secret-set') return 3;
   return 4;
+}
+
+function assertGatewaySecret(value) {
+  if (value !== String(value)) throw new Error('invalid-provider-gateway-secret');
+  const length = Buffer.byteLength(value);
+  if (length < 32 || length > 256) throw new Error('invalid-provider-gateway-secret');
+  return value;
+}
+
+function redact(value, secret) {
+  return secret === String(secret) && secret.length > 0 ? value.replaceAll(secret, '[REDACTED]') : value;
 }
 
 export function validateCloudflareConfig(config) {

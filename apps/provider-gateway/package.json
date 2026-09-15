@@ -1,0 +1,14 @@
+{
+  "name": "@tobirink/provider-gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "zod": "4.5.4"
+  },
+  "scripts": {
+    "test": "deno test --unstable-kv src/index.test.ts",
+    "typecheck": "deno check --unstable-kv src/index.ts src/index.test.ts"
+  }
+}

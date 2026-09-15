@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "gateVersion": 1,
+  "driverId": "deno-provider-gateway",
+  "accountId": "tobirink",
+  "createdAt": "2026-09-15T17:09:46.619Z",
+  "expiresAt": "2026-09-15T17:24:46.619Z",
+  "inspectionDigest": "ba2bf651b85b15252357f1e1773f0929e3bcfcdf10e1fccaf21f158e7fddfdd7",
+  "previewDigest": "07a0e9726d07df4eb57b52838c5c591b654f8dafa8c0770a7a5eafcc0e23905b",
+  "actions": [
+    {
+      "kind": "gateway-deploy",
+      "target": "deno-app:tobirink-provider-gateway/production"
+    }
+  ],
+  "digest": "6f261bc6cfea54e7a65b485884f449ec393bdb609f8e2ea6e2631287962c52d3"
+}

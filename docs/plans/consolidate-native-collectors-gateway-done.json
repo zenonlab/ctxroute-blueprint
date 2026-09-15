@@ -1,0 +1,25 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "conditional-provider-gateway",
+  "status": "DONE",
+  "files": [
+    "apps/provider-gateway/package.json",
+    "apps/provider-gateway/src/index.ts",
+    "apps/provider-gateway/src/index.test.ts",
+    "scripts/infra/provider-gateway-driver.mjs",
+    "scripts/infra/provider-gateway-driver.test.mjs",
+    "scripts/infra/tobirink-provider-gate.mjs",
+    "package-lock.json",
+    "docs/decisions/ADR-0051-provider-transport-gate.md",
+    "docs/architecture/src/public-pipeline.architecture.json",
+    "docs/plans/consolidate-native-collectors-gateway-done.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Cinq retests directs depuis Cloudflare ont rendu provider-http-403 pour AniList; le transport gateway est donc requis et activé explicitement.",
+    "La gateway Deno révision pbcbbjp6gzys utilise HMAC, nonce KV atomique, expiration, allowlist stricte et limites de corps; ses 7 tests et les 30 tests infra passent.",
+    "Les smokes signés AniList et MangaUpdates répondent 200; Discovery AniList 20 atteint VERIFIED et Agenda publie 711 événements via la gateway.",
+    "npm run verify, npm ls --all, npm audit à zéro vulnérabilité et Archify showcase 9/9 réussissent."
+  ]
+}

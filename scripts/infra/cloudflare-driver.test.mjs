@@ -17,6 +17,7 @@ const releaseVersion = JSON.parse(readFileSync(resolve(extensionRoot, 'package.j
 function test_derive_operation_targets() {
   const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async () => '' });
   assert.deepEqual(driver.listOperations(), [
+    { name: 'worker-secret-set:PROVIDER_GATEWAY_HMAC_KEY', kind: 'worker-secret-set', target: 'worker-secret:public-api/PROVIDER_GATEWAY_HMAC_KEY' },
     { name: 'worker-deploy', kind: 'worker-deploy', target: 'worker:public-api' },
     { name: 'd1-migrate:CATALOGUE_DB', kind: 'd1-migrate', target: 'd1:public-catalogue' },
   ]);
@@ -82,6 +83,31 @@ async function test_preview_and_apply_translations() {
     { workerDirectory: '/worker' },
     { workerDirectory: '/worker' },
   ]);
+}
+
+async function test_gateway_secret_is_stdin_only_and_redacted() {
+  const calls = [];
+  const gatewaySecret = '0123456789abcdef0123456789abcdef';
+  const run = async (args, options) => {
+    calls.push({ args, options });
+    return `configured ${gatewaySecret}`;
+  };
+  const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run, gatewaySecret });
+  const actions = driver.resolveOperations(['worker-secret-set:PROVIDER_GATEWAY_HMAC_KEY']);
+  const preview = await driver.preview(actions);
+  assert.deepEqual(preview.actions, [{ kind: 'worker-secret-set', target: 'worker-secret:public-api/PROVIDER_GATEWAY_HMAC_KEY' }]);
+  const result = await driver.apply(actions);
+  assert.deepEqual(calls[0].args, ['secret', 'put', 'PROVIDER_GATEWAY_HMAC_KEY', '--name', 'public-api']);
+  assert.equal(calls[0].options.input, `${gatewaySecret}\n`);
+  assert.equal(result[0].output, 'configured [REDACTED]');
+}
+
+async function test_gateway_secret_fails_closed_before_wrangler() {
+  const calls = [];
+  const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async args => { calls.push(args); return ''; }, gatewaySecret: 'short' });
+  const actions = driver.resolveOperations(['worker-secret-set:PROVIDER_GATEWAY_HMAC_KEY']);
+  await assert.rejects(() => driver.apply(actions), /invalid-provider-gateway-secret/u);
+  assert.deepEqual(calls, []);
 }
 
 async function test_worker_build_failure_prevents_wrangler() {
@@ -209,6 +235,8 @@ function test_reject_invalid_r2_identifiers() {
 test('the driver derives operation targets from configuration', test_derive_operation_targets);
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
+test('the gateway secret is passed on stdin and redacted from results', test_gateway_secret_is_stdin_only_and_redacted);
+test('an absent or weak gateway secret fails before Wrangler', test_gateway_secret_fails_closed_before_wrangler);
 test('a failed web build prevents Worker preview and deployment', test_worker_build_failure_prevents_wrangler);
 test('release publication hashes bytes before translating the bounded R2 upload', test_release_publish_is_hashed_and_translated);
 test('release snapshots are schema-validated and uploaded before their pointer', test_release_snapshot_publication_is_validated_and_ordered);

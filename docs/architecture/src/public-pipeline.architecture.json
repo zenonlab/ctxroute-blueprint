@@ -2,21 +2,27 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "TobiRink — pipeline publique déployée",
+    "title": "TobiRink — collecteurs natifs et egress fournisseur isolé",
     "quality_profile": "showcase",
-    "viewBox": [1320, 760],
+    "viewBox": [1380, 820],
     "views": [
       {
-        "id": "deployed-path",
-        "label": "Chemin déployé",
-        "focus": ["extension", "worker", "d1", "r2"],
-        "note": "Le Worker sert Discovery D1-first et Agenda; D1 conserve une génération active et deux sauvegardes bornées."
+        "id": "discovery-path",
+        "label": "Discovery instantanée",
+        "focus": ["extension", "worker", "queue", "gateway", "providers", "d1"],
+        "note": "Une demande v3 alimente la Queue; seul l'appel fournisseur traverse la gateway signée lorsque le mode gateway est actif."
       },
       {
-        "id": "collector-path",
-        "label": "Collecte OIDC",
-        "focus": ["providers", "github", "worker", "d1"],
-        "note": "Les workflows publics publient par OIDC avec IDs immuables; Agenda est hebdomadaire et Discovery reste quotidien à 03:23 UTC."
+        "id": "agenda-path",
+        "label": "Agenda natif",
+        "focus": ["cron", "worker", "gateway", "providers", "d1"],
+        "note": "Le cron toutes les dix minutes réutilise la gateway signée et conserve la dernière génération saine dans D1."
+      },
+      {
+        "id": "trust-boundary",
+        "label": "Frontière de confiance",
+        "focus": ["worker", "gateway", "providers"],
+        "note": "La gateway accepte une enveloppe HMAC bornée, refuse les rejeux et ne cible que les routes fournisseur autorisées."
       }
     ]
   },
@@ -26,67 +32,101 @@
       "type": "external",
       "label": "AniList / MangaUpdates",
       "sublabel": "Faits publics fournisseurs",
-      "pos": [50, 80],
-      "size": [230, 72]
+      "pos": [960, 60],
+      "size": [240, 72]
     },
     {
-      "id": "github",
-      "type": "security",
-      "label": "GitHub Actions OIDC",
-      "sublabel": "Agenda hebdo · Discovery quotidien",
-      "pos": [400, 80],
-      "size": [250, 72]
+      "id": "cron",
+      "type": "cloud",
+      "label": "Cron Cloudflare",
+      "sublabel": "Agenda toutes les 10 minutes",
+      "pos": [340, 100],
+      "size": [210, 72]
     },
     {
       "id": "extension",
       "type": "frontend",
-      "label": "Extension MV3 1.0.30",
-      "sublabel": "IndexedDB privé · zéro egress auto",
-      "pos": [50, 330],
-      "size": [230, 72]
+      "label": "Extension MV3",
+      "sublabel": "API TobiRink uniquement",
+      "pos": [40, 330],
+      "size": [210, 72]
     },
     {
       "id": "worker",
       "type": "cloud",
       "label": "Cloudflare Worker",
-      "sublabel": "API bornée · aucun egress fournisseur",
-      "pos": [700, 330],
-      "size": [250, 72]
+      "sublabel": "Discovery v3 · Agenda v3",
+      "pos": [330, 330],
+      "size": [230, 72]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "Cloudflare Queue",
+      "sublabel": "Retries bornés · DLQ",
+      "pos": [650, 480],
+      "size": [220, 72]
+    },
+    {
+      "id": "transport",
+      "type": "security",
+      "label": "ProviderTransportPort",
+      "sublabel": "gate direct | gateway",
+      "pos": [650, 250],
+      "size": [220, 72]
+    },
+    {
+      "id": "gateway",
+      "type": "backend",
+      "label": "Gateway fournisseur",
+      "sublabel": "Deno Deploy · HMAC · anti-rejeu",
+      "pos": [960, 250],
+      "size": [240, 72]
     },
     {
       "id": "d1",
       "type": "database",
       "label": "D1 tobirink-public",
       "sublabel": "Discovery terminal · Agenda révisionné",
-      "pos": [1040, 190],
-      "size": [230, 72]
+      "pos": [960, 500],
+      "size": [240, 72]
     },
     {
       "id": "r2",
       "type": "database",
       "label": "R2 public-releases",
       "sublabel": "ZIP Chrome / Firefox immuables",
-      "pos": [1040, 470],
-      "size": [230, 72]
+      "pos": [325, 650],
+      "size": [240, 72]
     }
   ],
   "boundaries": [
     {
       "kind": "region",
       "label": "Cloudflare publié",
-      "wraps": ["worker", "d1", "r2"],
+      "wraps": ["cron", "worker", "queue", "transport", "d1", "r2"],
       "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "Egress isolé hors Cloudflare",
+      "wraps": ["gateway"],
+      "pad": 18
     }
   ],
   "connections": [
-    { "id": "provider-collection", "from": "providers", "to": "github", "label": "pages bornées", "variant": "emphasis" },
-    { "id": "oidc-ingestion", "from": "github", "to": "worker", "label": "OIDC · IDs et workflow exacts", "variant": "security" },
-    { "id": "extension-api", "from": "extension", "to": "worker", "label": "HTTPS · demandes / Agenda v3", "variant": "emphasis" },
-    { "id": "worker-sql", "from": "worker", "to": "d1", "label": "SQL · PENDING / VERIFIED / générations" },
-    { "id": "worker-archives", "from": "worker", "to": "r2", "label": "lecture des archives immuables" }
+    { "id": "extension-api", "from": "extension", "to": "worker", "label": "HTTPS · v3", "variant": "emphasis" },
+    { "id": "cron-collect", "from": "cron", "to": "worker", "label": "scheduled()", "labelAt": [445, 186] },
+    { "id": "worker-queue", "from": "worker", "to": "queue", "label": "enqueue / consume", "variant": "emphasis" },
+    { "id": "worker-transport", "from": "worker", "to": "transport", "label": "fetch fournisseur" },
+    { "id": "queue-transport", "from": "queue", "to": "transport", "label": "résolution asynchrone", "variant": "dashed" },
+    { "id": "signed-gateway", "from": "transport", "to": "gateway", "label": "POST signé HMAC", "variant": "security" },
+    { "id": "provider-egress", "from": "gateway", "to": "providers", "label": "HTTPS allowlisté", "variant": "emphasis", "labelAt": [1260, 190] },
+    { "id": "queue-sql", "from": "queue", "to": "d1", "label": "bail · publication", "labelAt": [915, 586] },
+    { "id": "worker-archives", "from": "worker", "to": "r2", "label": "lecture archives", "variant": "dashed", "labelAt": [445, 416] }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Pipeline vérifiée", "items": ["Discovery terminal réutilisé", "Agenda AniList + MangaUpdates actif", "Aucun protocole Collectif actif", "Cible Discovery dix minutes préparée localement, non poussée"] },
-    { "dot": "cyan", "title": "Cycle de vie borné", "items": ["Agenda frais moins de huit jours", "Fenêtre source vérifiée", "JWKS: 64 KiB, 16 clés, timeout 3 s, cache 5 min", "Active + deux sauvegardes D1"] }
+    { "dot": "emerald", "title": "Runtime natif", "items": ["Discovery déclenchée immédiatement par Queue", "Agenda collecté par Cron", "D1 conserve les états et générations", "Aucune exécution GitHub requise"] },
+    { "dot": "rose", "title": "Gateway fermée", "items": ["Secret HMAC 32–256 octets", "Nonce et horodatage vérifiés", "Corps et réponse plafonnés", "Aucune URL arbitraire ni redirection"] }
   ]
 }

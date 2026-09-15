@@ -3,12 +3,21 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { applyApprovedPlan, createOperationPlan } from './provider-gate-core.mjs';
 import { createCloudflareDriver, loadCloudflareConfig } from './cloudflare-driver.mjs';
+import { createProviderGatewayDriver } from './provider-gateway-driver.mjs';
 
 export async function runProviderGate(argv, { cwd = process.cwd(), stdout = console.log } = {}) {
   const { command, values } = parseArguments(argv);
-  const workerDirectory = resolve(cwd, 'apps/worker');
-  const config = await loadCloudflareConfig(resolve(workerDirectory, 'wrangler.jsonc'));
-  const driver = createCloudflareDriver({ config, workerDirectory });
+  const provider = values.provider ?? 'cloudflare';
+  let driver;
+  if (provider === 'deno') {
+    driver = createProviderGatewayDriver({ gatewayDirectory: resolve(cwd, 'apps/provider-gateway') });
+  } else if (provider === 'cloudflare') {
+    const workerDirectory = resolve(cwd, 'apps/worker');
+    const config = await loadCloudflareConfig(resolve(workerDirectory, 'wrangler.jsonc'));
+    driver = createCloudflareDriver({ config, workerDirectory });
+  } else {
+    throw new Error('unsupported-provider');
+  }
 
   if (command === 'inspect') {
     stdout(JSON.stringify(await driver.inspect(required(values.account, '--account')), null, 2));
@@ -45,7 +54,7 @@ export async function runProviderGate(argv, { cwd = process.cwd(), stdout = cons
     return;
   }
 
-  throw new Error('usage: inspect --account <id> | plan --account <id> --operation <name> | apply --plan <file> --approve <digest> --account <id> --allow <resource>');
+  throw new Error('usage: [inspect|plan|apply] --provider <cloudflare|deno> --account <id> [--operation <name> | --plan <file> --approve <digest> --allow <resource>]');
 }
 
 function parseArguments(argv) {
@@ -56,7 +65,7 @@ function parseArguments(argv) {
     const value = args[index + 1];
     if (!flag?.startsWith('--') || value === undefined || value.startsWith('--')) throw new Error(`invalid-argument:${flag ?? ''}`);
     const key = flag.slice(2);
-    if (!['account', 'operation', 'plan', 'approve', 'allow'].includes(key)) throw new Error(`unknown-argument:${flag}`);
+    if (!['account', 'operation', 'plan', 'approve', 'allow', 'provider'].includes(key)) throw new Error(`unknown-argument:${flag}`);
     values[key] = values[key] === undefined ? value : [...(Array.isArray(values[key]) ? values[key] : [values[key]]), value];
   }
   return { command, values };

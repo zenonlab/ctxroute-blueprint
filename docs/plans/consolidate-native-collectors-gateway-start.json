@@ -1,0 +1,24 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "conditional-provider-gateway",
+  "status": "DONE",
+  "files": [
+    "apps/provider-gateway/package.json",
+    "apps/provider-gateway/src/index.ts",
+    "apps/provider-gateway/src/index.test.ts",
+    "scripts/infra/provider-gateway-driver.mjs",
+    "scripts/infra/provider-gateway-driver.test.mjs",
+    "scripts/infra/tobirink-provider-gate.mjs",
+    "package-lock.json",
+    "docs/decisions/ADR-0051-provider-transport-gate.md",
+    "docs/architecture/src/public-pipeline.architecture.json",
+    "docs/plans/consolidate-native-collectors-gateway-start.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Le retest direct corrigé échoue cinq fois en HTTP 403 depuis Cloudflare; le mode gateway est donc requis et restauré sur le Worker 1d512c87.",
+    "Deno production pbcbbjp6gzys: HMAC, KV anti-rejeu, allowlist, limites, en-tête JSON:API Kitsu; 7/7 tests et typecheck réussis.",
+    "Smokes réels: AniList et MangaUpdates via Deno répondent 200; Discovery VERIFIED et Agenda 711 événements terminent via la gateway sans GitHub."
+  ]
+}

@@ -66,6 +66,11 @@ function assertGatewaySecret(value: string | undefined): string {
   return value;
 }
 
+function rejectRedirect(response: Response): Response {
+  if (response.status >= 300 && response.status < 400) throw new Error('provider-transport-redirect');
+  return response;
+}
+
 async function hmac(secret: string, value: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { hash: 'SHA-256', name: 'HMAC' }, false, ['sign']);
   const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)));
@@ -77,7 +82,7 @@ export class DirectProviderTransportAdapter implements ProviderTransportPort {
 
   async fetch(target: string, init: RequestInit): Promise<Response> {
     if (!isAllowedProviderTarget(target, methodOf(init))) throw new TypeError('provider-transport-target');
-    return this.fetcher(target, { ...init, cache: 'no-store', redirect: 'error' });
+    return rejectRedirect(await this.fetcher(target, { ...init, cache: 'no-store', redirect: 'manual' }));
   }
 }
 
@@ -92,7 +97,7 @@ export class SignedGatewayProviderTransportAdapter implements ProviderTransportP
     this.origin = assertGatewayOrigin(input.origin);
     this.secret = assertGatewaySecret(input.secret);
     this.fetcher = input.fetcher ?? fetch.bind(globalThis);
-    this.nonce = input.nonce ?? crypto.randomUUID;
+    this.nonce = input.nonce ?? (() => crypto.randomUUID());
     this.now = input.now ?? Date.now;
   }
 
@@ -101,22 +106,37 @@ export class SignedGatewayProviderTransportAdapter implements ProviderTransportP
     if (!isAllowedProviderTarget(target, method)) throw new TypeError('provider-transport-target');
     if (method === 'GET' && init.body != null) throw new TypeError('provider-gateway-body');
     if (method === 'POST' && init.body == null) throw new TypeError('provider-gateway-body');
-    const body = method === 'POST' ? await new Response(init.body).text() : null;
-    const raw = JSON.stringify({ body, issuedAt: new Date(this.now()).toISOString(), method, nonce: this.nonce(), target, version: 1 });
+    let raw: string;
+    try {
+      const body = method === 'POST' ? await new Response(init.body).text() : null;
+      raw = JSON.stringify({ body, issuedAt: new Date(this.now()).toISOString(), method, nonce: this.nonce(), target, version: 1 });
+    } catch {
+      throw new Error('provider-gateway-envelope');
+    }
     if (bytes(raw) > requestByteLimit) throw new RangeError('provider-gateway-request-too-large');
+    let signature: string;
+    try {
+      signature = await hmac(this.secret, raw);
+    } catch {
+      throw new Error('provider-gateway-signature');
+    }
     const request: RequestInit = {
       body: raw,
       cache: 'no-store',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        'X-Tobirink-Gateway-Signature': await hmac(this.secret, raw),
+        'X-Tobirink-Gateway-Signature': signature,
       },
       method: 'POST',
-      redirect: 'error',
+      redirect: 'manual',
     };
     if (init.signal !== undefined) request.signal = init.signal;
-    return this.fetcher(`${this.origin}/v1/provider-fetch`, request);
+    try {
+      return rejectRedirect(await this.fetcher(`${this.origin}/v1/provider-fetch`, request));
+    } catch {
+      throw new Error('provider-gateway-fetch');
+    }
   }
 }
 

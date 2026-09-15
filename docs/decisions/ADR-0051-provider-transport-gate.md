@@ -6,8 +6,14 @@ scope:
   - apps/worker/src/provider-transport-adapter.test.ts
   - apps/worker/src/native-collectors.ts
   - apps/worker/wrangler.jsonc
+  - apps/provider-gateway/package.json
+  - apps/provider-gateway/src/index.ts
+  - apps/provider-gateway/src/index.test.ts
+  - scripts/infra/provider-gateway-driver.mjs
+  - scripts/infra/provider-gateway-driver.test.mjs
   - docs/architecture/src/public-discovery.dataflow.json
   - docs/architecture/src/agenda-release.dataflow.json
+  - docs/architecture/src/public-pipeline.architecture.json
 review: on-change
 revised: true
 ---
@@ -60,30 +66,36 @@ origine, le même référent et le même user-agent produit que la collecte Agen
 Ces en-têtes ne portent ni secret ni donnée de bibliothèque; ils évitent qu'un
 client serveur anonyme soit confondu avec un trafic générique.
 
-Vercel Hobby est le premier candidat gratuit pour une passerelle séparée : au
-15 septembre 2026, la documentation officielle annonce un plan personnel non
-commercial gratuit et jusqu’à un million d’invocations Function incluses. Deno
-Deploy Free est un second candidat mais suspend l’application au dépassement de
-ses limites. Cloud Run possède un free tier de calcul, tandis que son trafic
-sortant peut être facturé. Une passerelle publique ouverte est exclue : elle ne
-fournit ni identité, ni confidentialité, ni disponibilité contrôlable.
+Deno Deploy est retenu comme premier candidat gratuit pour une passerelle
+séparée : ses règles autorisent explicitement une API qui interroge une API
+externe et un reverse proxy, contrairement à un forward proxy générique. La
+passerelle utilise une base Deno KV attachée pour réclamer chaque nonce par
+transaction atomique avec expiration. Vercel Hobby reste un candidat de repli,
+mais son offre gratuite est limitée aux usages personnels non commerciaux.
+Render gratuit est exclu car sa mise en veille peut ajouter environ une minute
+au premier appel. Une passerelle publique ouverte est exclue : elle ne fournit
+ni identité, ni confidentialité, ni disponibilité contrôlable.
 
 Aucun candidat n’est déclaré compatible avant un smoke test signé vers AniList
 et MangaUpdates, puis un test Discovery `PENDING` jusqu’à l’état terminal et
-une collecte Agenda complète. La création du service, du secret et le
-déploiement restent une étape fournisseur séparée soumise à approbation.
+une collecte Agenda complète. Le déploiement Deno, sa base KV et son secret
+passent exclusivement par la gate fournisseur dédiée.
 
 ## Conséquences
 
 Le mode direct peut être essayé sans coût ni nouvelle ressource, puis remplacé
 par une passerelle sans modifier le flux métier. La gate rend la configuration
 invalide visible au démarrage du traitement au lieu de basculer silencieusement.
-Le dépôt ne prouve pas encore qu’AniList accepte l’egress Cloudflare, Vercel,
-Deno ou Google; cette preuve appartient à la future certification distante.
+Le retest distant du 15 septembre 2026 confirme cinq réponses AniList HTTP 403
+depuis l’adaptateur direct Cloudflare. La gateway Deno répond 200 pour AniList
+et MangaUpdates, mène Discovery à `VERIFIED` et produit une génération Agenda
+active de 711 événements. `gateway` est donc le mode de production; `direct`
+reste un rollback explicite sans bascule silencieuse.
 
 Sources de décision consultées le 15 septembre 2026 :
 
-- https://vercel.com/docs/plans/hobby
-- https://vercel.com/docs/functions/limitations
 - https://docs.deno.com/deploy/usage/
-- https://cloud.google.com/run/pricing
+- https://docs.deno.com/deploy/reference/deno_kv/
+- https://docs.deno.com/deploy/kv/transactions/
+- https://vercel.com/docs/plans/hobby
+- https://render.com/docs/free

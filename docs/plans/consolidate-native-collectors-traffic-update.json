@@ -1,0 +1,17 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "certify-live-traffic",
+  "status": "DONE",
+  "files": [
+    "docs/release.md",
+    "docs/architecture/src/traffic.dataflow.json",
+    "docs/plans/consolidate-native-collectors-traffic-update.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Discovery v3: la demande AniList 20 passe de 202 PENDING à VERIFIED sur le Worker d5d0ce85 avec le profil Naruto complet.",
+    "Agenda natif: cron réel */10 à 17:30 UTC, traitement Queue en 47 s puis génération active calendar-d2732f2f avec 711 événements (225 AniList, 486 MangaUpdates).",
+    "Routes publiques après collecte: Discovery v3 et Agenda v3 répondent 200 sur les nouvelles révisions; Catalogue v2 répond 410."
+  ]
+}

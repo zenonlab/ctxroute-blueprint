@@ -55,10 +55,11 @@
     ]
   },
   "triggers": {
-    "crons": ["17 3 * * 1"]
+    "crons": ["*/10 * * * *"]
   },
   "vars": {
-    "PROVIDER_TRANSPORT_MODE": "direct",
+    "PROVIDER_GATEWAY_ORIGIN": "https://tobirink-provider-gateway.tobirink.deno.net",
+    "PROVIDER_TRANSPORT_MODE": "gateway",
     "TOBIRINK_WORKER_DIAGNOSTICS": "worker-v1"
   },
   "observability": {

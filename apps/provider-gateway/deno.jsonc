@@ -1,0 +1,6 @@
+{
+  "deploy": {
+    "org": "tobirink",
+    "app": "tobirink-provider-gateway"
+  }
+}

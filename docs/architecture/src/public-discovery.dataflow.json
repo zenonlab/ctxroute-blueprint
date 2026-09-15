@@ -23,7 +23,7 @@
         "id": "boundaries",
         "label": "Frontières",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers"],
-        "note": "Le collecteur dépend d’un port stable; la gate choisit direct ou une passerelle signée sans modifier le métier."
+        "note": "Le collecteur dépend d’un port stable; la gate sélectionne la passerelle signée exigée par le blocage AniList depuis Cloudflare."
       }
     ]
   },
@@ -181,7 +181,7 @@
       "from": "collector",
       "to": "transportPort",
       "label": "requête via le port",
-      "classification": "direct par défaut · gateway explicite",
+      "classification": "gateway explicite · direct rollback",
       "variant": "security",
       "route": "straight",
       "labelAt": [853, 448]
@@ -244,8 +244,8 @@
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
         "D1, le collecteur et le code Worker restent dans le dépôt principal privé",
         "Le collecteur dépend uniquement de ProviderTransportPort, comme le métier dépend du port D1",
-        "Le mode direct ne requiert aucun proxy; les en-têtes AniList sont alignés sur la collecte Agenda",
-        "Le mode gateway reste un repli HMAC isolé uniquement si le smoke test direct échoue encore"
+        "Le mode direct reste disponible comme rollback mais le smoke réel reçoit HTTP 403 depuis Cloudflare",
+        "Le mode gateway HMAC isolé est actif; les routes externes OIDC de claim et résultat répondent 410"
       ]
     }
   ]

@@ -55,12 +55,41 @@ async function digest(value: string): Promise<string> {
 }
 
 function providerFetch(bindings: NativeCollectorBindings) {
-  return bindProviderTransport(createProviderTransportAdapter(bindings));
+  try {
+    return bindProviderTransport(createProviderTransportAdapter(bindings));
+  } catch (error) {
+    console.warn('provider-transport-init-failed', providerFailureCode(error instanceof Error ? error : undefined));
+    throw error;
+  }
+}
+
+function providerFailureCode(error: Error | undefined): string {
+  if (error === undefined) return 'provider-unknown';
+  if (/^provider-(gateway|transport)-/u.test(error.message)) {
+    return error.message.slice(0, 80);
+  }
+  const status = /HTTP ([1-5]\d{2})\b/u.exec(error.message)?.[1];
+  if (status !== undefined) return `provider-http-${status}`;
+  if (error.name === 'AbortError' || error.name === 'TimeoutError') return 'provider-timeout';
+  return 'provider-unavailable';
+}
+
+function collectorFailureCode(error: Error | undefined): string {
+  if (error !== undefined && /^(?:public-discovery|agenda)-[a-z-]{1,64}$/u.test(error.message)) return error.message;
+  if (error?.name === 'ZodError') return 'collector-schema-invalid';
+  if (error !== undefined && /^D1_[A-Z_]+:/u.test(error.message)) return error.message.split('\n')[0]!.slice(0, 120);
+  if (error !== undefined && /constraint failed/iu.test(error.message)) return 'collector-d1-constraint';
+  if (error instanceof TypeError) {
+    const detail = error.message.slice(0, 80).replaceAll(/[^A-Za-z0-9 .:_-]/gu, '?');
+    return `collector-type-error:${detail}`;
+  }
+  return 'collector-internal';
 }
 
 export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings): Promise<PublicDiscoveryBatchReport> {
   const port = new D1PublicDiscoveryV3Adapter(bindings.PUBLIC_DB);
   let activeToken = '';
+  const resolver = createPublicDiscoveryResolver(createPublicDiscoveryProviders(providerFetch(bindings)));
   return runPublicDiscoveryBatch({
     gateway: {
       claim: async (limit) => {
@@ -71,9 +100,17 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       publish: async (batch: PublicDiscoveryResultBatch) => port.publishBatch(batch, await digest(activeToken), await digest(JSON.stringify(batch.results)), new Date().toISOString()),
     },
     limit: 20,
-    nonce: crypto.randomUUID,
+    nonce: () => crypto.randomUUID(),
     now: () => new Date().toISOString(),
-    resolver: createPublicDiscoveryResolver(createPublicDiscoveryProviders(providerFetch(bindings))),
+    resolver: {
+      resolve: async (request) => {
+        try { return await resolver.resolve(request); }
+        catch (error) {
+          console.warn('public-discovery-provider-failed', providerFailureCode(error instanceof Error ? error : undefined));
+          throw error;
+        }
+      },
+    },
   });
 }
 
@@ -108,7 +145,10 @@ export async function handleNativeCollectorQueue(
         if (report.failed > 0) { message.retry({ delaySeconds: 15 * 60 }); continue; }
       }
       message.ack();
-    } catch { message.retry({ delaySeconds: Math.min(60 * (2 ** Math.max(0, message.attempts - 1)), 60 * 60) }); }
+    } catch (error) {
+      console.warn('native-collector-failed', signal.type, collectorFailureCode(error instanceof Error ? error : undefined));
+      message.retry({ delaySeconds: Math.min(60 * (2 ** Math.max(0, message.attempts - 1)), 60 * 60) });
+    }
   }
 }
 
