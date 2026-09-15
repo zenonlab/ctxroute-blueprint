@@ -1165,16 +1165,16 @@
         {
           "id": "publish-native-runtime",
           "title": "Pousser, provisionner et déployer le runtime direct",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le tip certifié est poussé en fast-forward sur main.",
             "Les deux Queues sont créées via la gate et liées au Worker.",
             "Le Worker est déployé en mode direct sans gateway ni nouveau secret."
           ],
           "files": [
-            "apps/worker/wrangler.jsonc",
-            "scripts/infra/cloudflare-driver.mjs",
             "docs/release.md",
+            "docs/plans/consolidate-native-collectors-publish-start.json",
+            "docs/plans/consolidate-native-collectors-publish-update.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
@@ -1185,7 +1185,11 @@
             "npm run infra:apply avec digest vérifié",
             "npm exec -- wrangler queues list"
           ],
-          "evidence": []
+          "evidence": [
+            "Push fast-forward réussi: origin/main pointe sur 873f248377f4f74788d8218a0f071829c0cdb659; hooks lint, couverture, intégration et documentation verts.",
+            "Gate Cloudflare 84196083 a créé uniquement les deux Queues autorisées puis déployé le Worker 2ae7a6f8 à 100%.",
+            "Inventaire distant: Queue principale avec 1 producteur/1 consumer, DLQ avec 0/0; binding Worker présent et PROVIDER_TRANSPORT_MODE direct sans gateway ni nouveau secret."
+          ]
         },
         {
           "id": "certify-live-traffic",

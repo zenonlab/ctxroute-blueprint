@@ -1,5 +1,20 @@
 # Extension packaging and rollback
 
+## Runtime Cloudflare natif publié — 15 septembre 2026
+
+Le commit certifié `873f248377f4f74788d8218a0f071829c0cdb659` est
+publié en fast-forward sur `origin/main`. La gate opérationnelle a appliqué le
+plan `84196083cb83e934223423994ffd24ac491c8d187768b53c201bf63d16570e45`,
+limité à la création de `tobirink-public-discovery`, de sa DLQ et au
+déploiement de `tobirink-public-api`.
+
+La Queue principale possède exactement un producteur et un consumer; la DLQ
+n'en possède aucun. Le Worker `2ae7a6f8-1533-4485-98ba-a8f75ab12320` est actif
+à 100 %, lié à la Queue, et conserve `PROVIDER_TRANSPORT_MODE=direct`. Aucun
+service de gateway ni nouveau secret n'a été créé. La version Worker
+`db774555-4940-4bcb-8da4-fc9023d3e2cd` reste la référence immédiate de
+rollback tant que le trafic natif n'est pas certifié.
+
 ## Sauvegarde du collecteur public avant retrait — 15 septembre 2026
 
 Le dépôt public `tristan-monticelli/tobirink-public-discovery` possède une

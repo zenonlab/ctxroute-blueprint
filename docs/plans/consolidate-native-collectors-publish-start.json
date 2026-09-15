@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "publish-native-runtime",
+  "status": "IN_PROGRESS",
+  "files": [
+    "docs/plans/consolidate-native-collectors-publish-start.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": []
+}
