@@ -1,8 +1,11 @@
 {
   "goalId": "goal-publish-public-discovery-v2-retirement",
   "stepId": "step-1",
-  "status": "IN_PROGRESS",
+  "status": "DONE",
   "evidence": [
-    "Publication plan validated and approved"
+    "npm run verify passed; pre-push lint, coverage, integration and documentation gates passed",
+    "Commit c0a797d pushed to origin/main without .codex/config.toml",
+    "Cloudflare plan 21460c98 deployed only worker:tobirink-public-api as version a1c2e5cc",
+    "Production: all five v2 discovery routes return 410; v3 discovery and v3 Agenda return 200"
   ]
 }
