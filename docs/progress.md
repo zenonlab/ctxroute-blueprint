@@ -24,6 +24,10 @@
 
 - [x] **Synchroniser et vérifier le dépôt public localement** — DONE _(evidence: Clone public local propre sur refactor/public-discovery-v3; commit 51742d9 sans push, dispatch ni mutation fournisseur., Sources alignées exactement sur packages/public-discovery/src; contrat v3, listes 4+4 et état UNAVAILABLE couverts par 51 tests., npm ci --ignore-scripts, npm run verify et npm ls réussissent; workflow */10 et workflow_dispatch conservé; lockfile inchangé.)_
 
-## Retirer les fournisseurs du runtime de l’extension — ACTIVE
+## Retirer les fournisseurs du runtime de l’extension — DONE
 
-- [ ] **Acheminer les identités manuelles par Public Discovery v3** — IN_PROGRESS _(evidence: Manual Review uses a provider+ID-specific SHA-256 key and Public Discovery v3; PENDING and exact VERIFIED behavior covered by 7 application and 25 extension targeted tests., Chrome/Firefox manifests expose only https://tobirink.com/*, no declarativeNetRequest permission/resource; executable background bundles contain none of the four provider API origins., npm run verify passed fully and npm audit found 0 vulnerabilities; npm ls remains the known TypeScript/@types-node baseline assigned to dependency step 6.)_
+- [x] **Acheminer les identités manuelles par Public Discovery v3** — DONE _(evidence: Manual Review uses a provider+ID-specific SHA-256 key and Public Discovery v3; PENDING and exact VERIFIED behavior are covered by 7 application and 25 extension targeted tests., Chrome/Firefox manifests expose only https://tobirink.com/*, no declarativeNetRequest permission/resource; executable background bundles contain none of the four provider API origins., npm run verify and npm ls pass after the shared toolchain alignment; no provider call, deployment, publication, push or file deletion was performed.)_
+
+## Aligner l’outillage workspace et le gate CI — DONE
+
+- [x] **Unifier TypeScript et rendre npm ls bloquant** — DONE _(evidence: npm ci --ignore-scripts and npm ls pass with one TypeScript 7.0.2 baseline and @types/node 24.10.15., All workspace typechecks and 141 targeted UI tests pass; npm run verify passes fully with npm audit reporting 0 vulnerabilities., CI runs npm ls on every matrix OS, npm run verify on Ubuntu, and cross-platform validation on macOS and Windows; ADR-0048 and coherence checks pass.)_

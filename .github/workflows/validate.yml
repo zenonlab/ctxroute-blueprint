@@ -52,6 +52,9 @@ jobs:
       - name: Install pinned dependencies
         run: npm ci
 
+      - name: Validate dependency tree
+        run: npm ls
+
       - name: Synchronize frozen CRG environment
         run: uv sync --project packages/code-review-graph --frozen --python 3.12
 
@@ -68,7 +71,12 @@ jobs:
         shell: bash
         run: node scripts/crg-smoke.mjs > "${RUNNER_TEMP}/crg-smoke.json"
 
-      - name: Run complete repository gate
+      - name: Run complete repository gate on Ubuntu
+        if: runner.os == 'Linux'
+        run: npm run verify
+
+      - name: Run cross-platform validation
+        if: runner.os != 'Linux'
         run: npm run validate
 
       - name: Materialize Sensor artifacts

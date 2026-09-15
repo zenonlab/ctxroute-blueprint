@@ -14,5 +14,5 @@
     "verify:isolation": "node scripts/verify-isolation.mjs"
   },
   "dependencies": { "zod": "4.5.4" },
-  "devDependencies": { "@types/node": "24.10.15", "typescript": "5.9.3", "vitest": "4.1.11" }
+  "devDependencies": { "@types/node": "24.10.15", "typescript": "7.0.2", "vitest": "4.1.11" }
 }

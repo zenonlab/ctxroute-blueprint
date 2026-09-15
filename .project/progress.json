@@ -345,14 +345,14 @@
       "schemaVersion": 1,
       "id": "goal-extension-d1-only-discovery",
       "title": "Retirer les fournisseurs du runtime de l’extension",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
         {
           "id": "step-1",
           "title": "Acheminer les identités manuelles par Public Discovery v3",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Le background MV3 n’instancie aucun adaptateur de recherche ou d’hydratation AniList, MangaUpdates, MangaDex ou Kitsu.",
             "Une décision Review manuelle parse localement une référence exacte, utilise une clé dédiée fournisseur+ID, demande Public Discovery v3 et reste pending tant que D1 n’est pas VERIFIED.",
@@ -403,10 +403,67 @@
             "git commit -m fix(extension): route manual discovery through D1"
           ],
           "evidence": [
-            "Manual Review uses a provider+ID-specific SHA-256 key and Public Discovery v3; PENDING and exact VERIFIED behavior covered by 7 application and 25 extension targeted tests.",
+            "Manual Review uses a provider+ID-specific SHA-256 key and Public Discovery v3; PENDING and exact VERIFIED behavior are covered by 7 application and 25 extension targeted tests.",
             "Chrome/Firefox manifests expose only https://tobirink.com/*, no declarativeNetRequest permission/resource; executable background bundles contain none of the four provider API origins.",
-            "npm run verify passed fully and npm audit found 0 vulnerabilities; npm ls remains the known TypeScript/@types-node baseline assigned to dependency step 6.",
-            "Archify favorite-resolution and favorite-source-boundaries pass showcase 9/9; artifacts SHA-256 32d657d63a7b705b8fe7f73f7665402bc28e346902579eaa4bbd5dcf3315a18d and a8bd63748cf88a1e9ca0f4493d950589537372eed05de2a3f869201960ee2489."
+            "npm run verify and npm ls pass after the shared toolchain alignment; no provider call, deployment, publication, push or file deletion was performed."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-workspace-toolchain-ci",
+      "title": "Aligner l’outillage workspace et le gate CI",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Unifier TypeScript et rendre npm ls bloquant",
+          "status": "DONE",
+          "acceptance": [
+            "Le manifeste racine et tous les workspaces qui référencent TypeScript déclarent 7.0.2; ceux qui référencent @types/node déclarent 24.10.15.",
+            "Le package-lock matérialise ces versions sans autre mise à jour de dépendance intentionnelle.",
+            "npm ls réussit sans paquet invalid ou extraneous après npm ci --ignore-scripts.",
+            "La CI générale exécute npm ls sur chaque OS, npm run verify sur Ubuntu et conserve npm run validate sur macOS et Windows.",
+            "ADR-0048 documente le baseline et la répartition du gate; validations ADR/docs passent.",
+            "Les typechecks workspace, tests concernés et npm run verify réussissent.",
+            "La facturation GitHub n’est ni modifiée ni présentée comme corrigée; aucun push ni workflow distant.",
+            "Le commit local est chore(deps): align workspace toolchain et exclut .codex/config.toml."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/workspace-toolchain-ci-update.json",
+            ".github/workflows/validate.yml",
+            "package.json",
+            "package-lock.json",
+            "apps/extension/package.json",
+            "apps/web/package.json",
+            "apps/ui-workbench/package.json",
+            "packages/ui/package.json",
+            "packages/public-discovery/package.json",
+            "docs/decisions/ADR-0048-workspace-toolchain-baseline.md"
+          ],
+          "commands": [
+            "edit manifests and CI with apply_patch",
+            "npm install --package-lock-only --ignore-scripts",
+            "npm ci --ignore-scripts",
+            "npm ls",
+            "npm run typecheck",
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/ui-workbench",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m chore(deps): align workspace toolchain"
+          ],
+          "evidence": [
+            "npm ci --ignore-scripts and npm ls pass with one TypeScript 7.0.2 baseline and @types/node 24.10.15.",
+            "All workspace typechecks and 141 targeted UI tests pass; npm run verify passes fully with npm audit reporting 0 vulnerabilities.",
+            "CI runs npm ls on every matrix OS, npm run verify on Ubuntu, and cross-platform validation on macOS and Windows; ADR-0048 and coherence checks pass."
           ]
         }
       ]

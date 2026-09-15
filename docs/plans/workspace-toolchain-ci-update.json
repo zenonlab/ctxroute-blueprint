@@ -1,0 +1,34 @@
+{
+  "goalId": "goal-workspace-toolchain-ci",
+  "stepId": "step-1",
+  "status": "DONE",
+  "acceptance": [
+    "Le manifeste racine et tous les workspaces qui référencent TypeScript déclarent 7.0.2; ceux qui référencent @types/node déclarent 24.10.15.",
+    "Le package-lock matérialise ces versions sans autre mise à jour de dépendance intentionnelle.",
+    "npm ls réussit sans paquet invalid ou extraneous après npm ci --ignore-scripts.",
+    "La CI générale exécute npm ls sur chaque OS, npm run verify sur Ubuntu et conserve npm run validate sur macOS et Windows.",
+    "ADR-0048 documente le baseline et la répartition du gate; validations ADR/docs passent.",
+    "Les typechecks workspace, tests concernés et npm run verify réussissent.",
+    "La facturation GitHub n’est ni modifiée ni présentée comme corrigée; aucun push ni workflow distant.",
+    "Le commit local est chore(deps): align workspace toolchain et exclut .codex/config.toml."
+  ],
+  "files": [
+    ".project/progress.json",
+    "docs/progress.md",
+    "docs/plans/workspace-toolchain-ci-update.json",
+    ".github/workflows/validate.yml",
+    "package.json",
+    "package-lock.json",
+    "apps/extension/package.json",
+    "apps/web/package.json",
+    "apps/ui-workbench/package.json",
+    "packages/ui/package.json",
+    "packages/public-discovery/package.json",
+    "docs/decisions/ADR-0048-workspace-toolchain-baseline.md"
+  ],
+  "evidence": [
+    "npm ci --ignore-scripts and npm ls pass with one TypeScript 7.0.2 baseline and @types/node 24.10.15.",
+    "All workspace typechecks and 141 targeted UI tests pass; npm run verify passes fully with npm audit reporting 0 vulnerabilities.",
+    "CI runs npm ls on every matrix OS, npm run verify on Ubuntu, and cross-platform validation on macOS and Windows; ADR-0048 and coherence checks pass."
+  ]
+}

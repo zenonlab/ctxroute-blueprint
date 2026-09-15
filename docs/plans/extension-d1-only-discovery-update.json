@@ -1,0 +1,10 @@
+{
+  "goalId": "goal-extension-d1-only-discovery",
+  "stepId": "step-1",
+  "status": "DONE",
+  "evidence": [
+    "Manual Review uses a provider+ID-specific SHA-256 key and Public Discovery v3; PENDING and exact VERIFIED behavior are covered by 7 application and 25 extension targeted tests.",
+    "Chrome/Firefox manifests expose only https://tobirink.com/*, no declarativeNetRequest permission/resource; executable background bundles contain none of the four provider API origins.",
+    "npm run verify and npm ls pass after the shared toolchain alignment; no provider call, deployment, publication, push or file deletion was performed."
+  ]
+}
