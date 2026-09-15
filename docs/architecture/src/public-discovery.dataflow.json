@@ -59,11 +59,11 @@
       "id": "publicD1",
       "type": "database",
       "label": "D1 catalogue public",
-      "sublabel": "requête unique · profil complet",
+      "sublabel": "bail et tentatives bornés",
       "stage": 2,
       "row": 1,
       "width": 140,
-      "tag": "PENDING · TERMINAL"
+      "tag": "PENDING · FAILED · TERMINAL"
     },
     {
       "id": "github",
@@ -113,8 +113,8 @@
     {
       "from": "extension",
       "to": "worker",
-      "label": "requête d’œuvre normalisée",
-      "classification": "HTTPS · aucune identité",
+      "label": "requête ou reprise explicite",
+      "classification": "HTTPS · digest identique",
       "variant": "emphasis",
       "route": "straight",
       "labelAt": [208, 226]
@@ -158,8 +158,8 @@
     {
       "from": "github",
       "to": "verifiedD1",
-      "label": "profil public validé via Worker",
-      "classification": "workers.dev · OIDC repo/main/workflow/audience exacts",
+      "label": "publication atomique via Worker",
+      "classification": "bail + digest + meta.changes = 1",
       "variant": "security",
       "route": "auto",
       "labelAt": [820, 300]
@@ -189,6 +189,8 @@
       "items": [
         "D1 conserve une seule requête PENDING par clé",
         "Un bail PROCESSING empêche tout second collecteur concurrent",
+        "La huitième tentative expirée devient FAILED puis UNAVAILABLE",
+        "Un POST identique est requis pour remettre FAILED à PENDING",
         "Le résultat VERIFIED répond aux prochaines lectures"
       ]
     },

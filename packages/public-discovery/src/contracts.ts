@@ -123,6 +123,7 @@ export type PublicDiscoverySubmission = z.output<typeof publicDiscoverySubmissio
 export type PublicDiscoveryReadState =
   | { state: 'MISS' }
   | { retryAt: string; state: 'PENDING' }
+  | { reason: 'ATTEMPT_LIMIT'; state: 'UNAVAILABLE' }
   | { profile: PublicDiscoveryVerifiedProfile; state: 'VERIFIED'; verifiedAt: string }
   | { reason: string; state: 'NOT_FOUND'; verifiedAt: string }
   | { candidates: readonly PublicDiscoveryReferenceV2[]; reason: string; state: 'AMBIGUOUS'; verifiedAt: string };

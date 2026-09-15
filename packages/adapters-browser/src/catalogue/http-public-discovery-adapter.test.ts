@@ -31,4 +31,12 @@ describe('HttpPublicDiscoveryAdapter', () => {
     await expect(adapter.resolveOrRequest(key, query)).resolves.toMatchObject({ profile, state: 'VERIFIED' });
     expect(fetcher).toHaveBeenCalledOnce();
   });
+
+  it('returns an unavailable request without resubmitting it automatically', async () => {
+    const fetcher = vi.fn(async () => Response.json({ reason: 'ATTEMPT_LIMIT', state: 'UNAVAILABLE' }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    await expect(adapter.resolveOrRequest(key, query)).resolves.toEqual({ reason: 'ATTEMPT_LIMIT', state: 'UNAVAILABLE' });
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/v3/catalogue/discoveries?'), expect.objectContaining({ method: 'GET' }));
+  });
 });

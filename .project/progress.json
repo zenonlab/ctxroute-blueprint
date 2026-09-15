@@ -102,6 +102,64 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-public-discovery-d1-safety",
+      "title": "Sécuriser l’atomicité et les états de Public Discovery D1",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Rendre la publication atomique et terminer les demandes épuisées",
+          "status": "DONE",
+          "acceptance": [
+            "Une publication VERIFIED n’écrit aucune révision, œuvre, titre ou référence si le bail a été remplacé, a expiré, si le digest diffère ou si une référence fournisseur appartient déjà à une autre œuvre.",
+            "L’UPDATE terminal est conditionné par le bail, son échéance, le digest et l’absence de conflit fournisseur; son résultat D1 meta.changes vaut exactement 1 pour une publication acceptée, sinon l’adaptateur refuse le résultat.",
+            "Après l’expiration de la huitième tentative, la ligne devient FAILED et les lectures v3 exposent UNAVAILABLE au lieu de rester PENDING indéfiniment.",
+            "Un POST explicite portant exactement le même digest remet FAILED à PENDING avec un compteur réinitialisé; un contenu différent reste refusé.",
+            "Les tests D1 réels couvrent bail remplacé, bail expiré, conflit fournisseur, huitième tentative et reprise explicite sans écriture partielle.",
+            "L’extension comprend UNAVAILABLE et le transforme en échec fournisseur récupérable sans relancer automatiquement la demande publique.",
+            "ADR-0046 et le dataflow produit décrivent FAILED, UNAVAILABLE, le contrôle meta.changes et la reprise explicite; Archify passe showcase avec 9 contrôles, 0 erreur et 0 avertissement.",
+            "npm run verify réussit intégralement; aucun déploiement, push, suppression distante, installation de dépendance ou modification de .codex/config.toml n’a lieu.",
+            "Le changement vérifié est commité sur fix/public-discovery-d1-safety avec le message fix(discovery): harden D1 publication safety."
+          ],
+          "files": [
+            ".project/progress.json",
+            "apps/worker/migrations/0013_public_discovery_failure_states.sql",
+            "packages/public-discovery/src/contracts.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v2-adapter.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.ts",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/architecture/src/public-discovery.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:d1",
+            "npm test --workspace @tobirink/adapters-browser -- src/catalogue/http-public-discovery-adapter.test.ts",
+            "npm test --workspace @tobirink/application -- src/favorites/favorite-resolution-runner.test.ts",
+            "npm run typecheck",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- public-discovery.dataflow",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Tests D1 Cloudflare 15/15: bail remplacé, bail expiré, conflit fournisseur, huitième tentative FAILED/UNAVAILABLE et reprise POST identique sans écriture partielle",
+            "Tests HttpPublicDiscoveryAdapter 3/3 et FavoriteResolutionRunner 39/39: UNAVAILABLE ne déclenche aucun fournisseur ni resoumission automatique",
+            "Tous les typechecks passent; validations ADR et documentation passent",
+            "Archify public-discovery passe showcase 9/9, 0 erreur, 0 avertissement; artefact SHA-256 66221f7a5e6918d3c78cf3b42f3bff858663a17402bbbdcbad2ca08f2babe5bf",
+            "npm run verify passe intégralement, builds Chrome/Firefox inclus; npm audit rapporte 0 vulnérabilité"
+          ]
+        }
+      ]
     }
   ]
 }

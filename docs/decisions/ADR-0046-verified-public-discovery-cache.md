@@ -58,6 +58,7 @@ Une lecture renvoie exactement un état :
 
 - `MISS` : aucune association ni demande active;
 - `PENDING` : une demande bornée existe ou attend une reprise transitoire;
+- `UNAVAILABLE` : les huit tentatives serveur sont épuisées et une reprise explicite est requise;
 - `VERIFIED` : le composant autorisé a publié un profil fournisseur complet;
 - `NOT_FOUND` : toutes les lanes applicables ont répondu sans correspondance;
 - `AMBIGUOUS` : plusieurs identités restent crédibles et sont conservées pour
@@ -87,6 +88,17 @@ entre un appel fournisseur et son checkpoint peut encore répéter cet appel :
 aucun protocole distribué ne peut garantir exactement-une-fois face à ce crash,
 mais la répétition concurrente et toute répétition après résultat terminal sont
 interdites.
+
+Une huitième tentative dont le bail expire passe en état D1 interne `FAILED` et
+la lecture publique renvoie `UNAVAILABLE`. Aucun polling de l’extension ne
+réarme cette demande. Un nouveau POST explicite, portant exactement le même
+digest, remet la ligne à `PENDING` avec un compteur réinitialisé; tout contenu
+différent reste un conflit.
+
+Chaque écriture du catalogue et l’écriture terminale sont conditionnées dans le
+même batch D1 par le bail non expiré, son token, le digest de demande et
+l’absence de conflit de référence fournisseur. L’adaptateur n’accepte la
+publication que si `meta.changes` vaut exactement `1` pour l’UPDATE terminal.
 
 L’extension consulte d’abord IndexedDB, puis `storage.sync`, puis D1. Un
 `VERIFIED` fournit directement le candidat hydraté complet utilisé pour écrire

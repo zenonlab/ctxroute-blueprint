@@ -115,7 +115,9 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyTok
     if (Math.abs(Date.parse(parsed.data.verifiedAt) - Date.now()) > 2 * 86_400_000) return noStore({ error: 'invalid-verification-time' }, 400);
     try {
       const resultDigest = await digest(JSON.stringify(parsed.data.results));
-      return noStore(await v2Port(routeServices(context, injected)).publishBatch(parsed.data, await digest(parsed.data.claimToken), resultDigest), 201);
+      return noStore(await v2Port(routeServices(context, injected)).publishBatch(
+        parsed.data, await digest(parsed.data.claimToken), resultDigest, new Date().toISOString(),
+      ), 201);
     } catch {
       return noStore({ error: 'result-conflict' }, 409);
     }
