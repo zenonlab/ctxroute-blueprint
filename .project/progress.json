@@ -221,6 +221,75 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-public-discovery-v3-alignment",
+      "title": "Aligner les contrats internes Public Discovery sur v3",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Renommer le runtime, les tables et le schéma filaire vers v3",
+          "status": "DONE",
+          "acceptance": [
+            "Les requêtes, claims et résultats Public Discovery v3 utilisent schemaVersion 3 et les symboles de clé/référence V3.",
+            "Une migration additive renomme les tables actives requests et nonces de _v2 vers _v3 sans perdre de lignes.",
+            "L’adaptateur, son fichier, son port, la composition et les tests utilisent exclusivement les noms V3.",
+            "Après un FAILED, un POST identique réarme puis le prochain claim retourne attempt 1.",
+            "Aucune référence runtime à D1PublicDiscoveryV2, publicDiscoveryV2 ou aux tables _v2 ne subsiste hors migrations historiques et routes HTTP v2 explicitement retirées.",
+            "ADR-0046, ADR-0047 et le dataflow décrivent le contrat interne v3; Archify passe showcase 9/9 sans diagnostic.",
+            "npm run verify réussit; aucun push, déploiement, suppression, dépendance ou modification de .codex/config.toml.",
+            "Le commit est refactor(discovery): align internal v3 contracts sur la branche courante."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "apps/worker/migrations/0015_public_discovery_v3_alignment.sql",
+            "packages/public-discovery/src/contracts.ts",
+            "packages/public-discovery/src/contracts.test.ts",
+            "packages/public-discovery/src/collector.ts",
+            "packages/public-discovery/src/collector.test.ts",
+            "packages/public-discovery/src/http-gateway.test.ts",
+            "packages/public-discovery/src/provider-kit.ts",
+            "packages/public-discovery/src/resolver.ts",
+            "packages/public-discovery/src/resolver.test.ts",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.ts",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.test.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v2-adapter.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts",
+            "packages/adapters-cloudflare/src/catalogue/index.ts",
+            "apps/worker/src/composition.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/decisions/ADR-0047-portable-public-discovery-component.md",
+            "docs/architecture/src/public-discovery.dataflow.json"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/public-discovery",
+            "npm test --workspace @tobirink/adapters-browser -- src/catalogue/http-public-discovery-adapter.test.ts",
+            "npm run test:d1",
+            "rg v2 runtime identifier audit",
+            "npm run typecheck",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- public-discovery.dataflow",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m refactor(discovery): align internal v3 contracts"
+          ],
+          "evidence": [
+            "Contrat portable 51/51, adaptateur navigateur 3/3 et Worker 65/65 passent avec schemaVersion 3 et noms V3.",
+            "Migration 0015 renomme les tables actives vers _v3; test D1 prouve la conservation d’une ligne PENDING et la disparition de l’ancien nom.",
+            "Le test FAILED réarme par POST identique puis réclame attempt 1; audit rg ne trouve des marqueurs v2 que dans transitions, test négatif et routes 410.",
+            "Archify public-discovery passe showcase 9/9 sans diagnostic; artefact SHA-256 21b6d47b2179616fdbc262f6b455f5a015684027ff8ad6432e81c3795312cf4b.",
+            "npm run verify passe intégralement, builds Chrome/Firefox et audit 0 vulnérabilité; aucune opération distante."
+          ]
+        }
+      ]
     }
   ]
 }

@@ -53,7 +53,7 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     const state = await this.read(key);
     if (state.state !== 'MISS') return state;
     const response = await this.fetcher(new URL('/v3/catalogue/discoveries/requests', this.origin).toString(), {
-      body: JSON.stringify({ key, query, schemaVersion: 2 }), cache: 'no-store', credentials: 'omit',
+      body: JSON.stringify({ key, query, schemaVersion: 3 }), cache: 'no-store', credentials: 'omit',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
     });
     if (!response.ok) throw new Error(`Public discovery request failed with status ${response.status}.`);

@@ -1,11 +1,11 @@
 import { publicDiscoveryCandidateSchema, publicDiscoveryProviderSchema } from './contracts.js';
-import type { PublicDiscoveryCandidate, PublicDiscoveryReferenceV2 } from './contracts.js';
+import type { PublicDiscoveryCandidate, PublicDiscoveryReferenceV3 } from './contracts.js';
 
-export type FavoriteProvider = PublicDiscoveryReferenceV2['provider'];
+export type FavoriteProvider = PublicDiscoveryReferenceV3['provider'];
 export type ResolutionProvider = FavoriteProvider;
 export type FavoriteMediaKind = PublicDiscoveryCandidate['mediaKind'] | 'UNKNOWN';
 export type ProviderCandidate = PublicDiscoveryCandidate;
-export type FavoriteProviderReference = PublicDiscoveryReferenceV2;
+export type FavoriteProviderReference = PublicDiscoveryReferenceV3;
 
 export interface ProviderCandidateEnvelope {
   readonly candidates: readonly ProviderCandidate[];

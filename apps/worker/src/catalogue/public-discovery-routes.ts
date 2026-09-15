@@ -1,9 +1,6 @@
+import type { PublicDiscoveryV3Port } from '@tobirink/adapters-cloudflare';
 import {
-  type PublicDiscoveryPort,
-} from '@tobirink/application';
-import type { PublicDiscoveryV2Port } from '@tobirink/adapters-cloudflare';
-import {
-  publicDiscoveryKeyV2Schema,
+  publicDiscoveryKeyV3Schema,
   publicDiscoveryResultBatchSchema,
   publicDiscoverySubmissionSchema,
 } from '@tobirink/public-discovery';
@@ -13,19 +10,19 @@ import type { WorkerRuntime, WorkerServices } from '../composition';
 import { verifyGitHubAgendaToken } from '../releases/github-oidc';
 
 type VerifyCollectorToken = (token: string, audience: string) => Promise<void>;
-type DiscoveryServices = { publicDiscovery: PublicDiscoveryPort; publicDiscoveryV2?: PublicDiscoveryV2Port; rateLimiter?: RateLimit };
+type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; rateLimiter?: RateLimit };
 
 function routeServices(context: { get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
   if (injected) return injected;
   const services = context.get('services');
   return services.publicDiscoveryRateLimiter
-    ? { publicDiscovery: services.publicDiscovery, publicDiscoveryV2: services.publicDiscoveryV2, rateLimiter: services.publicDiscoveryRateLimiter }
-    : { publicDiscovery: services.publicDiscovery, publicDiscoveryV2: services.publicDiscoveryV2 };
+    ? { publicDiscoveryV3: services.publicDiscoveryV3, rateLimiter: services.publicDiscoveryRateLimiter }
+    : { publicDiscoveryV3: services.publicDiscoveryV3 };
 }
 
-function v2Port(services: DiscoveryServices): PublicDiscoveryV2Port {
-  if (!services.publicDiscoveryV2) throw new Error('public-discovery-v2-unavailable');
-  return services.publicDiscoveryV2;
+function v3Port(services: DiscoveryServices): PublicDiscoveryV3Port {
+  if (!services.publicDiscoveryV3) throw new Error('public-discovery-v3-unavailable');
+  return services.publicDiscoveryV3;
 }
 
 function noStore<TBody>(body: TBody, status = 200): Response {
@@ -71,12 +68,12 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyTok
   const limitedBody = bodyLimit({ maxSize: 64 * 1024, onError: () => noStore({ error: 'body-too-large' }, 413) });
 
   app.get('/v3/catalogue/discoveries', async (context) => {
-    const key = publicDiscoveryKeyV2Schema.safeParse({
+    const key = publicDiscoveryKeyV3Schema.safeParse({
       fingerprint: context.req.query('fingerprint'), mediaKind: context.req.query('mediaKind'),
       parserVersion: context.req.query('parserVersion'), siteRulesVersion: context.req.query('siteRulesVersion'),
     });
     if (!key.success) return noStore({ error: 'invalid-query' }, 400);
-    return noStore(await v2Port(routeServices(context, injected)).read(key.data, new Date().toISOString()));
+    return noStore(await v3Port(routeServices(context, injected)).read(key.data, new Date().toISOString()));
   });
 
   app.post('/v3/catalogue/discoveries/requests', limitedBody, async (context) => {
@@ -87,7 +84,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyTok
     if (!parsed.success) return noStore({ error: 'invalid-request' }, 400);
     const requestDigest = await digest(JSON.stringify(parsed.data));
     try {
-      return noStore(await v2Port(services).request({ ...parsed.data, requestDigest }, new Date().toISOString()), 202);
+      return noStore(await v3Port(services).request({ ...parsed.data, requestDigest }, new Date().toISOString()), 202);
     } catch (error) {
       if (error instanceof Error && error.message === 'public-discovery-capacity-unavailable') {
         return noStore({ error: 'discovery-capacity-unavailable' }, 503);
@@ -104,7 +101,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyTok
     if (!Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 50) return noStore({ error: 'invalid-limit' }, 400);
     const claimToken = randomToken();
     const now = new Date();
-    return noStore(await v2Port(routeServices(context, injected)).claimBatch({
+    return noStore(await v3Port(routeServices(context, injected)).claimBatch({
       claimToken, leaseUntil: new Date(now.getTime() + 15 * 60_000).toISOString(),
       limit: Number(limit), now: now.toISOString(), tokenDigest: await digest(claimToken),
     }));
@@ -118,7 +115,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyTok
     if (Math.abs(Date.parse(parsed.data.verifiedAt) - Date.now()) > 2 * 86_400_000) return noStore({ error: 'invalid-verification-time' }, 400);
     try {
       const resultDigest = await digest(JSON.stringify(parsed.data.results));
-      return noStore(await v2Port(routeServices(context, injected)).publishBatch(
+      return noStore(await v3Port(routeServices(context, injected)).publishBatch(
         parsed.data, await digest(parsed.data.claimToken), resultDigest, new Date().toISOString(),
       ), 201);
     } catch {

@@ -1,17 +1,15 @@
 import {
   CloudflareCoverImageAdapter,
   D1PublicCatalogueAdapter,
-  D1PublicDiscoveryAdapter,
-  D1PublicDiscoveryV2Adapter,
+  D1PublicDiscoveryV3Adapter,
   R2CoverMasterReadAdapter,
   R2PublicReleaseObjectAdapter,
 } from '@tobirink/adapters-cloudflare';
-import type { PublicDiscoveryV2Port } from '@tobirink/adapters-cloudflare';
+import type { PublicDiscoveryV3Port } from '@tobirink/adapters-cloudflare';
 import type {
   CoverImageRenderPort,
   CoverMasterReadPort,
   PublicCatalogueReadPort,
-  PublicDiscoveryPort,
   PublicReleaseObjectPort,
 } from '@tobirink/application';
 import type { CloudPolicy } from './cloud-policy';
@@ -21,8 +19,7 @@ import { D1PublicReleaseCalendarAdapter } from './releases/public-release-calend
 
 export interface WorkerServices {
   catalogue: PublicCatalogueReadPort;
-  publicDiscovery: PublicDiscoveryPort;
-  publicDiscoveryV2: PublicDiscoveryV2Port;
+  publicDiscoveryV3: PublicDiscoveryV3Port;
   publicDiscoveryRateLimiter?: RateLimit;
   coverImages: CoverImageRenderPort;
   coverMasters: CoverMasterReadPort;
@@ -39,8 +36,7 @@ export type WorkerRuntime = {
 export function createWorkerServices(bindings: Env): WorkerServices {
   return {
     catalogue: new D1PublicCatalogueAdapter(bindings.PUBLIC_DB),
-    publicDiscovery: new D1PublicDiscoveryAdapter(bindings.PUBLIC_DB),
-    publicDiscoveryV2: new D1PublicDiscoveryV2Adapter(bindings.PUBLIC_DB),
+    publicDiscoveryV3: new D1PublicDiscoveryV3Adapter(bindings.PUBLIC_DB),
     publicDiscoveryRateLimiter: bindings.PUBLIC_DISCOVERY_RATE_LIMITER,
     coverImages: new CloudflareCoverImageAdapter(bindings.COVER_IMAGES),
     coverMasters: new R2CoverMasterReadAdapter(bindings.COVER_BUCKET),

@@ -47,7 +47,7 @@ export async function runPublicDiscoveryBatch(input: PublicDiscoveryBatchInput):
     claimToken: batch.claimToken,
     nonce: input.nonce(),
     results,
-    schemaVersion: 2,
+    schemaVersion: 3,
     verifiedAt: input.now(),
   });
   const receipt = publicDiscoveryReceiptSchema.parse(await input.gateway.publish(resultBatch));

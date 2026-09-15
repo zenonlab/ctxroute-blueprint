@@ -1,5 +1,5 @@
 import { publicDiscoveryCandidateSchema } from './contracts.js';
-import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV2, PublicDiscoveryTerminalResolution } from './contracts.js';
+import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoveryTerminalResolution } from './contracts.js';
 import { inspectFavoriteTitleCandidates } from './provider-kit.js';
 import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit.js';
 import { AniListFavoriteProviderAdapter } from './providers/anilist.js';
@@ -21,7 +21,7 @@ export function createPublicDiscoveryProviders(): PublicDiscoveryProviderPorts {
 
 interface LaneDecision {
   readonly candidates: readonly ProviderCandidate[];
-  readonly references: readonly PublicDiscoveryReferenceV2[];
+  readonly references: readonly PublicDiscoveryReferenceV3[];
   readonly state: 'MATCH' | 'AMBIGUOUS' | 'NOT_FOUND';
 }
 interface MutableTitleMatchQuery {
@@ -85,7 +85,7 @@ async function sha256(value: string): Promise<string> {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function references(candidate: ProviderCandidate): PublicDiscoveryReferenceV2[] {
+function references(candidate: ProviderCandidate): PublicDiscoveryReferenceV3[] {
   const values = [{ provider: candidate.provider, externalId: candidate.externalId }, ...(candidate.linkedReferences ?? [])];
   return [...new Map(values.map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()].slice(0, 5);
 }

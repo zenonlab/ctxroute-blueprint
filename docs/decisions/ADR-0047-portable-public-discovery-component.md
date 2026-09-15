@@ -19,7 +19,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-14
-- Revised: 2026-09-14
+- Revised: 2026-09-15
 
 ## Contexte
 
@@ -72,9 +72,11 @@ nomment aussi le dépôt public exact, `refs/heads/main` et
 `.github/workflows/collect.yml@refs/heads/main`; les workflows de forks et de
 pull request ne reçoivent donc aucune autorité D1.
 
-La première implémentation matérialise ce contrat en version `2`, avec des lots
-de cinquante demandes au maximum et les issues terminales `VERIFIED`,
-`NOT_FOUND` et `AMBIGUOUS`.
+Le contrat actif est la version `3`, alignée sur les routes HTTP publiques v3,
+avec des lots de cinquante demandes au maximum, deux listes de quatre titres au
+maximum et les issues terminales `VERIFIED`, `NOT_FOUND` et `AMBIGUOUS`. Le
+passage depuis l’ancien numéro interne `2` renomme les symboles et tables
+actifs sans modifier les clés ni perdre les demandes déjà matérialisées.
 
 Le workflow initial sonde la file une fois par jour à 03:23 UTC et accepte un
 déclenchement manuel. Une demande est donc dédupliquée dans D1 immédiatement,

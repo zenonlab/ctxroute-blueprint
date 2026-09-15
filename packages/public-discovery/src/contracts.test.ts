@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { publicDiscoveryQuerySchema } from '.';
+import { publicDiscoveryQuerySchema, publicDiscoverySubmissionSchema } from '.';
 
 const query = {
   discoveryTitles: ['One'],
@@ -15,5 +15,11 @@ describe('public discovery request minimization', () => {
   it('accepts four titles in each bounded list', () => {
     const titles = ['One', 'Two', 'Three', 'Four'];
     expect(publicDiscoveryQuerySchema.safeParse({ ...query, discoveryTitles: titles, sourceTitles: titles }).success).toBe(true);
+  });
+
+  it('accepts only the v3 wire schema', () => {
+    const key = { fingerprint: 'a'.repeat(64), mediaKind: 'ANIME', parserVersion: '5', siteRulesVersion: '3' };
+    expect(publicDiscoverySubmissionSchema.safeParse({ key, query, schemaVersion: 3 }).success).toBe(true);
+    expect(publicDiscoverySubmissionSchema.safeParse({ key, query, schemaVersion: 2 }).success).toBe(false);
   });
 });

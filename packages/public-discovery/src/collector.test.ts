@@ -10,9 +10,9 @@ const claims: PublicDiscoveryClaimBatch = {
   requests: [{
     attempt: 1, key,
     query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Sousou no Frieren'] },
-    requestDigest: 'b'.repeat(64), schemaVersion: 2,
+    requestDigest: 'b'.repeat(64), schemaVersion: 3,
   }],
-  schemaVersion: 2,
+  schemaVersion: 3,
 };
 
 describe('runPublicDiscoveryBatch', () => {

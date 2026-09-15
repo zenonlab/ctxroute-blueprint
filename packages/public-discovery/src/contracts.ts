@@ -8,21 +8,21 @@ export const publicDiscoveryProviderSchema = z.enum([
   'anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga',
 ]);
 
-export const publicDiscoveryKeyV2Schema = z.strictObject({
+export const publicDiscoveryKeyV3Schema = z.strictObject({
   fingerprint: fingerprintSchema,
   mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA', 'UNKNOWN']),
   parserVersion: identifierSchema,
   siteRulesVersion: identifierSchema,
 });
 
-export const publicDiscoveryReferenceV2Schema = z.strictObject({
+export const publicDiscoveryReferenceV3Schema = z.strictObject({
   externalId: identifierSchema,
   provider: publicDiscoveryProviderSchema,
 });
 
 export const publicDiscoveryQuerySchema = z.strictObject({
   discoveryTitles: z.array(titleSchema).min(1).max(4),
-  explicitProviderReference: publicDiscoveryReferenceV2Schema.optional(),
+  explicitProviderReference: publicDiscoveryReferenceV3Schema.optional(),
   mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA', 'UNKNOWN']),
   preSerialization: z.boolean().optional(),
   season: z.number().int().positive().max(1000).optional(),
@@ -31,10 +31,10 @@ export const publicDiscoveryQuerySchema = z.strictObject({
 });
 
 export const publicDiscoveryRequestSchema = z.strictObject({
-  key: publicDiscoveryKeyV2Schema,
+  key: publicDiscoveryKeyV3Schema,
   query: publicDiscoveryQuerySchema,
   requestDigest: fingerprintSchema,
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
 });
 
 export const publicDiscoverySubmissionSchema = publicDiscoveryRequestSchema.omit({ requestDigest: true });
@@ -54,7 +54,7 @@ export const publicDiscoveryCandidateSchema = z.strictObject({
   externalId: identifierSchema,
   format: z.string().trim().min(1).max(100).optional(),
   genres: z.array(z.string().trim().min(1).max(100)).max(32).optional(),
-  linkedReferences: z.array(publicDiscoveryReferenceV2Schema).max(5).optional(),
+  linkedReferences: z.array(publicDiscoveryReferenceV3Schema).max(5).optional(),
   mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
   metadataVersion: z.union([z.literal(1), z.literal(2)]).optional(),
   popularity: z.strictObject({ kind: z.enum(['MEMBERS', 'RANK']), value: z.number().int().nonnegative() }).optional(),
@@ -69,7 +69,7 @@ export const publicDiscoveryCandidateSchema = z.strictObject({
 
 export const publicDiscoveryVerifiedProfileSchema = z.strictObject({
   candidate: publicDiscoveryCandidateSchema,
-  references: z.array(publicDiscoveryReferenceV2Schema).min(1).max(5),
+  references: z.array(publicDiscoveryReferenceV3Schema).min(1).max(5),
   workId: identifierSchema,
 });
 
@@ -77,7 +77,7 @@ export const publicDiscoveryTerminalResolutionSchema = z.discriminatedUnion('sta
   z.strictObject({ profile: publicDiscoveryVerifiedProfileSchema, state: z.literal('VERIFIED') }),
   z.strictObject({ reason: z.string().trim().min(1).max(200), state: z.literal('NOT_FOUND') }),
   z.strictObject({
-    candidates: z.array(publicDiscoveryReferenceV2Schema).min(2).max(10),
+    candidates: z.array(publicDiscoveryReferenceV3Schema).min(2).max(10),
     reason: z.string().trim().min(1).max(200),
     state: z.literal('AMBIGUOUS'),
   }),
@@ -87,10 +87,10 @@ export const publicDiscoveryClaimedRequestSchema = publicDiscoveryRequestSchema.
 export const publicDiscoveryClaimBatchSchema = z.strictObject({
   claimToken: z.string().min(32).max(256),
   requests: z.array(publicDiscoveryClaimedRequestSchema).max(50),
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
 });
 export const publicDiscoveryResultSchema = z.strictObject({
-  key: publicDiscoveryKeyV2Schema,
+  key: publicDiscoveryKeyV3Schema,
   requestDigest: fingerprintSchema,
   resolution: publicDiscoveryTerminalResolutionSchema,
 });
@@ -98,7 +98,7 @@ export const publicDiscoveryResultBatchSchema = z.strictObject({
   claimToken: z.string().min(32).max(256),
   nonce: z.string().uuid(),
   results: z.array(publicDiscoveryResultSchema).min(1).max(50),
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   verifiedAt: z.string().datetime({ offset: false }),
 });
 export const publicDiscoveryReceiptSchema = z.strictObject({
@@ -109,10 +109,10 @@ export const publicDiscoveryReceiptSchema = z.strictObject({
 export type PublicDiscoveryCandidate = z.output<typeof publicDiscoveryCandidateSchema>;
 export type PublicDiscoveryClaimBatch = z.output<typeof publicDiscoveryClaimBatchSchema>;
 export type PublicDiscoveryClaimedRequest = z.output<typeof publicDiscoveryClaimedRequestSchema>;
-export type PublicDiscoveryKeyV2 = z.output<typeof publicDiscoveryKeyV2Schema>;
+export type PublicDiscoveryKeyV3 = z.output<typeof publicDiscoveryKeyV3Schema>;
 export type PublicDiscoveryQuery = z.output<typeof publicDiscoveryQuerySchema>;
 export type PublicDiscoveryReceipt = z.output<typeof publicDiscoveryReceiptSchema>;
-export type PublicDiscoveryReferenceV2 = z.output<typeof publicDiscoveryReferenceV2Schema>;
+export type PublicDiscoveryReferenceV3 = z.output<typeof publicDiscoveryReferenceV3Schema>;
 export type PublicDiscoveryRequest = z.output<typeof publicDiscoveryRequestSchema>;
 export type PublicDiscoveryResult = z.output<typeof publicDiscoveryResultSchema>;
 export type PublicDiscoveryResultBatch = z.output<typeof publicDiscoveryResultBatchSchema>;
@@ -126,4 +126,4 @@ export type PublicDiscoveryReadState =
   | { reason: 'ATTEMPT_LIMIT'; state: 'UNAVAILABLE' }
   | { profile: PublicDiscoveryVerifiedProfile; state: 'VERIFIED'; verifiedAt: string }
   | { reason: string; state: 'NOT_FOUND'; verifiedAt: string }
-  | { candidates: readonly PublicDiscoveryReferenceV2[]; reason: string; state: 'AMBIGUOUS'; verifiedAt: string };
+  | { candidates: readonly PublicDiscoveryReferenceV3[]; reason: string; state: 'AMBIGUOUS'; verifiedAt: string };

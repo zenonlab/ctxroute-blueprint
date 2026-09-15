@@ -54,6 +54,11 @@ D1 ne leur associent aucun owner, installation, compte, URL, dossier,
 progression ou bibliothèque. Les logs applicatifs n’enregistrent ni clé ni
 contenu de demande.
 
+Le schéma filaire de ce protocole porte `schemaVersion: 3`. Les tables D1
+actives de demandes et de nonces portent le suffixe `_v3`; une migration par
+renommage conserve les lignes produites par l’implémentation interne initiale
+sans les recopier ni les supprimer.
+
 Une lecture renvoie exactement un état :
 
 - `MISS` : aucune association ni demande active;

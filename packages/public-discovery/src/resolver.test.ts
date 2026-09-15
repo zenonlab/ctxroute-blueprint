@@ -21,7 +21,7 @@ function request(mediaKind: PublicDiscoveryClaimedRequest['query']['mediaKind'],
     key: { fingerprint: 'a'.repeat(64), mediaKind, parserVersion: 'parser-v1', siteRulesVersion: 'rules-v1' },
     query: { discoveryTitles: [title], mediaKind, sourceTitles: [title] },
     requestDigest: 'b'.repeat(64),
-    schemaVersion: 2,
+    schemaVersion: 3,
   };
 }
 

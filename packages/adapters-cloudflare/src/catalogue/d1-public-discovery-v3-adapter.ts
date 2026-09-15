@@ -5,7 +5,7 @@ import {
   publicDiscoveryTerminalResolutionSchema,
   publicDiscoveryVerifiedProfileSchema,
   type PublicDiscoveryClaimBatch,
-  type PublicDiscoveryKeyV2,
+  type PublicDiscoveryKeyV3,
   type PublicDiscoveryReadState,
   type PublicDiscoveryRequest,
   type PublicDiscoveryResult,
@@ -28,7 +28,7 @@ interface StatementResult {
   meta: { changes: number };
   success: boolean;
 }
-export interface PublicDiscoveryV2D1Database {
+export interface PublicDiscoveryV3D1Database {
   batch(statements: Statement[]): Promise<readonly StatementResult[]>;
   prepare(query: string): Statement;
 }
@@ -49,14 +49,14 @@ interface CanonicalFacts {
   normalizedTitles: readonly string[];
   workId: string;
 }
-export interface PublicDiscoveryV2Port {
+export interface PublicDiscoveryV3Port {
   claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
   publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ published: number; replayed: number }>;
-  read(key: PublicDiscoveryKeyV2, now: string): Promise<PublicDiscoveryReadState>;
+  read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState>;
   request(request: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryReadState>;
 }
 
-function keyValues(key: PublicDiscoveryKeyV2): [string, string, string, string] {
+function keyValues(key: PublicDiscoveryKeyV3): [string, string, string, string] {
   return [key.fingerprint, key.mediaKind, key.parserVersion, key.siteRulesVersion];
 }
 function futureIso(now: string, milliseconds: number): string {
@@ -81,24 +81,24 @@ function stateFromRow(row: DiscoveryRow | null, now: string): PublicDiscoveryRea
   return { candidates: resolution.candidates, reason: resolution.reason, state: 'AMBIGUOUS', verifiedAt: row.verifiedAt };
 }
 
-export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
-  constructor(private readonly database: PublicDiscoveryV2D1Database, private readonly pendingLimit = publicDiscoveryPendingLimit) {
+export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
+  constructor(private readonly database: PublicDiscoveryV3D1Database, private readonly pendingLimit = publicDiscoveryPendingLimit) {
     if (!Number.isSafeInteger(pendingLimit) || pendingLimit < 1 || pendingLimit > publicDiscoveryPendingLimit) {
       throw new RangeError('public-discovery-pending-limit-out-of-range');
     }
   }
 
-  private row(key: PublicDiscoveryKeyV2): Promise<DiscoveryRow | null> {
+  private row(key: PublicDiscoveryKeyV3): Promise<DiscoveryRow | null> {
     return this.database.prepare(`SELECT attempt_count AS attemptCount, claim_token_hash AS claimTokenHash,
       failure_reason AS failureReason, lease_until AS leaseUntil, request_digest AS requestDigest,
       request_json AS requestJson, result_json AS resultJson,
-      retry_at AS retryAt, state, verified_at AS verifiedAt FROM public_discovery_requests_v2
+      retry_at AS retryAt, state, verified_at AS verifiedAt FROM public_discovery_requests_v3
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4 LIMIT 1`)
       .bind(...keyValues(key)).first<DiscoveryRow>();
   }
 
-  private async failExhaustedKey(key: PublicDiscoveryKeyV2, now: string): Promise<void> {
-    await this.database.prepare(`UPDATE public_discovery_requests_v2 SET
+  private async failExhaustedKey(key: PublicDiscoveryKeyV3, now: string): Promise<void> {
+    await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = 'FAILED', failure_reason = 'ATTEMPT_LIMIT', failed_at = ?5,
       claim_token_hash = NULL, lease_until = NULL, retry_at = ?5, updated_at = ?5,
       purge_after = ?6
@@ -108,17 +108,17 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
   }
 
   private async failExhaustedBatch(now: string, limit: number): Promise<void> {
-    await this.database.prepare(`UPDATE public_discovery_requests_v2 SET
+    await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = 'FAILED', failure_reason = 'ATTEMPT_LIMIT', failed_at = ?1,
       claim_token_hash = NULL, lease_until = NULL, retry_at = ?1, updated_at = ?1,
       purge_after = ?3
-      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v2
+      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3
         WHERE state = 'PROCESSING' AND attempt_count >= 8 AND lease_until <= ?1
         ORDER BY updated_at, fingerprint LIMIT ?2)
       RETURNING fingerprint`).bind(now, limit, futureIso(now, failedRetentionMilliseconds)).all();
   }
 
-  async read(key: PublicDiscoveryKeyV2, now: string): Promise<PublicDiscoveryReadState> {
+  async read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState> {
     await this.failExhaustedKey(key, now);
     return stateFromRow(await this.row(key), now);
   }
@@ -126,20 +126,20 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
   async request(input: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryReadState> {
     const request = publicDiscoveryRequestSchema.parse(input);
     await this.failExhaustedKey(request.key, now);
-    await this.database.prepare(`INSERT INTO public_discovery_requests_v2(
+    await this.database.prepare(`INSERT INTO public_discovery_requests_v3(
       fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
       state, retry_at, created_at, updated_at
     ) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7
-    WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2
+    WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4)
-      OR (SELECT COUNT(*) FROM public_discovery_requests_v2 INDEXED BY public_discovery_v2_pending
+      OR (SELECT COUNT(*) FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_pending
         WHERE state IN ('PENDING', 'PROCESSING')) < ?8
     ON CONFLICT(fingerprint, media_kind, parser_version, rules_version) DO UPDATE SET
       state = 'PENDING', claim_token_hash = NULL, lease_until = NULL, attempt_count = 0,
       failure_reason = NULL, failed_at = NULL, result_json = NULL, verified_at = NULL,
       retry_at = excluded.retry_at, updated_at = excluded.updated_at, purge_after = NULL
-    WHERE public_discovery_requests_v2.state = 'FAILED'
-      AND public_discovery_requests_v2.request_digest = excluded.request_digest`)
+    WHERE public_discovery_requests_v3.state = 'FAILED'
+      AND public_discovery_requests_v3.request_digest = excluded.request_digest`)
       .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now, this.pendingLimit).first();
     const row = await this.row(request.key);
     if (!row) throw new Error('public-discovery-capacity-unavailable');
@@ -149,10 +149,10 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
 
   async claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch> {
     await this.failExhaustedBatch(input.now, input.limit);
-    const rows = await this.database.prepare(`UPDATE public_discovery_requests_v2 SET
+    const rows = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = 'PROCESSING', claim_token_hash = ?1, lease_until = ?2,
       attempt_count = attempt_count + 1, retry_at = ?2, updated_at = ?3
-      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v2
+      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3
         WHERE ((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
           AND attempt_count < 8 ORDER BY updated_at, fingerprint LIMIT ?4)
       RETURNING request_json AS requestJson, attempt_count AS attemptCount`)
@@ -162,7 +162,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
       const request = publicDiscoveryRequestSchema.parse(JSON.parse(row.requestJson));
       return publicDiscoveryClaimedRequestSchema.parse({ ...request, attempt: row.attemptCount });
     });
-    return { claimToken: input.claimToken, requests, schemaVersion: 2 };
+    return { claimToken: input.claimToken, requests, schemaVersion: 3 };
   }
 
   private publicationGuardValues(result: PublicDiscoveryResult, profile: PublicDiscoveryVerifiedProfile | undefined, tokenDigest: string, now: string): SqlValue[] {
@@ -195,7 +195,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
     const candidate = profile.candidate;
     return [
       this.database.prepare(`INSERT OR IGNORE INTO catalogue_revisions(revision, published_at)
-        SELECT ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
+        SELECT ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
@@ -207,7 +207,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
             JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
             WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`).bind(revision, verifiedAt, ...guardValues),
       this.database.prepare(`INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision)
-        SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
+        SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
@@ -222,7 +222,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
         preferred_title = excluded.preferred_title, revision = excluded.revision`)
         .bind(profile.workId, candidate.mediaKind === 'ANIME' ? 'anime' : 'manga', candidate.displayTitle ?? candidate.titles[0] ?? candidate.externalId, revision, ...guardValues),
       ...candidate.titles.map((title) => this.database.prepare(`INSERT OR IGNORE INTO catalogue_titles(work_id, locale, title)
-        SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
+        SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
@@ -236,7 +236,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
         .bind(profile.workId, 'und', title, ...guardValues)),
       ...this.canonicalFacts(profile).normalizedTitles.map((normalizedTitle) => this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
           normalization_version, normalized_title, media_kind, work_id, created_at)
-        SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
+        SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
@@ -250,7 +250,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
         ON CONFLICT(normalization_version, normalized_title, media_kind) DO NOTHING`)
         .bind(favoriteTitlePreparationVersion, normalizedTitle, candidate.mediaKind === 'ANIME' ? 'anime' : 'manga', profile.workId, verifiedAt, ...guardValues)),
       ...profile.references.map((reference) => this.database.prepare(`INSERT INTO catalogue_external_references(provider, external_id, work_id)
-        SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
+        SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
@@ -274,7 +274,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
     ];
     const outcomes = await this.database.batch(canonical.normalizedTitles.map((normalizedTitle) => this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
         normalization_version, normalized_title, media_kind, work_id, created_at)
-      SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v2 WHERE
+      SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
         fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
         AND state = 'VERIFIED' AND request_digest = ? AND result_json = ?)
         AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
@@ -305,7 +305,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
       : undefined;
     const guardValues = this.publicationGuardValues(result, profile, tokenDigest, now);
     const statements = profile ? this.catalogueStatements(profile, verifiedAt, guardValues) : [];
-    statements.push(this.database.prepare(`UPDATE public_discovery_requests_v2 SET
+    statements.push(this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = ?, result_json = ?, verified_at = ?, retry_at = ?,
       claim_token_hash = NULL, lease_until = NULL, updated_at = ?, request_json = '{}', purge_after = NULL
       WHERE fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
@@ -332,7 +332,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
 
   async publishBatch(input: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string) {
     const batch = publicDiscoveryResultBatchSchema.parse(input);
-    const nonce = await this.database.prepare('SELECT result_digest AS resultDigest FROM public_discovery_result_nonces_v2 WHERE nonce = ?1 LIMIT 1')
+    const nonce = await this.database.prepare('SELECT result_digest AS resultDigest FROM public_discovery_result_nonces_v3 WHERE nonce = ?1 LIMIT 1')
       .bind(batch.nonce).first<{ resultDigest: string }>();
     if (nonce) {
       if (nonce.resultDigest !== resultDigest) throw new Error('public-discovery-nonce-conflict');
@@ -345,7 +345,7 @@ export class D1PublicDiscoveryV2Adapter implements PublicDiscoveryV2Port {
       if (await this.publishOne(result, tokenDigest, batch.verifiedAt, now) === 'published') published += 1;
       else replayed += 1;
     }
-    await this.database.prepare(`INSERT INTO public_discovery_result_nonces_v2(nonce, result_digest, created_at, purge_after)
+    await this.database.prepare(`INSERT INTO public_discovery_result_nonces_v3(nonce, result_digest, created_at, purge_after)
       VALUES (?1, ?2, ?3, ?4)`)
       .bind(batch.nonce, resultDigest, batch.verifiedAt, futureIso(now, nonceRetentionMilliseconds)).first();
     return { published, replayed };

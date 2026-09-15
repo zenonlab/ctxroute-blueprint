@@ -1,5 +1,5 @@
 import { applyD1Migrations, env, SELF } from 'cloudflare:test';
-import { D1PublicDiscoveryAdapter, D1PublicDiscoveryV2Adapter } from '@tobirink/adapters-cloudflare';
+import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
 
@@ -7,7 +7,7 @@ const discoveryKey = (marker: string) => ({ fingerprint: marker.repeat(64), medi
 type DiscoverySubmission = {
   key: ReturnType<typeof discoveryKey>;
   query: { discoveryTitles: string[]; mediaKind: 'ANIME'; sourceTitles: string[] };
-  schemaVersion: 2;
+  schemaVersion: 3;
 };
 
 async function jsonDigest(value: DiscoverySubmission): Promise<string> {
@@ -33,14 +33,28 @@ function verifiedResult(key: ReturnType<typeof discoveryKey>, requestDigest: str
   };
 }
 
-beforeEach(async () => {
+beforeEach(async (context) => {
+  if (context.task.name === 'preserves queued rows while renaming the active D1 tables to v3') return;
   await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS);
 });
 
 describe('verified public discovery cache', () => {
+  it('preserves queued rows while renaming the active D1 tables to v3', async () => {
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(0, -1));
+    const key = discoveryKey('0');
+    await env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v2(
+      fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
+      state, retry_at, created_at, updated_at)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7)`)
+      .bind(...Object.values(key), '0'.repeat(64), JSON.stringify({ key, query: { discoveryTitles: ['Preserved'], mediaKind: 'ANIME', sourceTitles: ['Preserved'] }, requestDigest: '0'.repeat(64), schemaVersion: 3 }), '2026-09-15T12:00:00.000Z').run();
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(-1));
+    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ state: 'PENDING' });
+    await expect(env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v2 LIMIT 1').first()).rejects.toThrow();
+  });
+
   it('logs only a bounded code when collector OIDC verification rejects', async () => {
-    const adapter = new D1PublicDiscoveryAdapter(env.PUBLIC_DB);
-    const app = createPublicDiscoveryApp({ publicDiscovery: adapter }, async () => { throw new Error('raw verifier details'); });
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter }, async () => { throw new Error('raw verifier details'); });
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
       headers: { Authorization: `Bearer ${'x'.repeat(32)}` }, method: 'POST',
@@ -52,7 +66,7 @@ describe('verified public discovery cache', () => {
 
   it('stores one server-side request for repeated v3 discovery misses', async () => {
     const key = discoveryKey('e');
-    const body = { key, query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Sousou no Frieren'] }, schemaVersion: 2 };
+    const body = { key, query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Sousou no Frieren'] }, schemaVersion: 3 };
     const responses = await Promise.all([1, 2].map(() => SELF.fetch('https://tobirink.test/v3/catalogue/discoveries/requests', {
       body: JSON.stringify(body), headers: { 'CF-Connecting-IP': '192.0.2.3', 'Content-Type': 'application/json' }, method: 'POST',
     })));
@@ -60,16 +74,16 @@ describe('verified public discovery cache', () => {
     expect(await Promise.all(responses.map((response) => response.json()))).toEqual([
       expect.objectContaining({ state: 'PENDING' }), expect.objectContaining({ state: 'PENDING' }),
     ]);
-    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ count: 1 });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ count: 1 });
   });
 
   it('returns 503 for a new key after the global active-request ceiling while preserving replays', async () => {
-    const active = await env.PUBLIC_DB.prepare(`SELECT COUNT(*) AS count FROM public_discovery_requests_v2
+    const active = await env.PUBLIC_DB.prepare(`SELECT COUNT(*) AS count FROM public_discovery_requests_v3
       WHERE state IN ('PENDING', 'PROCESSING')`).first<{ count: number }>();
-    const adapter = new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB, (active?.count ?? 0) + 2);
-    const app = createPublicDiscoveryApp({ publicDiscovery: new D1PublicDiscoveryAdapter(env.PUBLIC_DB), publicDiscoveryV2: adapter });
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB, (active?.count ?? 0) + 2);
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter });
     const submit = (marker: string) => app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
-      body: JSON.stringify({ key: discoveryKey(marker), query: { discoveryTitles: [`Work ${marker}`], mediaKind: 'ANIME', sourceTitles: [`Work ${marker}`] }, schemaVersion: 2 }),
+      body: JSON.stringify({ key: discoveryKey(marker), query: { discoveryTitles: [`Work ${marker}`], mediaKind: 'ANIME', sourceTitles: [`Work ${marker}`] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect((await submit('a')).status).toBe(202);
@@ -82,11 +96,10 @@ describe('verified public discovery cache', () => {
 
   it('lets only the OIDC collector claim and terminally resolve a v3 request', async () => {
     const key = discoveryKey('f');
-    const v1 = new D1PublicDiscoveryAdapter(env.PUBLIC_DB);
-    const v2 = new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB);
-    const app = createPublicDiscoveryApp({ publicDiscovery: v1, publicDiscoveryV2: v2 }, async () => undefined);
+    const v3 = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: v3 }, async () => undefined);
     await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
-      body: JSON.stringify({ key, query: { discoveryTitles: ['Unknown Work'], mediaKind: 'ANIME', sourceTitles: ['Unknown Work'] }, schemaVersion: 2 }),
+      body: JSON.stringify({ key, query: { discoveryTitles: ['Unknown Work'], mediaKind: 'ANIME', sourceTitles: ['Unknown Work'] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect((await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', { method: 'POST' })).status).toBe(401);
@@ -102,22 +115,21 @@ describe('verified public discovery cache', () => {
         claimToken: batch.claimToken, nonce: crypto.randomUUID(), results: [{
           key, requestDigest: request?.requestDigest,
           resolution: { reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' },
-        }], schemaVersion: 2, verifiedAt,
+        }], schemaVersion: 3, verifiedAt,
       }),
       headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect(result.status).toBe(201);
     expect(await result.json()).toEqual({ published: 1, replayed: 0 });
-    expect(await v2.read(key, verifiedAt)).toMatchObject({ reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' });
+    expect(await v3.read(key, verifiedAt)).toMatchObject({ reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' });
   });
 
   it('hydrates D1 with the full verified profile and replays the same result idempotently', async () => {
     const key = discoveryKey('9');
-    const v1 = new D1PublicDiscoveryAdapter(env.PUBLIC_DB);
-    const v2 = new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB);
-    const app = createPublicDiscoveryApp({ publicDiscovery: v1, publicDiscoveryV2: v2 }, async () => undefined);
+    const v3 = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: v3 }, async () => undefined);
     await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
-      body: JSON.stringify({ key, query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Frieren'] }, schemaVersion: 2 }),
+      body: JSON.stringify({ key, query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Frieren'] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     const claimed = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
@@ -141,7 +153,7 @@ describe('verified public discovery cache', () => {
           references: [{ externalId: '154587', provider: 'anilist' }], workId: 'work_anilist_154587',
         }, state: 'VERIFIED' },
       }],
-      schemaVersion: 2,
+      schemaVersion: 3,
       verifiedAt,
     };
     const headers = { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' };
@@ -149,7 +161,7 @@ describe('verified public discovery cache', () => {
     const replay = await app.request('https://tobirink.test/v3/catalogue/discoveries/results', { body: JSON.stringify(payload), headers, method: 'POST' });
     expect(await first.json()).toEqual({ published: 1, replayed: 0 });
     expect(await replay.json()).toEqual({ published: 0, replayed: 1 });
-    await expect(v2.read(key, verifiedAt)).resolves.toMatchObject({
+    await expect(v3.read(key, verifiedAt)).resolves.toMatchObject({
       profile: { candidate: { episodeCount: 28, genres: ['Adventure'], provider: 'anilist' } }, state: 'VERIFIED',
     });
     expect(await env.PUBLIC_DB.prepare('SELECT preferred_title AS title FROM catalogue_works WHERE work_id = ?1').bind('work_anilist_154587').first()).toEqual({ title: 'Frieren' });
@@ -159,26 +171,26 @@ describe('verified public discovery cache', () => {
         { mediaKind: 'anime', normalizedTitle: 'frieren', workId: 'work_anilist_154587' },
         { mediaKind: 'anime', normalizedTitle: 'sousou no frieren', workId: 'work_anilist_154587' },
       ]);
-    expect(await env.PUBLIC_DB.prepare('SELECT request_json AS requestJson FROM public_discovery_requests_v2 WHERE fingerprint = ?1')
+    expect(await env.PUBLIC_DB.prepare('SELECT request_json AS requestJson FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
       .bind(key.fingerprint).first()).toEqual({ requestJson: '{}' });
-    const nonce = await env.PUBLIC_DB.prepare('SELECT purge_after AS purgeAfter FROM public_discovery_result_nonces_v2 WHERE nonce = ?1')
+    const nonce = await env.PUBLIC_DB.prepare('SELECT purge_after AS purgeAfter FROM public_discovery_result_nonces_v3 WHERE nonce = ?1')
       .bind(payload.nonce).first<{ purgeAfter: string }>();
     expect(Date.parse(nonce?.purgeAfter ?? '') - Date.parse(verifiedAt)).toBeGreaterThan(6 * 86_400_000);
   });
 
   it('rejects a normalized-title collision atomically', async () => {
-    const adapter = new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB);
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const token = 'c'.repeat(48);
     const tokenDigest = 'd'.repeat(64);
     const verifiedAt = '2026-09-15T12:00:00.000Z';
     const publish = async (marker: string, title: string) => {
       const key = discoveryKey(marker);
-      const submission = { key, query: { discoveryTitles: [title], mediaKind: 'ANIME' as const, sourceTitles: [title] }, schemaVersion: 2 as const };
+      const submission = { key, query: { discoveryTitles: [title], mediaKind: 'ANIME' as const, sourceTitles: [title] }, schemaVersion: 3 as const };
       const requestDigest = await jsonDigest(submission);
       await adapter.request({ ...submission, requestDigest }, verifiedAt);
       await adapter.claimBatch({ claimToken: token, leaseUntil: '2026-09-15T13:00:00.000Z', limit: 50, now: verifiedAt, tokenDigest });
       return adapter.publishBatch({
-        claimToken: token, nonce: crypto.randomUUID(), results: [verifiedResult(key, requestDigest, marker, marker, title)], schemaVersion: 2, verifiedAt,
+        claimToken: token, nonce: crypto.randomUUID(), results: [verifiedResult(key, requestDigest, marker, marker, title)], schemaVersion: 3, verifiedAt,
       }, tokenDigest, marker.repeat(64), verifiedAt);
     };
     await expect(publish('1', 'L’Épopée')).resolves.toEqual({ published: 1, replayed: 0 });
@@ -186,7 +198,7 @@ describe('verified public discovery cache', () => {
     expect(await env.PUBLIC_DB.prepare('SELECT work_id AS workId FROM catalogue_canonical_titles_v1 WHERE normalized_title = ?1 AND media_kind = ?2')
       .bind('l epopee', 'anime').first()).toEqual({ workId: 'work_1' });
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_works WHERE work_id = ?1').bind('work_2').first()).toEqual({ count: 0 });
-    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(discoveryKey('2').fingerprint).first()).toEqual({ state: 'PROCESSING' });
+    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey('2').fingerprint).first()).toEqual({ state: 'PROCESSING' });
   });
 
   it('backfills the canonical index when an exact historical terminal result is replayed', async () => {
@@ -198,14 +210,14 @@ describe('verified public discovery cache', () => {
       env.PUBLIC_DB.prepare('INSERT INTO catalogue_revisions(revision, published_at) VALUES (?1, ?2)').bind(4, verifiedAt),
       env.PUBLIC_DB.prepare('INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES (?1, ?2, ?3, ?4)')
         .bind('work_historical', 'anime', 'Épopée historique', 4),
-      env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v2(
+      env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v3(
         fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
         state, result_json, retry_at, verified_at, created_at, updated_at)
         VALUES (?1, ?2, ?3, ?4, ?5, '{}', 'VERIFIED', ?6, ?7, ?7, ?7, ?7)`)
         .bind(...Object.values(key), requestDigest, JSON.stringify(result.resolution), verifiedAt),
     ]);
-    const replay = await new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB).publishBatch({
-      claimToken: 'c'.repeat(48), nonce: crypto.randomUUID(), results: [result], schemaVersion: 2, verifiedAt,
+    const replay = await new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB).publishBatch({
+      claimToken: 'c'.repeat(48), nonce: crypto.randomUUID(), results: [result], schemaVersion: 3, verifiedAt,
     }, 'd'.repeat(64), 'e'.repeat(64), verifiedAt);
     expect(replay).toEqual({ published: 0, replayed: 1 });
     expect(await env.PUBLIC_DB.prepare(`SELECT work_id AS workId FROM catalogue_canonical_titles_v1
@@ -214,18 +226,15 @@ describe('verified public discovery cache', () => {
   });
 
   it.each([
-    ['replaced', async (key: ReturnType<typeof discoveryKey>) => env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v2
+    ['replaced', async (key: ReturnType<typeof discoveryKey>) => env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3
       SET claim_token_hash = ?1, lease_until = ?2 WHERE fingerprint = ?3`).bind('d'.repeat(64), '2099-01-01T00:00:00.000Z', key.fingerprint).run()],
-    ['expired', async (key: ReturnType<typeof discoveryKey>) => env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v2
+    ['expired', async (key: ReturnType<typeof discoveryKey>) => env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3
       SET lease_until = ?1 WHERE fingerprint = ?2`).bind('2000-01-01T00:00:00.000Z', key.fingerprint).run()],
   ])('rejects a %s lease without writing any catalogue row', async (marker, invalidateLease) => {
     const key = discoveryKey(marker === 'replaced' ? '7' : '8');
-    const app = createPublicDiscoveryApp({
-      publicDiscovery: new D1PublicDiscoveryAdapter(env.PUBLIC_DB),
-      publicDiscoveryV2: new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB),
-    }, async () => undefined);
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB) }, async () => undefined);
     await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
-      body: JSON.stringify({ key, query: { discoveryTitles: ['Lease Test'], mediaKind: 'ANIME', sourceTitles: ['Lease Test'] }, schemaVersion: 2 }),
+      body: JSON.stringify({ key, query: { discoveryTitles: ['Lease Test'], mediaKind: 'ANIME', sourceTitles: ['Lease Test'] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     const claimed = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
@@ -239,7 +248,7 @@ describe('verified public discovery cache', () => {
     const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/results', {
       body: JSON.stringify({
         claimToken: claim.claimToken, nonce: crypto.randomUUID(), results: [verifiedResult(key, request.requestDigest, `lease_${marker}`)],
-        schemaVersion: 2, verifiedAt,
+        schemaVersion: 3, verifiedAt,
       }),
       headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST',
     });
@@ -248,7 +257,7 @@ describe('verified public discovery cache', () => {
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_titles WHERE work_id = ?1').bind(`work_lease_${marker}`).first()).toEqual({ count: 0 });
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_external_references WHERE external_id = ?1').bind(`lease_${marker}`).first()).toEqual({ count: 0 });
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_revisions WHERE revision = ?1').bind(Date.parse(verifiedAt)).first()).toEqual({ count: 0 });
-    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ state: 'PROCESSING' });
+    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ state: 'PROCESSING' });
   });
 
   it('rejects a provider reference conflict without partial catalogue or terminal writes', async () => {
@@ -259,12 +268,9 @@ describe('verified public discovery cache', () => {
       env.PUBLIC_DB.prepare('INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES (?1, ?2, ?3, ?4)').bind('work_existing', 'anime', 'Existing', 1),
       env.PUBLIC_DB.prepare('INSERT INTO catalogue_external_references(provider, external_id, work_id) VALUES (?1, ?2, ?3)').bind('anilist', 'shared-id', 'work_existing'),
     ]);
-    const app = createPublicDiscoveryApp({
-      publicDiscovery: new D1PublicDiscoveryAdapter(env.PUBLIC_DB),
-      publicDiscoveryV2: new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB),
-    }, async () => undefined);
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB) }, async () => undefined);
     await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
-      body: JSON.stringify({ key, query: { discoveryTitles: ['Conflict'], mediaKind: 'ANIME', sourceTitles: ['Conflict'] }, schemaVersion: 2 }),
+      body: JSON.stringify({ key, query: { discoveryTitles: ['Conflict'], mediaKind: 'ANIME', sourceTitles: ['Conflict'] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     const claimed = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
@@ -276,7 +282,7 @@ describe('verified public discovery cache', () => {
     const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/results', {
       body: JSON.stringify({
         claimToken: claim.claimToken, nonce: crypto.randomUUID(), results: [verifiedResult(key, request.requestDigest, 'conflict', 'shared-id')],
-        schemaVersion: 2, verifiedAt,
+        schemaVersion: 3, verifiedAt,
       }),
       headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST',
     });
@@ -284,14 +290,14 @@ describe('verified public discovery cache', () => {
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_works WHERE work_id = ?1').bind('work_conflict').first()).toEqual({ count: 0 });
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_titles WHERE work_id = ?1').bind('work_conflict').first()).toEqual({ count: 0 });
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_revisions WHERE revision = ?1').bind(Date.parse(verifiedAt)).first()).toEqual({ count: 0 });
-    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ state: 'PROCESSING' });
+    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ state: 'PROCESSING' });
     expect(await env.PUBLIC_DB.prepare('SELECT work_id AS workId FROM catalogue_external_references WHERE provider = ?1 AND external_id = ?2').bind('anilist', 'shared-id').first()).toEqual({ workId: 'work_existing' });
   });
 
   it('exposes the expired eighth attempt as unavailable and requires an identical explicit retry', async () => {
     const key = discoveryKey('5');
-    const adapter = new D1PublicDiscoveryV2Adapter(env.PUBLIC_DB);
-    const submission = { key, query: { discoveryTitles: ['Attempt Limit'], mediaKind: 'ANIME' as const, sourceTitles: ['Attempt Limit'] }, schemaVersion: 2 as const };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const submission = { key, query: { discoveryTitles: ['Attempt Limit'], mediaKind: 'ANIME' as const, sourceTitles: ['Attempt Limit'] }, schemaVersion: 3 as const };
     const request = { ...submission, requestDigest: await jsonDigest(submission) };
     await adapter.request(request, '2026-09-15T00:00:00.000Z');
     for (let attempt = 1; attempt <= 8; attempt += 1) {
@@ -302,17 +308,23 @@ describe('verified public discovery cache', () => {
     }
     const exhaustedAt = '2026-09-15T08:00:00.000Z';
     await expect(adapter.read(key, exhaustedAt)).resolves.toEqual({ reason: 'ATTEMPT_LIMIT', state: 'UNAVAILABLE' });
-    expect(await env.PUBLIC_DB.prepare('SELECT attempt_count AS attemptCount, purge_after AS purgeAfter, state FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({
+    expect(await env.PUBLIC_DB.prepare('SELECT attempt_count AS attemptCount, purge_after AS purgeAfter, state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({
       attemptCount: 8, purgeAfter: '2026-10-15T08:00:00.000Z', state: 'FAILED',
     });
     await expect(adapter.request({ ...request, requestDigest: 'e'.repeat(64) }, exhaustedAt)).rejects.toThrow('public-discovery-request-conflict');
-    const app = createPublicDiscoveryApp({ publicDiscovery: new D1PublicDiscoveryAdapter(env.PUBLIC_DB), publicDiscoveryV2: adapter });
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter });
     const retry = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
       body: JSON.stringify(submission), headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect(retry.status).toBe(202);
     await expect(retry.json()).resolves.toMatchObject({ state: 'PENDING' });
-    expect(await env.PUBLIC_DB.prepare('SELECT attempt_count AS attemptCount, state FROM public_discovery_requests_v2 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ attemptCount: 0, state: 'PENDING' });
+    expect(await env.PUBLIC_DB.prepare('SELECT attempt_count AS attemptCount, state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ attemptCount: 0, state: 'PENDING' });
+    const reclaimedAt = new Date().toISOString();
+    const reclaimed = await adapter.claimBatch({
+      claimToken: 'r'.repeat(48), leaseUntil: new Date(Date.parse(reclaimedAt) + 15 * 60_000).toISOString(),
+      limit: 50, now: reclaimedAt, tokenDigest: 'f'.repeat(64),
+    });
+    expect(reclaimed.requests.find((item) => item.key.fingerprint === key.fingerprint)?.attempt).toBe(1);
   });
 
   it('does not expose retired collective and unverified-cache endpoints', async () => {

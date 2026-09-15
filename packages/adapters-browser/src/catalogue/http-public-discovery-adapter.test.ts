@@ -17,7 +17,7 @@ describe('HttpPublicDiscoveryAdapter', () => {
     });
     const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
     await expect(adapter.resolveOrRequest(key, query)).resolves.toEqual({ retryAt: '2026-09-14T12:15:00.000Z', state: 'PENDING' });
-    expect(bodies).toEqual([{ key, query, schemaVersion: 2 }]);
+    expect(bodies).toEqual([{ key, query, schemaVersion: 3 }]);
     expect(JSON.stringify(bodies)).not.toMatch(/lease|consent|collective|bookmark|folder|progress/iu);
   });
 

@@ -7,7 +7,7 @@ const resultToken = 'r'.repeat(32);
 describe('public discovery HTTP gateway', () => {
   it('uses separate OIDC tokens for the exact claim and result routes', async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => String(input).endsWith('/collector/claims')
-      ? Response.json({ claimToken: 'd'.repeat(32), requests: [], schemaVersion: 2 })
+      ? Response.json({ claimToken: 'd'.repeat(32), requests: [], schemaVersion: 3 })
       : Response.json({ published: 1, replayed: 0 }));
     const gateway = createPublicDiscoveryHttpGateway({ baseUrl: 'https://tobirink.test', claimToken, fetcher, resultToken });
     await expect(gateway.claim(5)).resolves.toMatchObject({ requests: [] });
@@ -17,7 +17,7 @@ describe('public discovery HTTP gateway', () => {
         key: { fingerprint: 'a'.repeat(64), mediaKind: 'MANGA', parserVersion: 'parser-v1', siteRulesVersion: 'rules-v1' },
         requestDigest: 'b'.repeat(64), resolution: { reason: 'not-found', state: 'NOT_FOUND' },
       }],
-      schemaVersion: 2, verifiedAt: '2026-09-14T12:00:00.000Z',
+      schemaVersion: 3, verifiedAt: '2026-09-14T12:00:00.000Z',
     })).resolves.toEqual({ published: 1, replayed: 0 });
     expect(fetcher).toHaveBeenNthCalledWith(1, 'https://tobirink.test/v3/catalogue/discoveries/collector/claims', expect.objectContaining({ headers: expect.objectContaining({
       Authorization: `Bearer ${claimToken}`,
