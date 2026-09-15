@@ -1560,6 +1560,58 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-deno-secret-transport-hardening",
+      "title": "Retirer les secrets HMAC des arguments de processus Deno",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "harden-deno-secret-transport",
+          "title": "Charger les clés par fichier temporaire privé et borné",
+          "status": "DONE",
+          "acceptance": [
+            "Les opérations de création et rotation ne placent aucune valeur HMAC dans argv, stdout ou une erreur propagée.",
+            "Le runner matérialise exactement une variable secrète autorisée dans un répertoire temporaire privé et un fichier 0600.",
+            "Le fichier et son répertoire temporaires sont supprimés après succès comme après échec de la CLI.",
+            "La suppression de la clé précédente reste une opération séparée sans valeur et toutes les mutations fournisseur restent non exécutées.",
+            "Le runbook, ADR-0051, la stratégie qualité et agenda-release.dataflow décrivent le transport de secret corrigé.",
+            "Les tests ciblés, les  tests infra, Archify, npm run verify, npm ls, audit et git diff --check passent.",
+            "Un commit vérifié local est créé sans .codex/config.toml, push, déploiement, mutation de secret ou suppression distante."
+          ],
+          "files": [
+            "scripts/infra/provider-gateway-driver.mjs",
+            "scripts/infra/provider-gateway-driver.test.mjs",
+            "docs/operations/cloudflare.md",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0051-provider-transport-gate.md",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/deno-secret-transport-hardening-start.json",
+            "docs/plans/deno-secret-transport-hardening-done.json"
+          ],
+          "commands": [
+            "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress/CRG prévues.",
+            "Exécuter les tests ciblés du driver puis npm run test:infra.",
+            "Valider agenda-release.dataflow, all et internal avec Archify showcase.",
+            "Exécuter npm run verify, npm ls --all, npm audit --audit-level=high et git diff --check.",
+            "Reconstruire CRG après le commit.",
+            "Créer le commit fix(gateway): keep Deno secrets out of process arguments sans push ni déploiement."
+          ],
+          "evidence": [
+            "Le driver Deno transmet chaque clé via env load avec exactement une variable autorisée; 11 tests ciblés prouvent l'absence de valeur dans argv et le rejet des environnements inconnus ou multi-clés.",
+            "Le runner crée un fichier temporaire exclusif en mode 0600, nettoie son répertoire après succès et échec, et remplace toute erreur CLI brute par deno-provider-command-failed.",
+            "Les 36 tests infra passent sans appel fournisseur; la suppression de la clé précédente reste une opération séparée et sans valeur.",
+            "npm run verify, npm ls --all et npm audit passent; les builds Chrome et Firefox réussissent et aucune vulnérabilité n'est signalée.",
+            "agenda-release.dataflow, Archify all et internal passent en showcase 9/9 sans erreur ni avertissement; ADR-0051, le runbook et la stratégie qualité décrivent le transport corrigé.",
+            "AGENTS.md, CLAUDE.md et .codex/hooks.json restent inchangés; .codex/config.toml demeure une modification utilisateur exclue du commit."
+          ]
+        }
+      ]
     }
   ]
 }

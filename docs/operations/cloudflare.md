@@ -155,6 +155,13 @@ a destructive secret mutation and remains forbidden without approval for that
 exact Deno variable. Roll back before step 5 by restoring the old Worker key;
 after step 5, reinstall the old Deno current key first if rollback is required.
 
+The Deno gate never places either HMAC value in process arguments. Secret-set
+operations call `deno deploy env load` with one allowlisted variable stored in
+a private temporary directory and a `0600` file, then remove that directory on
+success or failure. A generic failure code replaces raw CLI errors so a
+provider echo cannot disclose the value. Do not replace this path with direct
+`env add` or `env update-value` automation: both require the value in argv.
+
 ## Public Discovery retention
 
 D1 records deletion eligibility without deleting data automatically:

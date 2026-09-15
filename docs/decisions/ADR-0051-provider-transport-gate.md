@@ -63,6 +63,15 @@ courante et la suppression finale. La précédente est installée avant la mise 
 jour courante; sa suppression et chaque déploiement restent des mutations
 fournisseur approuvées séparément.
 
+La CLI Deno exige une valeur positionnelle pour `env add` et
+`env update-value`, ce qui placerait un secret dans les arguments du processus.
+La gate utilise donc `env load` avec exactement une variable autorisée dans un
+répertoire temporaire privé et un fichier créé en mode `0600`. La valeur reste
+absente des arguments et des erreurs propagées; le répertoire est supprimé en
+`finally`, après succès comme après échec. Les opérations et plans conservent
+leurs cibles unitaires : ce détail de transport ne permet ni secret arbitraire
+ni mutation supplémentaire.
+
 La gate opérationnelle Cloudflare dérive également les deux ressources Queue
 du seul `wrangler.jsonc`. Elle expose uniquement les opérations de création
 `tobirink-public-discovery` et `tobirink-public-discovery-dlq`, inclut

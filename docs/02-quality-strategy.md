@@ -124,6 +124,9 @@ browser or `workerd` test when platform behavior is the risk.
   weak, duplicate and excessive key sets, preserve nonce replay protection and
   prove that the Deno gate redacts both values while inspecting only secret
   names.
+- Deno gate tests prove that secret mutations use a single allowlisted variable
+  in a `0600` temporary file, keep values out of process arguments and raw
+  errors, and remove the temporary directory after success and failure.
 
 ## Performance budgets
 

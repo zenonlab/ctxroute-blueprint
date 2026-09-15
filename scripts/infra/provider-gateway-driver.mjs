@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -10,6 +11,9 @@ const APP = 'tobirink-provider-gateway';
 const DATABASE = 'tobirink-provider-gateway-nonces';
 const SECRET = 'PROVIDER_GATEWAY_HMAC_KEY';
 const PREVIOUS_SECRET = 'PROVIDER_GATEWAY_HMAC_KEY_PREVIOUS';
+const SECRET_FILE_TOKEN = '__TOBIRINK_DENO_SECRET_FILE__';
+const secretNames = new Set([SECRET, PREVIOUS_SECRET]);
+const runDeno = createDenoCommandRunner();
 
 export function createProviderGatewayDriver({
   gatewayDirectory,
@@ -79,8 +83,8 @@ export function createProviderGatewayDriver({
       const selected = materialize(operations, actions).sort((left, right) => priority(left) - priority(right));
       const results = [];
       for (const action of selected) {
-        const args = mutationArguments(action, accountId, secret, previousSecret);
-        const output = await run(args, { cwd: gatewayDirectory });
+        const invocation = mutationInvocation(action, accountId, secret, previousSecret);
+        const output = await run(invocation.args, { cwd: gatewayDirectory, secretEnvironment: invocation.secretEnvironment });
         results.push({ kind: action.kind, output: redact(output, [secret, previousSecret]), target: action.target });
       }
       return results;
@@ -96,28 +100,28 @@ function materialize(operations, actions) {
   });
 }
 
-function mutationArguments(action, organization, secret, previousSecret) {
+function mutationInvocation(action, organization, secret, previousSecret) {
   const common = ['--json', '--non-interactive', '--org', organization];
   if (action.kind === 'gateway-app-create') {
-    return ['deploy', 'create', '.', ...common, '--app', APP, '--source', 'local', '--runtime-mode', 'dynamic', '--entrypoint', 'src/index.ts', '--region', 'global'];
+    return { args: ['deploy', 'create', '.', ...common, '--app', APP, '--source', 'local', '--runtime-mode', 'dynamic', '--entrypoint', 'src/index.ts', '--region', 'global'] };
   }
-  if (action.kind === 'gateway-database-provision') return ['deploy', 'database', 'provision', DATABASE, ...common, '--kind', 'denokv'];
-  if (action.kind === 'gateway-database-assign') return ['deploy', 'database', 'assign', DATABASE, ...common, '--app', APP];
+  if (action.kind === 'gateway-database-provision') return { args: ['deploy', 'database', 'provision', DATABASE, ...common, '--kind', 'denokv'] };
+  if (action.kind === 'gateway-database-assign') return { args: ['deploy', 'database', 'assign', DATABASE, ...common, '--app', APP] };
   if (action.kind === 'gateway-secret-set') {
     assertSecret(secret);
-    return ['deploy', 'env', 'add', SECRET, secret, ...common, '--app', APP, '--secret'];
+    return { args: ['deploy', 'env', 'load', SECRET_FILE_TOKEN, ...common, '--app', APP], secretEnvironment: { [SECRET]: secret } };
   }
   if (action.kind === 'gateway-secret-update') {
     assertSecret(secret);
-    return ['deploy', 'env', 'update-value', SECRET, secret, ...common, '--app', APP];
+    return { args: ['deploy', 'env', 'load', SECRET_FILE_TOKEN, ...common, '--app', APP], secretEnvironment: { [SECRET]: secret } };
   }
   if (action.kind === 'gateway-previous-secret-set') {
     assertSecret(previousSecret);
     if (secret === previousSecret) throw new Error('duplicate-provider-gateway-secret');
-    return ['deploy', 'env', 'add', PREVIOUS_SECRET, previousSecret, ...common, '--app', APP, '--secret'];
+    return { args: ['deploy', 'env', 'load', SECRET_FILE_TOKEN, ...common, '--app', APP], secretEnvironment: { [PREVIOUS_SECRET]: previousSecret } };
   }
-  if (action.kind === 'gateway-previous-secret-delete') return ['deploy', 'env', 'delete', PREVIOUS_SECRET, ...common, '--app', APP];
-  if (action.kind === 'gateway-deploy') return ['deploy', '.', ...common, '--app', APP, '--prod'];
+  if (action.kind === 'gateway-previous-secret-delete') return { args: ['deploy', 'env', 'delete', PREVIOUS_SECRET, ...common, '--app', APP] };
+  if (action.kind === 'gateway-deploy') return { args: ['deploy', '.', ...common, '--app', APP, '--prod'] };
   throw new Error(`unsupported-gateway-action-kind:${action.kind}`);
 }
 
@@ -125,10 +129,42 @@ function priority(action) {
   return ['gateway-app-create', 'gateway-database-provision', 'gateway-database-assign', 'gateway-secret-set', 'gateway-previous-secret-set', 'gateway-secret-update', 'gateway-previous-secret-delete', 'gateway-deploy'].indexOf(action.kind);
 }
 
-async function runDeno(args, { cwd }) {
-  const environment = { ...process.env };
-  const { stdout } = await execFileAsync('deno', args, { cwd, encoding: 'utf8', env: environment, maxBuffer: 4 * 1024 * 1024 });
-  return stdout;
+export function createDenoCommandRunner({
+  execute = execFileAsync,
+  makeTemporaryDirectory = mkdtemp,
+  removeTemporary = rm,
+  temporaryDirectory = tmpdir,
+  write = writeFile,
+} = {}) {
+  return async (args, { cwd, secretEnvironment } = {}) => {
+    if (secretEnvironment === undefined) return executeDeno(execute, args, cwd);
+    const directory = await makeTemporaryDirectory(join(temporaryDirectory(), 'tobirink-deno-env-'));
+    const path = join(directory, '.env');
+    try {
+      await write(path, serializeSecretEnvironment(secretEnvironment), { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+      return await executeDeno(execute, args.map(argument => argument === SECRET_FILE_TOKEN ? path : argument), cwd);
+    } finally {
+      await removeTemporary(directory, { force: true, recursive: true });
+    }
+  };
+}
+
+async function executeDeno(execute, args, cwd) {
+  try {
+    const { stdout } = await execute('deno', args, { cwd, encoding: 'utf8', env: { ...process.env }, maxBuffer: 4 * 1024 * 1024 });
+    return stdout;
+  } catch {
+    throw new Error('deno-provider-command-failed');
+  }
+}
+
+function serializeSecretEnvironment(environment) {
+  const entries = Object.entries(environment);
+  if (entries.length !== 1) throw new Error('invalid-provider-gateway-secret-environment');
+  const [name, value] = entries[0];
+  if (!secretNames.has(name)) throw new Error('invalid-provider-gateway-secret-environment');
+  assertSecret(value);
+  return `${name}=${JSON.stringify(value)}\n`;
 }
 
 function assertSecret(value) {
