@@ -1194,7 +1194,7 @@
         {
           "id": "certify-live-traffic",
           "title": "Certifier Discovery et Agenda en trafic réel",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Un miss Discovery évolue de PENDING vers un état terminal via Queue.",
             "Retries, DLQ et latence sont observables et bornés.",
@@ -1202,7 +1202,9 @@
             "Les routes v2 restent 410 et les routes v3 restent disponibles."
           ],
           "files": [
-            "docs/plans/consolidate-native-collectors-traffic-start.json",
+            "docs/release.md",
+            "docs/architecture/src/traffic.dataflow.json",
+            "docs/plans/consolidate-native-collectors-traffic-update.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
@@ -1212,12 +1214,16 @@
             "interroger D1 en lecture seule",
             "npm run archify:validate -- traffic.dataflow"
           ],
-          "evidence": []
+          "evidence": [
+            "Discovery v3: la demande AniList 20 passe de 202 PENDING à VERIFIED sur le Worker d5d0ce85 avec le profil Naruto complet.",
+            "Agenda natif: cron réel */10 à 17:30 UTC, traitement Queue en 47 s puis génération active calendar-d2732f2f avec 711 événements (225 AniList, 486 MangaUpdates).",
+            "Routes publiques après collecte: Discovery v3 et Agenda v3 répondent 200 sur les nouvelles révisions; Catalogue v2 répond 410."
+          ]
         },
         {
           "id": "conditional-provider-gateway",
           "title": "Ajouter une gateway isolée seulement si AniList bloque Cloudflare",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "L'étape est omise si le mode direct fonctionne.",
             "Sinon la gateway est HMAC, anti-rejeu, bornée et strictement allowlistée.",
@@ -1228,11 +1234,12 @@
             "apps/provider-gateway/src/index.ts",
             "apps/provider-gateway/src/index.test.ts",
             "scripts/infra/provider-gateway-driver.mjs",
+            "scripts/infra/provider-gateway-driver.test.mjs",
             "scripts/infra/tobirink-provider-gate.mjs",
-            "package.json",
             "package-lock.json",
             "docs/decisions/ADR-0051-provider-transport-gate.md",
-            "docs/architecture/src/public-discovery.dataflow.json",
+            "docs/architecture/src/public-pipeline.architecture.json",
+            "docs/plans/consolidate-native-collectors-gateway-done.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
@@ -1244,12 +1251,17 @@
             "npm run verify",
             "git commit -m feat(gateway): add isolated provider egress"
           ],
-          "evidence": []
+          "evidence": [
+            "Cinq retests directs depuis Cloudflare ont rendu provider-http-403 pour AniList; le transport gateway est donc requis et activé explicitement.",
+            "La gateway Deno révision pbcbbjp6gzys utilise HMAC, nonce KV atomique, expiration, allowlist stricte et limites de corps; ses 7 tests et les 30 tests infra passent.",
+            "Les smokes signés AniList et MangaUpdates répondent 200; Discovery AniList 20 atteint VERIFIED et Agenda publie 711 événements via la gateway.",
+            "npm run verify, npm ls --all, npm audit à zéro vulnérabilité et Archify showcase 9/9 réussissent."
+          ]
         },
         {
           "id": "remove-github-runtime-and-actions",
           "title": "Retirer le runtime GitHub OIDC et les sept workflows",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Les routes et clients propres au collecteur GitHub sont retirés ou terminalisés en 410.",
             "Les sept workflows sont supprimés après équivalence des gates locales.",
@@ -1258,28 +1270,17 @@
             "Verify, audit, packaging et Archify passent."
           ],
           "files": [
-            ".github/workflows/agenda-collector.yml",
-            ".github/workflows/public-discovery-collector.yml",
-            ".github/workflows/cloudflare.yml",
-            ".github/workflows/validate.yml",
-            ".github/workflows/docker-publish.yml",
-            ".github/workflows/code-review-graph.yml",
-            ".github/workflows/code-review-graph-comment.yml",
-            "apps/worker/src/releases/github-oidc.ts",
-            "apps/worker/src/releases/github-oidc.test.ts",
-            "apps/worker/src/releases/public-release-routes.ts",
+            ".github/workflows",
             "apps/worker/src/catalogue/public-discovery-routes.ts",
-            "packages/public-discovery/src/cli.ts",
-            "packages/public-discovery/src/http-gateway.ts",
-            "packages/public-discovery/src/http-gateway.test.ts",
-            "packages/public-discovery/src/run.ts",
-            "docs/release.md",
-            "docs/operations/cloudflare.env.example",
+            "apps/worker/src/releases/public-release-routes.ts",
+            "packages/public-discovery/src/index.ts",
+            "packages/public-discovery/package.json",
+            "scripts/check-coherence.mjs",
+            "tests/ci-security.test.mjs",
             "docs/architecture/src/public-pipeline.architecture.json",
             "docs/architecture/src/public-discovery.dataflow.json",
             "docs/architecture/src/agenda-release.dataflow.json",
-            "docs/decisions/ADR-0045-public-release-calendar.md",
-            "docs/decisions/ADR-0047-portable-public-discovery-component.md",
+            "docs/plans/consolidate-native-collectors-retire-github-done.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
@@ -1293,7 +1294,12 @@
             "valider les trois vues Archify",
             "git commit -m refactor(operations): retire GitHub Actions collectors"
           ],
-          "evidence": []
+          "evidence": [
+            "Les sept workflows, le validateur GitHub OIDC, les deux CLI HTTP, les scripts de publication externe et leurs exports sont retirés; les trois routes d'ingestion externes répondent 410.",
+            "La recherche active ne trouve plus de runtime GitHub OIDC; les références historiques sont conservées seulement dans les chronologies explicitement remplacées.",
+            "npm run verify réussit: 274 tests de gouvernance, tous les workspaces dont Worker 77/77 et Public Discovery 49/49, builds Chromium/Firefox, intégration et audit à zéro vulnérabilité.",
+            "npm ls --all réussit, les ZIP 1.0.31 sont reproductibles et les vues Archify passent showcase 9/9 sans erreur ni avertissement."
+          ]
         },
         {
           "id": "push-and-redeploy-clean-runtime",

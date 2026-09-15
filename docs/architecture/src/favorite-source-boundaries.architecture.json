@@ -34,7 +34,7 @@
       {
         "id": "manual-d1-path",
         "label": "Identité manuelle via D1",
-        "focus": ["sourceContract", "manualReview", "publicWorker", "publicD1", "githubCollector"],
+        "focus": ["sourceContract", "manualReview", "publicWorker", "publicD1", "nativeCollector"],
         "note": "Une référence exacte saisie en Review devient une requête v3; seul un profil VERIFIED revient dans IndexedDB."
       }
     ]
@@ -52,12 +52,12 @@
     { "id": "manualReview", "type": "frontend", "label": "Review manuelle", "sublabel": "référence exacte", "pos": [250, 720], "size": [160, 68], "tag": "révision contrôlée" },
     { "id": "publicWorker", "type": "cloud", "label": "Worker public v3", "sublabel": "lecture + demande", "pos": [480, 720], "size": [160, 68], "tag": "origine Tobirink" },
     { "id": "publicD1", "type": "database", "label": "Cache D1", "sublabel": "requête sans owner", "pos": [710, 720], "size": [160, 68], "tag": "PENDING · VERIFIED" },
-    { "id": "githubCollector", "type": "security", "label": "Collecteur GitHub", "sublabel": "OIDC · fournisseurs", "pos": [930, 720], "size": [140, 68], "tag": "hors extension" }
+    { "id": "nativeCollector", "type": "security", "label": "Collecteur Queue", "sublabel": "gateway · fournisseurs", "pos": [930, 720], "size": [140, 68], "tag": "hors extension" }
   ],
   "boundaries": [
     { "kind": "region", "label": "Cœur pur", "wraps": ["eligibility", "sourceRegistry", "genericEvidence", "sourceContract"], "pad": 22 },
     { "kind": "region", "label": "Extracteurs locaux sans réseau", "wraps": ["anilistAdapter", "mangaUpdatesAdapter", "mangadexAdapter", "kitsuAdapter"], "pad": 18 },
-    { "kind": "region", "label": "Frontière publique", "wraps": ["publicWorker", "publicD1", "githubCollector"], "pad": 18 }
+    { "kind": "region", "label": "Frontière publique", "wraps": ["publicWorker", "publicD1", "nativeCollector"], "pad": 18 }
   ],
   "connections": [
     { "id": "observationQualification", "from": "favoriteObservation", "to": "eligibility", "label": "qualifie sans réécrire", "variant": "security", "labelAt": [220, 352] },
@@ -75,11 +75,11 @@
     { "id": "manualRequest", "from": "sourceContract", "to": "manualReview", "label": "ID ou URL explicite", "variant": "security", "fromSide": "bottom", "toSide": "top", "via": [[1000, 650], [330, 650]] },
     { "id": "reviewWorker", "from": "manualReview", "to": "publicWorker", "label": "clé dédiée + titres bornés", "variant": "emphasis", "labelAt": [445, 812] },
     { "id": "workerD1", "from": "publicWorker", "to": "publicD1", "label": "v3 PENDING / VERIFIED", "variant": "security", "labelAt": [675, 812] },
-    { "id": "collectorD1", "from": "publicD1", "to": "githubCollector", "label": "claim / publication", "variant": "security", "labelAt": [900, 812] }
+    { "id": "collectorD1", "from": "publicD1", "to": "nativeCollector", "label": "claim / publication", "variant": "security", "labelAt": [900, 812] }
   ],
   "cards": [
     { "dot": "emerald", "title": "Autorité", "items": ["Favoris : présence et progression observée", "FavoriteSource : Work direct, Review optionnelle, résultat versionné"] },
     { "dot": "cyan", "title": "Modularité", "items": ["Application possède la sélection pure", "Règles exactes versionnées, distribuées par Worker"] },
-    { "dot": "rose", "title": "Sécurité", "items": ["Extraction locale sans code distant ni permission fournisseur", "Hydratation uniquement par le collecteur GitHub OIDC", "Aucun runtime direct ni règle DNR fournisseur dans l’extension"] }
+    { "dot": "rose", "title": "Sécurité", "items": ["Extraction locale sans code distant ni permission fournisseur", "Hydratation uniquement par le collecteur Queue via gateway", "Aucun runtime direct ni règle DNR fournisseur dans l’extension"] }
   ]
 }

@@ -46,7 +46,8 @@ extension scripts under `script-src 'self'` with object embedding disabled.
 Firefox builds declare the stable signing identifier `tobirink@tobirink.local`
 and `data_collection_permissions.required: [bookmarksInfo]`. Resolution sends
 only bounded titles or an explicit provider identifier to Public Discovery v3
-on the Tobirink Worker. GitHub's OIDC collector owns provider access. Raw
+on the Tobirink Worker. The native Queue consumer owns provider access through
+the isolated, authenticated provider gateway. Raw
 bookmark URLs, folders, progress and the resulting local library are not
 transmitted.
 

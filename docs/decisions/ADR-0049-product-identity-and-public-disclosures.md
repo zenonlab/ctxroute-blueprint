@@ -22,7 +22,7 @@ revised: true
 Le manifeste npm racine conservait le nom, la description et les liens du
 template `ctxroute-blueprint`. La page de confidentialité décrivait aussi un
 appel direct de l’extension aux catalogues fournisseurs, alors que Public
-Discovery v3 passe exclusivement par l’API TobiRink et le collecteur GitHub.
+Discovery v3 passe exclusivement par l’API TobiRink et son consumer Queue natif.
 Plusieurs preuves de livraison affichaient encore la version 1.0.0 ou un état
 navigateur antérieur.
 
@@ -37,8 +37,8 @@ La déclaration publique distingue les données privées locales des demandes de
 découverte publiques. L’extension peut envoyer à l’API TobiRink des titres
 normalisés et bornés ou un identifiant fournisseur public explicite. Elle
 n’envoie jamais l’URL brute du favori, ses dossiers, la progression ou la
-bibliothèque au Worker, à D1 ou aux fournisseurs. Seul le collecteur GitHub
-OIDC appelle les APIs fournisseurs.
+bibliothèque au Worker, à D1 ou aux fournisseurs. Seul le consumer Queue natif
+appelle les APIs fournisseurs, au travers du transport serveur isolé.
 
 Les documents et diagrammes actifs reflètent la version extension 1.0.30, les
 deux builds MV3 vérifiés et les migrations D1 versionnées. Ils distinguent une

@@ -95,7 +95,7 @@ not become runtime dependencies of Tobirink.
   bootstrap, technical preferences and a five-entry, thirty-day, non-authoritative
   popup continuation cache; `storage.sync` only for a bounded
   provider-ID snapshot; D1 for separate catalogue rows and a
-  `MISS/PENDING/VERIFIED` discovery cache promoted only through GitHub OIDC;
+  `MISS/PENDING/VERIFIED` discovery cache promoted only by the native Queue consumer;
   R2 for image objects and encrypted backup blobs.
   Domain code cannot import any provider.
 - Library analytics: seven stable multi-select facets (genre, editorial status,
@@ -144,7 +144,7 @@ questions, trade-offs, and research anchors used to make these decisions.
   external payloads and extension messages are validated.
 - Une résolution consulte D1 avant toute recherche textuelle. Un seul client
   obtient un bail; sa proposition contient uniquement empreinte versionnée et
-  identifiants publics, puis seul le collecteur GitHub OIDC peut publier
+  identifiants publics, puis seul le collecteur Queue natif peut publier
   `VERIFIED`. Aucun consentement produit, owner, appairage, titre brut, URL,
   bibliothèque ou progression n’entre dans ce protocole.
 - Storage migration, export, import, cache reconstruction, encrypted recovery,

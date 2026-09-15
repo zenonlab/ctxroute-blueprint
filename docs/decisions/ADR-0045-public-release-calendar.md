@@ -12,7 +12,6 @@ scope:
   - apps/extension/wxt-entrypoints/background.ts
   - apps/extension/entrypoints/agenda/**
   - packages/public-discovery/**
-  - .github/workflows/agenda-collector.yml
   - docs/architecture/src/agenda-release.dataflow.json
 review: on-change
 revised: true
@@ -39,45 +38,28 @@ utiles, mais sa formule de terminaison MangaUpdates ne constitue pas un oracle.
 
 ## Décision
 
-La collecte partagée est séparée du Worker HTTP. Le package MIT autonome du
-dépôt public `tristan-monticelli/tobirink-public-discovery` possède les contrats,
-parseurs et collecteurs Agenda sans dépendance au monorepo privé. Son workflow
-GitHub Actions `agenda.yml`, planifié chaque lundi à 03:17 UTC, lit deux lanes indépendantes : AniList pour les
-sorties anime officielles et MangaUpdates pour les sorties manga, manhwa et
-manhua confirmées. Il transmet au Worker une génération complète, bornée,
-versionnée et sans donnée personnelle. Un jeton GitHub OIDC court authentifie
-l'émetteur sans secret partagé sur l’audience `workers.dev`. Le Worker vérifie signature RS256 auprès du
-JWKS GitHub, issuer, audience, dépôt, IDs immuables du dépôt et du propriétaire,
-branche et identité exacte du workflow,
-valide nonce, digest, fenêtre et schéma, puis reste l'unique auteur D1.
-
-L’identité publique attend `repository_id=1370309060` et
-`repository_owner_id=239743354`, vérifiés depuis l’API GitHub. Une lecture JWKS
-est interrompue après trois secondes et reste limitée à 64 Kio et seize clés.
-Les clés validées sont mises en cache au plus cinq minutes dans une structure
-bornée par fetcher; un `kid` absent force immédiatement un rafraîchissement afin
-de permettre la rotation sans élargir la confiance.
-
-Le workflow du dépôt privé est manuel et vérifie seulement l’export autonome.
-Il ne demande aucun jeton OIDC, n’appelle aucun fournisseur et ne publie aucune
-génération. La source publique devient ainsi l’unique exécuteur partagé des
-requêtes AniList et MangaUpdates.
+La collecte partagée s’exécute dans le consumer Queue du Worker. Un cron toutes
+les dix minutes dépose uniquement un signal `agenda-refresh`; le consumer lit
+deux lanes indépendantes, AniList pour les sorties anime officielles et
+MangaUpdates pour les sorties manga, manhwa et manhua confirmées. Il promeut
+directement une génération complète, bornée, versionnée et sans donnée
+personnelle dans D1. Aucun runtime GitHub ni route d’ingestion externe n’est
+nécessaire; l’ancienne route `POST /v2/releases/generations` répond 410.
 
 La collecte déclenchée par `GET /v2/releases` reste supprimée : une lecture
 publique ne provoque jamais une requête fournisseur. Le candidat local ajoute
-un cron Worker hebdomadaire qui dépose un signal sans événement dans la même
+un cron Worker toutes les dix minutes qui dépose un signal sans événement dans la même
 Cloudflare Queue que Discovery. Le consumer collecte les deux lanes, refuse
 tout lot incomplet et promeut directement la génération D1. Tout `403`, `429`,
 timeout ou échec conserve la dernière génération valide et reprogramme le
 message selon une temporisation bornée.
 
-AniList et MangaUpdates sont joints uniquement via le proxy sortant signé de
-l’ADR-0047; l’adresse de sortie n’appartient donc pas à Cloudflare. La signature,
+AniList et MangaUpdates sont joints uniquement via la gateway sortante signée de
+l’ADR-0051; l’adresse de sortie n’appartient donc pas à Cloudflare. La signature,
 l’horodatage, l’anti-rejeu, l’allowlist et les limites de corps s’appliquent aussi
-à Agenda. La création de la Queue, du proxy, de son IP dédiée et des secrets,
-puis le déploiement et le test réel, restent une opération fournisseur séparée.
-Jusqu’à cette certification, le workflow public GitHub demeure le chemin
-opérationnel et aucune réussite live n’est déduite des tests locaux.
+à Agenda. La Queue, la gateway Deno, Deno KV et les secrets passent par leurs
+gates opérationnelles. La certification du 15 septembre 2026 a produit une
+génération active de 711 événements, dont 225 AniList et 486 MangaUpdates.
 
 L'extension ne possède aucun repli fournisseur Agenda. Elle lit le calendrier
 D1 par `/v3/releases`; une indisponibilité réseau peut réutiliser la dernière

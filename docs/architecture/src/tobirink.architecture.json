@@ -31,7 +31,7 @@
           "d1",
           "collector"
         ],
-        "note": "Sans identité produit ni appairage : claim atomique PENDING, IDs proposés, puis promotion VERIFIED par collecteur GitHub OIDC."
+        "note": "Sans identité produit ni appairage : claim atomique PENDING, IDs proposés, puis promotion VERIFIED par le consumer Queue natif."
       },
       {
         "id": "presentation",
@@ -84,7 +84,7 @@
       "id": "worker",
       "type": "cloud",
       "label": "Worker HTTP typé",
-      "sublabel": "Claims / gate OIDC / catalogue",
+      "sublabel": "API v3 / Queue / catalogue",
       "pos": [
         840,
         350
@@ -153,7 +153,7 @@
     {
       "id": "collector",
       "type": "security",
-      "label": "Collecteur GitHub OIDC",
+      "label": "Collecteur Queue natif",
       "sublabel": "Hydratation ID / preuve officielle",
       "pos": [
         1140,

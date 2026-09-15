@@ -8,8 +8,8 @@ scope:
   - apps/worker/migrations/**
   - apps/worker/src/catalogue/**
   - apps/worker/src/releases/**
-  - .github/workflows/**
-  - scripts/agenda-collector/**
+  - apps/worker/src/native-collectors.ts
+  - apps/provider-gateway/**
   - docs/systems/favorite-resolution-rebuild-pipeline.md
   - docs/systems/agenda-recovery-plan.md
   - docs/architecture/src/favorite-resolution.dataflow.json
@@ -38,8 +38,8 @@ pas la frontière D1-first attendue.
 Le besoin est de réutiliser une œuvre déjà résolue sans envoyer l’URL, le
 dossier, la progression ou une bibliothèque. L’extension doit seulement lire
 D1 ou y matérialiser une requête publique bornée. La recherche, la sélection et
-l’hydratation appartiennent à un composant serveur extractible exécuté par
-GitHub Actions. Un résultat fonctionnel, y compris introuvable ou ambigu, doit
+l’hydratation appartiennent à un composant serveur extractible exécuté par le
+consumer Queue natif du Worker. Un résultat fonctionnel, y compris introuvable ou ambigu, doit
 être persistant afin que la même requête ne relance pas les fournisseurs.
 
 ## Décision
@@ -81,8 +81,8 @@ Anime ou Kitsu Manga selon le type média, applique le matcher versionné, puis
 hydrate l’identifiant exact retenu. Il produit exactement un résultat
 `VERIFIED`, `NOT_FOUND` ou `AMBIGUOUS`; une panne, un 403, un 429, une réponse
 incomplète ou un timeout reste `PENDING` avec une reprise bornée. Le Worker
-vérifie signature, issuer, audience, dépôt, branche, workflow et digest avant
-toute publication; il demeure l’unique auteur des tables publiques fiables.
+conditionne chaque publication au bail et au digest courants; il demeure
+l’unique auteur des tables publiques fiables.
 
 La clé D1 possède un index unique. Demande, prise de travail et publication sont
 idempotentes. Un seul collecteur peut posséder un bail de traitement actif; les
@@ -131,7 +131,7 @@ et `AMBIGUOUS` terminent la tâche en Review locale sans relancer le composant.
 Le chemin automatique, la réparation de couvertures et les actions manuelles ne
 consultent aucun adaptateur de recherche ou d'hydratation fournisseur dans
 l'extension. Une référence manuelle exacte utilise une clé dédiée incluant
-fournisseur et identifiant, puis suit le même cycle D1/GitHub. `PENDING` conserve
+fournisseur et identifiant, puis suit le même cycle D1/Queue. `PENDING` conserve
 la Review; seul un profil `VERIFIED` qui contient cette référence peut être
 commité localement. Les parseurs d'URL fournisseur restent locaux et sans
 réseau; aucun adaptateur réseau fournisseur n'est composé par le background.
@@ -146,14 +146,14 @@ une UI maison ne retire pas cette obligation de transparence.
 ## Conséquences
 
 D1 reçoit immédiatement une ligne `PENDING` après le premier miss accepté,
-puis un résultat terminal seulement après le cycle OIDC. Les lectures suivantes
+puis un résultat terminal seulement après le traitement Queue. Les lectures suivantes
 réutilisent ce résultat; les requêtes concurrentes attendent. Aucune extension
 ne contacte AniList, MangaUpdates, MangaDex ou Kitsu pour cette découverte.
 
 Les anciennes routes `/v2/catalogue/discoveries` et leurs sous-routes sont
-retirées et répondent `410 Gone`. L’ingestion, la lecture et la création de
-demande utilisent exclusivement v3; aucune identité OIDC privée v2 n’est
-conservée.
+retirées et répondent `410 Gone`. Les anciennes routes externes de claim et de
+publication répondent également `410 Gone`; l’ingestion, la lecture et la
+création de demande utilisent exclusivement v3.
 
 Le cache ne représente aucune bibliothèque et ne peut pas restaurer la
 progression privée. Les anciennes tables et migrations Collectif restent

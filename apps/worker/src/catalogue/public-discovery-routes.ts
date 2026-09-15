@@ -8,9 +8,6 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { WorkerRuntime, WorkerServices } from '../composition';
 import type { NativeCollectorSignal } from '../native-collectors';
-import { verifyGitHubAgendaToken } from '../releases/github-oidc';
-
-type VerifyCollectorToken = (token: string, audience: string) => Promise<void>;
 interface DiscoveryQueuePort {
   send(body: NativeCollectorSignal, options?: { contentType?: 'json' }): Promise<QueueSendResponse | void>;
 }
@@ -50,25 +47,7 @@ function randomToken(): string {
   return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
 }
 
-function bearer(request: { header(name: string): string | undefined }): string | undefined {
-  return /^Bearer ([A-Za-z0-9._-]{32,8192})$/u.exec(request.header('Authorization') ?? '')?.[1];
-}
-
-function oidcRejectionCode(message: string | undefined): string {
-  return message && /^agenda-oidc-[a-z-]+$/u.test(message) ? message : 'agenda-oidc-invalid';
-}
-
-async function authorize(request: { header(name: string): string | undefined }, url: string, verify: VerifyCollectorToken): Promise<boolean> {
-  const token = bearer(request);
-  if (!token) return false;
-  try { await verify(token, url); return true; }
-  catch (error) {
-    console.warn('discovery-ingestion-authorization-rejected', oidcRejectionCode(error instanceof Error ? error.message : undefined));
-    return false;
-  }
-}
-
-export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyToken: VerifyCollectorToken = verifyGitHubAgendaToken): Hono<WorkerRuntime> {
+export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCollectorTestHarness?: () => Promise<void>): Hono<WorkerRuntime> {
   const app = new Hono<WorkerRuntime>();
   const limitedBody = bodyLimit({ maxSize: 64 * 1024, onError: () => noStore({ error: 'body-too-large' }, 413) });
 
@@ -104,8 +83,8 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyTok
   });
 
   app.post('/v3/catalogue/discoveries/collector/claims', limitedBody, async (context) => {
-    const audience = `${new URL(context.req.url).origin}/v3/catalogue/discoveries/collector/claims`;
-    if (!await authorize(context.req, audience, verifyToken)) return noStore({ error: 'discovery-ingestion-unauthorized' }, 401);
+    if (retiredCollectorTestHarness === undefined) return noStore({ error: 'external-discovery-collector-retired' }, 410);
+    await retiredCollectorTestHarness();
     const body: { limit?: unknown } = await context.req.json<{ limit?: unknown }>().catch(() => ({}));
     const limit = body.limit ?? 20;
     if (!Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 50) return noStore({ error: 'invalid-limit' }, 400);
@@ -118,8 +97,8 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyTok
   });
 
   app.post('/v3/catalogue/discoveries/results', limitedBody, async (context) => {
-    const audience = `${new URL(context.req.url).origin}/v3/catalogue/discoveries/results`;
-    if (!await authorize(context.req, audience, verifyToken)) return noStore({ error: 'discovery-ingestion-unauthorized' }, 401);
+    if (retiredCollectorTestHarness === undefined) return noStore({ error: 'external-discovery-collector-retired' }, 410);
+    await retiredCollectorTestHarness();
     const parsed = publicDiscoveryResultBatchSchema.safeParse(await context.req.json().catch(() => undefined));
     if (!parsed.success) return noStore({ error: 'invalid-result' }, 400);
     if (Math.abs(Date.parse(parsed.data.verifiedAt) - Date.now()) > 2 * 86_400_000) return noStore({ error: 'invalid-verification-time' }, 400);

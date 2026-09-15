@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "exports": { ".": "./src/index.ts", "./agenda": "./src/agenda/index.ts", "./agenda/cli": "./src/agenda/cli.ts", "./cli": "./src/cli.ts" },
+  "exports": { ".": "./src/index.ts", "./agenda": "./src/agenda/index.ts" },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",

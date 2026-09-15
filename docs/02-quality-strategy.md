@@ -78,8 +78,8 @@ browser or `workerd` test when platform behavior is the risk.
   `https://tobirink.com/*` content-script match and the same
   `externally_connectable` match before their SHA-256 is recorded.
 - Public Discovery tests prouvent la création D1 atomique et dédupliquée,
-  l’attente sans consommation de tentative MV3, le claim réservé au collecteur
-  OIDC, la publication terminale d’un profil complet et son rejeu idempotent.
+  l’attente sans consommation de tentative MV3, le claim natif via Queue,
+  la publication terminale d’un profil complet et son rejeu idempotent.
   Les contrats refusent une cinquième entrée dans chacune des deux listes de
   titres. Les tests D1 réels vérifient le plafond global actif et sa réponse
   `503`, l’expurgation terminale et le backfill historique de `request_json`
@@ -92,8 +92,8 @@ browser or `workerd` test when platform behavior is the risk.
   Le package exportable exécute en plus les tests HTTP réels des cinq
   adaptateurs, vérifie les deux ordres de fallback et l’ambiguïté inter-lanes,
   refuse tout import `@tobirink/*` et produit son bundle depuis son propre
-  manifeste et son propre lockfile. Les tests OIDC Worker exigent le dépôt,
-  la branche, le workflow, l’événement et chacune des deux audiences exactes.
+  manifeste et son propre lockfile. Les tests Worker exigent que les anciennes
+  routes externes de claim, résultat et ingestion Agenda répondent 410.
   Les anciennes routes de consentement, d’appairage et de cache non vérifié
   doivent répondre 404.
 - Public-catalogue tests prove that D1 stores only reconstructible work titles

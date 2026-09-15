@@ -10,8 +10,8 @@ elle ne dépend d'aucune base FavLib.
 
 Le protocole Collectif décrit plus bas est conservé comme historique de cette
 correction v3. Il est supersédé par ADR-0046 : le runtime actuel n'a ni owner,
-ni appairage, ni consentement Collectif; D1 suit `MISS/PENDING/VERIFIED` et seul
-le collecteur GitHub OIDC peut promouvoir une association publique fiable.
+ni appairage, ni consentement Collectif; D1 suit ses états v3 et seul le
+consumer Queue natif peut promouvoir une association publique fiable.
 
 Référence historique : commit Git `3267de2`, notamment `CLAUDE.md` et
 `docs/adr/0087-architecture-locale-favoris-resolution-agenda.md`. Le dernier
@@ -89,7 +89,7 @@ par défaut ou ses heuristiques non bornées.
 | Artefacts, œuvres hydratées, tâches, décisions, agenda, caches | IndexedDB extension | transactions, versions, reçus, export privé |
 | Identifiants fournisseurs | snapshot `storage.sync` | IDs seulement; aucune progression ou décision |
 | Bootstrap et préférences | `storage.local` extension | accès de confiance, jamais sync/site/logs |
-| Empreinte versionnée ↔ IDs publics vérifiés | D1 via Worker | claim atomique, propositions IDs seulement, promotion GitHub OIDC |
+| Empreinte versionnée ↔ IDs publics vérifiés | D1 via Worker | demande atomique, bail Queue et publication conditionnelle |
 | Affichage web | projection WebBridge | aucune autorité ni accès direct D1, aucun secret produit |
 
 Un retrait navigateur détache la source et retire sa présence active de la

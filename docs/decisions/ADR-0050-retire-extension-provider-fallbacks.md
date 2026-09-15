@@ -51,7 +51,7 @@ Lorsqu’une génération partagée est enregistrée, elle efface encore les lig
 de staging et l’ancien checkpoint local; aucune API publique ne permet de
 réactiver la collecte directe.
 
-Les adaptateurs fournisseurs portables du collecteur GitHub restent hors de
+Les adaptateurs fournisseurs portables du consumer Queue natif restent hors de
 l’extension. Les extracteurs locaux d’identifiants présents dans les URL de
 favoris restent purs et sans réseau.
 

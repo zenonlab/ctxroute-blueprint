@@ -18,15 +18,14 @@ Le navigateur possède présence et progression observée; IndexedDB possède
 les transactions privées. Sync restaure les IDs et leurs associations à une
 empreinte normalisée, jamais les titres ni la navigation. Le Worker seul
 possède D1. Le cache public n’a ni owner ni appairage : le client réserve une
-clé `PENDING` et propose seulement des identifiants publics; le collecteur
-GitHub OIDC publie seul `VERIFIED` après hydratation et contrôle des titres
+clé `PENDING`; le consumer Queue natif publie seul `VERIFIED` après hydratation
+et contrôle des titres
 officiels. La pipeline et ses budgets suivent le plan v3; la section suivante
 décrit l'ancien runtime, qui ne constitue pas le résultat cible.
 
-Les permissions du paquet MV3 sont limitées aux cinq origines HTTPS nécessaires
-à l'exécution : AniList, MangaUpdates, MangaDex, Kitsu et `tobirink.com` pour
-WebBridge. Les anciennes preuves Progress qui indiquent `host_permissions vide`
-sont historiques et ne décrivent plus le manifest installé.
+Les permissions du paquet MV3 sont limitées à l’origine publique TobiRink.
+AniList, MangaUpdates, MangaDex et Kitsu ne sont jamais contactés par
+l’extension.
 
 ## État implémenté vérifié
 
@@ -734,8 +733,8 @@ des champs de compatibilité exige une autre ADR après mesure de migration.
   Review;
 - les métriques par défaut sont locales : compte par état, durée par étape,
   profondeur de file, âge du plus vieux retry, motifs agrégés et migrations;
-- une demande publique ne contient qu’une empreinte versionnée et, après
-  résolution, des identifiants fournisseur; seul OIDC peut publier `VERIFIED`.
+- une demande publique ne contient qu’une empreinte versionnée et des titres
+  bornés; seul le consumer Queue natif peut publier `VERIFIED`.
 
 ## Ordre de livraison historique remplacé
 
@@ -980,20 +979,14 @@ ou mot de passe n’est transmis au site, au Worker, à D1, à R2 ou aux
 fournisseurs.
 
 Après un premier miss, une demande publique bornée rejoint une outbox locale
-indépendante du commit de l’œuvre. Le Worker réserve atomiquement la clé et
-retourne un bail court à un seul client. Après résolution locale, ce client
-propose uniquement des identifiants fournisseur. La proposition reste
-`PENDING` et n’alimente ni catalogue, ni titre, ni facette.
-
-Le collecteur GitHub OIDC hydrate ces identifiants et recalcule les empreintes
-des titres officiels. Le Worker publie avec SQL préparé seulement les profils
-qui correspondent exactement, sous état `VERIFIED`. D1 ne stocke jamais le
-titre brut, l’URL du favori, son dossier, sa progression, une décision humaine,
-un owner, une identité d’installation, un diagnostic ou un secret.
-Le workflow de vérification est planifié chaque heure à la minute 23 et traite
-au plus 50 claims par exécution. Deux audiences OIDC distinctes protègent la
-lecture des propositions et leur promotion. La publication du workflow reste
-une opération externe séparément approuvée.
+indépendante du commit de l’œuvre. Le Worker crée atomiquement la clé puis
+dépose le travail dans sa Queue. Le consumer natif acquiert seul le bail,
+hydrate les profils et publie avec SQL préparé seulement ceux qui correspondent
+exactement, sous état `VERIFIED`. D1 ne stocke jamais l’URL du favori, son
+dossier, sa progression, une décision humaine, un owner, une identité
+d’installation, un diagnostic ou un secret. Le cron Agenda et le consumer
+Discovery utilisent la même Queue; leur trafic fournisseur passe par la
+gateway authentifiée et isolée définie par l’ADR-0051.
 
 Les références provenant du cache vérifié suivent le même chemin d'hydratation
 que les références explicites et les résultats locaux. Le secours HTTP 405

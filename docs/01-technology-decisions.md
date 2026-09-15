@@ -131,9 +131,9 @@ one pending search and propose provider IDs only; it cannot publish a title or
 a trusted catalogue result. Concurrent clients see `PENDING`, and `VERIFIED`
 entries are reused without another title search.
 
-Only the GitHub collector authenticated by OIDC can hydrate the proposed IDs,
-verify an official provider title against the fingerprint and promote the row
-to `VERIFIED`. ADR-0046 defines the bounded requests, leases and idempotent D1
+Only the native Queue consumer can hydrate the proposed IDs, verify an official
+provider title against the fingerprint and promote the row to `VERIFIED`.
+ADR-0046 defines the bounded requests, leases and idempotent D1
 state transitions. Historical Collective migrations remain versioned but their
 routes and runtimes are retired. Only the operational gate may apply production
 migrations.

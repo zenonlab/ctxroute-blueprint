@@ -64,7 +64,7 @@ répertoire FavLib à l’exécution, au build ou dans ses tests.
    Une ambiguïté ou un introuvable terminal média va en `REVIEW_REQUIRED`.
    Import, panne et unsupported ne créent jamais de Review.
 8. Les décisions Review sont des mutations locales confirmées. Le cache public
-   n'accepte que des IDs proposés et seule une vérification OIDC peut publier.
+   n'accepte qu'une publication du consumer Queue natif, conditionnée au bail.
 
 ## Pipeline canonique
 
@@ -701,9 +701,9 @@ comparables et leur provenance sont conservés; l'ordre ne tranche jamais.
 
 ADR-0046 remplace le Collectif. La clé publique contient l'empreinte, le média et
 les versions de parsing/règles, sans owner, installation, appairage ou secret.
-Le client peut proposer uniquement des IDs fournisseur après avoir obtenu un
-bail atomique. Seul le collecteur GitHub OIDC hydrate les profils officiels et
-publie `VERIFIED`. Aucun titre brut, URL, dossier, progression ou décision
+Le client crée une demande bornée sans obtenir de bail de fournisseur. Seul le
+consumer Queue natif hydrate les profils officiels et publie `VERIFIED`. Aucun
+titre brut, URL, dossier, progression ou décision
 privée n'entre dans D1; le site et WebBridge ne participent pas au protocole.
 
 ## Versioning et oracle

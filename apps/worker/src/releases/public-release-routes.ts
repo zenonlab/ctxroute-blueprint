@@ -1,10 +1,7 @@
 import { parsePublicReleaseSnapshot } from '@tobirink/adapters-cloudflare';
 import { Hono } from 'hono';
-import { bodyLimit } from 'hono/body-limit';
 import type { WorkerRuntime, WorkerServices } from '../composition';
-import { verifyGitHubAgendaToken } from './github-oidc';
 import type { PublicReleaseCalendarPort, PublicReleaseQuery } from './public-release-calendar';
-import { publicReleaseIngestionSchema } from './public-release-ingestion';
 
 interface ReleaseErrorBody { error: string }
 
@@ -18,9 +15,8 @@ function noStoreJson(
   return context.json({ error }, status);
 }
 
-type ReleaseCalendarRoute = Pick<PublicReleaseCalendarPort, 'query'> & Partial<Pick<PublicReleaseCalendarPort, 'ingest'>>;
+type ReleaseCalendarRoute = Pick<PublicReleaseCalendarPort, 'query'>;
 type ReleaseServices = Pick<WorkerServices, 'policy' | 'releases'> & { releaseCalendar?: ReleaseCalendarRoute };
-type VerifyAgendaToken = (token: string, audience: string) => Promise<void>;
 const maximumReleaseWindowDays = 40;
 
 function canonicalDate(value: string): boolean {
@@ -37,38 +33,12 @@ function routeServices(context: { get(key: 'services'): WorkerServices }, inject
   return injected ?? context.get('services');
 }
 
-export function createPublicReleaseApp(injected?: ReleaseServices, verifyAgendaToken: VerifyAgendaToken = verifyGitHubAgendaToken): Hono<WorkerRuntime> {
+export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerRuntime> {
   const app = new Hono<WorkerRuntime>();
 
-  app.post('/v2/releases/generations', bodyLimit({ maxSize: 2 * 1024 * 1024, onError: () => Response.json({ error: 'body-too-large' }, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }, status: 413 }) }), async (context) => {
-    const authorization = context.req.header('Authorization') ?? '';
-    const match = /^Bearer ([A-Za-z0-9._-]{32,8192})$/u.exec(authorization);
-    if (!match?.[1]) return Response.json({ error: 'agenda-ingestion-unauthorized' }, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }, status: 401 });
-    const url = new URL(context.req.url);
-    try {
-      await verifyAgendaToken(match[1], `${url.origin}/v2/releases/generations`);
-    } catch {
-      return Response.json({ error: 'agenda-ingestion-unauthorized' }, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }, status: 401 });
-    }
-    let input;
-    try {
-      input = publicReleaseIngestionSchema.parse(await context.req.json());
-    } catch {
-      return Response.json({ error: 'invalid-agenda-generation' }, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }, status: 400 });
-    }
-    const generatedAt = Date.parse(input.generatedAt);
-    if (generatedAt > Date.now() + 10 * 60_000 || generatedAt < Date.now() - 2 * 86_400_000) {
-      return Response.json({ error: 'invalid-agenda-generation-time' }, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }, status: 400 });
-    }
-    try {
-      const calendar = routeServices(context, injected).releaseCalendar;
-      if (!calendar?.ingest) return noStoreJson(context, 'release-calendar-unavailable', 503);
-      const result = await calendar.ingest(input);
-      return Response.json(result, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }, status: result.accepted ? (result.replayed ? 200 : 201) : 202 });
-    } catch {
-      return noStoreJson(context, 'release-calendar-unavailable', 503);
-    }
-  });
+  app.post('/v2/releases/generations', () => Response.json({ error: 'external-agenda-ingestion-retired' }, {
+    headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }, status: 410,
+  }));
 
   app.get('/v1/releases', async (context) => {
     if (new URL(context.req.url).search.length > 0) {

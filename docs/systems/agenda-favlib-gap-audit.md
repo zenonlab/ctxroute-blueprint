@@ -2,12 +2,11 @@
 
 ## Verdict de production — 14 septembre 2026
 
-Les écarts bloquants historiques ci-dessous sont clos. Le dépôt public exécute
-seul les collecteurs AniList et MangaUpdates; le Worker ne possède plus ces
-clients et reçoit uniquement une génération OIDC sur son audience `workers.dev`.
-Le run `34888271094` a publié 765 événements réels (239 AniList et 526
-MangaUpdates). La génération D1 correspondante est active et deux lectures HTTP
-consécutives ont rendu le même corps, la même révision et le même ETag.
+Les écarts bloquants historiques ci-dessous sont clos. Le consumer Queue natif
+du Worker exécute les collecteurs AniList et MangaUpdates à travers la gateway
+isolée. La collecte observée du 15 septembre 2026 a publié une génération D1 de
+711 événements réels (225 AniList et 486 MangaUpdates), servie par
+`GET /v3/releases`.
 
 MangaUpdates renvoie réellement des champs `null` et quelques sorties sans
 `series_id`. Le parseur accepte cette forme, mais le collecteur exclut les

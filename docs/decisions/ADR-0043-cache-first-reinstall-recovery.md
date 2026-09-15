@@ -71,9 +71,9 @@ collectée.
 
 Le Worker expose le cache public borné défini par l’ADR-0046. Une lecture par
 empreinte ou référence précède les API fournisseurs. Un client peut seulement
-créer un claim `PENDING` et proposer des identifiants fournisseur publics; il ne
-publie jamais une association, un titre, une facette ou un profil. Un collecteur
-GitHub OIDC hydrate et vérifie ces identifiants avant la seule transition
+créer une demande `PENDING`; il ne publie jamais une association, un titre, une
+facette ou un profil. Le consumer Queue natif hydrate et vérifie les résultats
+avant la seule transition
 `VERIFIED`. L’unicité D1 empêche deux recherches concurrentes; un bail expiré
 autorise une reprise bornée.
 

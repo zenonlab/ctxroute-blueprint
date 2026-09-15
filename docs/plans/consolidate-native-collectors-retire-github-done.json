@@ -1,0 +1,26 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "remove-github-runtime-and-actions",
+  "status": "DONE",
+  "files": [
+    ".github/workflows",
+    "apps/worker/src/catalogue/public-discovery-routes.ts",
+    "apps/worker/src/releases/public-release-routes.ts",
+    "packages/public-discovery/src/index.ts",
+    "packages/public-discovery/package.json",
+    "scripts/check-coherence.mjs",
+    "tests/ci-security.test.mjs",
+    "docs/architecture/src/public-pipeline.architecture.json",
+    "docs/architecture/src/public-discovery.dataflow.json",
+    "docs/architecture/src/agenda-release.dataflow.json",
+    "docs/plans/consolidate-native-collectors-retire-github-done.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Les sept workflows, le validateur GitHub OIDC, les deux CLI HTTP, les scripts de publication externe et leurs exports sont retirés; les trois routes d'ingestion externes répondent 410.",
+    "La recherche active ne trouve plus de runtime GitHub OIDC; les références historiques sont conservées seulement dans les chronologies explicitement remplacées.",
+    "npm run verify réussit: 274 tests de gouvernance, tous les workspaces dont Worker 77/77 et Public Discovery 49/49, builds Chromium/Firefox, intégration et audit à zéro vulnérabilité.",
+    "npm ls --all réussit, les ZIP 1.0.31 sont reproductibles et les vues Archify passent showcase 9/9 sans erreur ni avertissement."
+  ]
+}

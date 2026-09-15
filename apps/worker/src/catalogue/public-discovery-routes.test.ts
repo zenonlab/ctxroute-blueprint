@@ -1,6 +1,6 @@
 import { applyD1Migrations, env, SELF } from 'cloudflare:test';
 import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
 
 const discoveryKey = (marker: string) => ({ fingerprint: marker.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' });
@@ -91,16 +91,17 @@ describe('verified public discovery cache', () => {
     ]);
   });
 
-  it('logs only a bounded code when collector OIDC verification rejects', async () => {
+  it('retires both external collector routes', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
-    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter }, async () => { throw new Error('raw verifier details'); });
-    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
-      headers: { Authorization: `Bearer ${'x'.repeat(32)}` }, method: 'POST',
-    });
-    expect(response.status).toBe(401);
-    expect(warning).toHaveBeenCalledWith('discovery-ingestion-authorization-rejected', 'agenda-oidc-invalid');
-    warning.mockRestore();
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter });
+    const responses = await Promise.all([
+      app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', { method: 'POST' }),
+      app.request('https://tobirink.test/v3/catalogue/discoveries/results', { method: 'POST' }),
+    ]);
+    expect(responses.map(({ status }) => status)).toEqual([410, 410]);
+    await expect(Promise.all(responses.map((response) => response.json()))).resolves.toEqual([
+      { error: 'external-discovery-collector-retired' }, { error: 'external-discovery-collector-retired' },
+    ]);
   });
 
   it('stores one server-side request for repeated v3 discovery misses', async () => {
@@ -133,7 +134,7 @@ describe('verified public discovery cache', () => {
     await expect(saturated.json()).resolves.toEqual({ error: 'discovery-capacity-unavailable' });
   });
 
-  it('lets only the OIDC collector claim and terminally resolve a v3 request', async () => {
+  it('keeps the retired-route test harness capable of exercising claim and publication', async () => {
     const key = discoveryKey('f');
     const v3 = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const app = createPublicDiscoveryApp({ publicDiscoveryV3: v3 }, async () => undefined);
@@ -141,7 +142,6 @@ describe('verified public discovery cache', () => {
       body: JSON.stringify({ key, query: { discoveryTitles: ['Unknown Work'], mediaKind: 'ANIME', sourceTitles: ['Unknown Work'] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
-    expect((await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', { method: 'POST' })).status).toBe(401);
     const claimed = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
       body: JSON.stringify({ limit: 20 }), headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST',
     });

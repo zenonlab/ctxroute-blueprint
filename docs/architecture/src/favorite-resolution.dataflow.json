@@ -72,7 +72,7 @@
           "publicD1",
           "verifiedCollector"
         ],
-        "note": "Automatique ou manuel : demande v3 sans owner, hydratation par collecteur OIDC et profil VERIFIED; export privé local AES-GCM."
+        "note": "Automatique ou manuel : demande v3 sans owner, hydratation par collecteur Queue et profil VERIFIED; export privé local AES-GCM."
       }
     ]
   },
@@ -202,7 +202,7 @@
       "row": 4,
       "yOffset": 270,
       "width": 150,
-      "tag": "claims publics · gate OIDC"
+      "tag": "claims publics · bail D1"
     },
     {
       "id": "publicD1",
@@ -217,7 +217,7 @@
     {
       "id": "verifiedCollector",
       "type": "security",
-      "label": "Collecteur GitHub OIDC",
+      "label": "Collecteur Queue natif",
       "stage": 3,
       "row": 4,
       "yOffset": 270,
@@ -401,10 +401,10 @@
     {
       "from": "verifiedCollector",
       "to": "publicD1",
-      "label": "profils vérifiés OIDC",
+      "label": "profils vérifiés",
       "route": "straight",
       "labelAt": [638, 926],
-      "classification": "GitHub OIDC seulement",
+      "classification": "consumer Queue seulement",
       "variant": "security"
     },
     {
@@ -450,7 +450,7 @@
         "Une clé PENDING ou terminale interdit toute recherche fournisseur MV3",
         "Inventaire puis présence: pages et checkpoints atomiques",
         "Alarme nommée restaurée à chaque réveil MV3; aucun runner concurrent",
-        "GitHub Actions possède seul les lanes AniList, MU, MangaDex et Kitsu",
+        "Le consumer Queue possède seul les lanes AniList, MU, MangaDex et Kitsu",
         "Panne, 403 ou page incomplète : PENDING puis reprise bornée",
         "Agenda lit D1 ou son dernier cache valide sans repli fournisseur MV3"
       ]
@@ -464,7 +464,7 @@
         "Tri par titre, ajout, année, progression ou popularité comparable",
         "Bootstrap sans scan du catalogue; lectures Work/progression par fenêtres ≤ 100",
         "Genres typés et totaux éditoriaux explicites uniquement",
-        "Sync sans titre privé; D1 sert seulement les fiches vérifiées OIDC",
+        "Sync sans titre privé; D1 sert seulement les fiches vérifiées par le consumer",
         "URL fournisseur locale; R2 exige licence ou domaine public"
       ]
     }

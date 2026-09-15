@@ -1,8 +1,6 @@
 ---
 scope:
   - packages/public-discovery/**
-  - scripts/public-discovery/**
-  - .github/workflows/public-discovery-collector.yml
   - packages/application/src/public-discovery/**
   - packages/adapters-browser/src/catalogue/**
   - packages/adapters-cloudflare/src/catalogue/**
@@ -46,17 +44,14 @@ transitoire par demande, refuse les résultats dont la clé ou le digest diffèr
 et publie seulement des objets JSON validés. Il ne transporte jamais `Request`,
 `Response`, `Error`, fonction ou instance de classe à travers ses ports.
 
-Le package porte aussi sa composition autonome : adaptateur HTTP vers les
-routes Worker, matching borné, adaptateurs AniList, MangaUpdates, MangaDex,
-Kitsu Anime et Kitsu Manga, puis point d’entrée GitHub Actions. Ce dernier
-obtient ses jetons OIDC temporaires et appelle la même fonction publique. Les
-URLs, audiences et variables d’environnement restent dans le CLI, jamais dans
-le moteur injectable.
+Le package porte le matching borné et les adaptateurs AniList, MangaUpdates,
+MangaDex, Kitsu Anime et Kitsu Manga. Leur composition appartient au consumer
+Worker natif; les anciens clients HTTP/OIDC et CLI de collecte sont retirés.
 
 Le package expose un export public stable, un test avec ports mémoire et un
 contrôle d’isolation qui échoue sur tout import `@tobirink/*` ou identifiant
-ressemblant à un secret. Il doit pouvoir être extrait par `git subtree` comme
-racine du dépôt public `tristan-monticelli/tobirink-public-discovery`.
+ressemblant à un secret. Cette autonomie préserve une frontière testable sans
+exiger un dépôt d’exécution distinct.
 
 Le runtime cible remplace le sondage GitHub par un signal Cloudflare Queue
 émis immédiatement après la matérialisation `PENDING`. Ce signal ne contient
@@ -94,13 +89,9 @@ le runner public et réussir `npm ci` hors du monorepo.
 
 La cadence et l’hébergeur du collecteur peuvent changer sans modifier
 l’extension. Le transport fournisseur peut changer sans modifier le consumer :
-seule la composition externe du Worker sélectionne son adaptateur. GitHub
-Actions reste la composition opérationnelle déployée tant que la Queue et son
-trafic réel ne sont pas certifiés.
-Le Worker n’accepte les audiences Discovery que si les claims OIDC
-nomment aussi le dépôt public exact, `refs/heads/main` et
-`.github/workflows/collect.yml@refs/heads/main`; les workflows de forks et de
-pull request ne reçoivent donc aucune autorité D1.
+seule la composition externe du Worker sélectionne son adaptateur. La Queue et
+la gateway ont été certifiées en trafic réel; les anciennes routes externes de
+claim et publication répondent désormais 410.
 
 Le contrat actif est la version `3`, alignée sur les routes HTTP publiques v3,
 avec des lots de cinquante demandes au maximum, deux listes de quatre titres au
@@ -108,9 +99,8 @@ maximum et les issues terminales `VERIFIED`, `NOT_FOUND` et `AMBIGUOUS`. Le
 passage depuis l’ancien numéro interne `2` renomme les symboles et tables
 actifs sans modifier les clés ni perdre les demandes déjà matérialisées.
 
-Le candidat local Queue supprime l’attente de cadence : un cache miss programme
-le traitement dès la création `PENDING`. Sa présence dans le dépôt ne prouve ni
-la création des ressources Cloudflare, ni l’accessibilité AniList depuis
-l’adaptateur direct, ni le déploiement. Les routes OIDC et le dépôt public restent donc un rollback
-opérationnel jusqu’à une bascule séparée et vérifiée; leur suppression demande
-une approbation destructive distincte.
+La Queue supprime l’attente de cadence : un cache miss programme le traitement
+dès la création `PENDING`. Le test réel confirme qu’AniList répond 403 depuis
+l’egress Cloudflare direct mais réussit via la gateway Deno signée. Le dépôt
+principal conserve toute l’implémentation; le dépôt public n’est plus un
+rollback opérationnel.

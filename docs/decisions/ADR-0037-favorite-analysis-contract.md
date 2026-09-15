@@ -34,7 +34,8 @@ La version `source-adapter-v3` réanalyse aussi les routes de sortie racine
 bornées, sans supposer manga lorsque la catégorie manque. Ces adaptateurs de
 source sont des parseurs locaux et n'effectuent aucun fetch. Les checkpoints
 fournisseur, la recherche et l'hydratation des cinq fournisseurs appartiennent
-au collecteur Public Discovery portable exécuté par GitHub Actions. Les
+au collecteur Public Discovery portable exécuté par le consumer Queue du
+Worker. Les
 références croisées modernes MangaDex→MangaUpdates sont converties depuis le
 slug base36; un ancien identifiant décimal `series.html` ne devient jamais un
 ID API.
@@ -58,7 +59,7 @@ NOT_FOUND terminé garde la saisie manuelle et la confirmation no-match actives.
 
 Ordre dans l'extension : ID/URL exact, règle origine/route, artefact/aliases,
 fiche locale hydratée, snapshot privé synchronisé, puis D1 public `VERIFIED` ou
-Review terminale. Un `MISS` produit une demande v3; le collecteur GitHub route
+Review terminale. Un `MISS` produit une demande v3; le consumer Queue route
 ensuite AniList anime puis Kitsu Anime après NO_MATCH complet, et
 MangaUpdates manga/manhwa/manhua puis MangaDex et Kitsu Manga. Une référence
 AniList manga explicite reste hydratable par le collecteur.
@@ -68,7 +69,7 @@ lane manque; deux identités de types différents imposent Review.
 Panne, 403, 429, timeout et réponse incomplète n'autorisent pas le fallback.
 Un 403 ne prouve ni un arrêt documenté du fournisseur ni un NO_MATCH.
 Le transport fournisseur n'existe pas dans le navigateur. La compatibilité
-MangaUpdates est confinée au collecteur GitHub, qui n'a pas besoin d'une règle
+MangaUpdates est confinée au collecteur serveur, qui n'a pas besoin d'une règle
 déclarative MV3 pour modifier l'en-tête Origin.
 La version 2 des règles embarquées reconnaît les routes Comix `/title/`
 avec un préfixe opaque de cinq caractères et le segment optionnel
@@ -125,7 +126,7 @@ Le port public strict reçoit seulement une clé SHA-256 versionnée et une requ
 bornée. Une saisie manuelle utilise une clé dédiée incluant le fournisseur et
 l'identifiant afin de ne pas entrer en conflit avec la requête par titre.
 `PENDING` reporte sans fournisseur dans l'extension; `VERIFIED` contient le
-profil exact hydraté. Seul le collecteur GitHub OIDC peut réclamer puis publier
+profil exact hydraté. Seul le consumer Queue natif peut réclamer puis publier
 conformément à ADR-0046.
 
 Parser, matcher, progression, normalisation, règles, décisions et reçus sont
@@ -176,7 +177,8 @@ artefact, type, progression, identité, décision et raison. Le bilan 77/4/1
 décrit les décisions prises sur ce corpus; il ne mesure pas une bibliothèque
 privée et ne revendique pas une parité avec le produit historique.
 
-Le réseau fournisseur est exécuté hors extension par le collecteur GitHub.
+Le réseau fournisseur est exécuté hors extension par le consumer Queue natif,
+via la gateway isolée lorsque l'egress direct est refusé.
 MV3 transmet au Worker seulement les titres bornés ou l'ID exact; URL brute,
 dossiers, progression et historique ne quittent pas le stockage privé.
 `npm run verify`, tests installés Chromium/Firefox, migrations, SQL, quotas,
