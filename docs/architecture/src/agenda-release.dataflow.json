@@ -37,7 +37,7 @@
     { "id": "scheduledTrigger", "type": "cloud", "label": "Cron Worker", "sublabel": "toutes les 10 minutes", "stage": 0, "row": 0, "width": 145, "tag": "signal seulement" },
     { "id": "providerApis", "type": "external", "label": "APIs fournisseurs", "sublabel": "AniList · MangaUpdates", "stage": 0, "row": 1, "width": 145, "tag": "données publiques" },
     { "id": "queue", "type": "messagebus", "label": "Cloudflare Queue", "sublabel": "agenda-refresh · DLQ après 8 retries", "stage": 1, "row": 0, "width": 175, "tag": "logs JSON bornés" },
-    { "id": "transportPort", "type": "security", "label": "ProviderTransportPort", "sublabel": "AniList + MU via Deno", "stage": 1, "row": 1, "width": 175, "tag": "gate par endpoint" },
+    { "id": "transportPort", "type": "security", "label": "ProviderTransportPort", "sublabel": "AniList + MU via Deno", "stage": 1, "row": 1, "width": 175, "tag": "rotation HMAC 2 clés max" },
     { "id": "collector", "type": "backend", "label": "Consumer Worker", "sublabel": "code lane · tentative · disposition", "stage": 2, "row": 0, "width": 165, "tag": "ack · retry · DLQ" },
     { "id": "releaseD1", "type": "database", "label": "D1 Agenda", "sublabel": "générations · événements DATE/INSTANT", "stage": 2, "row": 1, "width": 175, "tag": "pointeur actif atomique" },
     { "id": "releaseApi", "type": "backend", "label": "GET /v3/releases", "sublabel": "fenêtre source · fraîcheur · ETag", "stage": 2, "row": 2, "width": 175, "tag": "pages de 100" },

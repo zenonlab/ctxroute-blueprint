@@ -24,7 +24,7 @@ interface GatewayOptions {
   readonly fetcher?: ProviderFetch;
   readonly nonceStore: GatewayNonceStore;
   readonly now?: () => number;
-  readonly secret: string;
+  readonly secrets: readonly string[];
 }
 
 function bytes(value: string): number {
@@ -98,6 +98,22 @@ async function readBounded(stream: ReadableStream<Uint8Array> | null, limit: num
 async function hmac(secret: string, value: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { hash: 'SHA-256', name: 'HMAC' }, false, ['sign']);
   return new Uint8Array(await crypto.subtle.sign('HMAC', key, value));
+}
+
+function assertGatewaySecrets(values: readonly string[]): readonly string[] {
+  if (values.length < 1 || values.length > 2 || new Set(values).size !== values.length) throw new TypeError('gateway-secrets');
+  for (const value of values) {
+    const length = bytes(value);
+    if (length < minimumSecretBytes || length > maximumSecretBytes) throw new TypeError('gateway-secret');
+  }
+  return Object.freeze([...values]);
+}
+
+async function matchesGatewaySignature(secrets: readonly string[], raw: Uint8Array<ArrayBuffer>, provided: Uint8Array): Promise<boolean> {
+  const expected = await Promise.all(secrets.map((secret) => hmac(secret, raw)));
+  let matches = false;
+  for (const candidate of expected) matches = equalConstantTime(provided, candidate) || matches;
+  return matches;
 }
 
 function decodeHex(value: string): Uint8Array | undefined {
@@ -180,7 +196,7 @@ export class DenoKvNonceStore implements GatewayNonceStore {
 }
 
 export function createProviderGatewayHandler(options: GatewayOptions): (request: Request) => Promise<Response> {
-  if (bytes(options.secret) < minimumSecretBytes || bytes(options.secret) > maximumSecretBytes) throw new TypeError('gateway-secret');
+  const secrets = assertGatewaySecrets(options.secrets);
   const fetcher = options.fetcher ?? fetch.bind(globalThis);
   const now = options.now ?? Date.now;
   return async (request) => {
@@ -196,7 +212,7 @@ export function createProviderGatewayHandler(options: GatewayOptions): (request:
       return json(413, 'request-too-large');
     }
     const provided = decodeHex(request.headers.get('x-tobirink-gateway-signature') ?? '');
-    if (provided === undefined || !equalConstantTime(provided, await hmac(options.secret, raw))) return json(401, 'invalid-signature');
+    if (provided === undefined || !await matchesGatewaySignature(secrets, raw, provided)) return json(401, 'invalid-signature');
     const currentTime = now();
     const envelope = parseEnvelope(raw, currentTime);
     if (envelope === undefined) return json(400, 'invalid-envelope');
@@ -231,12 +247,17 @@ export function createUnconfiguredGatewayHandler(): (request: Request) => Promis
 
 if (import.meta.main) {
   const secret = Deno.env.get('PROVIDER_GATEWAY_HMAC_KEY');
+  const previousSecret = Deno.env.get('PROVIDER_GATEWAY_HMAC_KEY_PREVIOUS');
   let handler: (request: Request) => Promise<Response>;
   if (secret === undefined) {
     handler = createUnconfiguredGatewayHandler();
   } else {
-    const kv = await Deno.openKv();
-    handler = createProviderGatewayHandler({ nonceStore: new DenoKvNonceStore(kv), secret });
+    try {
+      const kv = await Deno.openKv();
+      handler = createProviderGatewayHandler({ nonceStore: new DenoKvNonceStore(kv), secrets: previousSecret === undefined ? [secret] : [secret, previousSecret] });
+    } catch {
+      handler = createUnconfiguredGatewayHandler();
+    }
   }
   Deno.serve(async (request) => {
     const startedAt = Date.now();

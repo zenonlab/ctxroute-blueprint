@@ -1,0 +1,13 @@
+{
+  "goalId": "goal-provider-gateway-hmac-rotation",
+  "stepId": "implement-dual-key-rotation",
+  "status": "DONE",
+  "evidence": [
+    "La gateway accepte une clé courante et au plus une clé précédente distincte; 9 tests Deno couvrent les deux signatures, les clés faibles, dupliquées ou excessives et le démarrage fermé.",
+    "La gate Deno ordonne l'installation de l'ancienne clé avant la mise à jour de la nouvelle, expurge les deux valeurs et expose une suppression sans valeur; 8 tests ciblés et les 33 tests infra passent.",
+    "L'inspection Deno ne restitue que les noms et la classification des variables; toute valeur inattendue est supprimée de l'inventaire normalisé.",
+    "npm run verify, npm ls --all et npm audit passent; les builds Chrome et Firefox réussissent et aucune vulnérabilité n'est signalée.",
+    "public-pipeline.architecture, agenda-release.dataflow, Archify all et internal passent en showcase 9/9 sans erreur ni avertissement; ADR-0051 et le runbook décrivent la fenêtre bornée à deux clés.",
+    "AGENTS.md, CLAUDE.md et .codex/hooks.json restent inchangés; .codex/config.toml demeure une modification utilisateur exclue du commit."
+  ]
+}

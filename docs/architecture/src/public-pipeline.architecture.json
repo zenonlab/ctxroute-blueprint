@@ -87,7 +87,7 @@
       "id": "gateway",
       "type": "backend",
       "label": "Gateway fournisseur",
-      "sublabel": "Deno Deploy · HMAC · anti-rejeu",
+      "sublabel": "Deno · HMAC ×2 · anti-rejeu",
       "pos": [960, 250],
       "size": [240, 72]
     },
@@ -136,6 +136,6 @@
   ],
   "cards": [
     { "dot": "emerald", "title": "Runtime natif", "items": ["Discovery déclenchée immédiatement par Queue", "Agenda collecté par Cron", "Logs JSON: lane, tentative et disposition", "D1 conserve la dernière génération saine"] },
-    { "dot": "rose", "title": "Gateway sélective fermée", "items": ["Secret HMAC 32–256 octets", "Nonce et horodatage vérifiés", "AniList + tous les endpoints MU", "MangaDex et Kitsu directs"] }
+    { "dot": "rose", "title": "Gateway sélective fermée", "items": ["Deux secrets HMAC maximum pendant rotation", "Nonce et horodatage vérifiés", "AniList + tous les endpoints MU", "MangaDex et Kitsu directs"] }
   ]
 }

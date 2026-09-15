@@ -52,6 +52,17 @@ MangaUpdates (`/v1/series/search`, `/v1/series/{id}` et
 passerelle modifie seulement ces bindings et repasse par la gate de déploiement
 Cloudflare; le consumer et les fournisseurs restent inchangés.
 
+La signature Cloudflare utilise toujours une seule clé courante. Pour une
+rotation sans interruption, Deno accepte temporairement cette clé courante et
+une seule clé précédente distincte, toutes deux bornées à 32–256 octets. Il
+calcule les deux signatures attendues avant de décider, conserve le nonce
+atomique commun et échoue fermé pour une liste vide, une clé invalide, un
+doublon ou plus de deux clés. La gate Deno inventorie les noms de variables
+sans leur valeur et sépare l’ajout de la précédente, la mise à jour de la
+courante et la suppression finale. La précédente est installée avant la mise à
+jour courante; sa suppression et chaque déploiement restent des mutations
+fournisseur approuvées séparément.
+
 La gate opérationnelle Cloudflare dérive également les deux ressources Queue
 du seul `wrangler.jsonc`. Elle expose uniquement les opérations de création
 `tobirink-public-discovery` et `tobirink-public-discovery-dlq`, inclut
@@ -107,5 +118,6 @@ Sources de décision consultées le 15 septembre 2026 :
 - https://docs.deno.com/deploy/usage/
 - https://docs.deno.com/deploy/reference/deno_kv/
 - https://docs.deno.com/deploy/kv/transactions/
+- https://docs.deno.com/runtime/reference/cli/deploy/
 - https://vercel.com/docs/plans/hobby
 - https://render.com/docs/free

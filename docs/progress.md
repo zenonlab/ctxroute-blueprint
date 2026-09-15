@@ -103,3 +103,7 @@
 ## Corriger les écarts du pipeline et de sa documentation — DONE
 
 - [x] **Fiabiliser l’observabilité et rétablir la vérité architecturale** — DONE _(evidence: Worker 81/81 et gateway Deno 7/7 passent; les tests Queue couvrent succès, signal invalide, retry, neuvième livraison vers DLQ et codes AniList/MangaUpdates bornés., npm ci --ignore-scripts, npm ls --all et npm run verify passent; les builds Chrome/Firefox réussissent et npm audit rapporte 0 vulnérabilité., Archify all et internal passent en showcase 9/9 sans erreur ni avertissement; Agenda, pipeline public, trafic et blueprint décrivent le runtime Cloudflare plus Deno sans GitHub Actions actif.)_
+
+## Permettre la rotation HMAC Deno sans interruption — DONE
+
+- [x] **Accepter une clé précédente bornée et étendre la gate Deno** — DONE _(evidence: La gateway accepte une clé courante et au plus une clé précédente distincte; 9 tests Deno couvrent les deux signatures, les clés faibles, dupliquées ou excessives et le démarrage fermé., La gate Deno ordonne l'installation de l'ancienne clé avant la mise à jour de la nouvelle, expurge les deux valeurs et expose une suppression sans valeur; 8 tests ciblés et les 33 tests infra passent., L'inspection Deno ne restitue que les noms et la classification des variables; toute valeur inattendue est supprimée de l'inventaire normalisé.)_

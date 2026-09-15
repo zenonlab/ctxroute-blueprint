@@ -127,6 +127,34 @@ The Deno gateway health probe is `GET /healthz`. A configured instance returns
 HTTP 200 with `{ "status": "healthy" }`; an instance missing its secret or KV
 binding remains closed with HTTP 503 and `{ "error": "gateway-not-configured" }`.
 
+## Zero-downtime gateway key rotation
+
+The Worker signs with `PROVIDER_GATEWAY_HMAC_KEY` only. Deno accepts that
+current key and, during a rotation window, one distinct
+`PROVIDER_GATEWAY_HMAC_KEY_PREVIOUS`. Both values must contain 32–256 UTF-8
+bytes. An empty, duplicate, weak, oversized or third key leaves the gateway
+closed. The inspection gate records environment-variable names and secret
+classification, never their values.
+
+Rotate in this exact order, with a separately reviewed provider plan and exact
+approval for every apply:
+
+1. keep the old key only in the operator environment as the previous value and
+   generate the new current value outside the repository;
+2. apply one Deno plan containing `gateway-previous-secret-set`,
+   `gateway-secret-update` and `gateway-deploy`; the driver installs the old
+   previous key before changing the current key;
+3. verify `/healthz` and a signed request from the still-old Worker;
+4. apply the Cloudflare secret update and Worker deployment with the new
+   current key, then verify Discovery and Agenda traffic;
+5. apply a final Deno plan containing `gateway-previous-secret-delete` and
+   `gateway-deploy`, then repeat the traffic check.
+
+Never combine step 5 with the Cloudflare switch. Removing the previous key is
+a destructive secret mutation and remains forbidden without approval for that
+exact Deno variable. Roll back before step 5 by restoring the old Worker key;
+after step 5, reinstall the old Deno current key first if rollback is required.
+
 ## Public Discovery retention
 
 D1 records deletion eligibility without deleting data automatically:

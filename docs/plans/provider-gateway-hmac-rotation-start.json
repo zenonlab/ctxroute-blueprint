@@ -1,0 +1,54 @@
+{
+  "goalId": "goal-provider-gateway-hmac-rotation",
+  "title": "Permettre la rotation HMAC Deno sans interruption",
+  "status": "ACTIVE",
+  "executionMode": "autonomous",
+  "modeOffered": true,
+  "approved": true,
+  "steps": [
+    {
+      "id": "implement-dual-key-rotation",
+      "title": "Accepter une clé précédente bornée et étendre la gate Deno",
+      "status": "IN_PROGRESS",
+      "acceptance": [
+        "La gateway accepte la clé courante et au plus une clé précédente distincte pendant la rotation, sans changer le signer Cloudflare.",
+        "Les clés absentes, faibles, trop longues, dupliquées ou une troisième clé échouent fermées avant le service.",
+        "La vérification calcule les signatures de toutes les clés configurées avant de décider et conserve l’anti-rejeu existant.",
+        "La gate Deno expose des opérations séparées pour définir et retirer la clé précédente, sans lire ni journaliser leur valeur.",
+        "Le runbook documente l’ordre sans coupure et réserve chaque mutation de secret ou déploiement à une approbation exacte ultérieure.",
+        "ADR-0051 et les vues Archify décrivent la fenêtre à deux clés; tests Deno, infra, verify, npm ls, audit et validations documentaires passent.",
+        "Un commit vérifié local est créé sans .codex/config.toml, push, déploiement, mutation de secret ou suppression distante."
+      ],
+      "files": [
+        "apps/provider-gateway/src/index.ts",
+        "apps/provider-gateway/src/index.test.ts",
+        "scripts/infra/provider-gateway-driver.mjs",
+        "scripts/infra/provider-gateway-driver.test.mjs",
+        "docs/operations/cloudflare.env.example",
+        "docs/operations/cloudflare.md",
+        "docs/02-quality-strategy.md",
+        "docs/decisions/ADR-0051-provider-transport-gate.md",
+        "docs/architecture/src/public-pipeline.architecture.json",
+        "docs/architecture/src/agenda-release.dataflow.json",
+        ".project/progress.json",
+        "docs/progress.md",
+        "docs/plans/provider-gateway-hmac-rotation-start.json",
+        "docs/plans/provider-gateway-hmac-rotation-done.json"
+      ],
+      "commands": [
+        "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress/CRG prévues.",
+        "Exécuter deno test et deno check pour la gateway, puis npm run test:infra.",
+        "Exécuter npm run verify, npm ls --all, npm audit --audit-level=high et git diff --check.",
+        "Valider public-pipeline.architecture, agenda-release.dataflow, all et internal avec Archify showcase.",
+        "Mettre CRG à jour sur le commit final.",
+        "Créer le commit fix(gateway): support zero-downtime key rotation sans push ni déploiement."
+      ],
+      "evidence": []
+    }
+  ],
+  "validationEvidence": [
+    "Audit local: la gateway et la gate Deno n’acceptent actuellement qu’une seule clé PROVIDER_GATEWAY_HMAC_KEY.",
+    "Documentation Deno Deploy officielle consultée le 15 septembre 2026: env add/update-value/delete sont les opérations supportées.",
+    "Aucune valeur de secret réelle, mutation fournisseur, suppression, dépense, publication ou push dans cette étape."
+  ]
+}

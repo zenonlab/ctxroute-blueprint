@@ -18,13 +18,13 @@ function memoryNonceStore(): GatewayNonceStore {
   return { claim: (value) => Promise.resolve(!values.has(value) && Boolean(values.add(value))) };
 }
 
-async function signature(raw: string): Promise<string> {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { hash: 'SHA-256', name: 'HMAC' }, false, ['sign']);
+async function signature(raw: string, signingSecret = secret): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(signingSecret), { hash: 'SHA-256', name: 'HMAC' }, false, ['sign']);
   const value = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(raw)));
   return Array.from(value, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function gatewayRequest(overrides: Partial<{ body: string | null; issuedAt: string; method: 'GET' | 'POST'; nonce: string; target: string; version: 1 }> = {}): Promise<Request> {
+async function gatewayRequest(overrides: Partial<{ body: string | null; issuedAt: string; method: 'GET' | 'POST'; nonce: string; target: string; version: 1 }> = {}, signingSecret = secret): Promise<Request> {
   const raw = JSON.stringify({
     body: '{"query":"query { Media(id: 154587) { id } }"}',
     issuedAt: new Date(now).toISOString(),
@@ -36,7 +36,7 @@ async function gatewayRequest(overrides: Partial<{ body: string | null; issuedAt
   });
   return new Request('https://gateway.example/v1/provider-fetch', {
     body: raw,
-    headers: { 'Content-Type': 'application/json', 'X-Tobirink-Gateway-Signature': await signature(raw) },
+    headers: { 'Content-Type': 'application/json', 'X-Tobirink-Gateway-Signature': await signature(raw, signingSecret) },
     method: 'POST',
   });
 }
@@ -52,7 +52,7 @@ Deno.test('forwards a valid signed AniList request with fixed product headers', 
     },
     nonceStore: memoryNonceStore(),
     now: () => now,
-    secret,
+    secrets: [secret],
   });
   const response = await handler(await gatewayRequest());
   assert(response.status === 200);
@@ -74,7 +74,7 @@ Deno.test('forwards MangaUpdates and rejects direct-only provider targets', asyn
     },
     nonceStore: memoryNonceStore(),
     now: () => now,
-    secret,
+    secrets: [secret],
   });
   const response = await handler(await gatewayRequest({
     body: '{}',
@@ -93,7 +93,7 @@ Deno.test('rejects a replay before a second provider call', async () => {
     fetcher: () => { calls += 1; return Promise.resolve(Response.json({ ok: true })); },
     nonceStore: memoryNonceStore(),
     now: () => now,
-    secret,
+    secrets: [secret],
   });
   assert((await handler(await gatewayRequest())).status === 200);
   assert((await handler(await gatewayRequest())).status === 409);
@@ -105,7 +105,7 @@ Deno.test('rejects tampering, stale envelopes and arbitrary targets', async () =
     fetcher: () => Promise.resolve(Response.json({ ok: true })),
     nonceStore: memoryNonceStore(),
     now: () => now,
-    secret,
+    secrets: [secret],
   });
   const tampered = await gatewayRequest();
   tampered.headers.set('X-Tobirink-Gateway-Signature', '0'.repeat(64));
@@ -122,7 +122,7 @@ Deno.test('bounds request and upstream response bodies', async () => {
     fetcher: () => Promise.resolve(new Response(oversized, { headers: { 'Content-Type': 'application/json' } })),
     nonceStore: memoryNonceStore(),
     now: () => now,
-    secret,
+    secrets: [secret],
   });
   assert((await handler(await gatewayRequest())).status === 502);
   const largeBody = 'x'.repeat(64 * 1024);
@@ -130,12 +130,33 @@ Deno.test('bounds request and upstream response bodies', async () => {
 });
 
 Deno.test('exposes only a bounded health endpoint besides the signed route', async () => {
-  const handler = createProviderGatewayHandler({ nonceStore: memoryNonceStore(), now: () => now, secret });
+  const handler = createProviderGatewayHandler({ nonceStore: memoryNonceStore(), now: () => now, secrets: [secret] });
   const health = await handler(new Request('https://gateway.example/healthz'));
   assert(health.status === 200);
   assert((await health.json()).status === 'healthy');
   assert((await handler(new Request('https://gateway.example/'))).status === 404);
   assert((await handler(new Request('https://gateway.example/v1/provider-fetch?target=https://example.com'))).status === 404);
+});
+
+Deno.test('accepts one distinct previous key only during a bounded rotation window', async () => {
+  const previousSecret = 'abcdef0123456789abcdef0123456789';
+  const handler = createProviderGatewayHandler({
+    fetcher: () => Promise.resolve(Response.json({ ok: true })),
+    nonceStore: memoryNonceStore(),
+    now: () => now,
+    secrets: [secret, previousSecret],
+  });
+  assert((await handler(await gatewayRequest({}, previousSecret))).status === 200);
+  assert((await handler(await gatewayRequest({ nonce: '223e4567-e89b-42d3-a456-426614174000' }))).status === 200);
+});
+
+Deno.test('rejects invalid, duplicate and excessive gateway key sets', () => {
+  const options = { nonceStore: memoryNonceStore(), now: () => now };
+  for (const secrets of [[], ['short'], [secret, secret], [secret, 'abcdef0123456789abcdef0123456789', 'fedcba9876543210fedcba9876543210']]) {
+    let rejected = false;
+    try { createProviderGatewayHandler({ ...options, secrets }); } catch { rejected = true; }
+    assert(rejected);
+  }
 });
 
 Deno.test('starts closed while Deno provisions the secret and KV binding', async () => {

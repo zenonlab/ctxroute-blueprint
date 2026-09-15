@@ -9,18 +9,23 @@ const DRIVER_ID = 'deno-provider-gateway';
 const APP = 'tobirink-provider-gateway';
 const DATABASE = 'tobirink-provider-gateway-nonces';
 const SECRET = 'PROVIDER_GATEWAY_HMAC_KEY';
+const PREVIOUS_SECRET = 'PROVIDER_GATEWAY_HMAC_KEY_PREVIOUS';
 
 export function createProviderGatewayDriver({
   gatewayDirectory,
   run = runDeno,
   read = readFile,
   secret = process.env[SECRET],
+  previousSecret = process.env[PREVIOUS_SECRET],
 }) {
   const operations = new Map([
     ['gateway-app-create', { kind: 'gateway-app-create', target: `deno-app:${APP}` }],
     ['gateway-database-provision', { kind: 'gateway-database-provision', target: `deno-kv:${DATABASE}` }],
     ['gateway-database-assign', { kind: 'gateway-database-assign', target: `deno-assignment:${DATABASE}/${APP}` }],
     ['gateway-secret-set', { kind: 'gateway-secret-set', target: `deno-secret:${APP}/${SECRET}` }],
+    ['gateway-secret-update', { kind: 'gateway-secret-update', target: `deno-secret:${APP}/${SECRET}` }],
+    ['gateway-previous-secret-set', { kind: 'gateway-previous-secret-set', target: `deno-secret:${APP}/${PREVIOUS_SECRET}` }],
+    ['gateway-previous-secret-delete', { kind: 'gateway-previous-secret-delete', target: `deno-secret:${APP}/${PREVIOUS_SECRET}` }],
     ['gateway-deploy', { kind: 'gateway-deploy', target: `deno-app:${APP}/production` }],
   ]);
 
@@ -40,16 +45,18 @@ export function createProviderGatewayDriver({
     async inspect(organization) {
       requiredIdentifier(organization, 'organization');
       const common = ['--json', '--non-interactive', '--org', organization];
-      const [identity, apps, databases] = await Promise.all([
+      const [identity, apps, databases, environment] = await Promise.all([
         run(['deploy', 'whoami', '--json', '--non-interactive'], { cwd: gatewayDirectory }),
         run(['deploy', 'apps', 'list', ...common], { cwd: gatewayDirectory }),
         run(['deploy', 'database', 'list', ...common], { cwd: gatewayDirectory }),
+        run(['deploy', 'env', 'list', ...common, '--app', APP], { cwd: gatewayDirectory }),
       ]);
       return {
         accountId: organization,
         applications: parseJson(apps, 'invalid-deno-apps'),
         databases: parseJson(databases, 'invalid-deno-databases'),
         driverId: DRIVER_ID,
+        environment: parseEnvironmentInventory(environment),
         identity: parseJson(identity, 'invalid-deno-identity'),
       };
     },
@@ -72,9 +79,9 @@ export function createProviderGatewayDriver({
       const selected = materialize(operations, actions).sort((left, right) => priority(left) - priority(right));
       const results = [];
       for (const action of selected) {
-        const args = mutationArguments(action, accountId, secret);
+        const args = mutationArguments(action, accountId, secret, previousSecret);
         const output = await run(args, { cwd: gatewayDirectory });
-        results.push({ kind: action.kind, output: redact(output, secret), target: action.target });
+        results.push({ kind: action.kind, output: redact(output, [secret, previousSecret]), target: action.target });
       }
       return results;
     },
@@ -89,7 +96,7 @@ function materialize(operations, actions) {
   });
 }
 
-function mutationArguments(action, organization, secret) {
+function mutationArguments(action, organization, secret, previousSecret) {
   const common = ['--json', '--non-interactive', '--org', organization];
   if (action.kind === 'gateway-app-create') {
     return ['deploy', 'create', '.', ...common, '--app', APP, '--source', 'local', '--runtime-mode', 'dynamic', '--entrypoint', 'src/index.ts', '--region', 'global'];
@@ -100,12 +107,22 @@ function mutationArguments(action, organization, secret) {
     assertSecret(secret);
     return ['deploy', 'env', 'add', SECRET, secret, ...common, '--app', APP, '--secret'];
   }
+  if (action.kind === 'gateway-secret-update') {
+    assertSecret(secret);
+    return ['deploy', 'env', 'update-value', SECRET, secret, ...common, '--app', APP];
+  }
+  if (action.kind === 'gateway-previous-secret-set') {
+    assertSecret(previousSecret);
+    if (secret === previousSecret) throw new Error('duplicate-provider-gateway-secret');
+    return ['deploy', 'env', 'add', PREVIOUS_SECRET, previousSecret, ...common, '--app', APP, '--secret'];
+  }
+  if (action.kind === 'gateway-previous-secret-delete') return ['deploy', 'env', 'delete', PREVIOUS_SECRET, ...common, '--app', APP];
   if (action.kind === 'gateway-deploy') return ['deploy', '.', ...common, '--app', APP, '--prod'];
   throw new Error(`unsupported-gateway-action-kind:${action.kind}`);
 }
 
 function priority(action) {
-  return ['gateway-app-create', 'gateway-database-provision', 'gateway-database-assign', 'gateway-secret-set', 'gateway-deploy'].indexOf(action.kind);
+  return ['gateway-app-create', 'gateway-database-provision', 'gateway-database-assign', 'gateway-secret-set', 'gateway-previous-secret-set', 'gateway-secret-update', 'gateway-previous-secret-delete', 'gateway-deploy'].indexOf(action.kind);
 }
 
 async function runDeno(args, { cwd }) {
@@ -132,6 +149,20 @@ function parseJson(value, error) {
   }
 }
 
-function redact(value, secret) {
-  return secret === String(secret) && secret.length > 0 ? value.replaceAll(secret, '[REDACTED]') : value;
+function parseEnvironmentInventory(value) {
+  const parsed = parseJson(value, 'invalid-deno-environment');
+  const variables = Array.isArray(parsed) ? parsed : parsed?.variables;
+  if (!Array.isArray(variables)) throw new Error('invalid-deno-environment');
+  return {
+    variables: variables.map(variable => {
+      if (variable === null || variable?.name !== String(variable?.name)) throw new Error('invalid-deno-environment');
+      return { name: variable.name, secret: variable.secret === true || variable.type === 'secret' };
+    }),
+  };
+}
+
+function redact(value, secrets) {
+  let redacted = value;
+  for (const secret of secrets) if (secret === String(secret) && secret.length > 0) redacted = redacted.replaceAll(secret, '[REDACTED]');
+  return redacted;
 }

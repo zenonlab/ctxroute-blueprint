@@ -1504,6 +1504,62 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-provider-gateway-hmac-rotation",
+      "title": "Permettre la rotation HMAC Deno sans interruption",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "implement-dual-key-rotation",
+          "title": "Accepter une clé précédente bornée et étendre la gate Deno",
+          "status": "DONE",
+          "acceptance": [
+            "La gateway accepte la clé courante et au plus une clé précédente distincte pendant la rotation, sans changer le signer Cloudflare.",
+            "Les clés absentes, faibles, trop longues, dupliquées ou une troisième clé échouent fermées avant le service.",
+            "La vérification calcule les signatures de toutes les clés configurées avant de décider et conserve l’anti-rejeu existant.",
+            "La gate Deno expose des opérations séparées pour définir et retirer la clé précédente, sans lire ni journaliser leur valeur.",
+            "Le runbook documente l’ordre sans coupure et réserve chaque mutation de secret ou déploiement à une approbation exacte ultérieure.",
+            "ADR-0051 et les vues Archify décrivent la fenêtre à deux clés; tests Deno, infra, verify, npm ls, audit et validations documentaires passent.",
+            "Un commit vérifié local est créé sans .codex/config.toml, push, déploiement, mutation de secret ou suppression distante."
+          ],
+          "files": [
+            "apps/provider-gateway/src/index.ts",
+            "apps/provider-gateway/src/index.test.ts",
+            "scripts/infra/provider-gateway-driver.mjs",
+            "scripts/infra/provider-gateway-driver.test.mjs",
+            "docs/operations/cloudflare.env.example",
+            "docs/operations/cloudflare.md",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0051-provider-transport-gate.md",
+            "docs/architecture/src/public-pipeline.architecture.json",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/provider-gateway-hmac-rotation-start.json",
+            "docs/plans/provider-gateway-hmac-rotation-done.json"
+          ],
+          "commands": [
+            "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress/CRG prévues.",
+            "Exécuter deno test et deno check pour la gateway, puis npm run test:infra.",
+            "Exécuter npm run verify, npm ls --all, npm audit --audit-level=high et git diff --check.",
+            "Valider public-pipeline.architecture, agenda-release.dataflow, all et internal avec Archify showcase.",
+            "Mettre CRG à jour sur le commit final.",
+            "Créer le commit fix(gateway): support zero-downtime key rotation sans push ni déploiement."
+          ],
+          "evidence": [
+            "La gateway accepte une clé courante et au plus une clé précédente distincte; 9 tests Deno couvrent les deux signatures, les clés faibles, dupliquées ou excessives et le démarrage fermé.",
+            "La gate Deno ordonne l'installation de l'ancienne clé avant la mise à jour de la nouvelle, expurge les deux valeurs et expose une suppression sans valeur; 8 tests ciblés et les 33 tests infra passent.",
+            "L'inspection Deno ne restitue que les noms et la classification des variables; toute valeur inattendue est supprimée de l'inventaire normalisé.",
+            "npm run verify, npm ls --all et npm audit passent; les builds Chrome et Firefox réussissent et aucune vulnérabilité n'est signalée.",
+            "public-pipeline.architecture, agenda-release.dataflow, Archify all et internal passent en showcase 9/9 sans erreur ni avertissement; ADR-0051 et le runbook décrivent la fenêtre bornée à deux clés.",
+            "AGENTS.md, CLAUDE.md et .codex/hooks.json restent inchangés; .codex/config.toml demeure une modification utilisateur exclue du commit."
+          ]
+        }
+      ]
     }
   ]
 }
