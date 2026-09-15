@@ -813,6 +813,86 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-push-main-remediation-ce6f43d",
+      "title": "Publier les remédiations et la preuve de sauvegarde sur origin/main",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "push-exact-tip",
+          "title": "Pousser le tip certifié vers origin/main",
+          "status": "DONE",
+          "acceptance": [
+            "Le push est fast-forward.",
+            "refs/heads/main pointe exactement sur ce6f43dbbc165afea77b4cb82a29cb5d355e066f.",
+            "Aucune autre ref distante n’est modifiée.",
+            ".codex/config.toml et le dump D1 restent hors push.",
+            "Les exécutions GitHub déclenchées sont observées et leur état est rapporté."
+          ],
+          "files": [
+            "remote:origin/refs/heads/main"
+          ],
+          "commands": [
+            "git fetch origin main",
+            "git merge-base --is-ancestor origin/main ce6f43dbbc165afea77b4cb82a29cb5d355e066f",
+            "git push origin ce6f43dbbc165afea77b4cb82a29cb5d355e066f:refs/heads/main",
+            "git ls-remote origin refs/heads/main",
+            "gh run list --repo tristan-monticelli/Tobirink --branch main"
+          ],
+          "evidence": [
+            "Push fast-forward réussi: origin/main pointe exactement sur ce6f43dbbc165afea77b4cb82a29cb5d355e066f.",
+            "La modification utilisateur .codex/config.toml et le dump D1 sont restés hors push.",
+            "Runs 34969133546, 34969133545 et 34969133539 créés puis arrêtés avant toute étape; runner_id=0 et annotation GitHub de paiement/plafond de dépenses."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-deploy-public-discovery-v3-worker",
+      "title": "Déployer les migrations Public Discovery v3 et le Worker",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "apply-d1-and-worker",
+          "title": "Appliquer D1 0013–0015 puis déployer le Worker v3",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Les migrations 0013, 0014 et 0015 sont enregistrées comme appliquées et aucune migration ne reste en attente.",
+            "public_discovery_requests_v3 et public_discovery_result_nonces_v3 existent; leurs noms _v2 ont disparu.",
+            "La requête VERIFIED préexistante est conservée et request_json vaut l’objet JSON vide.",
+            "catalogue_canonical_titles_v1 et les index de rétention existent.",
+            "Le nouveau Worker sert Discovery v3 et Agenda v3 avec HTTP 200; les routes Discovery v2 restent HTTP 410.",
+            "Les 14 tables historiques Collectif/Favorite ne sont pas supprimées dans cette étape.",
+            ".codex/config.toml reste intact."
+          ],
+          "files": [
+            "build/operations/deploy-public-discovery-v3-worker.json",
+            "remote:d1:tobirink-public",
+            "remote:worker:tobirink-public-api"
+          ],
+          "commands": [
+            "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation d1-migrate:PUBLIC_DB --operation worker-deploy",
+            "Materialiser exactement le JSON du preview dans build/operations/deploy-public-discovery-v3-worker.json",
+            "npm run infra:apply -- --plan build/operations/deploy-public-discovery-v3-worker.json --approve <digest> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow d1:tobirink-public --allow worker:tobirink-public-api",
+            "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "Requêtes D1 de schéma, conservation et minimisation",
+            "Vérification HTTP des routes Public Discovery v2/v3 et Agenda v3"
+          ],
+          "evidence": [
+            "Migrations 0013–0015 et Worker db774555 déployés; v3=200 et v2=410.",
+            "La vérification production a révélé request_json historique=394 octets; migration corrective 0016 ajoutée sans DELETE/DROP.",
+            "Tests D1 19/19: VERIFIED, NOT_FOUND, AMBIGUOUS expurgés; PENDING, PROCESSING, FAILED conservés.",
+            "npm run verify passe, audit 0 vulnérabilité, builds MV3 réussis; Archify public-discovery showcase 9/9, artefact f6ed7ecc."
+          ]
+        }
+      ]
     }
   ]
 }

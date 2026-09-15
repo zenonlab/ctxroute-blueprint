@@ -192,7 +192,8 @@
         "Un bail PROCESSING empêche tout second collecteur concurrent",
         "La huitième tentative expirée devient FAILED puis UNAVAILABLE",
         "Un POST identique est requis pour remettre FAILED à PENDING",
-        "Le résultat VERIFIED répond aux prochaines lectures; request_json devient {}"
+        "Le résultat VERIFIED répond aux prochaines lectures; request_json devient {}",
+        "Le backfill terminal historique conserve PENDING, PROCESSING et FAILED"
       ]
     },
     {

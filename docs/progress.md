@@ -59,3 +59,11 @@
 ## Versionner la preuve de sauvegarde D1 — DONE
 
 - [x] **Valider et commiter la preuve opérationnelle** — DONE _(evidence: validate:docs -- --all et validate:decisions (50 ADR, 437 scopes) réussis., git diff --check réussi; aucun changement dans AGENTS.md, CLAUDE.md, .codex/hooks.json ou .claude/hooks., Le diff versionné reste limité aux deux fichiers Progress; le dump et .codex/config.toml sont exclus.)_
+
+## Publier les remédiations et la preuve de sauvegarde sur origin/main — DONE
+
+- [x] **Pousser le tip certifié vers origin/main** — DONE _(evidence: Push fast-forward réussi: origin/main pointe exactement sur ce6f43dbbc165afea77b4cb82a29cb5d355e066f., La modification utilisateur .codex/config.toml et le dump D1 sont restés hors push., Runs 34969133546, 34969133545 et 34969133539 créés puis arrêtés avant toute étape; runner_id=0 et annotation GitHub de paiement/plafond de dépenses.)_
+
+## Déployer les migrations Public Discovery v3 et le Worker — ACTIVE
+
+- [ ] **Appliquer D1 0013–0015 puis déployer le Worker v3** — IN_PROGRESS _(evidence: Migrations 0013–0015 et Worker db774555 déployés; v3=200 et v2=410., La vérification production a révélé request_json historique=394 octets; migration corrective 0016 ajoutée sans DELETE/DROP., Tests D1 19/19: VERIFIED, NOT_FOUND, AMBIGUOUS expurgés; PENDING, PROCESSING, FAILED conservés.)_

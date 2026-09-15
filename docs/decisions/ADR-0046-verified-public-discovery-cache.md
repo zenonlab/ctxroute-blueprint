@@ -115,8 +115,11 @@ matérialise l’index manquant sans rappeler de fournisseur.
 Au plus 5 000 demandes peuvent être simultanément `PENDING` ou `PROCESSING`.
 Une nouvelle clé au-delà de cette borne reçoit `503`; une clé existante reste
 lisible et rejouable. Après terminalisation, `request_json` devient `{}` et le
-résultat terminal est conservé comme cache. Les nonces reçoivent une échéance
-à sept jours, les échecs `FAILED` à trente jours et les révisions orphelines
+résultat terminal est conservé comme cache. Une migration de backfill applique
+la même minimisation aux lignes terminales antérieures, sans modifier les
+demandes `PENDING`, `PROCESSING` ou `FAILED` nécessaires à une reprise. Les
+nonces reçoivent une échéance à sept jours, les échecs `FAILED` à trente jours
+et les révisions orphelines
 deviennent éligibles après trente jours. Ces échéances n’autorisent aucune
 suppression automatique : toute purge D1 exige sauvegarde, plan borné et
 approbation destructive séparée.

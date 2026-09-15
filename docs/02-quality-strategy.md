@@ -82,7 +82,8 @@ browser or `workerd` test when platform behavior is the risk.
   OIDC, la publication terminale d’un profil complet et son rejeu idempotent.
   Les contrats refusent une cinquième entrée dans chacune des deux listes de
   titres. Les tests D1 réels vérifient le plafond global actif et sa réponse
-  `503`, l’expurgation terminale de `request_json`, les échéances des nonces et
+  `503`, l’expurgation terminale et le backfill historique de `request_json`
+  sans altérer les demandes reprenables, les échéances des nonces et
   des échecs, l’index canonique versionné, son plan de requête et le rejet sans
   écriture partielle d’une collision de titre normalisé.
   Les tests du runner prouvent qu’un MISS, un PENDING et un VERIFIED ne lancent

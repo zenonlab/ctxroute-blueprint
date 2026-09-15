@@ -34,22 +34,61 @@ function verifiedResult(key: ReturnType<typeof discoveryKey>, requestDigest: str
 }
 
 beforeEach(async (context) => {
-  if (context.task.name === 'preserves queued rows while renaming the active D1 tables to v3') return;
+  if (context.task.name === 'preserves active requests and redacts historical terminal requests during migration') return;
   await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS);
 });
 
 describe('verified public discovery cache', () => {
-  it('preserves queued rows while renaming the active D1 tables to v3', async () => {
-    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(0, -1));
+  it('preserves active requests and redacts historical terminal requests during migration', async () => {
+    const v3AlignmentIndex = env.TEST_MIGRATIONS.findIndex(({ name }) => name === '0015_public_discovery_v3_alignment.sql');
+    const minimizationIndex = env.TEST_MIGRATIONS.findIndex(({ name }) => name === '0016_public_discovery_terminal_minimization.sql');
+    expect(v3AlignmentIndex).toBeGreaterThan(-1);
+    expect(minimizationIndex).toBeGreaterThan(v3AlignmentIndex);
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(0, v3AlignmentIndex));
     const key = discoveryKey('0');
+    const now = '2026-09-15T12:00:00.000Z';
+    const preservedJson = JSON.stringify({ key, query: { discoveryTitles: ['Preserved'], mediaKind: 'ANIME', sourceTitles: ['Preserved'] }, requestDigest: '0'.repeat(64), schemaVersion: 3 });
     await env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v2(
       fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
       state, retry_at, created_at, updated_at)
       VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7)`)
-      .bind(...Object.values(key), '0'.repeat(64), JSON.stringify({ key, query: { discoveryTitles: ['Preserved'], mediaKind: 'ANIME', sourceTitles: ['Preserved'] }, requestDigest: '0'.repeat(64), schemaVersion: 3 }), '2026-09-15T12:00:00.000Z').run();
-    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(-1));
+      .bind(...Object.values(key), '0'.repeat(64), preservedJson, now).run();
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(v3AlignmentIndex, minimizationIndex));
     expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ state: 'PENDING' });
     await expect(env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v2 LIMIT 1').first()).rejects.toThrow();
+    const requestJson = JSON.stringify({ query: { discoveryTitles: ['Historical'], sourceTitles: ['Historical'] } });
+    const states = ['PROCESSING', 'FAILED', 'VERIFIED', 'NOT_FOUND', 'AMBIGUOUS'] as const;
+    await env.PUBLIC_DB.batch(states.map((state, index) => env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v3(
+      fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
+      state, claim_token_hash, lease_until, attempt_count, failure_reason, failed_at,
+      result_json, retry_at, verified_at, created_at, updated_at, purge_after)
+      VALUES (?1, 'ANIME', '5', '3', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?11, ?11, ?13)`)
+      .bind(
+        String.fromCharCode(117 + index).repeat(64), String.fromCharCode(117 + index).repeat(64), requestJson, state,
+        state === 'PROCESSING' ? 'c'.repeat(64) : null,
+        state === 'PROCESSING' ? '2099-01-01T00:00:00.000Z' : null,
+        state === 'FAILED' ? 8 : 0,
+        state === 'FAILED' ? 'ATTEMPT_LIMIT' : null,
+        state === 'FAILED' ? now : null,
+        ['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS'].includes(state) ? '{}' : null,
+        now,
+        ['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS'].includes(state) ? now : null,
+        state === 'FAILED' ? '2026-10-15T12:00:00.000Z' : null,
+      )));
+
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(minimizationIndex));
+
+    const rows = (await env.PUBLIC_DB.prepare(`SELECT state, request_json AS requestJson
+      FROM public_discovery_requests_v3 WHERE fingerprint IN (?1, ?2, ?3, ?4, ?5, ?6) ORDER BY state`)
+      .bind(key.fingerprint, ...states.map((_, index) => String.fromCharCode(117 + index).repeat(64))).all()).results;
+    expect(rows).toEqual([
+      { requestJson: '{}', state: 'AMBIGUOUS' },
+      { requestJson, state: 'FAILED' },
+      { requestJson: '{}', state: 'NOT_FOUND' },
+      { requestJson: preservedJson, state: 'PENDING' },
+      { requestJson, state: 'PROCESSING' },
+      { requestJson: '{}', state: 'VERIFIED' },
+    ]);
   });
 
   it('logs only a bounded code when collector OIDC verification rejects', async () => {
