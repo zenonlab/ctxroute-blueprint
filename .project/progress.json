@@ -467,6 +467,63 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-security-runtime-boundaries",
+      "title": "Borner WebBridge et renforcer la confiance OIDC",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Plafonner les sessions locales et le cache JWKS",
+          "status": "DONE",
+          "acceptance": [
+            "WebBridge purge les sessions expirées, conserve au plus 32 sessions en LRU, 64 requestIds par session et 512 requestIds au total.",
+            "Une session évincée ou ayant épuisé son quota échoue fermée et peut uniquement se rétablir par un nouveau handshake.",
+            "OIDC exige repository_id 1370309060 et repository_owner_id 239743354 en plus du dépôt, de la branche, du workflow et de l’audience.",
+            "La lecture JWKS est interrompue après 3 secondes et son cache conserve au plus 16 clés pendant au plus 5 minutes; un kid absent force un rafraîchissement.",
+            "Les tests ciblés prouvent purge, LRU, quotas, claims immuables, timeout, réutilisation et rotation du cache.",
+            "ADR-0036 et ADR-0045 ainsi que les deux diagrammes produit décrivent les limites; Archify passe showcase.",
+            "npm run typecheck, npm run verify, les validations documentaires et git diff --check réussissent.",
+            "Le commit local fix(security): bound bridge and OIDC trust exclut .codex/config.toml; aucun push, déploiement ou appel fournisseur n’a lieu."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/security-runtime-boundaries.json",
+            "apps/extension/runtime/web-bridge-runtime.ts",
+            "apps/extension/runtime/web-bridge-runtime.test.ts",
+            "apps/worker/src/releases/github-oidc.ts",
+            "apps/worker/src/releases/github-oidc.test.ts",
+            "docs/decisions/ADR-0036-static-site-and-local-bridge.md",
+            "docs/decisions/ADR-0045-public-release-calendar.md",
+            "docs/architecture/src/tobirink-ux.dataflow.json",
+            "docs/architecture/src/public-pipeline.architecture.json"
+          ],
+          "commands": [
+            "edit scoped files with apply_patch",
+            "npm test --workspace @tobirink/extension -- runtime/web-bridge-runtime.test.ts",
+            "npm test --workspace @tobirink/worker -- src/releases/github-oidc.test.ts",
+            "npm run typecheck",
+            "npm run archify:validate -- tobirink-ux.dataflow",
+            "npm run archify:validate -- public-pipeline.architecture",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m fix(security): bound bridge and OIDC trust"
+          ],
+          "evidence": [
+            "WebBridge tests 7/7 prove 32-session LRU, 64 IDs per session, 512 IDs globally, closed quotas and expired-session purge behavior.",
+            "OIDC tests prove immutable repository 1370309060 and owner 239743354, 3-second abort, 5-minute cache reuse/expiry, kid rotation and 16-key rejection; security suites pass Extension 9/9 and Worker 15/15.",
+            "All workspace typechecks and npm run verify pass; npm audit reports 0 vulnerabilities and Chrome/Firefox MV3 builds succeed.",
+            "Archify showcase passes 9/9 with no warnings; public-pipeline artifact eff426e83e1aa8aa00a07c598e156a6bb7b42b33333af304bd9bc9bd0f639f67 and tobirink-ux artifact 661e5d4ac8e4ba0e757e3f29643c41723dea9e8eae128f6c3978cebc626431bf."
+          ]
+        }
+      ]
     }
   ]
 }

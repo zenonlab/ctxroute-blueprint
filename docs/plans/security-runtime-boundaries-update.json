@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-security-runtime-boundaries",
+  "stepId": "step-1",
+  "status": "DONE",
+  "evidence": [
+    "WebBridge tests 7/7 prove 32-session LRU, 64 IDs per session, 512 IDs globally, closed quotas and expired-session purge behavior.",
+    "OIDC tests prove immutable repository 1370309060 and owner 239743354, 3-second abort, 5-minute cache reuse/expiry, kid rotation and 16-key rejection; security suites pass Extension 9/9 and Worker 15/15.",
+    "All workspace typechecks and npm run verify pass; npm audit reports 0 vulnerabilities and Chrome/Firefox MV3 builds succeed.",
+    "Archify showcase passes 9/9 with no warnings; public-pipeline artifact eff426e83e1aa8aa00a07c598e156a6bb7b42b33333af304bd9bc9bd0f639f67 and tobirink-ux artifact 661e5d4ac8e4ba0e757e3f29643c41723dea9e8eae128f6c3978cebc626431bf."
+  ]
+}

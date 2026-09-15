@@ -45,8 +45,16 @@ sorties anime officielles et MangaUpdates pour les sorties manga, manhwa et
 manhua confirmées. Il transmet au Worker une génération complète, bornée,
 versionnée et sans donnée personnelle. Un jeton GitHub OIDC court authentifie
 l'émetteur sans secret partagé sur l’audience `workers.dev`. Le Worker vérifie signature RS256 auprès du
-JWKS GitHub, issuer, audience, dépôt, branche et identité exacte du workflow,
+JWKS GitHub, issuer, audience, dépôt, IDs immuables du dépôt et du propriétaire,
+branche et identité exacte du workflow,
 valide nonce, digest, fenêtre et schéma, puis reste l'unique auteur D1.
+
+L’identité publique attend `repository_id=1370309060` et
+`repository_owner_id=239743354`, vérifiés depuis l’API GitHub. Une lecture JWKS
+est interrompue après trois secondes et reste limitée à 64 Kio et seize clés.
+Les clés validées sont mises en cache au plus cinq minutes dans une structure
+bornée par fetcher; un `kid` absent force immédiatement un rafraîchissement afin
+de permettre la rotation sans élargir la confiance.
 
 Le workflow du dépôt privé est manuel et vérifie seulement l’export autonome.
 Il ne demande aucun jeton OIDC, n’appelle aucun fournisseur et ne publie aucune

@@ -16,7 +16,7 @@
         "id": "collector-path",
         "label": "Collecte OIDC",
         "focus": ["providers", "github", "worker", "d1"],
-        "note": "Les workflows publics collectent les fournisseurs puis publient par OIDC sans secret partagé."
+        "note": "Les workflows publics publient par OIDC avec IDs immuables; JWKS est limité, temporisé et mis en cache cinq minutes."
       }
     ]
   },
@@ -33,7 +33,7 @@
       "id": "github",
       "type": "security",
       "label": "GitHub Actions OIDC",
-      "sublabel": "Agenda hebdomadaire · Discovery quotidien",
+      "sublabel": "Agenda hebdomadaire · Discovery dix minutes",
       "pos": [400, 80],
       "size": [250, 72]
     },
@@ -80,13 +80,13 @@
   ],
   "connections": [
     { "id": "provider-collection", "from": "providers", "to": "github", "label": "pages bornées", "variant": "emphasis" },
-    { "id": "oidc-ingestion", "from": "github", "to": "worker", "label": "OIDC · dépôt et workflow exacts", "variant": "security" },
+    { "id": "oidc-ingestion", "from": "github", "to": "worker", "label": "OIDC · IDs et workflow exacts", "variant": "security" },
     { "id": "extension-api", "from": "extension", "to": "worker", "label": "HTTPS · demandes / Agenda v3", "variant": "emphasis" },
     { "id": "worker-sql", "from": "worker", "to": "d1", "label": "SQL · PENDING / VERIFIED / générations" },
     { "id": "worker-archives", "from": "worker", "to": "r2", "label": "lecture des archives immuables" }
   ],
   "cards": [
     { "dot": "emerald", "title": "Pipeline vérifiée", "items": ["Discovery terminal réutilisé", "Agenda AniList + MangaUpdates actif", "Aucun protocole Collectif actif"] },
-    { "dot": "cyan", "title": "Cycle de vie borné", "items": ["Agenda frais moins de huit jours", "Fenêtre source vérifiée", "Active + deux sauvegardes D1"] }
+    { "dot": "cyan", "title": "Cycle de vie borné", "items": ["Agenda frais moins de huit jours", "Fenêtre source vérifiée", "JWKS: 64 KiB, 16 clés, timeout 3 s, cache 5 min", "Active + deux sauvegardes D1"] }
   ]
 }
