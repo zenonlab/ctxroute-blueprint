@@ -1,0 +1,18 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "delete-public-repository",
+  "status": "DONE",
+  "files": [
+    "build/backups/tobirink-public-discovery.bundle.b64",
+    "docs/release.md",
+    "docs/plans/consolidate-native-collectors-delete-public-repo-done.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": [
+    "Le bundle décodé est valide, contient l'historique complet et pointe main/HEAD sur 51742d92602d91e66a45e7a62b6d687dbd566219; SHA-256 c41e16372290150a7c3937aa3fa7bf2588b4dc743fa75beee0ac1721aca796e2.",
+    "Aucune dépendance active du dépôt principal ne vise tristan-monticelli/tobirink-public-discovery.",
+    "Le dépôt exact tristan-monticelli/tobirink-public-discovery a été supprimé avec le compte propriétaire et l'API GitHub répond HTTP 404.",
+    "Après suppression, Agenda v3 sert toujours une génération fraîche et la gateway Deno répond sur /healthz."
+  ]
+}

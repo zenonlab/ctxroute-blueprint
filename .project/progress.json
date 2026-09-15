@@ -1326,15 +1326,16 @@
         {
           "id": "delete-public-repository",
           "title": "Supprimer le dépôt public devenu inutile",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le bundle contient 51742d9 et aucune dépendance active ne vise le dépôt.",
             "Le dépôt exact tristan-monticelli/tobirink-public-discovery est supprimé.",
             "GitHub répond 404 et le trafic Cloudflare reste sain."
           ],
           "files": [
-            "build/backups/tobirink-public-discovery.bundle",
+            "build/backups/tobirink-public-discovery.bundle.b64",
             "docs/release.md",
+            "docs/plans/consolidate-native-collectors-delete-public-repo-done.json",
             ".project/progress.json",
             "docs/progress.md"
           ],
@@ -1345,7 +1346,12 @@
             "vérifier le 404",
             "recertifier le Worker"
           ],
-          "evidence": []
+          "evidence": [
+            "Le bundle décodé est valide, contient l'historique complet et pointe main/HEAD sur 51742d92602d91e66a45e7a62b6d687dbd566219; SHA-256 c41e16372290150a7c3937aa3fa7bf2588b4dc743fa75beee0ac1721aca796e2.",
+            "Aucune dépendance active du dépôt principal ne vise tristan-monticelli/tobirink-public-discovery.",
+            "Le dépôt exact tristan-monticelli/tobirink-public-discovery a été supprimé avec le compte propriétaire et l'API GitHub répond HTTP 404.",
+            "Après suppression, Agenda v3 sert toujours une génération fraîche et la gateway Deno répond sur /healthz."
+          ]
         },
         {
           "id": "final-audit-and-secret-inventory",

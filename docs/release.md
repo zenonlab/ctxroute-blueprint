@@ -16,6 +16,12 @@ et `POST /v3/catalogue/discoveries/results` répondent 410. Les sections datées
 ci-dessous restent l’historique des versions antérieures et ne décrivent plus
 la composition active.
 
+Le dépôt public devenu inutile
+`tristan-monticelli/tobirink-public-discovery` a été supprimé après vérification
+de son bundle complet. L’API GitHub répond 404; la sauvegarde locale conserve
+`main` et `HEAD` sur `51742d92602d91e66a45e7a62b6d687dbd566219` avec le
+SHA-256 `c41e16372290150a7c3937aa3fa7bf2588b4dc743fa75beee0ac1721aca796e2`.
+
 ## Runtime Cloudflare natif publié — 15 septembre 2026
 
 Le commit certifié `873f248377f4f74788d8218a0f071829c0cdb659` est
