@@ -40,6 +40,23 @@
       "simple": { "limit": 10, "period": 60 }
     }
   ],
+  "queues": {
+    "producers": [
+      { "binding": "PUBLIC_DISCOVERY_QUEUE", "queue": "tobirink-public-discovery" }
+    ],
+    "consumers": [
+      {
+        "queue": "tobirink-public-discovery",
+        "max_batch_size": 1,
+        "max_batch_timeout": 0,
+        "max_retries": 8,
+        "dead_letter_queue": "tobirink-public-discovery-dlq"
+      }
+    ]
+  },
+  "triggers": {
+    "crons": ["17 3 * * 1"]
+  },
   "vars": {
     "TOBIRINK_WORKER_DIAGNOSTICS": "worker-v1"
   },

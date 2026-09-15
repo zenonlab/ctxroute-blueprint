@@ -876,6 +876,29 @@ Conditional reads returned HTTP 304 on both routes. Public GET requests read D1
 only; provider collection remains isolated in the scheduled or manually
 dispatched GitHub workflow.
 
+### Candidat local — collecteurs Queue et proxy sortant
+
+La branche `refactor/cloudflare-native-collectors` prépare le remplacement du
+sondage GitHub par une Cloudflare Queue. Un `POST` Discovery qui matérialise
+`PENDING` dépose immédiatement un signal `{ type, version }` sans titre, clé ou
+donnée personnelle. Le consumer Worker réclame D1 directement, publie sous le
+bail existant et choisit explicitement `ack` ou `retry`. Le cron Agenda dépose
+un signal séparé dans la même file et conserve la dernière génération valide si
+une lane fournisseur échoue.
+
+Les appels AniList, MangaUpdates, MangaDex et Kitsu passent par un transport
+injecté vers un proxy HTTPS hors Cloudflare. Chaque enveloppe est signée
+HMAC-SHA-256, horodatée et munie d’un nonce. Le handler portable limite la
+requête à 64 Kio et la réponse à 512 Kio, refuse les redirections et toute URL,
+méthode ou query hors allowlist, et ferme le registre de nonces à saturation.
+Une instance unique peut utiliser le registre mémoire borné; plusieurs
+instances exigent un registre partagé.
+
+Ce candidat ne crée aucune Queue, DLQ, IP statique, application proxy ou secret
+et ne déploie rien. GitHub reste le chemin de production et ne doit être retiré
+qu’après création séparée des ressources, déploiement, test d’un miss réel
+jusqu’à l’état terminal et vérification d’une collecte Agenda réelle.
+
 The published archives are byte-identical to the verified local candidates:
 
 - Chrome: 302755 bytes, SHA-256 `78cd2e6755dc0d26d92c209eda082711dd0917b794f41f947e7ed4b5aa6be211`.

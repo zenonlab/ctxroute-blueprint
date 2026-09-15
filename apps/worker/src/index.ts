@@ -5,6 +5,7 @@ import { createPublicReleaseApp } from './releases/public-release-routes';
 import { createWorkerServices, type WorkerRuntime } from './composition';
 import { boundedDuration, classifyWorkerRoute, emitWorkerDiagnostic, workerMethod } from './diagnostics';
 import { Hono } from 'hono';
+import { enqueueAgendaRefresh, handleNativeCollectorQueue, processAgendaQueue, processPublicDiscoveryQueue, type NativeCollectorBindings, type NativeCollectorSignal } from './native-collectors';
 
 const app = new Hono<WorkerRuntime>();
 const publicSiteRoutes = new Set(['/', '/library', '/agenda', '/privacy', '/download']);
@@ -56,4 +57,11 @@ app.onError((_error, context) => {
   return context.json({ error: 'internal-error' }, 500);
 });
 
-export default { fetch: app.fetch };
+export default {
+  fetch: app.fetch,
+  queue: async (batch: MessageBatch<NativeCollectorSignal>, env: NativeCollectorBindings) => handleNativeCollectorQueue(batch.messages, {
+    agenda: (scheduledFor) => processAgendaQueue(env, scheduledFor),
+    discovery: () => processPublicDiscoveryQueue(env),
+  }),
+  scheduled: (controller: ScheduledController, env: NativeCollectorBindings) => enqueueAgendaRefresh(controller, env),
+};

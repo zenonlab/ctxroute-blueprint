@@ -5,7 +5,7 @@
     "title": "TobiRink — découverte publique D1-first",
     "output": "public-discovery.dataflow.html",
     "quality_profile": "showcase",
-    "viewBox": [1080, 460],
+    "viewBox": [1080, 700],
     "views": [
       {
         "id": "cache-hit",
@@ -16,14 +16,14 @@
       {
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
-        "focus": ["extension", "worker", "publicD1", "github", "providers", "verifiedD1", "extensionResult"],
-        "note": "Le miss devient une requête unique; GitHub Actions interroge le fournisseur puis hydrate D1."
+        "focus": ["extension", "worker", "publicD1", "queue", "collector", "proxy", "providers", "verifiedD1", "extensionResult"],
+        "note": "Le miss devient PENDING puis une Queue déclenche le collecteur sans attendre un cron."
       },
       {
         "id": "boundaries",
         "label": "Frontières",
-        "focus": ["extension", "worker", "publicD1", "github", "providers"],
-        "note": "Aucun compte, consentement, Collectif ou appel fournisseur direct dans la découverte automatique."
+        "focus": ["extension", "worker", "publicD1", "queue", "collector", "proxy", "providers"],
+        "note": "Le proxy signé autorise seulement les opérations fournisseur connues et masque l’egress Cloudflare."
       }
     ]
   },
@@ -31,7 +31,7 @@
     { "label": "Demande" },
     { "label": "API" },
     { "label": "Cache et file" },
-    { "label": "Collecte" },
+    { "label": "Traitement" },
     { "label": "Résultat" }
   ],
   "nodes": [
@@ -66,15 +66,37 @@
       "tag": "PENDING · FAILED · TERMINAL"
     },
     {
-      "id": "github",
-      "type": "security",
-      "label": "Repo public Discovery",
-      "sublabel": "Actions · entrée workers.dev",
+      "id": "queue",
+      "type": "messagebus",
+      "label": "Cloudflare Queue",
+      "sublabel": "signal sans titre ni identité",
+      "stage": 2,
+      "row": 2,
+      "yOffset": 20,
+      "width": 140,
+      "tag": "déclenchement immédiat"
+    },
+    {
+      "id": "collector",
+      "type": "backend",
+      "label": "Collecteur Worker",
+      "sublabel": "claim D1 · résolution bornée",
       "stage": 3,
       "row": 2,
-      "yOffset": -30,
+      "yOffset": 20,
       "width": 140,
-      "tag": "MIT · runner standard"
+      "tag": "ack ou retry explicite"
+    },
+    {
+      "id": "proxy",
+      "type": "security",
+      "label": "Proxy sortant signé",
+      "sublabel": "HMAC · anti-rejeu · allowlist",
+      "stage": 4,
+      "row": 2,
+      "yOffset": 20,
+      "width": 140,
+      "tag": "IP hors Cloudflare"
     },
     {
       "id": "providers",
@@ -82,10 +104,10 @@
       "label": "APIs fournisseurs",
       "sublabel": "AniList · MU · MD · Kitsu ×2",
       "stage": 4,
-      "row": 2,
-      "yOffset": -30,
+      "row": 3,
+      "yOffset": 50,
       "width": 140,
-      "tag": "GitHub uniquement"
+      "tag": "proxy uniquement"
     },
     {
       "id": "verifiedD1",
@@ -126,7 +148,7 @@
       "classification": "4 + 4 titres · 5 000 actifs max",
       "variant": "security",
       "route": "straight",
-      "labelAt": [423, 316]
+      "labelAt": [423, 204]
     },
     {
       "from": "publicD1",
@@ -139,30 +161,47 @@
     },
     {
       "from": "publicD1",
-      "to": "github",
+      "to": "queue",
       "label": "MISS : requête PENDING unique",
-      "classification": "dédupliquée par clé",
+      "classification": "signal sans titres · dédupliquée par clé",
       "variant": "security",
       "route": "auto",
-      "labelAt": [638, 402]
+      "labelAt": [530, 338]
     },
     {
-      "from": "github",
+      "from": "queue",
+      "to": "collector",
+      "label": "lot disponible",
+      "classification": "at-least-once · bail D1 idempotent",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [638, 448]
+    },
+    {
+      "from": "collector",
+      "to": "proxy",
+      "label": "enveloppe signée bornée",
+      "classification": "cible allowlistée · nonce court",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [853, 448]
+    },
+    {
+      "from": "proxy",
       "to": "providers",
       "label": "requête API bornée",
       "classification": "AniList · MU · MangaDex · Kitsu Anime/Manga",
       "variant": "emphasis",
       "route": "auto",
-      "labelAt": [853, 428]
+      "labelAt": [960, 600]
     },
     {
-      "from": "github",
+      "from": "collector",
       "to": "verifiedD1",
-      "label": "publication atomique via Worker",
+      "label": "publication atomique directe",
       "classification": "bail + digest + meta.changes = 1",
       "variant": "security",
-      "route": "auto",
-      "labelAt": [820, 300]
+      "route": "auto"
     },
     {
       "from": "verifiedD1",
@@ -187,7 +226,7 @@
       "dot": "cyan",
       "title": "MISS D1",
       "items": [
-        "D1 conserve une seule requête PENDING par clé",
+        "D1 conserve une seule requête PENDING par clé et la Queue ne transporte aucun titre",
         "Titre normalisé + média possède un unique workId versionné",
         "Un bail PROCESSING empêche tout second collecteur concurrent",
         "La huitième tentative expirée devient FAILED puis UNAVAILABLE",
@@ -198,14 +237,15 @@
     },
     {
       "dot": "amber",
-      "title": "Périmètre",
+      "title": "Candidat local non déployé",
       "items": [
         "Aucun utilisateur, compte, consentement ou Collectif",
         "Nonces 7 jours · FAILED 30 jours · résultats terminaux conservés",
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
-        "D1 et le code Worker restent privés; seul le collecteur MIT est public",
-        "GitHub utilise workers.dev pour éviter le challenge Bot Fight Mode du site",
-        "OIDC valide l’en-tête GitHub RS256/kid/x5t puis journalise seulement un code de rejet stable et borné, jamais le jeton ni les détails du vérificateur"
+        "D1, le collecteur et le code Worker restent dans le dépôt principal privé",
+        "Le proxy sortant n’accepte aucune URL arbitraire et utilise une IP hors Cloudflare",
+        "Chaque appel porte une signature HMAC, un horodatage et un nonce anti-rejeu borné",
+        "GitHub reste le chemin opérationnel tant que Queue, proxy et trafic réel ne sont pas certifiés"
       ]
     }
   ]

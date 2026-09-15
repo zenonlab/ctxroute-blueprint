@@ -6,16 +6,17 @@ import { AniListFavoriteProviderAdapter } from './providers/anilist.js';
 import { KitsuFavoriteProviderAdapter } from './providers/kitsu.js';
 import { MangaDexFavoriteProviderAdapter } from './providers/mangadex.js';
 import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates.js';
+import type { FavoriteProviderFetch } from './provider-http.js';
 
 export type PublicDiscoveryProviderPorts = Readonly<Record<ResolutionProvider, FavoriteProviderPort>>;
 
-export function createPublicDiscoveryProviders(): PublicDiscoveryProviderPorts {
+export function createPublicDiscoveryProviders(fetcher: FavoriteProviderFetch = fetch.bind(globalThis)): PublicDiscoveryProviderPorts {
   return Object.freeze({
-    anilist: new AniListFavoriteProviderAdapter(),
-    mangaupdates: new MangaUpdatesFavoriteProviderAdapter(),
-    mangadex: new MangaDexFavoriteProviderAdapter(),
-    'kitsu-anime': new KitsuFavoriteProviderAdapter('kitsu-anime'),
-    'kitsu-manga': new KitsuFavoriteProviderAdapter('kitsu-manga'),
+    anilist: new AniListFavoriteProviderAdapter(fetcher),
+    mangaupdates: new MangaUpdatesFavoriteProviderAdapter(fetcher),
+    mangadex: new MangaDexFavoriteProviderAdapter(fetcher),
+    'kitsu-anime': new KitsuFavoriteProviderAdapter('kitsu-anime', fetcher),
+    'kitsu-manga': new KitsuFavoriteProviderAdapter('kitsu-manga', fetcher),
   });
 }
 

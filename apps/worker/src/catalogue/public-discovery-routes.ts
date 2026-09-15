@@ -7,17 +7,22 @@ import {
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { WorkerRuntime, WorkerServices } from '../composition';
+import type { NativeCollectorSignal } from '../native-collectors';
 import { verifyGitHubAgendaToken } from '../releases/github-oidc';
 
 type VerifyCollectorToken = (token: string, audience: string) => Promise<void>;
-type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; rateLimiter?: RateLimit };
+interface DiscoveryQueuePort {
+  send(body: NativeCollectorSignal, options?: { contentType?: 'json' }): Promise<QueueSendResponse | void>;
+}
+type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; rateLimiter?: RateLimit };
 
 function routeServices(context: { get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
   if (injected) return injected;
   const services = context.get('services');
-  return services.publicDiscoveryRateLimiter
-    ? { publicDiscoveryV3: services.publicDiscoveryV3, rateLimiter: services.publicDiscoveryRateLimiter }
-    : { publicDiscoveryV3: services.publicDiscoveryV3 };
+  const selected: DiscoveryServices = { publicDiscoveryV3: services.publicDiscoveryV3 };
+  if (services.publicDiscoveryQueue) selected.queue = services.publicDiscoveryQueue;
+  if (services.publicDiscoveryRateLimiter) selected.rateLimiter = services.publicDiscoveryRateLimiter;
+  return selected;
 }
 
 function v3Port(services: DiscoveryServices): PublicDiscoveryV3Port {
@@ -84,7 +89,12 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, verifyTok
     if (!parsed.success) return noStore({ error: 'invalid-request' }, 400);
     const requestDigest = await digest(JSON.stringify(parsed.data));
     try {
-      return noStore(await v3Port(services).request({ ...parsed.data, requestDigest }, new Date().toISOString()), 202);
+      const state = await v3Port(services).request({ ...parsed.data, requestDigest }, new Date().toISOString());
+      if (state.state === 'PENDING' && services.queue) {
+        try { await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' }); }
+        catch { return noStore({ error: 'discovery-queue-unavailable' }, 503); }
+      }
+      return noStore(state, 202);
     } catch (error) {
       if (error instanceof Error && error.message === 'public-discovery-capacity-unavailable') {
         return noStore({ error: 'discovery-capacity-unavailable' }, 503);

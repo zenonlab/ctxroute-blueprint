@@ -7,6 +7,8 @@ scope:
   - packages/adapters-browser/src/catalogue/**
   - packages/adapters-cloudflare/src/catalogue/**
   - apps/worker/src/catalogue/**
+  - apps/worker/src/native-collectors.ts
+  - apps/worker/src/native-collectors.test.ts
   - apps/worker/migrations/**
   - apps/extension/wxt-entrypoints/background.ts
   - apps/extension/wxt.config.ts
@@ -56,6 +58,24 @@ contrôle d’isolation qui échoue sur tout import `@tobirink/*` ou identifiant
 ressemblant à un secret. Il doit pouvoir être extrait par `git subtree` comme
 racine du dépôt public `tristan-monticelli/tobirink-public-discovery`.
 
+Le runtime cible remplace le sondage GitHub par un signal Cloudflare Queue
+émis immédiatement après la matérialisation `PENDING`. Ce signal ne contient
+que son type et sa version : les titres et la clé restent dans D1. Le consumer
+Worker réclame ensuite le lot directement dans D1, applique le bail et les
+digests existants, puis acquitte ou reprogramme explicitement le message. La
+livraison au moins une fois reste sûre grâce à l’idempotence D1.
+Huit retries Queue donnent une neuvième livraison : elle constate le huitième
+bail expiré, matérialise `FAILED/ATTEMPT_LIMIT`, ne réclame aucun nouveau lot et
+acquitte le signal au lieu de le laisser en DLQ.
+
+Les appels fournisseurs du consumer passent par un transport injecté vers un
+proxy sortant hors Cloudflare. L’enveloppe JSON est bornée, horodatée et signée
+HMAC-SHA-256. Le proxy refuse toute cible ou méthode hors de la liste exacte
+AniList, MangaUpdates, MangaDex et Kitsu, les redirections, les réponses de
+plus de 512 Kio, les signatures invalides, les requêtes expirées et les nonces
+rejoués. Un déploiement mono-réplique peut utiliser le registre de nonces borné
+en mémoire; plusieurs répliques exigent un registre partagé avant activation.
+
 Cette racine est publiée sous licence MIT et reste `private: true` au sens npm :
 le code peut être public sans autoriser une publication accidentelle sur le
 registre. `zod` reste l’unique dépendance d’exécution; TypeScript, Vitest,
@@ -67,7 +87,8 @@ le runner public et réussir `npm ci` hors du monorepo.
 
 La cadence et l’hébergeur du collecteur peuvent changer sans modifier
 l’extension ou le Worker. GitHub Actions reste la composition opérationnelle
-initiale. Le Worker n’accepte les audiences Discovery que si les claims OIDC
+déployée tant que la Queue, le proxy et leur trafic réel ne sont pas certifiés.
+Le Worker n’accepte les audiences Discovery que si les claims OIDC
 nomment aussi le dépôt public exact, `refs/heads/main` et
 `.github/workflows/collect.yml@refs/heads/main`; les workflows de forks et de
 pull request ne reçoivent donc aucune autorité D1.
@@ -78,9 +99,9 @@ maximum et les issues terminales `VERIFIED`, `NOT_FOUND` et `AMBIGUOUS`. Le
 passage depuis l’ancien numéro interne `2` renomme les symboles et tables
 actifs sans modifier les clés ni perdre les demandes déjà matérialisées.
 
-Le workflow déployé sonde encore la file une fois par jour à 03:23 UTC et
-accepte un déclenchement manuel. Une demande est donc dédupliquée dans D1
-immédiatement, mais sa fiche peut rester `PENDING` jusqu'au prochain passage.
-Le clone public local prépare une cadence de dix minutes; elle ne devient pas
-effective avant un push et un run planifié réussis, chacun vérifié séparément.
-La cadence borne le nombre de runs GitHub Actions sans garantir leur gratuité.
+Le candidat local Queue supprime l’attente de cadence : un cache miss programme
+le traitement dès la création `PENDING`. Sa présence dans le dépôt ne prouve ni
+la création des ressources Cloudflare, ni le secret partagé du proxy, ni le
+déploiement. Les routes OIDC et le dépôt public restent donc un rollback
+opérationnel jusqu’à une bascule séparée et vérifiée; leur suppression demande
+une approbation destructive distincte.

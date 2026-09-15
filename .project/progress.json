@@ -895,6 +895,134 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-push-main-discovery-v3-6dfe27c",
+      "title": "Pousser la correction et les preuves Discovery v3 sur main",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "push-exact-tip",
+          "title": "Pousser exactement 6dfe27c vers origin/main",
+          "status": "DONE",
+          "acceptance": [
+            "Le push est fast-forward.",
+            "origin/main pointe exactement sur 6dfe27c41839fac8f2b78b74167737b135530431.",
+            "Aucune autre ref distante n'est modifiée.",
+            ".codex/config.toml reste hors commit et hors push.",
+            "Les workflows déclenchés sont observés et leur état est rapporté."
+          ],
+          "files": [
+            "remote:origin/refs/heads/main"
+          ],
+          "commands": [
+            "git fetch origin main",
+            "git merge-base --is-ancestor origin/main 6dfe27c41839fac8f2b78b74167737b135530431",
+            "git push origin 6dfe27c41839fac8f2b78b74167737b135530431:refs/heads/main",
+            "git ls-remote origin refs/heads/main",
+            "gh run list --repo tristan-monticelli/Tobirink --branch main"
+          ],
+          "evidence": [
+            "Push fast-forward réussi: ce6f43d..6dfe27c; origin/main pointe exactement sur 6dfe27c41839fac8f2b78b74167737b135530431.",
+            "Les gates pré-push locales lint, couverture, intégration et build documentaire ont réussi.",
+            "Les runs 34975288611, 34975288507 et 34975288676 ont été créés puis arrêtés avant exécution par le blocage GitHub paiement/plafond.",
+            ".codex/config.toml reste une modification utilisateur locale, non commitée et non poussée."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-public-collector-v3-51742d9",
+      "title": "Publier le collecteur Public Discovery v3 à cadence dix minutes",
+      "status": "BLOCKED",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "push-public-collector-v3",
+          "title": "Pousser exactement 51742d9 vers le dépôt public et vérifier le trafic",
+          "status": "BLOCKED",
+          "acceptance": [
+            "Le push est fast-forward et public main pointe exactement sur 51742d92602d91e66a45e7a62b6d687dbd566219.",
+            "Le workflow déployé conserve schedule */10, workflow_dispatch, permissions minimales et OIDC v3 workers.dev.",
+            "npm run verify et npm ls réussissent dans le dépôt public.",
+            "Un run planifié v3 est observé sans utilisation des runners du dépôt privé.",
+            "Les endpoints claim/result v3 sont atteints avec OIDC et le run termine correctement, y compris si la file est vide.",
+            "Les routes publiques Discovery v3 et Agenda v3 restent opérationnelles; v2 reste 410."
+          ],
+          "files": [
+            "remote:tristan-monticelli/tobirink-public-discovery/refs/heads/main"
+          ],
+          "commands": [
+            "git fetch origin main",
+            "git merge-base --is-ancestor origin/main 51742d92602d91e66a45e7a62b6d687dbd566219",
+            "npm run verify && npm ls",
+            "git push origin 51742d92602d91e66a45e7a62b6d687dbd566219:refs/heads/main",
+            "git ls-remote origin refs/heads/main",
+            "gh run list --repo tristan-monticelli/tobirink-public-discovery",
+            "Observe next scheduled collect run and verify production v3 traffic"
+          ],
+          "evidence": [
+            "Commit public 51742d9 poussé et vérifié; tests locaux 51/51 et npm ls réussis.",
+            "Routes publiques vérifiées: Discovery v3 et Agenda v3 répondent 200; Discovery v2 répond 410.",
+            "external: aucun run schedule créé sur 51742d9 après plusieurs fenêtres */10; GitHub reste sans garantie de démarrage et ne satisfait pas la latence demandée."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-cloudflare-native-collectors",
+      "title": "Remplacer GitHub Actions par des collecteurs Cloudflare et un proxy sortant",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "implement-local-runtime",
+          "title": "Implémenter et certifier localement la Queue et le proxy signé",
+          "status": "DONE",
+          "acceptance": [
+            "Une demande PENDING émet un signal Queue sans titre ni donnée privée.",
+            "Le consommateur traite les doublons de façon idempotente et acquitte ou reprend chaque message explicitement.",
+            "Le proxy refuse URL arbitraire, origine non autorisée, signature expirée, rejeu, corps ou réponse hors limite.",
+            "Discovery et Agenda utilisent un port de transport proxy injectable sans réintroduire les fournisseurs dans extension.",
+            "npm run verify, npm ls --all, validations ADR/docs et Archify dataflow showcase passent."
+          ],
+          "files": [
+            "apps/worker/wrangler.jsonc",
+            "apps/worker/src",
+            "apps/provider-proxy",
+            "packages/public-discovery/src",
+            "docs/decisions/ADR-0045-public-release-calendar.md",
+            "docs/decisions/ADR-0047-portable-public-discovery-component.md",
+            "docs/architecture/src/public-discovery.dataflow.json",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "git switch -c refactor/cloudflare-native-collectors",
+            "npm run test --workspace @tobirink/worker",
+            "npm run test --workspace @tobirink/public-discovery",
+            "npm run verify",
+            "npm ls --all",
+            "npm run archify:validate -- dataflow",
+            "git diff --check",
+            "git commit -m feat(worker): add event-driven public collectors"
+          ],
+          "evidence": [
+            "Worker 71/71 et Public Discovery 55/55 passent; les tests prouvent signal Queue opaque, 503 avec PENDING conservé, ack/retry, validation du message et proxy HMAC/allowlist/anti-rejeu/limites.",
+            "npm run verify, npm ls --all, npm audit (0 vulnérabilité) et les builds Chrome/Firefox réussissent; le dry-run Wrangler reconnaît Queue, D1, R2, Images, Assets et rate limit sans déploiement.",
+            "Archify dataflow Discovery et Agenda passent showcase 9/9, 0 erreur, 0 avertissement; artefacts 761e900d296cb5f0a5b37a2f5807cd1fde9529a01e1a19aa41a4fbb8d0d865c0 et c788c05477864ab9548fe710f28c23e2f96f06486304f263377ba2cfe4825d6f."
+          ]
+        }
+      ]
     }
   ]
 }

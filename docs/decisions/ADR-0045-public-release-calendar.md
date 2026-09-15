@@ -2,6 +2,8 @@
 scope:
   - apps/worker/src/releases/**
   - apps/worker/src/index.ts
+  - apps/worker/src/native-collectors.ts
+  - apps/worker/src/native-collectors.test.ts
   - apps/worker/migrations/**
   - apps/worker/wrangler.jsonc
   - packages/application/src/agenda/**
@@ -61,18 +63,27 @@ Il ne demande aucun jeton OIDC, n’appelle aucun fournisseur et ne publie aucun
 génération. La source publique devient ainsi l’unique exécuteur partagé des
 requêtes AniList et MangaUpdates.
 
-Le cron Cloudflare et la collecte déclenchée par `GET /v2/releases` sont
-supprimés : une lecture publique ne provoque jamais une requête fournisseur.
-Le workflow respecte les cadences et traite tout `403`, `429`, timeout ou lot
-incomplet comme un échec total. Son activation et la première collecte réelle
-restent des opérations publiées et vérifiées séparément; aucun succès n'est
-déduit des fixtures locales.
+La collecte déclenchée par `GET /v2/releases` reste supprimée : une lecture
+publique ne provoque jamais une requête fournisseur. Le candidat local ajoute
+un cron Worker hebdomadaire qui dépose un signal sans événement dans la même
+Cloudflare Queue que Discovery. Le consumer collecte les deux lanes, refuse
+tout lot incomplet et promeut directement la génération D1. Tout `403`, `429`,
+timeout ou échec conserve la dernière génération valide et reprogramme le
+message selon une temporisation bornée.
+
+AniList et MangaUpdates sont joints uniquement via le proxy sortant signé de
+l’ADR-0047; l’adresse de sortie n’appartient donc pas à Cloudflare. La signature,
+l’horodatage, l’anti-rejeu, l’allowlist et les limites de corps s’appliquent aussi
+à Agenda. La création de la Queue, du proxy, de son IP dédiée et des secrets,
+puis le déploiement et le test réel, restent une opération fournisseur séparée.
+Jusqu’à cette certification, le workflow public GitHub demeure le chemin
+opérationnel et aucune réussite live n’est déduite des tests locaux.
 
 L'extension ne possède aucun repli fournisseur Agenda. Elle lit le calendrier
 D1 par `/v3/releases`; une indisponibilité réseau peut réutiliser la dernière
 génération partagée de même fenêtre tant qu'elle a moins de huit jours. Sans
 génération partagée valide, Agenda expose son état indisponible et attend la
-prochaine collecte GitHub. Ni un démarrage, ni une alarme, ni une lecture Agenda
+prochaine collecte planifiée. Ni un démarrage, ni une alarme, ni une lecture Agenda
 ne peut appeler AniList ou MangaUpdates depuis MV3.
 
 Kitsu reste un repli de résolution et ne produit aucune date Agenda. MangaDex
@@ -136,10 +147,10 @@ n'est inventée pour MangaUpdates.
 ## Conséquences
 
 Le calendrier reste mutualisable sans rendre l'utilisateur dépendant de
-l'egress Cloudflare. Une collecte hebdomadaire alimente toutes les lectures;
+l’egress Cloudflare vers les fournisseurs. Une collecte hebdomadaire alimente toutes les lectures;
 une recherche utilisateur ne relance pas les fournisseurs Agenda. Le site et WebBridge ne voient toujours qu'une projection
 locale. Les résultats publics restent disponibles hors ligne et les pannes
-fournisseur ne réinitialisent pas le calendrier validé. Seul le workflow public
-planifié ou déclenché manuellement appelle les fournisseurs Agenda. La publication du Worker et du workflow reste derrière
-les gates opérationnelles correspondantes. Aucun secret d'ingestion ou `.env`
-Agenda n'est créé.
+fournisseur ne réinitialisent pas le calendrier validé. Après bascule certifiée,
+seul le consumer Worker via proxy appellera les fournisseurs Agenda. La Queue,
+le proxy, leurs secrets et le Worker restent derrière leurs gates
+opérationnelles; cette décision locale ne crée aucun secret ni ressource.

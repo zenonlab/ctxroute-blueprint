@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { FavoriteProviderFetch } from '../provider-http.js';
 import { publicAgendaReleaseEventSchema, type PublicAgendaReleaseEvent } from './contracts.js';
 import { createMangaUpdatesAgendaEvent, parseAniListAgendaPage, parseMangaUpdatesAgendaPage } from './provider-pages.js';
 
@@ -45,8 +46,8 @@ export async function collectPublicAgendaLanes(collectors: readonly PublicAgenda
 
 export class AniListAgendaCollector implements PublicAgendaCollector {
   readonly provider = 'anilist' as const;
-  private readonly fetcher: typeof fetch;
-  constructor(fetcher?: typeof fetch, private readonly pause: Wait = wait, private readonly saveCheckpoint: SavePageCheckpoint = ignoreCheckpoint, private readonly clock: () => number = Date.now) { this.fetcher = fetcher ?? fetch.bind(globalThis); }
+  private readonly fetcher: FavoriteProviderFetch;
+  constructor(fetcher?: FavoriteProviderFetch, private readonly pause: Wait = wait, private readonly saveCheckpoint: SavePageCheckpoint = ignoreCheckpoint, private readonly clock: () => number = Date.now) { this.fetcher = fetcher ?? fetch.bind(globalThis); }
   async collect(window: { from: string; to: string }): Promise<PublicAgendaProviderCollection> {
     const from = Math.floor(Date.parse(`${window.from}T00:00:00.000Z`) / 1000);
     const to = Math.floor(Date.parse(`${window.to}T23:59:59.999Z`) / 1000);
@@ -84,7 +85,7 @@ export class AniListAgendaCollector implements PublicAgendaCollector {
 
 export class MangaUpdatesAgendaCollector implements PublicAgendaCollector {
   readonly provider = 'mangaupdates' as const;
-  constructor(private readonly fetcher: typeof fetch = fetch.bind(globalThis), private readonly pause: Wait = wait, private readonly saveCheckpoint: SavePageCheckpoint = ignoreCheckpoint, private readonly clock: () => number = Date.now) {}
+  constructor(private readonly fetcher: FavoriteProviderFetch = fetch.bind(globalThis), private readonly pause: Wait = wait, private readonly saveCheckpoint: SavePageCheckpoint = ignoreCheckpoint, private readonly clock: () => number = Date.now) {}
   async collect(window: { from: string; to: string }): Promise<PublicAgendaProviderCollection> {
     const events = new Map<string, PublicAgendaReleaseEvent>();
     let received = 0; let skippedUnidentified = 0;

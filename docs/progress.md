@@ -67,3 +67,15 @@
 ## Déployer les migrations Public Discovery v3 et le Worker — DONE
 
 - [x] **Appliquer D1 0013–0015 puis déployer le Worker v3** — DONE _(evidence: Cloudflare: migrations 0013–0016 appliquées; aucune migration restante; Worker db774555 à 100%., D1: 1 ligne VERIFIED conservée, minimized_count=1, request_json_bytes=2; lectures changes=0., Schéma: tables requests/nonces _v3, index canonique et index pending/FAILED/nonce présents; noms actifs _v2 absents.)_
+
+## Pousser la correction et les preuves Discovery v3 sur main — DONE
+
+- [x] **Pousser exactement 6dfe27c vers origin/main** — DONE _(evidence: Push fast-forward réussi: ce6f43d..6dfe27c; origin/main pointe exactement sur 6dfe27c41839fac8f2b78b74167737b135530431., Les gates pré-push locales lint, couverture, intégration et build documentaire ont réussi., Les runs 34975288611, 34975288507 et 34975288676 ont été créés puis arrêtés avant exécution par le blocage GitHub paiement/plafond.)_
+
+## Publier le collecteur Public Discovery v3 à cadence dix minutes — BLOCKED
+
+- [ ] **Pousser exactement 51742d9 vers le dépôt public et vérifier le trafic** — BLOCKED _(evidence: Commit public 51742d9 poussé et vérifié; tests locaux 51/51 et npm ls réussis., Routes publiques vérifiées: Discovery v3 et Agenda v3 répondent 200; Discovery v2 répond 410., external: aucun run schedule créé sur 51742d9 après plusieurs fenêtres */10; GitHub reste sans garantie de démarrage et ne satisfait pas la latence demandée.)_
+
+## Remplacer GitHub Actions par des collecteurs Cloudflare et un proxy sortant — DONE
+
+- [x] **Implémenter et certifier localement la Queue et le proxy signé** — DONE _(evidence: Worker 71/71 et Public Discovery 55/55 passent; les tests prouvent signal Queue opaque, 503 avec PENDING conservé, ack/retry, validation du message et proxy HMAC/allowlist/anti-rejeu/limites., npm run verify, npm ls --all, npm audit (0 vulnérabilité) et les builds Chrome/Firefox réussissent; le dry-run Wrangler reconnaît Queue, D1, R2, Images, Assets et rate limit sans déploiement., Archify dataflow Discovery et Agenda passent showcase 9/9, 0 erreur, 0 avertissement; artefacts 761e900d296cb5f0a5b37a2f5807cd1fde9529a01e1a19aa41a4fbb8d0d865c0 et c788c05477864ab9548fe710f28c23e2f96f06486304f263377ba2cfe4825d6f.)_
