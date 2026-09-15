@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-publish-pipeline-hardening",
+  "title": "Publier le durcissement du pipeline fournisseur",
+  "status": "ACTIVE",
+  "executionMode": "collaborative",
+  "steps": [
+    {
+      "id": "push-deploy-and-certify",
+      "title": "Pousser, déployer les deux runtimes et certifier le trafic",
+      "status": "TODO",
+      "acceptance": [
+        "origin/main pointe exactement sur 589f52c avant les déploiements.",
+        "La gate Deno déploie uniquement deno-app:tobirink-provider-gateway/production sans modifier secret ni KV.",
+        "La gate Cloudflare déploie uniquement worker:tobirink-public-api sans migration D1 ni autre ressource.",
+        "La santé Deno, Discovery AniList et MangaUpdates, Agenda v3 et la retraite v2 sont certifiées en production."
+      ],
+      "files": [
+        ".project/progress.json",
+        "docs/progress.md",
+        "docs/plans/publish-pipeline-hardening.json",
+        "docs/plans/publish-pipeline-hardening-done.json"
+      ],
+      "commands": [
+        "git push origin 589f52c:main",
+        "npm run infra:plan -- --provider deno --account tobirink --operation gateway-deploy",
+        "npm run infra:apply -- --provider deno --account tobirink --allow deno-app:tobirink-provider-gateway/production",
+        "npm run infra:plan -- --provider cloudflare --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation worker-deploy",
+        "npm run infra:apply -- --provider cloudflare --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow worker:tobirink-public-api",
+        "Production HTTP verification for Deno health, Discovery v3, Agenda v3 and Catalogue v2"
+      ],
+      "evidence": []
+    }
+  ],
+  "validationEvidence": [
+    "origin/main exact SHA verification",
+    "Deno and Cloudflare gate receipts with exact allowlists",
+    "Production traffic reaches terminal provider-backed results",
+    "Catalogue v2 remains HTTP 410"
+  ],
+  "approved": true
+}

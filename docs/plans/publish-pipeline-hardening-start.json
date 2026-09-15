@@ -1,0 +1,6 @@
+{
+  "goalId": "goal-publish-pipeline-hardening",
+  "stepId": "push-deploy-and-certify",
+  "status": "IN_PROGRESS",
+  "evidence": []
+}

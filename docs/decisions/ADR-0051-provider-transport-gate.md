@@ -59,7 +59,9 @@ calcule les deux signatures attendues avant de décider, conserve le nonce
 atomique commun et échoue fermé pour une liste vide, une clé invalide, un
 doublon ou plus de deux clés. La gate Deno inventorie les noms de variables
 sans leur valeur et sépare l’ajout de la précédente, la mise à jour de la
-courante et la suppression finale. La précédente est installée avant la mise à
+courante et la suppression finale. Elle normalise les réponses historiques
+`name`/`secret` et actuelles `key`/`isSecret` sans conserver de valeur; une
+forme mixte, ambiguë ou inconnue échoue avant la planification. La précédente est installée avant la mise à
 jour courante; sa suppression et chaque déploiement restent des mutations
 fournisseur approuvées séparément.
 

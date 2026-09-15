@@ -191,10 +191,19 @@ function parseEnvironmentInventory(value) {
   if (!Array.isArray(variables)) throw new Error('invalid-deno-environment');
   return {
     variables: variables.map(variable => {
-      if (variable === null || variable?.name !== String(variable?.name)) throw new Error('invalid-deno-environment');
-      return { name: variable.name, secret: variable.secret === true || variable.type === 'secret' };
+      if (!isRecord(variable)) throw new Error('invalid-deno-environment');
+      const legacy = variable.name === String(variable.name) && variable.key === undefined;
+      const current = variable.key === String(variable.key) && variable.name === undefined && (variable.isSecret === true || variable.isSecret === false);
+      if (!legacy && !current) throw new Error('invalid-deno-environment');
+      return legacy
+        ? { name: variable.name, secret: variable.secret === true || variable.type === 'secret' }
+        : { name: variable.key, secret: variable.isSecret };
     }),
   };
+}
+
+function isRecord(value) {
+  return value !== null && value !== undefined && Object.getPrototypeOf(value) === Object.prototype;
 }
 
 function redact(value, secrets) {

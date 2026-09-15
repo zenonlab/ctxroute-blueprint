@@ -127,6 +127,9 @@ browser or `workerd` test when platform behavior is the risk.
 - Deno gate tests prove that secret mutations use a single allowlisted variable
   in a `0600` temporary file, keep values out of process arguments and raw
   errors, and remove the temporary directory after success and failure.
+- Deno inspection tests cover both the legacy `name`/`secret` inventory and the
+  current `key`/`isSecret` inventory, discard provider values, and reject mixed
+  or unclassified current entries before planning.
 
 ## Performance budgets
 

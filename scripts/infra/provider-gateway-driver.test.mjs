@@ -27,7 +27,7 @@ test('inspection is read-only and includes secret names without values', async (
     calls.push(args);
     if (args[1] === 'whoami') return '{"subject":"owner"}';
     if (args[1] === 'apps') return '{"apps":[]}';
-    if (args[1] === 'env') return '{"variables":[{"name":"PROVIDER_GATEWAY_HMAC_KEY","secret":true,"value":"must-not-escape"}]}';
+    if (args[1] === 'env') return '[{"id":"env-1","key":"PROVIDER_GATEWAY_HMAC_KEY","value":{"encrypted":"must-not-escape"},"isSecret":true,"contexts":{"production":true}}]';
     return '{"databases":[]}';
   };
   const driver = createProviderGatewayDriver({ gatewayDirectory: '/gateway', run });
@@ -40,6 +40,29 @@ test('inspection is read-only and includes secret names without values', async (
     identity: { subject: 'owner' },
   });
   assert.equal(calls.every(args => !args.includes('create') && !args.includes('provision') && !args.includes('assign') && !args.includes('add') && !args.includes('delete')), true);
+  assert.equal(JSON.stringify(await driver.inspect(organization)).includes('must-not-escape'), false);
+});
+
+test('inspection accepts the legacy environment shape and rejects ambiguous inventories', async () => {
+  const inspect = environment => createProviderGatewayDriver({
+    gatewayDirectory: '/gateway',
+    run: async args => {
+      if (args[1] === 'whoami') return '{"subject":"owner"}';
+      if (args[1] === 'apps') return '{"apps":[]}';
+      if (args[1] === 'env') return environment;
+      return '{"databases":[]}';
+    },
+  }).inspect(organization);
+
+  await assert.doesNotReject(() => inspect('{"variables":[{"name":"PROVIDER_GATEWAY_HMAC_KEY","secret":true,"value":"must-not-escape"}]}'));
+  await assert.rejects(
+    () => inspect('[{"name":"PROVIDER_GATEWAY_HMAC_KEY","key":"PROVIDER_GATEWAY_HMAC_KEY","isSecret":true}]'),
+    /invalid-deno-environment/u,
+  );
+  await assert.rejects(
+    () => inspect('[{"key":"PROVIDER_GATEWAY_HMAC_KEY"}]'),
+    /invalid-deno-environment/u,
+  );
 });
 
 test('preview hashes local source without a provider mutation', async () => {

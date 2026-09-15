@@ -135,6 +135,9 @@ current key and, during a rotation window, one distinct
 bytes. An empty, duplicate, weak, oversized or third key leaves the gateway
 closed. The inspection gate records environment-variable names and secret
 classification, never their values.
+It accepts the Deno CLI legacy `name`/`secret` and current `key`/`isSecret`
+inventory shapes, normalizes both to the same value-free record, and fails
+closed on an ambiguous or unknown shape.
 
 Rotate in this exact order, with a separately reviewed provider plan and exact
 approval for every apply:

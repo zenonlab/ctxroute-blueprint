@@ -1,0 +1,36 @@
+{
+  "goalId": "goal-publish-pipeline-hardening",
+  "stepId": "push-deploy-and-certify",
+  "status": "IN_PROGRESS",
+  "acceptance": [
+    "origin/main pointe exactement sur 589f52c et le Worker sert la version 2267a691 à 100 %.",
+    "La gate Deno normalise les inventaires historiques name/secret et actuels key/isSecret sans conserver de valeur.",
+    "La gate Deno déploie uniquement deno-app:tobirink-provider-gateway/production sans modifier secret ni KV.",
+    "Discovery AniList et MangaUpdates atteignent VERIFIED; Agenda v3 répond 200 et les routes retirées restent en 410.",
+    "Les tests infra, npm run verify et agenda-release.dataflow passent avant le commit vérifié."
+  ],
+  "files": [
+    ".project/progress.json",
+    "docs/progress.md",
+    "scripts/infra/provider-gateway-driver.mjs",
+    "scripts/infra/provider-gateway-driver.test.mjs",
+    "docs/02-quality-strategy.md",
+    "docs/operations/cloudflare.md",
+    "docs/decisions/ADR-0051-provider-transport-gate.md",
+    "docs/architecture/src/agenda-release.dataflow.json",
+    "docs/plans/publish-pipeline-hardening.json",
+    "docs/plans/publish-pipeline-hardening-start.json",
+    "docs/plans/deno-env-inventory-compat-start.json",
+    "docs/plans/publish-pipeline-hardening-done.json"
+  ],
+  "commands": [
+    "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress prévues.",
+    "Exécuter les tests ciblés du driver puis npm run test:infra.",
+    "Exécuter npm run verify, npm ls --all, npm audit --audit-level=high et git diff --check.",
+    "Valider agenda-release.dataflow avec Archify showcase.",
+    "Créer le commit fix(gateway): accept current Deno env inventory sans .codex/config.toml.",
+    "Appliquer gateway-deploy via une authentification Deno éphémère en mémoire et une allowlist exacte.",
+    "Certifier Deno health, Discovery v3, Agenda v3 et les routes retirées en production."
+  ],
+  "evidence": []
+}
