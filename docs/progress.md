@@ -64,6 +64,6 @@
 
 - [x] **Pousser le tip certifié vers origin/main** — DONE _(evidence: Push fast-forward réussi: origin/main pointe exactement sur ce6f43dbbc165afea77b4cb82a29cb5d355e066f., La modification utilisateur .codex/config.toml et le dump D1 sont restés hors push., Runs 34969133546, 34969133545 et 34969133539 créés puis arrêtés avant toute étape; runner_id=0 et annotation GitHub de paiement/plafond de dépenses.)_
 
-## Déployer les migrations Public Discovery v3 et le Worker — ACTIVE
+## Déployer les migrations Public Discovery v3 et le Worker — DONE
 
-- [ ] **Appliquer D1 0013–0015 puis déployer le Worker v3** — IN_PROGRESS _(evidence: Migrations 0013–0015 et Worker db774555 déployés; v3=200 et v2=410., La vérification production a révélé request_json historique=394 octets; migration corrective 0016 ajoutée sans DELETE/DROP., Tests D1 19/19: VERIFIED, NOT_FOUND, AMBIGUOUS expurgés; PENDING, PROCESSING, FAILED conservés.)_
+- [x] **Appliquer D1 0013–0015 puis déployer le Worker v3** — DONE _(evidence: Cloudflare: migrations 0013–0016 appliquées; aucune migration restante; Worker db774555 à 100%., D1: 1 ligne VERIFIED conservée, minimized_count=1, request_json_bytes=2; lectures changes=0., Schéma: tables requests/nonces _v3, index canonique et index pending/FAILED/nonce présents; noms actifs _v2 absents.)_

@@ -855,14 +855,14 @@
       "schemaVersion": 1,
       "id": "goal-deploy-public-discovery-v3-worker",
       "title": "Déployer les migrations Public Discovery v3 et le Worker",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
         {
           "id": "apply-d1-and-worker",
           "title": "Appliquer D1 0013–0015 puis déployer le Worker v3",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Les migrations 0013, 0014 et 0015 sont enregistrées comme appliquées et aucune migration ne reste en attente.",
             "public_discovery_requests_v3 et public_discovery_result_nonces_v3 existent; leurs noms _v2 ont disparu.",
@@ -886,10 +886,12 @@
             "Vérification HTTP des routes Public Discovery v2/v3 et Agenda v3"
           ],
           "evidence": [
-            "Migrations 0013–0015 et Worker db774555 déployés; v3=200 et v2=410.",
-            "La vérification production a révélé request_json historique=394 octets; migration corrective 0016 ajoutée sans DELETE/DROP.",
-            "Tests D1 19/19: VERIFIED, NOT_FOUND, AMBIGUOUS expurgés; PENDING, PROCESSING, FAILED conservés.",
-            "npm run verify passe, audit 0 vulnérabilité, builds MV3 réussis; Archify public-discovery showcase 9/9, artefact f6ed7ecc."
+            "Cloudflare: migrations 0013–0016 appliquées; aucune migration restante; Worker db774555 à 100%.",
+            "D1: 1 ligne VERIFIED conservée, minimized_count=1, request_json_bytes=2; lectures changes=0.",
+            "Schéma: tables requests/nonces _v3, index canonique et index pending/FAILED/nonce présents; noms actifs _v2 absents.",
+            "Les 14 tables historiques subsistent avec 20 lignes inchangées (8 owners, 8 installations, 3 receipts, 1 quota).",
+            "Production: Discovery v3 complet=200, Agenda v3=200, routes Discovery v2=410.",
+            "Tests D1 19/19, npm run verify et Archify showcase 9/9 passent; .codex/config.toml préservé."
           ]
         }
       ]
