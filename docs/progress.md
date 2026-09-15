@@ -51,3 +51,11 @@
 ## Certifier la candidate extension 1.0.31 sans fournisseur — DONE
 
 - [x] **Versionner, packager et certifier 1.0.31 localement** — DONE _(evidence: Candidate 1.0.31: Chrome 291601 octets SHA-256 a4bf87ecc73f03566ad84d8a6b2d8ee61dae0fe6e1cbf3f9f1897afb81dbd390; Firefox 291642 octets SHA-256 01657bc68988fc97360881f7a2f6bd431e52d82dbfc95440fb0ca58a545e3358., Deux builds isolés byte-identiques; 20 fichiers chacun, manifestes uniquement https://tobirink.com/*, aucun DNR ni origine fournisseur dans le background., npm run verify, npm ls --all, validations ADR/docs et git diff --check réussissent; npm audit 0 vulnérabilité.)_
+
+## Sauvegarder D1 avant toute suppression historique — DONE
+
+- [x] **Exporter et vérifier la base D1 de production** — DONE _(evidence: Export D1 distant réussi vers build/backups/tobirink-public-pre-cleanup-a111b2a.sql., Fichier ignoré par Git, 789390 octets, SHA-256 f203567fb0a0767c8c9278ad4c15542df7dceadc247ec59ce82e1383069a2f9f., Contrôle post-export: 8 owners, 8 installations, 3 receipts, 1 quota et 1 requête Discovery inchangés; meta changes=0 et changed_db=false.)_
+
+## Versionner la preuve de sauvegarde D1 — DONE
+
+- [x] **Valider et commiter la preuve opérationnelle** — DONE _(evidence: validate:docs -- --all et validate:decisions (50 ADR, 437 scopes) réussis., git diff --check réussi; aucun changement dans AGENTS.md, CLAUDE.md, .codex/hooks.json ou .claude/hooks., Le diff versionné reste limité aux deux fichiers Progress; le dump et .codex/config.toml sont exclus.)_

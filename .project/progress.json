@@ -740,6 +740,79 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-backup-d1-before-legacy-cleanup",
+      "title": "Sauvegarder D1 avant toute suppression historique",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "export-remote-d1",
+          "title": "Exporter et vérifier la base D1 de production",
+          "status": "DONE",
+          "acceptance": [
+            "L’export D1 se termine sans erreur.",
+            "Le fichier local est non vide, ignoré par Git et possède un SHA-256 enregistré.",
+            "La base distante n’est pas modifiée.",
+            "Aucune donnée n’est affichée dans la conversation."
+          ],
+          "files": [
+            "build/backups/tobirink-public-pre-cleanup-a111b2a.sql"
+          ],
+          "commands": [
+            "mkdir -p build/backups",
+            "npm exec -- wrangler d1 export PUBLIC_DB --remote --output ../../build/backups/tobirink-public-pre-cleanup-a111b2a.sql --skip-confirmation",
+            "shasum -a 256 build/backups/tobirink-public-pre-cleanup-a111b2a.sql",
+            "wc -c build/backups/tobirink-public-pre-cleanup-a111b2a.sql"
+          ],
+          "evidence": [
+            "Export D1 distant réussi vers build/backups/tobirink-public-pre-cleanup-a111b2a.sql.",
+            "Fichier ignoré par Git, 789390 octets, SHA-256 f203567fb0a0767c8c9278ad4c15542df7dceadc247ec59ce82e1383069a2f9f.",
+            "Contrôle post-export: 8 owners, 8 installations, 3 receipts, 1 quota et 1 requête Discovery inchangés; meta changes=0 et changed_db=false."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-record-d1-backup-evidence",
+      "title": "Versionner la preuve de sauvegarde D1",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "commit-backup-evidence",
+          "title": "Valider et commiter la preuve opérationnelle",
+          "status": "DONE",
+          "acceptance": [
+            "Les validations documentaires et de décisions passent.",
+            "Le diff ne touche aucun fichier d’instructions ou hook.",
+            "Le commit contient uniquement les deux fichiers Progress.",
+            "Le dump et .codex/config.toml restent hors commit.",
+            "Le nouveau commit est local et aucun push n’est effectué."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions",
+            "git diff --check",
+            "git diff -- AGENTS.md CLAUDE.md .codex/hooks.json .claude/hooks",
+            "git commit .project/progress.json docs/progress.md -m \"docs(operations): record D1 safety backup\""
+          ],
+          "evidence": [
+            "validate:docs -- --all et validate:decisions (50 ADR, 437 scopes) réussis.",
+            "git diff --check réussi; aucun changement dans AGENTS.md, CLAUDE.md, .codex/hooks.json ou .claude/hooks.",
+            "Le diff versionné reste limité aux deux fichiers Progress; le dump et .codex/config.toml sont exclus."
+          ]
+        }
+      ]
     }
   ]
 }
