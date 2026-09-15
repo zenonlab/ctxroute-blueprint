@@ -1,10 +1,9 @@
-import { favoriteIdentityKey, favoriteSourceIdentity, importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, repairMissingFavoriteCovers, runFavoriteResolutionSlice } from '@tobirink/application';
+import { favoriteIdentityKey, favoriteSourceIdentity, importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, runFavoriteResolutionSlice } from '@tobirink/application';
 import type { BookmarkImportPort, FavoriteIdentityLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, PublicDiscoveryRequestClientPort, ResolutionProvider, StoragePort } from '@tobirink/application';
 import { createFavoriteSource } from '@tobirink/domain';
-import type { FavoriteSourceId, LibraryId, Work } from '@tobirink/domain';
+import type { FavoriteSourceId, LibraryId } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
-import type { ProviderIdentityRecoveryRuntime } from './provider-identity-recovery-runtime';
 import type { ExtensionDiagnosticsPort } from './extension-diagnostics';
 
 export interface FavoriteResolutionRuntimeDependencies {
@@ -16,7 +15,6 @@ export interface FavoriteResolutionRuntimeDependencies {
   readonly ensureReady: () => Promise<{ schemaVersion: number }>;
   readonly diagnostics?: ExtensionDiagnosticsPort;
   readonly hydration: FavoriteProviderHydrationPorts;
-  readonly identityRecovery?: ProviderIdentityRecoveryRuntime;
   readonly libraryId: LibraryId;
   readonly now: () => string;
   readonly outbox: FavoriteResolutionOutboxPort;
@@ -75,7 +73,6 @@ export async function reconcileFavoriteBookmarkMutation(
 export function createFavoriteResolutionRuntime(dependencies: FavoriteResolutionRuntimeDependencies) {
   let active: Promise<void> | undefined;
   let inventoryQueued = false;
-  let coverRepairAfterId: Work['id'] | undefined;
   let cacheScanAfterId: FavoriteSourceId | undefined;
   let diagnosticFailureCode: 'INVENTORY_UNAVAILABLE' | 'RESOLUTION_UNAVAILABLE' = 'RESOLUTION_UNAVAILABLE';
   const recordDiagnostic = async (event: Parameters<NonNullable<FavoriteResolutionRuntimeDependencies['diagnostics']>['record']>[0]) => {
@@ -147,24 +144,12 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           diagnosticFailureCode = 'INVENTORY_UNAVAILABLE';
           await recordDiagnostic({ counts: { batches: inventoryBatches, observed }, errorCode: 'INVENTORY_UNAVAILABLE', outcome: 'failed', runId, stage: 'inventory' });
         }
-        const identityPreparation = dependencies.publicDiscovery === undefined ? await dependencies.identityRecovery?.prepare() : undefined;
         await prepareResolutionCaches();
         const result = await runFavoriteResolutionSlice(dependencies);
         const counts = { blocked: result.blocked, completed: result.completed, retried: result.retried };
         await recordDiagnostic({ counts, outcome: result.retried > 0 || result.blocked > 0 || result.continuationRequired ? 'retryable' : 'complete', runId, stage: 'resolution' });
-        if (dependencies.publicDiscovery === undefined) {
-          coverRepairAfterId = await dependencies.identityRecovery?.coverRepairAfterId?.() ?? coverRepairAfterId;
-          const repairedCovers = await repairMissingFavoriteCovers(dependencies.storage, dependencies.hydration, dependencies.now, coverRepairAfterId, dependencies.candidates);
-          coverRepairAfterId = repairedCovers.nextAfterId;
-          if (repairedCovers.inspected === 0) coverRepairAfterId = undefined;
-          await dependencies.identityRecovery?.saveCoverRepairAfterId?.(coverRepairAfterId);
-        }
-        const identityPublication = await dependencies.identityRecovery?.publish();
         if (inventoryFailure !== undefined) throw inventoryFailure;
-        if (!inventoryComplete || result.continuationRequired || identityPreparation?.kind === 'PENDING' || identityPublication?.kind === 'SCANNING') return dependencies.now();
-        if (identityPreparation?.kind === 'RETRYABLE') return new Date(identityPreparation.retryAt).toISOString();
-        if (identityPublication?.kind === 'DEFERRED' || identityPublication?.kind === 'STAGED') return new Date(identityPublication.retryAt).toISOString();
-        if (identityPublication?.kind === 'RETRYABLE') return dependencies.now();
+        if (!inventoryComplete || result.continuationRequired) return dependencies.now();
         return dependencies.outbox.nextAvailableAt({ kind: 'favorite-resolution', lane: 'routing' });
     });
   return function reconcileFavorites(inventoryRequested = false): Promise<void> {

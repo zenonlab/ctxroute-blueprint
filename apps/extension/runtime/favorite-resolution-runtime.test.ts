@@ -3,7 +3,6 @@ import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
 import { createFavoriteResolutionRuntime, reconcileFavoriteBookmarkMutation, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
 import type { ExtensionDiagnosticInput } from './extension-diagnostics';
-import type { ProviderIdentityRestoreResult } from '@tobirink/application';
 
 const unavailable = { search: async () => { throw new Error('unused'); } };
 const noHydration = { hydrate: async () => undefined };
@@ -85,27 +84,6 @@ describe('createFavoriteResolutionRuntime', () => {
     expect(updateContinuation).toHaveBeenLastCalledWith(undefined);
   });
 
-  it.each(['PENDING', 'RETRYABLE'] as const)('continues bounded resolution while identity restoration is %s', async (status) => {
-    const prepare = vi.fn<() => Promise<ProviderIdentityRestoreResult>>(async () => ({ kind: 'COMPLETE', hydrated: 0 })).mockResolvedValueOnce(status === 'PENDING'
-      ? { kind: 'PENDING' as const, hydrated: 2 }
-      : { kind: 'RETRYABLE' as const, hydrated: 0, retryAt: Date.parse('2026-09-08T00:15:00.000Z') });
-    const publish = vi.fn(async () => ({ kind: 'UNCHANGED' as const }));
-    const claimNext = vi.fn(async () => undefined);
-    const updateContinuation = vi.fn(async () => undefined);
-    const reconcile = createFavoriteResolutionRuntime({
-      bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [] }) }, candidates: unavailableCandidates,
-      ensureReady: async () => ({ schemaVersion: 11 }), hydration: emptyHydration, identityRecovery: { lookup: async (keys) => keys.map((key) => ({ fingerprint: key.fingerprint, kind: 'MISS' as const })), prepare, publish },
-      libraryId: libraryId('library_primary'), now: () => '2026-09-08T00:00:00.000Z', outbox: { block: vi.fn(), claimNext, nextAvailableAt: async () => undefined, retry: vi.fn() },
-      sourceAdapters: [], storage: new MemoryStoragePort(), token: () => 'recovery-token', updateContinuation,
-    });
-    await reconcile();
-    expect(claimNext).toHaveBeenCalledOnce(); expect(publish).toHaveBeenCalledOnce();
-    expect(updateContinuation).toHaveBeenLastCalledWith(status === 'PENDING' ? '2026-09-08T00:00:00.000Z' : '2026-09-08T00:15:00.000Z');
-    await reconcile();
-    expect(claimNext).toHaveBeenCalledTimes(2); expect(publish).toHaveBeenCalledTimes(2);
-    expect(prepare.mock.invocationCallOrder[0]).toBeLessThan(claimNext.mock.invocationCallOrder[0] ?? 0);
-    expect(claimNext.mock.invocationCallOrder[0]).toBeLessThan(publish.mock.invocationCallOrder[0] ?? 0);
-  });
   it('persists the latest bookmark mutation before requesting convergence', async () => {
     const storage = new MemoryStoragePort();
     const ensureReady = vi.fn(async () => ({ schemaVersion: 8 }));

@@ -24,6 +24,5 @@ export * from './notifications';
 export * from './preferences/web-extension-quick-preferences-adapter';
 export * from './releases/web-extension-release-cache-adapter';
 export * from './releases/http-public-release-loader';
-export * from './releases/http-public-release-page-source';
 export * from './popup';
 export * from './recovery/web-extension-provider-identity-sync-adapter';

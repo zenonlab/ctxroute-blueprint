@@ -2,7 +2,7 @@ import Dexie from 'dexie';
 import before from './fixtures/v1-before.json';
 import after from './fixtures/v2-after.json';
 import versionThree from './fixtures/v3-after.json';
-import { DexieLocalReleaseAgenda, DexiePublicReleaseFallbackStore, DexiePublicReleaseGenerationCache, DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
+import { DexieLocalReleaseAgenda, DexiePublicReleaseGenerationCache, DexieStoragePort, TobirinkDatabase, verifyDatabaseIntegrity } from '../src';
 import { importFavoriteSources, readReviewQueue } from '@tobirink/application';
 import { createFavoriteSource, createReview, createWork, favoriteSourceId, reviewId, workId } from '@tobirink/domain';
 
@@ -123,30 +123,22 @@ async function verifyReleaseContractMigration(name: string): Promise<void> {
   legacy.close();
   const migrated = new TobirinkDatabase(name);
   const event = await migrated.publicReleaseEvents.get('legacy-release');
-  if (migrated.verno !== 18 || event?.provider !== 'mangaupdates' || event.sequence !== '58' || migrated.publicReleaseStagingEvents.schema.idxByName.generation === undefined || migrated.localAgendaEvents.schema.idxByName['occurrence.value'] === undefined || migrated.localAgendaProjectionState.schema.primKey.name !== 'id' || migrated.localReleaseEvidence.schema.idxByName['[workId+occurrence.value]'] === undefined) throw new Error('Release contract migration did not preserve and normalize the legacy event or add durable Agenda indexes.');
+  if (migrated.verno !== 19 || event?.provider !== 'mangaupdates' || event.sequence !== '58' || migrated.publicReleaseStagingEvents.schema.idxByName.generation === undefined || migrated.localAgendaEvents.schema.idxByName['occurrence.value'] === undefined || migrated.localAgendaProjectionState.schema.primKey.name !== 'id' || migrated.localReleaseEvidence.schema.idxByName['[workId+occurrence.value]'] === undefined) throw new Error('Release contract migration did not preserve and normalize the legacy event or add durable Agenda indexes.');
   migrated.close();
 }
 
-async function verifyReleaseFallbackPromotion(name: string): Promise<void> {
-  document.body.dataset.phase = 'release-fallback-promotion';
+async function verifySharedReleasePromotion(name: string): Promise<void> {
+  document.body.dataset.phase = 'shared-release-promotion';
   const database = new TobirinkDatabase(name);
   await database.open();
-  const store = new DexiePublicReleaseFallbackStore(database);
-  const state = { generation: 'fallback-test', lanes: { anilist: { complete: false, nextPage: 1, notBefore: 0 }, mangaupdates: { complete: false, nextPage: 1, notBefore: 0 } }, startedAt: '2026-09-12T00:00:00.000Z', window: { from: '2026-09-12', to: '2026-10-17' } } as const;
-  const event = { expiresAt: '2026-11-12T00:00:00.000Z', id: 'anilist-episode-42-1', occurrence: { kind: 'INSTANT', value: '2026-09-13T00:00:00.000Z' }, provenance: { fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist', providerWorkId: '42', releaseKind: 'episode', sequence: '1', state: 'SCHEDULED' } as const;
-  await database.publicReleaseEvents.put({ ...event, id: 'previous-release' });
-  await store.begin(state);
-  await store.stage(state.generation, { complete: true, events: [event], page: 1, provider: 'anilist' });
-  if (!await database.publicReleaseEvents.get('previous-release')) throw new Error('Partial fallback replaced the last active generation.');
-  await store.stage(state.generation, { complete: true, events: [], page: 1, provider: 'mangaupdates' });
-  await store.promote(state.generation, '2026-09-12T00:01:00.000Z');
-  const active = await database.publicReleaseEvents.toArray();
-  if (active.length !== 1 || active[0]?.id !== event.id || (await database.publicReleaseSyncState.get('active'))?.source !== 'fallback') throw new Error('Complete fallback generation was not promoted atomically.');
   const cache = new DexiePublicReleaseGenerationCache(database);
+  const window = { from: '2026-09-12', to: '2026-10-17' } as const;
   const mangaEvent = { expiresAt: '2026-11-12T00:00:00.000Z', id: 'mangaupdates-9', occurrence: { kind: 'DATE', value: '2026-09-14' }, provenance: { fetchedAt: '2026-09-13T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'mangaupdates' }, provider: 'mangaupdates', providerWorkId: '77', releaseKind: 'chapter', sequence: '58.5', state: 'CONFIRMED' } as const;
-  await cache.save({ etag: '"releases-shared-window"', events: [mangaEvent], generatedAt: '2026-09-13T00:00:00.000Z', revision: 'shared-1', source: 'shared', window: state.window });
+  await database.publicReleaseSyncState.put({ checkedAt: '2026-09-12T00:00:00.000Z', fallback: { legacy: true }, generation: 0, id: 'fallback', source: 'fallback' });
+  await database.publicReleaseStagingEvents.put({ event: mangaEvent, generation: 'legacy', id: 'legacy:staged' });
+  await cache.save({ etag: '"releases-shared-window"', events: [mangaEvent], generatedAt: '2026-09-13T00:00:00.000Z', revision: 'shared-1', source: 'shared', window });
   const shared = await cache.load();
-  if (shared?.events[0]?.occurrence.kind !== 'DATE' || (await database.publicReleaseSyncState.get('active'))?.source !== 'shared' || await store.load()) throw new Error('Shared generation did not replace fallback state atomically.');
+  if (shared?.events[0]?.occurrence.kind !== 'DATE' || (await database.publicReleaseSyncState.get('active'))?.source !== 'shared' || await database.publicReleaseSyncState.get('fallback') || await database.publicReleaseStagingEvents.count()) throw new Error('Shared generation did not replace legacy release state atomically.');
   const agenda = new DexieLocalReleaseAgenda(database);
   const localWorkId = workId('work_release-date');
   const evidence = { id: 'evidence-release-date', publicReleaseId: mangaEvent.id, workId: localWorkId, observedAt: '2026-09-13T00:00:00.000Z', source: 'public', occurrence: mangaEvent.occurrence, state: mangaEvent.state, provider: mangaEvent.provider, providerWorkId: mangaEvent.providerWorkId, releaseKind: mangaEvent.releaseKind, sequence: mangaEvent.sequence } as const;
@@ -175,7 +167,7 @@ async function verifySuccessfulMigration(name: string, seed: (databaseName: stri
   }
   if (organizer.length !== 0) throw new Error('Version 5 organizer store must start empty.');
   const report = await verifyDatabaseIntegrity(database);
-  if (report.schemaVersion !== 18 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
+  if (report.schemaVersion !== 19 || report.checkedRecords !== 1 + (expectedSources * 2)) throw new Error('Integrity report did not cover the migrated database.');
   if (!database.favoriteSources.schema.idxByName.matchedWorkId) throw new Error('Direct Work source index was not added.');
   if (!database.works.schema.idxByName['hydration.favoriteAliasKeys']?.multi || !database.works.schema.idxByName['hydration.providerTitleKeys']?.multi) throw new Error('Hydrated identity multi-entry indexes were not added.');
   if (!database.works.schema.idxByName['hydration.candidate.genres']?.multi || !database.works.schema.idxByName['hydration.candidate.editorialStatus'] || !database.works.schema.idxByName['hydration.candidate.popularity.value']) throw new Error('Sortable metadata indexes were not added.');
@@ -265,7 +257,7 @@ const versionTenName = `tobirink-migration-v10-${Date.now()}`;
 const interruptedName = `tobirink-migration-interrupted-${Date.now()}`;
 const reviewCorrectionName = `tobirink-migration-review-${Date.now()}`;
 const releaseContractName = `tobirink-migration-release-${Date.now()}`;
-const releaseFallbackName = `tobirink-release-fallback-${Date.now()}`;
+const sharedReleaseName = `tobirink-release-shared-${Date.now()}`;
 try {
   await verifySuccessfulMigration(versionOneName, seedVersion1);
   await verifySuccessfulMigration(versionTwoName, seedVersion2);
@@ -278,7 +270,7 @@ try {
   await verifyInterruptedMigration(interruptedName);
   await verifyReviewCorrection(reviewCorrectionName);
   await verifyReleaseContractMigration(releaseContractName);
-  await verifyReleaseFallbackPromotion(releaseFallbackName);
+  await verifySharedReleasePromotion(sharedReleaseName);
   document.body.dataset.status = 'passed';
   document.body.textContent = 'IndexedDB migrations passed';
 } catch (error) {
@@ -295,5 +287,5 @@ try {
   await deleteDatabase(versionTenName);
   await deleteDatabase(interruptedName);
   await deleteDatabase(releaseContractName);
-  await deleteDatabase(releaseFallbackName);
+  await deleteDatabase(sharedReleaseName);
 }

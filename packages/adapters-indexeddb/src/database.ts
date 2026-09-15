@@ -5,7 +5,7 @@ import { publicReleaseEventSchema } from '@tobirink/application';
 import type { DurableTask, FavoriteBookmarkMutation, FavoriteInventoryCheckpoint, FavoriteInventoryMark, FavoriteParseArtifactRecord, FavoriteProviderRateCheckpoint, FavoriteResolutionReceipt, FavoriteReviewCandidateSet, PublicDiscoveryLocalRecord } from '@tobirink/application';
 import { migrateVersion1To2 } from './migrations/v2';
 import type { ProviderIdentityRecoveryRecord } from './recovery/provider-identity-recovery-state-adapter';
-import type { PublicReleaseStagingRecord, PublicReleaseSyncRecord } from './releases/dexie-public-release-fallback-store';
+import type { PublicReleaseStagingRecord, PublicReleaseSyncRecord } from './releases/public-release-records';
 
 export class TobirinkDatabase extends Dexie {
   readonly agenda!: Table<AgendaEntry, string>;

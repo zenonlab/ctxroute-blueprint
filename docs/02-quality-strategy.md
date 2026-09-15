@@ -74,7 +74,7 @@ browser or `workerd` test when platform behavior is the risk.
   blob, proves zero replacements after wrong-passphrase and tamper failures,
   and verifies that the R2 adapter rejects plaintext before storage access.
 - Every extension message and external payload is rejected on schema mismatch.
-- WebBridge release packages must contain version `1.0.0`, the exact
+- WebBridge release packages must contain version `1.0.30`, the exact
   `https://tobirink.com/*` content-script match and the same
   `externally_connectable` match before their SHA-256 is recorded.
 - Public Discovery tests prouvent la création D1 atomique et dédupliquée,
@@ -98,12 +98,12 @@ browser or `workerd` test when platform behavior is the risk.
 - Public-catalogue tests prove that D1 stores only reconstructible work titles
   and provider references, rejects malformed limits and cursors, treats query
   values as bound data, and never exposes a private identifier or URL.
-- Manifest permissions correspond to documented user flows. Host permissions
-  match the documented exact provider and Worker origins; no domain wildcard
-  or undocumented origin is accepted.
-- The packaged-Chrome Playwright journey unpacks the produced `1.0.0` ZIP into
+- Manifest permissions correspond to documented user flows. The only host
+  permission is the configured TobiRink origin; no provider origin, domain
+  wildcard, DNR ruleset or undocumented origin is accepted.
+- The packaged-Chrome Playwright journey unpacks the produced `1.0.30` ZIP into
   an isolated profile, creates a synthetic bookmark through the real extension,
-  proves Kitsu fallback after complete primary NO_MATCH and production WebBridge rendering, then
+  proves Public Discovery cache-first resolution and production WebBridge rendering, then
   reloads the private library offline without injecting a bridge mock.
 - Logs and CI artifacts redact URLs, titles, identifiers, payload bodies, and
   secrets unless a field is explicitly classified as safe.

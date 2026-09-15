@@ -612,6 +612,80 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-remove-legacy-extension-fallbacks",
+      "title": "Retirer les fallbacks fournisseur morts de l’extension",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Supprimer les runtimes directs et préserver la compatibilité IndexedDB",
+          "status": "DONE",
+          "acceptance": [
+            "Les dix fichiers listés sont supprimés et récupérables par revert Git.",
+            "Aucun export ou symbole PublicReleaseFallback, HttpPublicReleasePageSource, DexiePublicReleaseFallbackStore, createFavoriteProviderPorts ou ProviderIdentityRecoveryRuntime ne subsiste dans le produit.",
+            "FavoriteResolutionRuntime utilise exclusivement Public Discovery v3 et ne possède plus de branche optionnelle de restauration/hydratation fournisseur.",
+            "Le schéma IndexedDB historique reste additif; les types de records actifs sont déplacés et le cache partagé continue de nettoyer les lignes legacy sans exposer le fallback.",
+            "Les builds Chrome et Firefox ne contiennent plus rules/mangaupdates-transport.json et leurs manifests gardent uniquement tobirink.com.",
+            "La stratégie qualité et les diagrammes reflètent le chemin D1/GitHub exclusif et le nouveau nombre de fichiers d’archive.",
+            "Tests ciblés, typechecks, Archify showcase, npm run verify, npm ls et git diff --check réussissent.",
+            "Le commit exclut .codex/config.toml; aucun push, déploiement, publication ou suppression distante."
+          ],
+          "files": [
+            "apps/extension/public/rules/mangaupdates-transport.json",
+            "apps/extension/scripts/installed-mangaupdates.mjs",
+            "apps/extension/runtime/favorite-provider-runtime.ts",
+            "apps/extension/runtime/provider-identity-recovery-runtime.ts",
+            "apps/extension/runtime/provider-identity-recovery-runtime.test.ts",
+            "packages/application/src/agenda/public-release-fallback.ts",
+            "packages/application/src/agenda/public-release-fallback.test.ts",
+            "packages/adapters-browser/src/releases/http-public-release-page-source.ts",
+            "packages/adapters-browser/src/releases/http-public-release-page-source.test.ts",
+            "packages/adapters-indexeddb/src/releases/dexie-public-release-fallback-store.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/runtime/favorite-resolution-d1-boundary.test.ts",
+            "apps/extension/security/extension-security.test.ts",
+            "packages/application/src/agenda/index.ts",
+            "packages/adapters-browser/src/index.ts",
+            "packages/adapters-indexeddb/src/index.ts",
+            "packages/adapters-indexeddb/src/database.ts",
+            "packages/adapters-indexeddb/src/releases/public-release-records.ts",
+            "packages/adapters-indexeddb/test/migrations-entry.ts",
+            "docs/02-quality-strategy.md",
+            "docs/browser-support.md",
+            "docs/decisions/ADR-0050-retire-extension-provider-fallbacks.md",
+            "docs/architecture/src/favorite-source-boundaries.architecture.json",
+            "docs/architecture/src/extension-delivery-validation.dataflow.json"
+          ],
+          "commands": [
+            "apply_patch deleting the ten explicitly approved tracked files and editing only the listed companion files",
+            "npm test --workspace @tobirink/extension -- runtime/favorite-resolution-runtime.test.ts runtime/favorite-resolution-d1-boundary.test.ts security/extension-security.test.ts",
+            "npm test --workspace @tobirink/application -- src/agenda",
+            "npm test --workspace @tobirink/adapters-browser -- src/releases",
+            "npm run test:migrations --workspace @tobirink/adapters-indexeddb",
+            "npm run build --workspace @tobirink/extension",
+            "npm run build:firefox --workspace @tobirink/extension",
+            "rg audit for deleted symbols, rule and direct provider origins",
+            "npm run typecheck",
+            "npm run validate:decisions && npm run validate:docs -- --all",
+            "node .githooks/archify validate favorite-source-boundaries.architecture",
+            "node .githooks/archify validate extension-delivery-validation.dataflow",
+            "npm run verify && npm ls && git diff --check",
+            "git commit -m refactor(extension): remove legacy provider fallbacks"
+          ],
+          "evidence": [
+            "Dix fichiers legacy supprimés; aucun symbole fournisseur/fallback actif trouvé hors tests négatifs.",
+            "Chrome et Firefox MV3 construits à 20 fichiers, uniquement https://tobirink.com/*, sans DNR.",
+            "Migration IndexedDB v19 Chromium réussie; npm run verify, npm ls --all, npm audit et git diff --check réussissent.",
+            "Archify showcase valide les diagrammes 9/9 sans diagnostic."
+          ]
+        }
+      ]
     }
   ]
 }

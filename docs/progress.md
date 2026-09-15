@@ -43,3 +43,7 @@
 ## Distinguer la cadence Discovery déployée de la cible locale — DONE
 
 - [x] **Corriger la cadence dans le diagramme de pipeline publique** — DONE _(evidence: Le diagramme distingue Discovery quotidien 03:23 UTC déployé et cible dix minutes locale non poussée., Archify showcase passe 9/9 sans diagnostic; artefact public-pipeline 8f88a348680d90c136b5e01ef6377f295a8cceb2174950c90f0018f25ef0304e., Validations ADR/docs et build documentaire réussissent; le npm run verify complet du commit précédent est vert.)_
+
+## Retirer les fallbacks fournisseur morts de l’extension — DONE
+
+- [x] **Supprimer les runtimes directs et préserver la compatibilité IndexedDB** — DONE _(evidence: Dix fichiers legacy supprimés; aucun symbole fournisseur/fallback actif trouvé hors tests négatifs., Chrome et Firefox MV3 construits à 20 fichiers, uniquement https://tobirink.com/*, sans DNR., Migration IndexedDB v19 Chromium réussie; npm run verify, npm ls --all, npm audit et git diff --check réussissent.)_

@@ -40,7 +40,7 @@ components do not branch on a browser name.
   imported Review rows passed. Its default bookmarks are preserved; the test
   checks the synthetic source by bookmark ID rather than assuming an empty tree.
 - `node scripts/release/package-extension.mjs --verify-isolated` builds each
-  target twice in fresh directories. Both 21-file archives match byte-for-byte;
+  target twice in fresh directories. Both 20-file archives match byte-for-byte;
   the ignored verification manifest retains SHA-256 values and paths.
 - IndexedDB contracts and additive migrations, including interrupted import
   rollback and Review pagination, pass in Chromium and Firefox 151.

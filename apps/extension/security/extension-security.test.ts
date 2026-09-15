@@ -102,6 +102,7 @@ describe('extension security boundary', () => {
     expect(favoriteResolution).toMatch(/readBookmarkBatch\(checkpoint\.cursor, 100\)/);
     expect(favoriteResolution).toMatch(/normalizeBookmarks\(slice\.records\)/);
     expect(favoriteResolution).toMatch(/importFavoriteSources\(favorites, dependencies\.storage/);
+    expect(favoriteResolution).not.toMatch(/identityRecovery|repairMissingFavoriteCovers|ProviderIdentityRecoveryRuntime/);
     expect(background).toMatch(/WebExtensionBookmarkEventAdapter\(browser\.bookmarks\)/);
     expect(background).toMatch(/DexieFavoriteResolutionOutbox\(privateStorage\.storage\.database\)/);
     expect(background).toMatch(/createFavoriteResolutionRuntime/);
