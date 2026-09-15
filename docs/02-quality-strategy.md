@@ -30,6 +30,8 @@ data are forbidden in fixtures and artifacts.
 
 The inherited `npm run validate` remains mandatory. Product commands will be
 added to the root gate only when they exist and have a stable local contract.
+The repository currently relies on verified local commit and push gates; no
+GitHub Actions workflow is an active source of release evidence.
 
 ## Decision rule
 
@@ -112,6 +114,12 @@ browser or `workerd` test when platform behavior is the risk.
 - `npm run test:infra` proves deterministic plan hashes, a 30-minute maximum
   lifetime, exact account/resource allowlists, state and preview drift refusal,
   D1-before-Worker ordering, and zero provider invocation for invalid actions.
+- Native collector tests require structured, payload-free diagnostics for
+  invalid signals, successful acknowledgement, bounded retry and the final
+  retry that Cloudflare transfers to the configured DLQ. Agenda failures retain
+  only the bounded `anilist`, `mangaupdates` or combined lane code.
+- The Deno gateway health contract is HTTP 200 with
+  `{ "status": "healthy" }`; error responses retain `{ "error": code }`.
 
 ## Performance budgets
 

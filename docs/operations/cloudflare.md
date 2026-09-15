@@ -103,6 +103,30 @@ unknown paths keep their explicit JSON/404 behavior. Versioned downloads stream
 from `tobirink-public-releases` with immutable caching, attachment disposition,
 ETag, and content-type metadata.
 
+## Native collector observability
+
+The Queue consumer emits one bounded JSON record with
+`type=native-collector.queue`, `messageType`, `attempt` and `disposition`.
+Failures add only a classified code and the bounded retry delay; raw provider
+responses, titles, identifiers and envelopes are never logged. Agenda codes
+distinguish `agenda-anilist-unavailable`,
+`agenda-mangaupdates-unavailable`, their combined form and the unknown-provider
+fallback.
+
+`ack-success` confirms a completed message. `ack-invalid` confirms that an
+untrusted malformed signal was discarded. `retry` remains recoverable.
+`retry-to-dlq` means the ninth delivery has failed after eight configured
+retries and the
+platform will transfer an exhausted message to
+`tobirink-public-discovery-dlq`. The DLQ has no consumer: inspect it promptly
+from the Cloudflare Queue dashboard or Wrangler because Cloudflare retains an
+unconsumed DLQ message for four days. Replaying or purging a DLQ is a separate
+provider mutation and requires an exact approved target.
+
+The Deno gateway health probe is `GET /healthz`. A configured instance returns
+HTTP 200 with `{ "status": "healthy" }`; an instance missing its secret or KV
+binding remains closed with HTTP 503 and `{ "error": "gateway-not-configured" }`.
+
 ## Public Discovery retention
 
 D1 records deletion eligibility without deleting data automatically:

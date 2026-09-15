@@ -83,19 +83,23 @@ not become runtime dependencies of Tobirink.
 - Language: TypeScript in strict mode to share contracts across extension and
   optional Worker while keeping provider boundaries explicit.
 - Runtime: browser Manifest V3 service worker and pages; Node.js 24 LTS for
-  product build/test; Cloudflare Workers only for optional public capabilities.
+  product build/test; a Cloudflare Worker with Queue/Cron for public capabilities;
+  an isolated Deno Deploy gateway only for provider endpoints blocked from
+  Cloudflare egress.
 - Frontend: React 19 inside WXT entrypoints and a static Next App Router site,
   with CSS Modules and the existing framework-neutral design contract. The
   site is exported and served by the Worker with an explicit route fallback;
   it is not a server-centred application.
-- Backend: one Hono Worker only when a public use case needs it. Rails is not
-  selected for v1 because the authoritative workflows are local and do not yet
-  justify a server-centred application.
+- Backend: one Hono Worker owns the public HTTP surface, D1 and Queue consumers.
+  A separate HMAC-authenticated Deno gateway forwards only allowlisted AniList
+  and MangaUpdates requests; MangaDex and Kitsu remain direct from Cloudflare.
+  Rails is not selected for v1 because authoritative member workflows are local.
 - Storage: Dexie-backed IndexedDB behind `StoragePort`; `storage.local` only for
   bootstrap, technical preferences and a five-entry, thirty-day, non-authoritative
   popup continuation cache; `storage.sync` only for a bounded
   provider-ID snapshot; D1 for separate catalogue rows and a
-  `MISS/PENDING/VERIFIED` discovery cache promoted only by the native Queue consumer;
+  `MISS/PENDING/PROCESSING/FAILED/VERIFIED/NOT_FOUND/AMBIGUOUS` discovery cache
+  promoted only by the native Queue consumer;
   R2 for image objects and encrypted backup blobs.
   Domain code cannot import any provider.
 - Library analytics: seven stable multi-select facets (genre, editorial status,
@@ -106,14 +110,16 @@ not become runtime dependencies of Tobirink.
 - Tests: Vitest for domain and contracts, Vitest Browser Mode for UI, Playwright
   for Chromium extension journeys, Firefox packaging smoke with `web-ext`, and
   Workers integration tests in `workerd`.
-- Deployment: WXT-generated browser artifacts and a separately approved
-  Cloudflare gate with inspect, plan, and apply phases.
+- Deployment: WXT-generated browser artifacts and separately approved
+  Cloudflare and Deno gates with inspect, plan, and apply phases. GitHub Actions
+  is not an active runtime or release gate.
 - WebBridge delivery: release packaging pins the exact non-secret site origin
   `https://tobirink.com` into both manifests and refuses an origin or version
   mismatch before producing an archive.
-- Observability: a `TelemetryPort`, bounded redacted local diagnostics, and
-  Workers Logs for the public service; remote extension telemetry is off by
-  default.
+- Observability: a `TelemetryPort`, bounded redacted local diagnostics,
+  structured Queue logs containing lane, attempt and disposition, Workers Logs
+  and traces for the public service, and bounded Deno request metadata; remote
+  extension telemetry is off by default.
 - Security: explicit trust boundaries, permission budget, schema validation,
   adapter contract tests, dependency audit, and threat-model review.
 - Performance: enforce the budgets above in build reports, browser journeys,

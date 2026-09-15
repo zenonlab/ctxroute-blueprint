@@ -36,9 +36,9 @@
   "nodes": [
     { "id": "scheduledTrigger", "type": "cloud", "label": "Cron Worker", "sublabel": "toutes les 10 minutes", "stage": 0, "row": 0, "width": 145, "tag": "signal seulement" },
     { "id": "providerApis", "type": "external", "label": "APIs fournisseurs", "sublabel": "AniList · MangaUpdates", "stage": 0, "row": 1, "width": 145, "tag": "données publiques" },
-    { "id": "queue", "type": "messagebus", "label": "Cloudflare Queue", "sublabel": "agenda-refresh · DLQ après 8 retries", "stage": 1, "row": 0, "width": 175, "tag": "ressources gated" },
+    { "id": "queue", "type": "messagebus", "label": "Cloudflare Queue", "sublabel": "agenda-refresh · DLQ après 8 retries", "stage": 1, "row": 0, "width": 175, "tag": "logs JSON bornés" },
     { "id": "transportPort", "type": "security", "label": "ProviderTransportPort", "sublabel": "AniList + MU via Deno", "stage": 1, "row": 1, "width": 175, "tag": "gate par endpoint" },
-    { "id": "collector", "type": "backend", "label": "Consumer Worker", "sublabel": "deux lanes · lot complet", "stage": 2, "row": 0, "width": 165, "tag": "ack ou retry" },
+    { "id": "collector", "type": "backend", "label": "Consumer Worker", "sublabel": "code lane · tentative · disposition", "stage": 2, "row": 0, "width": 165, "tag": "ack · retry · DLQ" },
     { "id": "releaseD1", "type": "database", "label": "D1 Agenda", "sublabel": "générations · événements DATE/INSTANT", "stage": 2, "row": 1, "width": 175, "tag": "pointeur actif atomique" },
     { "id": "releaseApi", "type": "backend", "label": "GET /v3/releases", "sublabel": "fenêtre source · fraîcheur · ETag", "stage": 2, "row": 2, "width": 175, "tag": "pages de 100" },
     { "id": "releaseGeneration", "type": "database", "label": "Génération IndexedDB", "sublabel": "toutes pages validées puis commit", "stage": 3, "row": 4, "yOffset": -200, "width": 175, "tag": "dernier succès" },
@@ -47,7 +47,7 @@
   ],
   "flows": [
     { "from": "scheduledTrigger", "to": "queue", "label": "signal versionné", "classification": "aucun titre ni événement", "variant": "security", "route": "straight", "labelAt": [208, 110] },
-    { "from": "queue", "to": "collector", "label": "message disponible", "classification": "retry exponentiel borné", "variant": "emphasis", "route": "straight", "labelAt": [423, 100] },
+    { "from": "queue", "to": "collector", "label": "message disponible", "classification": "retry borné · lane observable", "variant": "emphasis", "route": "straight", "labelAt": [423, 100] },
     { "from": "collector", "to": "transportPort", "label": "AniList + MU via HMAC", "classification": "fenêtre J−1/J+15", "variant": "security", "route": "auto", "labelAt": [430, 314] },
     { "from": "providerApis", "to": "transportPort", "label": "pages publiques", "classification": "cibles et réponses bornées", "variant": "emphasis", "route": "straight", "labelAt": [208, 314] },
     { "from": "collector", "to": "releaseD1", "label": "promotion + rétention", "classification": "active + deux sauvegardes", "variant": "security", "route": "auto", "labelAt": [530, 200] },

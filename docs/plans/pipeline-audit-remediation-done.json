@@ -1,0 +1,12 @@
+{
+  "goalId": "goal-pipeline-audit-remediation",
+  "stepId": "harden-observability-and-architecture",
+  "status": "DONE",
+  "evidence": [
+    "Worker 81/81 et gateway Deno 7/7 passent; les tests Queue couvrent succès, signal invalide, retry, neuvième livraison vers DLQ et codes AniList/MangaUpdates bornés.",
+    "npm ci --ignore-scripts, npm ls --all et npm run verify passent; les builds Chrome/Firefox réussissent et npm audit rapporte 0 vulnérabilité.",
+    "Archify all et internal passent en showcase 9/9 sans erreur ni avertissement; Agenda, pipeline public, trafic et blueprint décrivent le runtime Cloudflare plus Deno sans GitHub Actions actif.",
+    "Les validations configuration, ADR, documentation et cohérence passent; AGENTS.md, CLAUDE.md, .codex/hooks.json et .claude/hooks restent inchangés.",
+    "CRG reconstruit après le commit compte 6079 nœuds, 53273 arêtes et 679 fichiers sur fix/pipeline-audit-remediation; .codex/config.toml reste une modification utilisateur exclue."
+  ]
+}

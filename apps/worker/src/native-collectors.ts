@@ -42,6 +42,23 @@ interface AgendaProcessingReceipt {
   readonly revision: string;
 }
 
+type NativeCollectorDisposition = 'ack-invalid' | 'ack-success' | 'retry' | 'retry-to-dlq';
+const nativeCollectorMaxRetryRequests = 8;
+
+interface NativeCollectorDiagnostic {
+  readonly attempt: number;
+  readonly code?: string;
+  readonly disposition: NativeCollectorDisposition;
+  readonly messageType: NativeCollectorSignal['type'] | 'invalid';
+  readonly retryDelaySeconds?: number;
+}
+
+function emitNativeCollectorDiagnostic(diagnostic: NativeCollectorDiagnostic): void {
+  const entry = JSON.stringify({ schemaVersion: 1, type: 'native-collector.queue', ...diagnostic });
+  if (diagnostic.disposition === 'ack-success') console.log(entry);
+  else console.warn(entry);
+}
+
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   let binary = '';
@@ -86,6 +103,14 @@ function collectorFailureCode(error: Error | undefined): string {
   return 'collector-internal';
 }
 
+export function agendaCollectionFailureCode(failures: readonly string[]): string {
+  const providers = new Set(failures.map((failure) => failure.split(':', 1)[0]).filter((provider) => provider === 'anilist' || provider === 'mangaupdates'));
+  if (providers.has('anilist') && providers.has('mangaupdates')) return 'agenda-anilist-mangaupdates-unavailable';
+  if (providers.has('anilist')) return 'agenda-anilist-unavailable';
+  if (providers.has('mangaupdates')) return 'agenda-mangaupdates-unavailable';
+  return 'agenda-provider-unavailable';
+}
+
 export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings): Promise<PublicDiscoveryBatchReport> {
   const port = new D1PublicDiscoveryV3Adapter(bindings.PUBLIC_DB);
   let activeToken = '';
@@ -123,7 +148,7 @@ function calendarWindow(scheduledFor: string): CalendarWindow {
 export async function processAgendaQueue(bindings: NativeCollectorBindings, scheduledFor: string): Promise<AgendaProcessingReceipt> {
   const transport = providerFetch(bindings); const window = calendarWindow(scheduledFor);
   const collection = await collectPublicAgendaLanes([new AniListAgendaCollector(transport), new MangaUpdatesAgendaCollector(transport)], window);
-  if (collection.failures.length > 0) throw new Error('agenda-collection-incomplete');
+  if (collection.failures.length > 0) throw new Error(agendaCollectionFailureCode(collection.failures));
   const ingestion = publicAgendaIngestionSchema.parse({ events: collection.events, generatedAt: scheduledFor, nonce: crypto.randomUUID(), schemaVersion: 1, window });
   const revision = `calendar-${(await digest(JSON.stringify({ events: ingestion.events, generatedAt: ingestion.generatedAt, window: ingestion.window }))).slice(0, 48)}`;
   await commitPublicReleaseGeneration(bindings.PUBLIC_DB, ingestion.events, ingestion.window, revision, ingestion.generatedAt);
@@ -136,18 +161,41 @@ export async function handleNativeCollectorQueue(
 ): Promise<void> {
   for (const message of messages) {
     const parsedSignal = nativeCollectorSignalSchema.safeParse(message.body);
-    if (!parsedSignal.success) { message.ack(); continue; }
+    if (!parsedSignal.success) {
+      emitNativeCollectorDiagnostic({ attempt: Math.max(1, message.attempts), code: 'collector-signal-invalid', disposition: 'ack-invalid', messageType: 'invalid' });
+      message.ack();
+      continue;
+    }
     const signal = parsedSignal.data;
     try {
       if (signal.type === 'agenda-refresh') await processors.agenda(signal.scheduledFor);
       else {
         const report = await processors.discovery();
-        if (report.failed > 0) { message.retry({ delaySeconds: 15 * 60 }); continue; }
+        if (report.failed > 0) {
+          const retryDelaySeconds = 15 * 60;
+          emitNativeCollectorDiagnostic({
+            attempt: Math.max(1, message.attempts),
+            code: 'public-discovery-partial',
+            disposition: message.attempts > nativeCollectorMaxRetryRequests ? 'retry-to-dlq' : 'retry',
+            messageType: signal.type,
+            retryDelaySeconds,
+          });
+          message.retry({ delaySeconds: retryDelaySeconds });
+          continue;
+        }
       }
+      emitNativeCollectorDiagnostic({ attempt: Math.max(1, message.attempts), disposition: 'ack-success', messageType: signal.type });
       message.ack();
     } catch (error) {
-      console.warn('native-collector-failed', signal.type, collectorFailureCode(error instanceof Error ? error : undefined));
-      message.retry({ delaySeconds: Math.min(60 * (2 ** Math.max(0, message.attempts - 1)), 60 * 60) });
+      const retryDelaySeconds = Math.min(60 * (2 ** Math.max(0, message.attempts - 1)), 60 * 60);
+      emitNativeCollectorDiagnostic({
+        attempt: Math.max(1, message.attempts),
+        code: collectorFailureCode(error instanceof Error ? error : undefined),
+        disposition: message.attempts > nativeCollectorMaxRetryRequests ? 'retry-to-dlq' : 'retry',
+        messageType: signal.type,
+        retryDelaySeconds,
+      });
+      message.retry({ delaySeconds: retryDelaySeconds });
     }
   }
 }

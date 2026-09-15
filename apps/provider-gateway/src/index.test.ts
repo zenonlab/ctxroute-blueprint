@@ -131,7 +131,9 @@ Deno.test('bounds request and upstream response bodies', async () => {
 
 Deno.test('exposes only a bounded health endpoint besides the signed route', async () => {
   const handler = createProviderGatewayHandler({ nonceStore: memoryNonceStore(), now: () => now, secret });
-  assert((await handler(new Request('https://gateway.example/healthz'))).status === 200);
+  const health = await handler(new Request('https://gateway.example/healthz'));
+  assert(health.status === 200);
+  assert((await health.json()).status === 'healthy');
   assert((await handler(new Request('https://gateway.example/'))).status === 404);
   assert((await handler(new Request('https://gateway.example/v1/provider-fetch?target=https://example.com'))).status === 404);
 });

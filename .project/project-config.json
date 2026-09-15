@@ -7,12 +7,12 @@
   },
   "decisions": {
     "language": "Strict TypeScript across product packages and shared contracts",
-    "runtime": "Manifest V3 browser contexts; Node.js 24 LTS product tooling; inherited governance keeps Node.js 22.13+ compatibility",
+    "runtime": "Manifest V3 browser contexts; Cloudflare Workers and Queues; an isolated Deno Deploy provider gateway; Node.js 24 LTS product tooling with Node.js 22.13+ governance compatibility",
     "frontend": "WXT 0.21.x extension entrypoints with React 19 and CSS Modules",
-    "backend": "Optional single Hono Cloudflare Worker for anonymous public capabilities; no Rails or Next.js in v1",
+    "backend": "One Hono Cloudflare Worker for anonymous public capabilities plus an isolated HMAC-authenticated Deno provider gateway; no Rails backend in v1",
     "storage": "Private state in IndexedDB through a Dexie adapter; optional anonymous public data in D1 through a repository adapter",
-    "deployment": "Deterministic WXT browser packages and separately approved Cloudflare inspect-plan-apply operations; no automatic production deployment",
-    "observability": "Provider-neutral TelemetryPort, bounded redacted local diagnostics, optional Workers Logs, and no remote extension telemetry by default",
+    "deployment": "Deterministic WXT browser packages and separately approved Cloudflare and Deno inspect-plan-apply operations; no automatic production deployment",
+    "observability": "Provider-neutral TelemetryPort, structured bounded collector and gateway logs, Workers Logs and traces, and no remote extension telemetry by default",
     "security": "Local-first privacy, least-privilege MV3 permissions, strict CSP, Zod validation at trust boundaries, provider isolation, and explicit operational approval",
     "performance": "Local UI response under 200 ms, no unbounded background startup, target extension package below 1.5 MB compressed, and optional API p95 below 300 ms"
   },
@@ -20,7 +20,7 @@
     "test": "npm run test:coverage",
     "initialize": "npm run initialize",
     "lint": "npm run lint",
-    "typecheck": null,
+    "typecheck": "npm run typecheck",
     "mutation": null,
     "integration": "npm run integration",
     "build": "npm run build:docs",
@@ -89,8 +89,8 @@
       "docs/architecture/src/favorite-source-boundaries.architecture.json",
       "docs/architecture/src/extension-delivery-validation.dataflow.json",
       "docs/architecture/src/production-publication.dataflow.json",
-      "docs/architecture/src/tobirink-ux.dataflow.json"
-      ,"docs/architecture/src/agenda-release.dataflow.json",
+      "docs/architecture/src/tobirink-ux.dataflow.json",
+      "docs/architecture/src/agenda-release.dataflow.json",
       "docs/architecture/src/public-discovery.dataflow.json",
       "docs/architecture/src/public-pipeline.architecture.json"
     ],

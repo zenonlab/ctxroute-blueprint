@@ -1393,7 +1393,7 @@
     {
       "schemaVersion": 1,
       "id": "goal-route-only-anilist-through-deno",
-      "title": "Limiter la gateway Deno aux appels AniList",
+      "title": "Router les endpoints fournisseur bloqués via Deno",
       "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": true,
@@ -1441,6 +1441,66 @@
             "Le cron de 20:50 UTC promeut calendar-3c0b7a698d38537c2adec26871f6eebf38d5532c9012e67e: 752 événements sur huit pages, dont 225 AniList et 527 MangaUpdates.",
             "npm run verify réussit intégralement, npm audit trouve zéro vulnérabilité et npm ls --all réussit après rematérialisation exacte du lockfile sans scripts.",
             "public-pipeline.architecture, public-discovery.dataflow et agenda-release.dataflow passent Archify showcase 9/9 avec zéro erreur et zéro avertissement."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-pipeline-audit-remediation",
+      "title": "Corriger les écarts du pipeline et de sa documentation",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "harden-observability-and-architecture",
+          "title": "Fiabiliser l’observabilité et rétablir la vérité architecturale",
+          "status": "DONE",
+          "acceptance": [
+            "Les erreurs Agenda identifient la lane AniList ou MangaUpdates sans exposer de payload fournisseur.",
+            "Les logs Queue sont structurés et distinguent retry, DLQ imminente, succès et signal invalide.",
+            "La health check Deno répond avec un contrat de succès explicite.",
+            "Le brief, la stratégie qualité, le runbook, Progress et les vues Archify décrivent le runtime Cloudflare plus Deno sans GitHub Actions actif.",
+            "Une installation propre depuis le lockfile produit un arbre npm valide sans dépendance invalide.",
+            "CRG est construit sur HEAD et les tests ciblés, npm run verify, npm ls, npm audit et Archify all/internal passent.",
+            "Un commit vérifié unique est créé sans inclure .codex/config.toml, sans push ni déploiement."
+          ],
+          "files": [
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/native-collectors.test.ts",
+            "apps/provider-gateway/src/index.ts",
+            "apps/provider-gateway/src/index.test.ts",
+            ".project/project-config.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/00-project-brief.md",
+            "docs/02-quality-strategy.md",
+            "docs/operations/cloudflare.md",
+            "docs/decisions/ADR-0052-native-collector-operations.md",
+            "docs/architecture/src/blueprint.architecture.json",
+            "docs/architecture/src/traffic.dataflow.json",
+            "docs/architecture/src/public-pipeline.architecture.json",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/plans/pipeline-audit-remediation-start.json",
+            "docs/plans/pipeline-audit-dependency-update.json",
+            "docs/plans/pipeline-audit-remediation-done.json"
+          ],
+          "commands": [
+            "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress/CRG prévues.",
+            "Rematérialiser node_modules depuis le lockfile avec npm ci --ignore-scripts.",
+            "Exécuter les tests ciblés Worker, Deno et infrastructure.",
+            "Exécuter npm run verify, npm ls --all, npm audit --audit-level=high et git diff --check.",
+            "Valider Archify all et internal en showcase.",
+            "Mettre CRG à jour sur HEAD et vérifier son statut.",
+            "Créer le commit fix(pipeline): harden collector observability sans push ni déploiement."
+          ],
+          "evidence": [
+            "Worker 81/81 et gateway Deno 7/7 passent; les tests Queue couvrent succès, signal invalide, retry, neuvième livraison vers DLQ et codes AniList/MangaUpdates bornés.",
+            "npm ci --ignore-scripts, npm ls --all et npm run verify passent; les builds Chrome/Firefox réussissent et npm audit rapporte 0 vulnérabilité.",
+            "Archify all et internal passent en showcase 9/9 sans erreur ni avertissement; Agenda, pipeline public, trafic et blueprint décrivent le runtime Cloudflare plus Deno sans GitHub Actions actif.",
+            "Les validations configuration, ADR, documentation et cohérence passent; AGENTS.md, CLAUDE.md, .codex/hooks.json et .claude/hooks restent inchangés.",
+            "CRG reconstruit après le commit compte 6079 nœuds, 53273 arêtes et 679 fichiers sur fix/pipeline-audit-remediation; .codex/config.toml reste une modification utilisateur exclue."
           ]
         }
       ]

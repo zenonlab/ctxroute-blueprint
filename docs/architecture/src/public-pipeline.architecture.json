@@ -71,7 +71,7 @@
       "id": "queue",
       "type": "messagebus",
       "label": "Cloudflare Queue",
-      "sublabel": "Retries bornés · DLQ",
+      "sublabel": "Retries journalisés · DLQ après 8",
       "pos": [650, 480],
       "size": [220, 72]
     },
@@ -135,7 +135,7 @@
     { "id": "worker-archives", "from": "worker", "to": "r2", "label": "lecture archives", "variant": "dashed", "labelAt": [445, 416] }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Runtime natif", "items": ["Discovery déclenchée immédiatement par Queue", "Agenda collecté par Cron", "D1 conserve les états et générations", "Aucune exécution GitHub requise"] },
+    { "dot": "emerald", "title": "Runtime natif", "items": ["Discovery déclenchée immédiatement par Queue", "Agenda collecté par Cron", "Logs JSON: lane, tentative et disposition", "D1 conserve la dernière génération saine"] },
     { "dot": "rose", "title": "Gateway sélective fermée", "items": ["Secret HMAC 32–256 octets", "Nonce et horodatage vérifiés", "AniList + tous les endpoints MU", "MangaDex et Kitsu directs"] }
   ]
 }

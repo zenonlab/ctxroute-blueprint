@@ -42,6 +42,17 @@ function json(status: number, code: string): Response {
   });
 }
 
+function healthy(): Response {
+  return Response.json({ status: 'healthy' }, {
+    headers: {
+      'Cache-Control': 'no-store',
+      'Content-Security-Policy': "default-src 'none'",
+      'X-Content-Type-Options': 'nosniff',
+    },
+    status: 200,
+  });
+}
+
 export function isAllowedProviderTarget(target: string, method: ProviderMethod): boolean {
   let url: URL;
   try {
@@ -174,7 +185,7 @@ export function createProviderGatewayHandler(options: GatewayOptions): (request:
   const now = options.now ?? Date.now;
   return async (request) => {
     const url = new URL(request.url);
-    if (request.method === 'GET' && url.pathname === '/healthz' && url.search === '') return json(200, 'healthy');
+    if (request.method === 'GET' && url.pathname === '/healthz' && url.search === '') return healthy();
     if (request.method !== 'POST' || url.pathname !== '/v1/provider-fetch' || url.search !== '') return json(404, 'not-found');
     const declaredLength = Number(request.headers.get('content-length'));
     if (Number.isFinite(declaredLength) && declaredLength > requestByteLimit) return json(413, 'request-too-large');
