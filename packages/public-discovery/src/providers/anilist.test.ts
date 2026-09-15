@@ -8,7 +8,17 @@ describe('AniListFavoriteProviderAdapter', () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ data: { Page: { media: [media], pageInfo: { hasNextPage: false } } } }), { headers: { 'content-type': 'application/json' } }));
     const adapter = new AniListFavoriteProviderAdapter(fetcher);
     const result = await adapter.search({ limit: 10, provider: 'anilist', titles: ['Frieren'] });
-    expect(fetcher).toHaveBeenCalledWith(anilistGraphqlEndpoint, expect.objectContaining({ method: 'POST', signal: expect.any(AbortSignal) }));
+    expect(fetcher).toHaveBeenCalledWith(anilistGraphqlEndpoint, expect.objectContaining({
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Origin: 'https://tobirink.com',
+        Referer: 'https://tobirink.com/',
+        'User-Agent': 'TobiRink/1.0 (+https://tobirink.com)',
+      },
+      method: 'POST',
+      signal: expect.any(AbortSignal),
+    }));
     expect(result).toMatchObject({ complete: true, provider: 'anilist', truncated: false });
     expect(result.candidates[0]).toMatchObject({ cover: { attribution: 'AniList', url: media.coverImage.extraLarge }, displayTitle: 'Frieren', editorialStatus: 'COMPLETED', episodeCount: 28, externalId: '154587', mediaKind: 'ANIME', metadataVersion: 2, popularity: { kind: 'MEMBERS', value: 250000 }, startYear: 2023, titleVariants: expect.arrayContaining([{ language: 'en', title: 'Frieren' }]), titles: ['Sousou no Frieren', 'Frieren', '葬送のフリーレン'] });
   });
@@ -21,8 +31,12 @@ describe('AniListFavoriteProviderAdapter', () => {
   });
 
   it('hydrates only an exact numeric reference', async () => {
-    const adapter = new AniListFavoriteProviderAdapter(async () => new Response(JSON.stringify({ data: { Media: media } }), { headers: { 'content-type': 'application/json' } }));
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ data: { Media: media } }), { headers: { 'content-type': 'application/json' } }));
+    const adapter = new AniListFavoriteProviderAdapter(fetcher);
     await expect(adapter.hydrate({ externalId: '154587', provider: 'anilist' })).resolves.toMatchObject({ externalId: '154587' });
+    expect(fetcher).toHaveBeenCalledWith(anilistGraphqlEndpoint, expect.objectContaining({
+      headers: expect.objectContaining({ Origin: 'https://tobirink.com', Referer: 'https://tobirink.com/', 'User-Agent': 'TobiRink/1.0 (+https://tobirink.com)' }),
+    }));
     await expect(adapter.hydrate({ externalId: 'slug', provider: 'anilist' })).rejects.toThrow(/numeric/u);
   });
 

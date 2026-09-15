@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-consolidate-native-collectors-and-retire-github",
+  "stepId": "certify-live-traffic",
+  "status": "IN_PROGRESS",
+  "files": [
+    "docs/plans/consolidate-native-collectors-traffic-start.json",
+    ".project/progress.json",
+    "docs/progress.md"
+  ],
+  "evidence": []
+}

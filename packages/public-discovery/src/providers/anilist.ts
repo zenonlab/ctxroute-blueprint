@@ -8,6 +8,13 @@ export const anilistGraphqlEndpoint = 'https://graphql.anilist.co';
 const mediaProjection = 'id type format status siteUrl title { romaji english native } synonyms genres coverImage { extraLarge large medium } startDate { year } endDate { year } episodes chapters volumes popularity';
 const searchQuery = `query FavoriteSearch($search: String!, $perPage: Int!, $page: Int!) { Page(page: $page, perPage: $perPage) { pageInfo { hasNextPage } media(search: $search, type: ANIME) { ${mediaProjection} } } }`;
 const hydrateQuery = `query FavoriteById($id: Int!) { Media(id: $id) { ${mediaProjection} } }`;
+const requestHeaders = Object.freeze({
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+  Origin: 'https://tobirink.com',
+  Referer: 'https://tobirink.com/',
+  'User-Agent': 'TobiRink/1.0 (+https://tobirink.com)',
+});
 const nonEmptyString = z.string().trim().min(1);
 const identifierSchema = z.union([z.number().int().positive(), nonEmptyString]).transform(String);
 const anilistMediaSchema = z.object({
@@ -78,7 +85,7 @@ export class AniListFavoriteProviderAdapter implements FavoriteProviderCandidate
     const page = favoriteProviderPage(query.cursor);
     const response = await this.gate.run(favoriteProviderPolicy.anilist.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, anilistGraphqlEndpoint, {
       body: JSON.stringify({ query: searchQuery, variables: { page, perPage: query.limit, search: query.titles[0] } }),
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: requestHeaders,
       method: 'POST',
     }, anilistSearchSchema));
     const candidates = response.value.data.Page.media.map(candidate);
@@ -92,7 +99,7 @@ export class AniListFavoriteProviderAdapter implements FavoriteProviderCandidate
     if (reference.provider !== 'anilist' || !/^\d+$/u.test(reference.externalId)) throw new TypeError('AniList hydration requires a numeric AniList reference.');
     const response = await this.gate.run(favoriteProviderPolicy.anilist.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, anilistGraphqlEndpoint, {
       body: JSON.stringify({ query: hydrateQuery, variables: { id: Number(reference.externalId) } }),
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      headers: requestHeaders,
       method: 'POST',
     }, anilistHydrationSchema));
     if (response.value.data.Media === null) return undefined;

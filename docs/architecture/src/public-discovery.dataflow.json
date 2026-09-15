@@ -237,15 +237,15 @@
     },
     {
       "dot": "amber",
-      "title": "Candidat local non déployé",
+      "title": "Runtime Cloudflare déployé",
       "items": [
         "Aucun utilisateur, compte, consentement ou Collectif",
         "Nonces 7 jours · FAILED 30 jours · résultats terminaux conservés",
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
         "D1, le collecteur et le code Worker restent dans le dépôt principal privé",
         "Le collecteur dépend uniquement de ProviderTransportPort, comme le métier dépend du port D1",
-        "Le mode direct ne requiert aucun proxy; le mode gateway exige HTTPS, HMAC et une cible allowlistée",
-        "Une passerelle gratuite reste candidate tant que son egress et son trafic réel ne sont pas certifiés"
+        "Le mode direct ne requiert aucun proxy; les en-têtes AniList sont alignés sur la collecte Agenda",
+        "Le mode gateway reste un repli HMAC isolé uniquement si le smoke test direct échoue encore"
       ]
     }
   ]

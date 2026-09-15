@@ -1194,7 +1194,7 @@
         {
           "id": "certify-live-traffic",
           "title": "Certifier Discovery et Agenda en trafic réel",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Un miss Discovery évolue de PENDING vers un état terminal via Queue.",
             "Retries, DLQ et latence sont observables et bornés.",
@@ -1202,8 +1202,7 @@
             "Les routes v2 restent 410 et les routes v3 restent disponibles."
           ],
           "files": [
-            "docs/release.md",
-            "docs/architecture/src/traffic.dataflow.json",
+            "docs/plans/consolidate-native-collectors-traffic-start.json",
             ".project/progress.json",
             "docs/progress.md"
           ],

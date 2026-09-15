@@ -55,6 +55,11 @@ interdit les redirections et borne les réponses à 512 Kio. Le client gateway
 borne son enveloppe à 64 Kio et la signe; aucun serveur proxy, registre de nonce
 ou endpoint public générique n’est conservé dans ce dépôt.
 
+Le transport direct identifie les requêtes AniList Discovery avec la même
+origine, le même référent et le même user-agent produit que la collecte Agenda.
+Ces en-têtes ne portent ni secret ni donnée de bibliothèque; ils évitent qu'un
+client serveur anonyme soit confondu avec un trafic générique.
+
 Vercel Hobby est le premier candidat gratuit pour une passerelle séparée : au
 15 septembre 2026, la documentation officielle annonce un plan personnel non
 commercial gratuit et jusqu’à un million d’invocations Function incluses. Deno
