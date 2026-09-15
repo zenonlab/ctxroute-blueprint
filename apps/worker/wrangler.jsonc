@@ -58,6 +58,7 @@
     "crons": ["17 3 * * 1"]
   },
   "vars": {
+    "PROVIDER_TRANSPORT_MODE": "direct",
     "TOBIRINK_WORKER_DIAGNOSTICS": "worker-v1"
   },
   "observability": {

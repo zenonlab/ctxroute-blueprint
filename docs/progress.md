@@ -79,3 +79,7 @@
 ## Remplacer GitHub Actions par des collecteurs Cloudflare et un proxy sortant — DONE
 
 - [x] **Implémenter et certifier localement la Queue et le proxy signé** — DONE _(evidence: Worker 71/71 et Public Discovery 55/55 passent; les tests prouvent signal Queue opaque, 503 avec PENDING conservé, ack/retry, validation du message et proxy HMAC/allowlist/anti-rejeu/limites., npm run verify, npm ls --all, npm audit (0 vulnérabilité) et les builds Chrome/Firefox réussissent; le dry-run Wrangler reconnaît Queue, D1, R2, Images, Assets et rate limit sans déploiement., Archify dataflow Discovery et Agenda passent showcase 9/9, 0 erreur, 0 avertissement; artefacts 761e900d296cb5f0a5b37a2f5807cd1fde9529a01e1a19aa41a4fbb8d0d865c0 et c788c05477864ab9548fe710f28c23e2f96f06486304f263377ba2cfe4825d6f.)_
+
+## Isoler et rendre interchangeable le transport fournisseur — DONE
+
+- [x] **Retirer le proxy embarqué et composer un port de transport sélectionnable** — DONE _(evidence: ProviderTransportPort sépare les collecteurs des adaptateurs direct et gateway; la gate refuse mode, cible, origine ou secret invalides et direct est la valeur Wrangler par défaut., Le serveur provider-proxy et son test sont supprimés; rg ne trouve plus aucun symbole PROVIDER_PROXY, createSignedProviderProxyFetch ou createProviderProxyHandler dans apps et packages., Public Discovery 52/52 et Worker 78/78 passent; npm run verify final, npm ls --all, typechecks, intégration, Chrome/Firefox MV3 et npm audit à 0 vulnérabilité réussissent.)_

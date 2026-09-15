@@ -2,16 +2,17 @@ import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import {
   AniListAgendaCollector,
   MangaUpdatesAgendaCollector,
+  bindProviderTransport,
   collectPublicAgendaLanes,
   createPublicDiscoveryProviders,
   createPublicDiscoveryResolver,
-  createSignedProviderProxyFetch,
   publicAgendaIngestionSchema,
   runPublicDiscoveryBatch,
   type PublicDiscoveryBatchReport,
   type PublicDiscoveryResultBatch,
 } from '@tobirink/public-discovery';
 import { commitPublicReleaseGeneration } from './releases/public-release-collectors';
+import { createProviderTransportAdapter, type ProviderTransportBindings } from './provider-transport-adapter';
 import { z } from 'zod';
 
 export const nativeCollectorSignalSchema = z.discriminatedUnion('type', [
@@ -20,9 +21,7 @@ export const nativeCollectorSignalSchema = z.discriminatedUnion('type', [
 ]);
 export type NativeCollectorSignal = z.infer<typeof nativeCollectorSignalSchema>;
 
-export type NativeCollectorBindings = Env & {
-  readonly PROVIDER_PROXY_HMAC_KEY?: string;
-  readonly PROVIDER_PROXY_ORIGIN?: string;
+export type NativeCollectorBindings = Env & ProviderTransportBindings & {
   readonly PUBLIC_DISCOVERY_QUEUE: Queue<NativeCollectorSignal>;
 };
 
@@ -55,9 +54,8 @@ async function digest(value: string): Promise<string> {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function proxyFetch(bindings: NativeCollectorBindings) {
-  if (!bindings.PROVIDER_PROXY_ORIGIN || !bindings.PROVIDER_PROXY_HMAC_KEY) throw new Error('provider-proxy-unconfigured');
-  return createSignedProviderProxyFetch({ origin: bindings.PROVIDER_PROXY_ORIGIN, secret: bindings.PROVIDER_PROXY_HMAC_KEY });
+function providerFetch(bindings: NativeCollectorBindings) {
+  return bindProviderTransport(createProviderTransportAdapter(bindings));
 }
 
 export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings): Promise<PublicDiscoveryBatchReport> {
@@ -75,7 +73,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     limit: 20,
     nonce: crypto.randomUUID,
     now: () => new Date().toISOString(),
-    resolver: createPublicDiscoveryResolver(createPublicDiscoveryProviders(proxyFetch(bindings))),
+    resolver: createPublicDiscoveryResolver(createPublicDiscoveryProviders(providerFetch(bindings))),
   });
 }
 
@@ -86,7 +84,7 @@ function calendarWindow(scheduledFor: string): CalendarWindow {
 }
 
 export async function processAgendaQueue(bindings: NativeCollectorBindings, scheduledFor: string): Promise<AgendaProcessingReceipt> {
-  const transport = proxyFetch(bindings); const window = calendarWindow(scheduledFor);
+  const transport = providerFetch(bindings); const window = calendarWindow(scheduledFor);
   const collection = await collectPublicAgendaLanes([new AniListAgendaCollector(transport), new MangaUpdatesAgendaCollector(transport)], window);
   if (collection.failures.length > 0) throw new Error('agenda-collection-incomplete');
   const ingestion = publicAgendaIngestionSchema.parse({ events: collection.events, generatedAt: scheduledFor, nonce: crypto.randomUUID(), schemaVersion: 1, window });

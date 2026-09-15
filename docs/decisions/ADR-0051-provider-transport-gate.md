@@ -1,0 +1,76 @@
+---
+scope:
+  - packages/public-discovery/src/provider-transport.ts
+  - packages/public-discovery/src/provider-http.ts
+  - apps/worker/src/provider-transport-adapter.ts
+  - apps/worker/src/provider-transport-adapter.test.ts
+  - apps/worker/src/native-collectors.ts
+  - apps/worker/wrangler.jsonc
+  - docs/architecture/src/public-discovery.dataflow.json
+  - docs/architecture/src/agenda-release.dataflow.json
+review: on-change
+---
+
+# ADR-0051 — Isoler et sélectionner le transport fournisseur
+
+- Status: accepted
+- Date: 2026-09-15
+
+## Contexte
+
+Le premier candidat Queue composait directement un client de proxy et publiait
+également le serveur proxy dans le package portable. Retirer ou remplacer cet
+hébergeur obligeait donc à toucher au consumer Discovery et Agenda. Le chemin
+direct Cloudflare est gratuit, mais un essai AniList antérieur a répondu HTTP
+403 depuis cet egress; son fonctionnement ne peut pas être supposé sans test
+réel. Cette décision remplace les paragraphes de composition proxy des
+ADR-0045 et ADR-0047; leurs constats de déploiement antérieurs restent des
+preuves historiques, pas la composition cible.
+
+## Décision
+
+Définir `ProviderTransportPort` dans le package portable et placer les
+implémentations réseau dans la composition Worker, comme le port D1 sépare le
+métier de son adaptateur Cloudflare. Les résolveurs et collecteurs reçoivent
+uniquement la fonction liée à ce port.
+
+La gate `PROVIDER_TRANSPORT_MODE` accepte seulement `direct` ou `gateway` et
+échoue fermée pour toute autre valeur. `direct` est la valeur versionnée par
+défaut et n’exige ni proxy ni secret. `gateway` exige une origine HTTPS sans
+chemin ni credentials et un secret HMAC de 32 à 256 octets. Changer de
+passerelle modifie seulement ces bindings et repasse par la gate de déploiement
+Cloudflare; le consumer et les fournisseurs restent inchangés.
+
+Les deux adaptateurs limitent les cibles aux opérations exactes AniList,
+MangaUpdates, MangaDex et Kitsu. La couche HTTP portable conserve un timeout,
+interdit les redirections et borne les réponses à 512 Kio. Le client gateway
+borne son enveloppe à 64 Kio et la signe; aucun serveur proxy, registre de nonce
+ou endpoint public générique n’est conservé dans ce dépôt.
+
+Vercel Hobby est le premier candidat gratuit pour une passerelle séparée : au
+15 septembre 2026, la documentation officielle annonce un plan personnel non
+commercial gratuit et jusqu’à un million d’invocations Function incluses. Deno
+Deploy Free est un second candidat mais suspend l’application au dépassement de
+ses limites. Cloud Run possède un free tier de calcul, tandis que son trafic
+sortant peut être facturé. Une passerelle publique ouverte est exclue : elle ne
+fournit ni identité, ni confidentialité, ni disponibilité contrôlable.
+
+Aucun candidat n’est déclaré compatible avant un smoke test signé vers AniList
+et MangaUpdates, puis un test Discovery `PENDING` jusqu’à l’état terminal et
+une collecte Agenda complète. La création du service, du secret et le
+déploiement restent une étape fournisseur séparée soumise à approbation.
+
+## Conséquences
+
+Le mode direct peut être essayé sans coût ni nouvelle ressource, puis remplacé
+par une passerelle sans modifier le flux métier. La gate rend la configuration
+invalide visible au démarrage du traitement au lieu de basculer silencieusement.
+Le dépôt ne prouve pas encore qu’AniList accepte l’egress Cloudflare, Vercel,
+Deno ou Google; cette preuve appartient à la future certification distante.
+
+Sources de décision consultées le 15 septembre 2026 :
+
+- https://vercel.com/docs/plans/hobby
+- https://vercel.com/docs/functions/limitations
+- https://docs.deno.com/deploy/usage/
+- https://cloud.google.com/run/pricing

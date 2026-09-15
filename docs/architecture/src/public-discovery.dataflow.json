@@ -16,14 +16,14 @@
       {
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
-        "focus": ["extension", "worker", "publicD1", "queue", "collector", "proxy", "providers", "verifiedD1", "extensionResult"],
+        "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
         "note": "Le miss devient PENDING puis une Queue déclenche le collecteur sans attendre un cron."
       },
       {
         "id": "boundaries",
         "label": "Frontières",
-        "focus": ["extension", "worker", "publicD1", "queue", "collector", "proxy", "providers"],
-        "note": "Le proxy signé autorise seulement les opérations fournisseur connues et masque l’egress Cloudflare."
+        "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers"],
+        "note": "Le collecteur dépend d’un port stable; la gate choisit direct ou une passerelle signée sans modifier le métier."
       }
     ]
   },
@@ -88,15 +88,15 @@
       "tag": "ack ou retry explicite"
     },
     {
-      "id": "proxy",
+      "id": "transportPort",
       "type": "security",
-      "label": "Proxy sortant signé",
-      "sublabel": "HMAC · anti-rejeu · allowlist",
+      "label": "ProviderTransportPort",
+      "sublabel": "gate direct | gateway signé",
       "stage": 4,
       "row": 2,
       "yOffset": 20,
       "width": 140,
-      "tag": "IP hors Cloudflare"
+      "tag": "adaptateurs isolés"
     },
     {
       "id": "providers",
@@ -107,7 +107,7 @@
       "row": 3,
       "yOffset": 50,
       "width": 140,
-      "tag": "proxy uniquement"
+      "tag": "transport sélectionné"
     },
     {
       "id": "verifiedD1",
@@ -179,18 +179,18 @@
     },
     {
       "from": "collector",
-      "to": "proxy",
-      "label": "enveloppe signée bornée",
-      "classification": "cible allowlistée · nonce court",
+      "to": "transportPort",
+      "label": "requête via le port",
+      "classification": "direct par défaut · gateway explicite",
       "variant": "security",
       "route": "straight",
       "labelAt": [853, 448]
     },
     {
-      "from": "proxy",
+      "from": "transportPort",
       "to": "providers",
       "label": "requête API bornée",
-      "classification": "AniList · MU · MangaDex · Kitsu Anime/Manga",
+      "classification": "cible allowlistée · timeout · réponse bornée",
       "variant": "emphasis",
       "route": "auto",
       "labelAt": [960, 600]
@@ -243,9 +243,9 @@
         "Nonces 7 jours · FAILED 30 jours · résultats terminaux conservés",
         "La découverte automatique de l’extension n’appelle aucune API fournisseur",
         "D1, le collecteur et le code Worker restent dans le dépôt principal privé",
-        "Le proxy sortant n’accepte aucune URL arbitraire et utilise une IP hors Cloudflare",
-        "Chaque appel porte une signature HMAC, un horodatage et un nonce anti-rejeu borné",
-        "GitHub reste le chemin opérationnel tant que Queue, proxy et trafic réel ne sont pas certifiés"
+        "Le collecteur dépend uniquement de ProviderTransportPort, comme le métier dépend du port D1",
+        "Le mode direct ne requiert aucun proxy; le mode gateway exige HTTPS, HMAC et une cible allowlistée",
+        "Une passerelle gratuite reste candidate tant que son egress et son trafic réel ne sont pas certifiés"
       ]
     }
   ]

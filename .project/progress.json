@@ -1023,6 +1023,63 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-isolate-provider-transport",
+      "title": "Isoler et rendre interchangeable le transport fournisseur",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "replace-proxy-with-transport-gate",
+          "title": "Retirer le proxy embarqué et composer un port de transport sélectionnable",
+          "status": "DONE",
+          "acceptance": [
+            "Les collecteurs ne connaissent que ProviderTransportPort et le mode direct fonctionne sans configuration de proxy.",
+            "Le mode gateway est sélectionné par une gate stricte, accepte uniquement une origine HTTPS et échoue fermé sans origine ou secret.",
+            "Le serveur proxy embarqué et son test sont supprimés; aucun déploiement, push, secret ou ressource distante n'est modifié.",
+            "Les tests ciblés, npm run verify, npm ls --all, npm audit, les builds MV3 et Archify dataflow réussissent.",
+            "Une ADR documente Vercel Hobby comme candidat gratuit à tester, avec Deno Deploy et Cloud Run comme replis sans prétendre qu'un egress est validé avant smoke test."
+          ],
+          "files": [
+            "packages/public-discovery/src/provider-proxy.ts",
+            "packages/public-discovery/src/provider-proxy.test.ts",
+            "packages/public-discovery/src/provider-transport.ts",
+            "packages/public-discovery/src/provider-transport.test.ts",
+            "packages/public-discovery/src/index.ts",
+            "apps/worker/src/provider-transport-adapter.ts",
+            "apps/worker/src/provider-transport-adapter.test.ts",
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/wrangler.jsonc",
+            "docs/architecture/src/public-discovery.dataflow.json",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/decisions/ADR-0047-portable-public-discovery-component.md",
+            "docs/decisions/ADR-0051-provider-transport-gate.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run archify:validate -- dataflow",
+            "npm run test --workspace @tobirink/public-discovery",
+            "npm run test --workspace @tobirink/worker",
+            "npm run verify",
+            "npm ls --all",
+            "npm audit",
+            "npm run build:extension:chrome",
+            "npm run build:extension:firefox",
+            "git diff --check"
+          ],
+          "evidence": [
+            "ProviderTransportPort sépare les collecteurs des adaptateurs direct et gateway; la gate refuse mode, cible, origine ou secret invalides et direct est la valeur Wrangler par défaut.",
+            "Le serveur provider-proxy et son test sont supprimés; rg ne trouve plus aucun symbole PROVIDER_PROXY, createSignedProviderProxyFetch ou createProviderProxyHandler dans apps et packages.",
+            "Public Discovery 52/52 et Worker 78/78 passent; npm run verify final, npm ls --all, typechecks, intégration, Chrome/Firefox MV3 et npm audit à 0 vulnérabilité réussissent.",
+            "Archify dataflow passe showcase 9/9 sans diagnostic; artefacts Agenda 318fbbd8386d0e83465fe8e261ca24d4f5c3d0c7857619bbb07f4f633513710b et Discovery 48866bb734046575e814d1d02ab502ba35bdc5a627c29c4f5d04f26152f6f154.",
+            "ADR-0051 retient direct sans coût par défaut et Vercel Hobby comme premier candidat gratuit à smoke-tester; aucun push, déploiement, secret ni ressource distante n'a été modifié."
+          ]
+        }
+      ]
     }
   ]
 }

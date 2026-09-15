@@ -68,13 +68,20 @@ Huit retries Queue donnent une neuvième livraison : elle constate le huitième
 bail expiré, matérialise `FAILED/ATTEMPT_LIMIT`, ne réclame aucun nouveau lot et
 acquitte le signal au lieu de le laisser en DLQ.
 
-Les appels fournisseurs du consumer passent par un transport injecté vers un
-proxy sortant hors Cloudflare. L’enveloppe JSON est bornée, horodatée et signée
-HMAC-SHA-256. Le proxy refuse toute cible ou méthode hors de la liste exacte
-AniList, MangaUpdates, MangaDex et Kitsu, les redirections, les réponses de
-plus de 512 Kio, les signatures invalides, les requêtes expirées et les nonces
-rejoués. Un déploiement mono-réplique peut utiliser le registre de nonces borné
-en mémoire; plusieurs répliques exigent un registre partagé avant activation.
+Les appels fournisseurs du consumer traversent `ProviderTransportPort`. Le
+consumer et les adaptateurs AniList, MangaUpdates, MangaDex et Kitsu ne
+connaissent ni l’hébergeur ni le mode de sortie. La composition Worker possède
+une gate fermée à deux adaptateurs : `direct`, sélectionné par défaut sans
+secret, et `gateway`, sélectionné explicitement avec une origine HTTPS exacte
+et une clé HMAC de 32 à 256 octets. Les deux chemins refusent toute cible ou
+méthode hors de l’allowlist fournisseur et les redirections.
+
+Le mode `gateway` conserve une enveloppe versionnée, bornée à 64 Kio,
+horodatée et signée HMAC-SHA-256. Le serveur proxy embarqué, son registre de
+nonces mémoire et son test quittent le composant portable. Toute passerelle
+externe doit vérifier la signature, l’horodatage, l’anti-rejeu et les mêmes
+bornes avant certification; aucune implémentation de serveur n’est activée par
+cette décision. Le détail et les candidats gratuits sont fixés par l’ADR-0051.
 
 Cette racine est publiée sous licence MIT et reste `private: true` au sens npm :
 le code peut être public sans autoriser une publication accidentelle sur le
@@ -86,8 +93,10 @@ le runner public et réussir `npm ci` hors du monorepo.
 ## Conséquences
 
 La cadence et l’hébergeur du collecteur peuvent changer sans modifier
-l’extension ou le Worker. GitHub Actions reste la composition opérationnelle
-déployée tant que la Queue, le proxy et leur trafic réel ne sont pas certifiés.
+l’extension. Le transport fournisseur peut changer sans modifier le consumer :
+seule la composition externe du Worker sélectionne son adaptateur. GitHub
+Actions reste la composition opérationnelle déployée tant que la Queue et son
+trafic réel ne sont pas certifiés.
 Le Worker n’accepte les audiences Discovery que si les claims OIDC
 nomment aussi le dépôt public exact, `refs/heads/main` et
 `.github/workflows/collect.yml@refs/heads/main`; les workflows de forks et de
@@ -101,7 +110,7 @@ actifs sans modifier les clés ni perdre les demandes déjà matérialisées.
 
 Le candidat local Queue supprime l’attente de cadence : un cache miss programme
 le traitement dès la création `PENDING`. Sa présence dans le dépôt ne prouve ni
-la création des ressources Cloudflare, ni le secret partagé du proxy, ni le
-déploiement. Les routes OIDC et le dépôt public restent donc un rollback
+la création des ressources Cloudflare, ni l’accessibilité AniList depuis
+l’adaptateur direct, ni le déploiement. Les routes OIDC et le dépôt public restent donc un rollback
 opérationnel jusqu’à une bascule séparée et vérifiée; leur suppression demande
 une approbation destructive distincte.
