@@ -12,6 +12,7 @@ import { stopReview } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
 import { runStep } from '../.githooks/setup.mjs';
+import { codeContextPolicy } from '../scripts/code-context-policy.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -162,6 +163,15 @@ test('AGENTS keeps CRG ahead of native tools for relational code context', () =>
   assert.match(instructions, /Start with `get_minimal_context_tool`/u);
   assert.match(instructions, /Use `rg` and direct file reads for exact-text lookup/u);
   assert.match(instructions, /state the native-tool fallback/u);
+});
+
+test('the shared code-context policy is complete and bounded', () => {
+  const policy = codeContextPolicy();
+  assert.match(policy, /code-review-graph MCP before native search/u);
+  assert.match(policy, /get_minimal_context_tool/u);
+  assert.match(policy, /_graph\.head_matches_build is true/u);
+  assert.match(policy, /npm run crg:update/u);
+  assert.ok(policy.length <= 700);
 });
 
 test('PreCompact refreshes canonical routing with the correct event envelope', () => {
