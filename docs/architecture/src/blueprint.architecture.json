@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "viewBox": [1390, 700],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The lifecycle returns bounded synchronous context while an explicit asynchronous maintenance lane keeps CRG current for later MCP queries." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "Session and worker prompts route relational questions to CRG first; native reads confirm lines and async maintenance keeps graph current." },
       { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "state", "worktrees", "recovery", "telemetry"], "note": "A single fail-closed bootstrap owns the global mutation lock, resumes pending intent, and preserves ambiguous worktrees." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg", "githubActions", "ciArtifacts"], "note": "Sensor blocks unsafe changes; CRG stays fail-closed at high and accepts only exact-SHA, digest-bound administrator dispositions." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
@@ -34,7 +34,7 @@
     ,{ "id": "telemetry", "type": "database", "label": "Decision events", "sublabel": "bounded JSONL rotation", "pos": [790, 580], "size": [190, 60] }
   ],
   "connections": [
-    { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "declared files + six events", "variant": "emphasis", "labelAt": [235, 124] },
+    { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "file + tool policy", "variant": "emphasis", "labelAt": [235, 124] },
     { "id": "lifecycle-ctxroute", "from": "lifecycle", "to": "ctxroute", "label": "bounded routing context", "labelAt": [500, 124] },
     { "id": "lifecycle-sensor", "from": "lifecycle", "to": "sensor", "label": "validate successful writes", "variant": "security", "labelAt": [450, 170] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse supported sources", "labelAt": [500, 304] },
@@ -42,7 +42,7 @@
     { "id": "orchestrator-lifecycle", "from": "orchestrator", "to": "lifecycle", "label": "targeted mission", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [315, 140] },
     { "id": "orchestrator-workers", "from": "orchestrator", "to": "workers", "label": "scope + worktree", "fromSide": "bottom", "toSide": "top", "labelAt": [90, 350] },
     { "id": "workers-orchestrator", "from": "workers", "to": "orchestrator", "label": "bounded report", "variant": "emphasis", "fromSide": "right", "toSide": "right", "via": [[250, 440], [250, 260]], "labelAt": [285, 395] },
-    { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
+    { "id": "agents-crg", "from": "agents", "to": "crg", "label": "CRG-first relational context", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
     { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "async coalesced update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
     { "id": "crg-graph", "from": "crg", "to": "graph", "label": "update + HEAD freshness", "labelAt": [800, 170] },
     { "id": "json-archify", "from": "jsonIr", "to": "archify", "label": "showcase validation", "labelAt": [1070, 170] },

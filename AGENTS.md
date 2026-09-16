@@ -48,6 +48,13 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Session and post-compaction hooks may inject only bounded current-goal or mission context. Continue from that context directly and query the orchestrator only when the task needs authoritative state or mutation.
 - Start or restart the agent from the repository root so project-local MCP servers are loaded.
 
+## Code-context tool routing
+
+- For cross-file relationships, dependencies, impact radius, architecture, or review scope, use the code-review-graph MCP before native search or broad file reads.
+- Start with `get_minimal_context_tool`, then call only the targeted CRG impact, review, query, or architecture tool needed by the task.
+- Use `rg` and direct file reads for exact-text lookup, line-level confirmation, unsupported or unindexed files, and deterministic verification after graph context.
+- Accept CRG evidence only when the graph reports current data and `_graph.head_matches_build` is `true`. Otherwise run `npm run crg:update`, retry once, and state the native-tool fallback if CRG remains unavailable.
+
 ## Development
 
 - Read existing files before writing.

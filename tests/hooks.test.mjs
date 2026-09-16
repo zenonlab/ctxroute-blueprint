@@ -12,6 +12,7 @@ import { stopReview } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
 import { runStep } from '../.githooks/setup.mjs';
+import { CODE_CONTEXT_POLICY } from '../scripts/code-context-policy.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -25,7 +26,7 @@ test('Codex and Claude expose one synchronous dispatcher plus explicit PostToolU
       assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
       assert.ok(handlers[0].timeout > 0, `${file} ${event} timeout`);
       assert.equal('statusMessage' in handlers[0], false, `${file} ${event} should remain quiet`);
-      if (harness === 'codex' && !['PreCompact', 'Stop'].includes(event)) assert.equal(handlers[0].additionalContextLimit, 1200, `${file} ${event} context limit`);
+      if (harness === 'codex' && event !== 'Stop') assert.equal(handlers[0].additionalContextLimit, ['SessionStart', 'PreCompact'].includes(event) ? 1600 : 1200, `${file} ${event} context limit`);
       if (event === 'PostToolUse') {
         assert.equal(handlers[1].command, `node ./.codex/hooks/lifecycle.mjs ${harness} PostToolUse maintenance`);
         assert.equal(handlers[1].async, true);
@@ -148,12 +149,36 @@ test('SessionStart retains the canonical file routing and hook timing', () => {
   assert.match(context, /architecture: docs\/architecture\/src\/blueprint\.architecture\.json/u);
   assert.match(context, /Declare intended files before mutation/u);
   assert.match(context, /PreToolUse handles prerequisites, PostToolUse audits/u);
+  assert.match(context, /use the code-review-graph MCP before native search/u);
+  assert.match(context, /start with get_minimal_context_tool/u);
+  assert.match(context, /_graph\.head_matches_build is true/u);
+  const merged = mergeOutputs('SessionStart', [output], [], 1600);
+  assert.doesNotMatch(merged.hookSpecificOutput.additionalContext, /contexte tronqué/u);
+  assert.match(merged.hookSpecificOutput.additionalContext, /state any native-tool fallback/u);
+});
+
+test('AGENTS keeps CRG ahead of native tools for relational code context', () => {
+  const instructions = readFileSync(join(root, 'AGENTS.md'), 'utf8');
+  assert.match(instructions, /use the code-review-graph MCP before native search/u);
+  assert.match(instructions, /Start with `get_minimal_context_tool`/u);
+  assert.match(instructions, /Use `rg` and direct file reads for exact-text lookup/u);
+  assert.match(instructions, /state the native-tool fallback/u);
+});
+
+test('the shared code-context policy is complete and bounded', () => {
+  const policy = CODE_CONTEXT_POLICY;
+  assert.match(policy, /code-review-graph MCP before native search/u);
+  assert.match(policy, /get_minimal_context_tool/u);
+  assert.match(policy, /_graph\.head_matches_build is true/u);
+  assert.match(policy, /npm run crg:update/u);
+  assert.ok(policy.length <= 700);
 });
 
 test('PreCompact refreshes canonical routing with the correct event envelope', () => {
   const output = routingContext(root, 'PreCompact');
   assert.equal(output.hookSpecificOutput?.hookEventName, 'PreCompact');
   assert.match(output.hookSpecificOutput?.additionalContext ?? '', /Canonical change routing/u);
+  assert.match(output.hookSpecificOutput?.additionalContext ?? '', /Code-context tool routing/u);
 });
 
 test('the lifecycle dispatcher skips architecture policy for read-only tools', () => {
