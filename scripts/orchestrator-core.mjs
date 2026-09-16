@@ -213,7 +213,7 @@ function applyOperation(state, command) {
     if (payload.acceptance_criteria) goal.acceptance_criteria = payload.acceptance_criteria;
     if (payload.base_revision) goal.base_revision = payload.base_revision;
     for (const field of ['importance', 'change_kind', 'assessment', 'consumption_policy', 'documentation_evidence', 'documentation_freshness', 'routing_decisions']) if (payload[field] !== undefined) goal[field] = payload[field];
-    if (goal.assessment) { goal.execution_receipts = []; goal.escalations = []; }
+    if (goal.assessment) { goal.execution_receipts = payload.execution_receipts ?? []; goal.escalations = []; }
     return { ...state, goals: [...state.goals, goal] };
   }
   if (command.action === 'goal.transition') return updateGoal(state, payload.goal_id, goal => {
@@ -242,6 +242,17 @@ function applyOperation(state, command) {
     if (payload.documentation_freshness) updated.documentation_freshness = payload.documentation_freshness;
     return updated;
   });
+  if (command.action === 'receipt.record') {
+    const withGoalReceipt = updateGoal(state, payload.goal_id, goal => {
+      if ((goal.execution_receipts ?? []).some(receipt => receipt.receipt_id === payload.receipt.receipt_id)) return goal;
+      return { ...goal, execution_receipts: [...(goal.execution_receipts ?? []), payload.receipt] };
+    });
+    if (!payload.mission_id) return withGoalReceipt;
+    return updateMission(withGoalReceipt, payload.goal_id, payload.mission_id, mission => {
+      if ((mission.execution_receipts ?? []).some(receipt => receipt.receipt_id === payload.receipt.receipt_id)) return mission;
+      return { ...mission, execution_receipts: [...(mission.execution_receipts ?? []), payload.receipt] };
+    });
+  }
   if (command.action === 'report.submit') return updateMission(state, payload.goal_id, payload.report.mission_id, mission => ({ ...mission, report: payload.report, status: 'BLOCKED' }));
   if (command.action === 'audit.apply') {
     if (state.audits.some(audit => audit.audit_id === payload.report.audit_id)) throw new Error(`audit already exists: ${payload.report.audit_id}`);

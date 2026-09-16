@@ -7,7 +7,7 @@
     "decision_id": { "$ref": "common.schema.json#/$defs/identifier" },
     "phase": { "enum": ["research", "planning", "work", "skillCreation", "skillAudit", "repair", "goalAudit", "conflictAnalysis", "synthesis"] },
     "level": { "enum": ["L0", "L1", "L2", "L3", "L4"] },
-    "selected": { "oneOf": [{ "type": "object", "required": ["adapter", "model_id", "provider_family"], "properties": { "adapter": { "enum": ["codex", "claude", "gemini", "fixture"] }, "model_id": { "$ref": "common.schema.json#/$defs/identifier" }, "provider_family": { "$ref": "common.schema.json#/$defs/identifier" } }, "unevaluatedProperties": false }, { "type": "null" }] },
+    "selected": { "oneOf": [{ "type": "object", "required": ["adapter", "model_id", "provider_family", "normalized_units"], "properties": { "adapter": { "enum": ["codex", "claude", "gemini", "fixture"] }, "model_id": { "$ref": "common.schema.json#/$defs/identifier" }, "provider_family": { "$ref": "common.schema.json#/$defs/identifier" }, "normalized_units": { "type": "integer", "minimum": 1, "maximum": 100000 } }, "unevaluatedProperties": false }, { "type": "null" }] },
     "effort": { "enum": ["none", "low", "medium", "high", "xhigh", "max"] },
     "access_mode": { "enum": ["read-only", "workspace-write"] },
     "required_capabilities": { "type": "array", "maxItems": 8, "uniqueItems": true, "items": { "enum": ["code", "reasoning", "long-context", "structured-output", "web-research"] } },

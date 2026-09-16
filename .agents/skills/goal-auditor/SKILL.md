@@ -18,3 +18,8 @@ mission. Use `repair` with narrowly scoped, non-overlapping missions when the
 goal remains safely repairable. Use `reject` when evidence is insufficient or
 the requested result cannot be established. Never infer success from a worker
 summary alone.
+
+When the mission includes a satisfied documentation evidence report, verify
+every external claim against its current ledger and return every source used in
+`documentation_source_ids`. Reject the goal when no applicable ledger source
+covers an external claim.

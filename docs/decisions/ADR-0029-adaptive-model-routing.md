@@ -54,6 +54,20 @@ cost stays unknown; the orchestrator never invents a currency estimate.
 Critical work requires a different provider family for the final audit and is
 blocked when that independence is unavailable.
 
+Every adaptive model invocation, including research, planning, work, repair,
+skill audit, goal audit, synthesis, timeout, and invalid output, produces an
+idempotent execution receipt. Normalized units are charged from the selected
+catalog descriptor before another dispatch is admitted. Parallel work reserves
+all bounded attempts plus mandatory per-dispatch research. Claude receives only
+the remaining USD allowance; an unmeasurable Claude attempt closes further USD
+dispatches instead of silently reusing the goal ceiling.
+
+An executable probe proves only local adapter availability. It never promotes
+an `unverified` or `degraded` model to `available`. Local evaluation aggregates
+all outcomes by actual phase, requires the configured sample floor before a
+measurement is trusted, permits automatic degradation, and leaves promotion
+disabled unless explicitly configured.
+
 Legacy configuration containing only `workerRuntime` retains the former global
 runtime behavior. A configuration with `modelRouting.mode` set to `adaptive`
 uses the new route. Existing state remains readable through optional adaptive
@@ -65,4 +79,6 @@ escalations, and consumption totals.
 Model aliases and capability claims are configuration and probe data, not core
 truth. `explain-route` executes the exact pure decision function used for
 dispatch. Large repetitive audits may shard across small qualified models and
-use a higher synthesis tier only when risk demands it.
+use a higher synthesis tier only when risk demands it. Goal audits apply this
+partitioning to the real changed-file evidence, persist every shard receipt,
+and synthesize multiple shard reports before acceptance.

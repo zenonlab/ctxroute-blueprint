@@ -40,7 +40,8 @@ export async function dispatchWorker({ dispatch_id, phase, mission, skill_path, 
   const cwd = resolve(root, worktree ?? '.');
   const contractPath = resolve(root, CONTRACT_FILES[output_contract]);
   const prompt = workerPrompt(dispatch);
-  const command = await workerCommand(runtime, phase, cwd, contractPath, prompt, root, environment, routing);
+  const policy = mission.consumption_policy ?? mission.consumption ?? {};
+  const command = await workerCommand(runtime, phase, cwd, contractPath, prompt, root, environment, routing, { max_cost_usd: policy.max_cost_usd ?? null });
   const started = Date.now();
   const outcome = await runBounded(command, {
     cwd,
@@ -50,19 +51,25 @@ export async function dispatchWorker({ dispatch_id, phase, mission, skill_path, 
     stderrBytes: config.workerStderrBytes,
     spawn: dependencies.spawn ?? spawn,
   });
-  if (outcome.timed_out) throw categorized('WORKER_TIMEOUT', 'worker exceeded its configured timeout');
-  if (outcome.code !== 0) throw categorized(classifyProviderFailure(outcome.stderr), `worker exited ${outcome.code}: ${redact(outcome.stderr).slice(0, 512)}`);
-  let value = parseRuntimeOutput(runtime, outcome.stdout, command.outputPath);
   const duration = Date.now() - started;
   const usage = extractUsage(runtime, outcome.stdout);
-  if (output_contract === 'worker-report' && routing?.selected) {
-    value = { ...value, documentation_sources_used: value.documentation_sources_used ?? [], confidence: value.confidence ?? 'medium', unverified_points: value.unverified_points ?? [], consumption: { receipt_id: `${dispatch_id}-receipt`, dispatch_id, adapter: runtime, model_id: routing.selected.model_id, provider_family: routing.selected.provider_family, effort: routing.effort, duration_ms: duration, normalized_units: 1, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cost_usd: usage.cost_usd, outcome: 'success', cause: null }, observed_model: routing.selected.model_id, observed_runtime: runtime };
+  if (outcome.timed_out) throw withReceipt(categorized('PROVIDER_TIMEOUT', 'worker exceeded its configured timeout'), executionReceipt(dispatch_id, runtime, routing, duration, usage, 'timed-out', 'PROVIDER_TIMEOUT'));
+  if (outcome.code !== 0) {
+    const cause = classifyProviderFailure(outcome.stderr);
+    throw withReceipt(categorized(cause, `worker exited ${outcome.code}: ${redact(outcome.stderr).slice(0, 512)}`), executionReceipt(dispatch_id, runtime, routing, duration, usage, 'failed', cause));
   }
-  assertNoSecrets(value);
-  assertOrchestratorContract(output_contract, value);
+  let value;
+  try { value = parseRuntimeOutput(runtime, outcome.stdout, command.outputPath); }
+  catch (error) { throw withReceipt(categorized('INVALID_STRUCTURED_OUTPUT', error.message), executionReceipt(dispatch_id, runtime, routing, duration, usage, 'failed', 'INVALID_STRUCTURED_OUTPUT')); }
+  const receipt = executionReceipt(dispatch_id, runtime, routing, duration, usage, 'success', null);
+  if (output_contract === 'worker-report' && routing?.selected) {
+    value = { ...value, documentation_sources_used: value.documentation_sources_used ?? [], confidence: value.confidence ?? 'medium', unverified_points: value.unverified_points ?? [], consumption: receipt, observed_model: routing.selected.model_id, observed_runtime: runtime };
+  }
+  try { assertNoSecrets(value); assertOrchestratorContract(output_contract, value); }
+  catch (error) { throw withReceipt(categorized('INVALID_STRUCTURED_OUTPUT', error.message), { ...receipt, outcome: 'failed', cause: 'INVALID_STRUCTURED_OUTPUT' }); }
   const reportPath = `.ctxroute/reports/${dispatch_id}.json`;
   await atomicReport(resolve(root, reportPath), value, config.reportBytes, dependencies);
-  return { runtime, model_id: routing?.selected?.model_id ?? 'runtime-default', provider_family: routing?.selected?.provider_family ?? runtime, effort: routing?.effort ?? 'none', report: value, report_path: reportPath, duration_ms: duration, usage, stderr: redact(outcome.stderr).slice(0, 512) || null };
+  return { runtime, model_id: routing?.selected?.model_id ?? 'runtime-default', provider_family: routing?.selected?.provider_family ?? runtime, effort: routing?.effort ?? 'none', report: value, report_path: reportPath, duration_ms: duration, usage, receipt, stderr: redact(outcome.stderr).slice(0, 512) || null };
 }
 
 export function buildWorkerCommand(runtime, phase, cwd, contractPath, prompt, root = process.cwd(), routing = null, options = {}) {
@@ -107,8 +114,8 @@ function selectRuntime(requested, environment, available) {
   return available.codex ? 'codex' : available.claude ? 'claude' : available.gemini ? 'gemini' : null;
 }
 
-async function workerCommand(runtime, phase, cwd, contractPath, prompt, root, environment, routing) {
-  const command = buildWorkerCommand(runtime, phase, cwd, contractPath, prompt, root, routing);
+async function workerCommand(runtime, phase, cwd, contractPath, prompt, root, environment, routing, options) {
+  const command = buildWorkerCommand(runtime, phase, cwd, contractPath, prompt, root, routing, options);
   if (runtime === 'fixture') command.stdin = JSON.stringify({ phase, dispatch: JSON.parse(prompt.slice(prompt.indexOf('{'))) });
   if (runtime !== 'fixture' && !await executableAvailable(command.executable, environment)) throw categorized('WORKER_UNAVAILABLE', `${runtime} executable is unavailable`);
   return command;
@@ -162,13 +169,23 @@ function parseRuntimeOutput(runtime, stdout, outputPath) {
 }
 
 export function extractUsage(runtime, stdout) {
-  if (runtime !== 'gemini') return { input_tokens: null, output_tokens: null, total_tokens: null, tool_calls: null, cost_usd: null };
   try {
     const parsed = JSON.parse(stdout);
+    if (runtime === 'claude') return { input_tokens: parsed.usage?.input_tokens ?? null, output_tokens: parsed.usage?.output_tokens ?? null, total_tokens: null, tool_calls: null, cost_usd: parsed.total_cost_usd ?? null };
+    if (runtime !== 'gemini') return { input_tokens: null, output_tokens: null, total_tokens: null, tool_calls: null, cost_usd: null };
     const models = Object.values(parsed.stats?.models ?? {});
     return { input_tokens: sum(models, 'prompt'), output_tokens: sum(models, 'candidates'), total_tokens: sum(models, 'total'), tool_calls: parsed.stats?.tools?.totalCalls ?? null, cost_usd: null };
   } catch { return { input_tokens: null, output_tokens: null, total_tokens: null, tool_calls: null, cost_usd: null }; }
 }
+
+function executionReceipt(dispatchId, runtime, routing, duration, usage, outcome, cause) {
+  if (!routing?.selected) return null;
+  const receipt = { receipt_id: `${dispatchId}-receipt`, dispatch_id: dispatchId, phase: routing.phase, adapter: runtime, model_id: routing.selected.model_id, provider_family: routing.selected.provider_family, effort: routing.effort, duration_ms: duration, normalized_units: routing.selected.normalized_units, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cost_usd: usage.cost_usd, outcome, cause };
+  assertOrchestratorContract('execution-receipt', receipt);
+  return receipt;
+}
+
+function withReceipt(error, receipt) { if (receipt) error.executionReceipt = receipt; return error; }
 
 export function classifyProviderFailure(output) {
   const value = String(output).toLocaleLowerCase('en-US');

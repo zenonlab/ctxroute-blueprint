@@ -70,7 +70,7 @@ export function routeTask({ decision_id, phase, assessment, catalog, consumption
   if (['work', 'repair', 'skillCreation'].includes(phase)) required.add('code');
   if (phase === 'research') required.add('web-research');
   if (['large', 'xlarge'].includes(assessment.context_class)) required.add('long-context');
-  const independenceRequired = ((assessment.importance === 'critical' || consumption.preset === 'quality') && phase === 'goalAudit') || (floor >= 3 && phase === 'skillAudit');
+  const independenceRequired = (profile.independence === true && floor >= 3) || ((assessment.importance === 'critical' || consumption.preset === 'quality') && ['goalAudit', 'synthesis'].includes(phase)) || (floor >= 3 && phase === 'skillAudit');
   const requestedEffort = effortFor(floor, profile.effort);
   const rejected = [];
   const candidates = [];
@@ -94,7 +94,7 @@ export function routeTask({ decision_id, phase, assessment, catalog, consumption
   const level = `L${floor}`;
   const decision = {
     decision_id, phase, level,
-    selected: selectedModel ? { adapter: selectedModel.adapter, model_id: selectedModel.model_id, provider_family: selectedModel.provider_family } : null,
+    selected: selectedModel ? { adapter: selectedModel.adapter, model_id: selectedModel.model_id, provider_family: selectedModel.provider_family, normalized_units: normalizedUnits(selectedModel) } : null,
     effort: floor === 0 ? 'none' : requestedEffort, access_mode: accessMode, required_capabilities: [...required].sort(), cascade, rejected,
     independence_required: independenceRequired,
     reason: floor === 0 ? 'Deterministic execution requires no model.' : selectedModel ? `Selected the smallest qualified ${selectedModel.level} model.` : 'No qualified model satisfies the closed constraints.',

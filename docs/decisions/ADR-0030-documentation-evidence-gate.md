@@ -41,10 +41,12 @@ current information are checked per goal; `latest`, availability, and incident
 claims are checked again before each applicable dispatch.
 
 The freshness receipt is computed deterministically from report identifiers,
-source digests, requirement cadence, and the current goal or dispatch. A worker
-may cite only source identifiers in the goal ledger. The final audit rejects an
-external claim without current ledger evidence. If current evidence is required
-but Web-capable research is unavailable, the goal is blocked with
+source digests, requirement cadence, and the current goal or dispatch. When the
+report is `SATISFIED`, a worker must cite at least one source identifier and may
+cite only identifiers in the goal ledger. The final audit has the same non-empty
+ledger requirement and rejects an external claim without current evidence. If
+current evidence is required but Web-capable research is unavailable, the goal
+is blocked with
 `FRESH_DOCUMENTATION_UNAVAILABLE` before any repository mutation.
 
 `local-only` forbids remote research and remote providers. It does not weaken

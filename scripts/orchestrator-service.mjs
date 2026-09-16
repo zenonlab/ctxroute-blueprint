@@ -104,6 +104,7 @@ export async function submitWorkerReport(command, root = process.cwd(), environm
   if (!found || found.goal.goal_id !== command.payload.goal_id) throw new Error(`unknown mission: ${report.mission_id}`);
   const mission = found.mission;
   if (!['RUNNING', 'BLOCKED'].includes(mission.status)) throw new Error(`mission cannot report from ${mission.status}`);
+  if (mission.documentation_evidence?.status === 'SATISFIED' && !report.documentation_sources_used?.length) throw categorized('DOCUMENTATION_CITATION_REQUIRED', 'worker must cite at least one applicable documentation source');
   if (mission.documentation_evidence && report.documentation_sources_used) assertDocumentCitations(mission.documentation_evidence, report.documentation_sources_used);
   const begun = await beginOrchestratorTransaction(command, root, dependencies);
   if (begun.replayed && !begun.pending) return begun;
@@ -121,8 +122,8 @@ export async function submitWorkerReport(command, root = process.cwd(), environm
     if (!reinspection.ok || JSON.stringify(reinspection.files) !== JSON.stringify(inspection.files)) throw categorized('VALIDATION_MUTATED_DIFF', 'validation changed the worker diff');
     const integration = await integrateMissionChanges(mission, root, dependencies);
     return completeOrchestratorTransaction(command, current => {
-      const updated = updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt, integration_status: 'INTEGRATED', worker_commit: integration.worker_commit, integrated_commit: integration.integrated_commit, blocking_cause: null, execution_receipts: report.consumption ? [...(item.execution_receipts ?? []), report.consumption] : item.execution_receipts }));
-      return report.consumption ? updateGoal(updated, command.payload.goal_id, goal => ({ ...goal, execution_receipts: [...(goal.execution_receipts ?? []), report.consumption] })) : updated;
+      const updated = updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt, integration_status: 'INTEGRATED', worker_commit: integration.worker_commit, integrated_commit: integration.integrated_commit, blocking_cause: null, execution_receipts: appendReceipt(item.execution_receipts, report.consumption) }));
+      return report.consumption ? updateGoal(updated, command.payload.goal_id, goal => ({ ...goal, execution_receipts: appendReceipt(goal.execution_receipts, report.consumption) })) : updated;
     }, 'UPDATED', root, dependencies);
   } catch (error) {
     const cause = error.causeCode ?? 'REPORT_REJECTED';
@@ -132,6 +133,11 @@ export async function submitWorkerReport(command, root = process.cwd(), environm
     }).catch(() => {});
     throw error;
   }
+}
+
+function appendReceipt(receipts, receipt) {
+  if (!receipt || receipts?.some(item => item.receipt_id === receipt.receipt_id)) return receipts ?? [];
+  return [...(receipts ?? []), receipt];
 }
 
 export async function resumeWaitingMission(command, root = process.cwd(), environment = process.env, dependencies = {}) {

@@ -28,7 +28,7 @@ export async function documentationGate({ request, root = process.cwd(), dispatc
   if (!dispatch) return finalizeReport({ report_id: `${request.goal_id}-documentation`, goal_id: request.goal_id, status: 'BLOCKED', requirements, sources: [], justification: 'No Web-capable documentation researcher is available.', created_at: now().toISOString(), digest: '0'.repeat(64), blocked_cause: 'FRESH_DOCUMENTATION_UNAVAILABLE' });
   let result;
   try {
-    result = await dispatch({ dispatch_id: `${request.goal_id}-documentation`, phase: 'research', mission: { goal_id: request.goal_id, importance: request.importance ?? 'normal', requirements }, skill_path: '.agents/skills/documentation-researcher/SKILL.md', output_contract: 'documentation-evidence-report', worktree: '.' });
+    result = await dispatch({ dispatch_id: `${request.goal_id}-documentation`, phase: 'research', mission: { goal_id: request.goal_id, importance: request.importance ?? 'normal', requirements, consumption_policy: consumption }, skill_path: '.agents/skills/documentation-researcher/SKILL.md', output_contract: 'documentation-evidence-report', worktree: '.' });
   } catch {
     return finalizeReport({ report_id: `${request.goal_id}-documentation`, goal_id: request.goal_id, status: 'BLOCKED', requirements, sources: [], justification: 'The documentation researcher could not produce a valid closed report.', created_at: now().toISOString(), digest: '0'.repeat(64), blocked_cause: 'FRESH_DOCUMENTATION_UNAVAILABLE' });
   }

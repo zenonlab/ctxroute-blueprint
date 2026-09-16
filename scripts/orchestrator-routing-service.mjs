@@ -24,7 +24,8 @@ export async function orchestratorUsage(goalId, root = process.cwd()) {
   const used = receipts.reduce((sum, receipt) => sum + receipt.normalized_units, 0);
   const tokenValues = receipts.flatMap(receipt => [receipt.input_tokens, receipt.output_tokens]).filter(Number.isFinite);
   const knownCosts = receipts.map(receipt => receipt.cost_usd).filter(Number.isFinite);
-  return { goal_id: goalId, normalized_units_used: used, normalized_units_remaining: goal.consumption_policy ? Math.max(0, goal.consumption_policy.max_normalized_units - used) : null, tokens_reported: tokenValues.length ? tokenValues.reduce((sum, value) => sum + value, 0) : null, cost_usd: knownCosts.length === receipts.length ? knownCosts.reduce((sum, value) => sum + value, 0) : null, cost_status: knownCosts.length === receipts.length ? 'known' : 'unknown', receipts };
+  const completeCost = receipts.length > 0 && knownCosts.length === receipts.length;
+  return { goal_id: goalId, normalized_units_used: used, normalized_units_remaining: goal.consumption_policy ? Math.max(0, goal.consumption_policy.max_normalized_units - used) : null, tokens_reported: tokenValues.length ? tokenValues.reduce((sum, value) => sum + value, 0) : null, cost_usd: completeCost ? knownCosts.reduce((sum, value) => sum + value, 0) : null, cost_status: completeCost ? 'known' : 'unknown', receipts };
 }
 
 export async function refreshOrchestratorDocumentation(request, root = process.cwd(), environment = process.env, dependencies = {}) {
@@ -41,13 +42,17 @@ export async function refreshOrchestratorDocumentation(request, root = process.c
 
 export async function orchestratorModelEvaluations(root = process.cwd()) {
   const state = await readOrchestratorState(root);
+  const config = await loadOrchestratorConfig(root);
+  const minimumSamples = config.modelRouting?.evaluation?.minimumSamples ?? 10;
+  const allowPromotion = config.modelRouting?.evaluation?.allowAutomaticPromotion === true;
   const groups = [];
   for (const receipt of state.goals.flatMap(goal => goal.execution_receipts ?? [])) {
-    let item = groups.find(candidate => candidate.model_id === receipt.model_id && candidate.phase === 'work');
-    if (!item) { item = { model_id: receipt.model_id, phase: 'work', samples: 0, successes: 0, structured: 0, scope: 0, durations: [] }; groups.push(item); }
-    item.samples += 1; item.successes += receipt.outcome === 'success' ? 1 : 0; item.structured += receipt.outcome === 'success' ? 1 : 0; item.scope += receipt.outcome === 'success' ? 1 : 0; item.durations.push(receipt.duration_ms);
+    let item = groups.find(candidate => candidate.model_id === receipt.model_id && candidate.phase === receipt.phase);
+    if (!item) { item = { model_id: receipt.model_id, phase: receipt.phase, samples: 0, successes: 0, structured: 0, scope: 0, durations: [] }; groups.push(item); }
+    const success = receipt.outcome === 'success';
+    item.samples += 1; item.successes += success ? 1 : 0; item.structured += receipt.cause === 'INVALID_STRUCTURED_OUTPUT' ? 0 : 1; item.scope += receipt.cause === 'OUTSIDE_SCOPE' ? 0 : 1; item.durations.push(receipt.duration_ms);
   }
-  return groups.map(item => ({ model_id: item.model_id, phase: item.phase, samples: item.samples, success_rate: item.successes / item.samples, structured_output_rate: item.structured / item.samples, scope_rate: item.scope / item.samples, median_duration_ms: median(item.durations), updated_at: new Date().toISOString() }));
+  return groups.map(item => { const measured = item.samples >= minimumSamples; const successRate = item.successes / item.samples; return { model_id: item.model_id, phase: item.phase, samples: item.samples, success_rate: successRate, structured_output_rate: item.structured / item.samples, scope_rate: item.scope / item.samples, median_duration_ms: median(item.durations), confidence: measured ? 'measured' : 'insufficient-samples', promotion_eligible: measured && allowPromotion && successRate >= 0.95, degraded: measured && successRate < 0.5, updated_at: new Date().toISOString() }; });
 }
 
 function median(values) { const sorted = [...values].sort((a, b) => a - b); return sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0; }

@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { runGoal, validateGoalPlan } from '../scripts/orchestrator-goal.mjs';
+import { remainingCost, runGoal, validateGoalPlan } from '../scripts/orchestrator-goal.mjs';
+import { orchestratorModelEvaluations, orchestratorUsage } from '../scripts/orchestrator-routing-service.mjs';
+import { probedModelStatus } from '../scripts/orchestrator-models.mjs';
 import { buildWorkerCommand, classifyProviderFailure, dispatchWorker, extractUsage, providerAdapter, workerRuntimeHealth } from '../scripts/orchestrator-worker.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -22,6 +24,13 @@ test('goal runner plans, launches a real fixture process, integrates, audits, an
   assert.match(readFileSync(join(root, 'src/result.mjs'), 'utf8'), /orchestrated/u);
   assert.ok(existsSync(join(root, '.ctxroute/reports/goal-one-plan.json')));
   assert.ok(existsSync(join(root, '.ctxroute/reports/goal-one-acceptance.json')));
+  assert.deepEqual(result.goal.execution_receipts.map(receipt => receipt.phase), ['planning', 'work', 'goalAudit']);
+  const usage = await orchestratorUsage('goal-one', root);
+  assert.equal(usage.normalized_units_used, 3);
+  assert.equal(usage.cost_status, 'unknown');
+  const evaluations = await orchestratorModelEvaluations(root);
+  assert.deepEqual(evaluations.map(item => item.phase).sort(), ['goalAudit', 'planning', 'work']);
+  assert.ok(evaluations.every(item => item.confidence === 'insufficient-samples' && item.promotion_eligible === false));
   assert.doesNotMatch(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }), /src\/result/u);
 });
 
@@ -47,6 +56,49 @@ test('external adaptive goals refresh official evidence before each volatile dis
   assert.equal(result.goal.missions[0].documentation_freshness.dispatch_id, 'goal-one-mission-1-work');
 });
 
+test('external workers and final audits must cite the current documentation ledger', async () => {
+  const root = fixture();
+  const goal = request();
+  goal.objective = 'Update the module for the current external SDK API.';
+  const result = await runGoal(goal, root, { ...process.env, CTXROUTE_WORKER_RUNTIME: 'fixture', CTXROUTE_FIXTURE_OMIT_CITATIONS: '1' });
+  assert.equal(result.goal.status, 'BLOCKED');
+  assert.equal(result.goal.blocked_cause, 'DOCUMENTATION_CITATION_REQUIRED');
+});
+
+test('normalized budgets include planning and reserve every bounded work attempt', async () => {
+  const root = fixture();
+  const goal = request();
+  goal.consumption = { preset: 'balanced', max_duration_ms: 900000, max_normalized_units: 2, max_cost_usd: null, allowed_providers: ['fixture'], denied_models: [], prefer_local: false, local_only: false };
+  const result = await runGoal(goal, root, { ...process.env, CTXROUTE_WORKER_RUNTIME: 'fixture' });
+  assert.equal(result.goal.status, 'BLOCKED');
+  assert.equal(result.goal.blocked_cause, 'BUDGET_EXHAUSTED');
+  assert.deepEqual(result.goal.execution_receipts.map(receipt => receipt.phase), ['planning']);
+  assert.equal(existsSync(join(root, 'src/result.mjs')), false);
+});
+
+test('USD budgets subtract reported Claude spend and fail closed on unknown Claude cost', () => {
+  const policy = { max_cost_usd: 5 };
+  assert.equal(remainingCost(policy, [{ adapter: 'claude', cost_usd: 1.25 }, { adapter: 'codex', cost_usd: null }]), 3.75);
+  assert.equal(remainingCost(policy, [{ adapter: 'claude', cost_usd: null }]), 0);
+  assert.equal(remainingCost({ max_cost_usd: null }, []), null);
+});
+
+test('large goal audits execute non-overlapping shards followed by synthesis', async () => {
+  const root = fixture();
+  const configPath = join(root, '.project/orchestrator-config.json');
+  const config = JSON.parse(readFileSync(configPath, 'utf8'));
+  config.modelRouting.profiles.goalAudit.max_context_bytes = 1024;
+  writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  const goal = request();
+  goal.acceptance_criteria.push('Second file is integrated.');
+  goal.suggested_paths.push('src/second.mjs');
+  const result = await runGoal(goal, root, { ...process.env, CTXROUTE_WORKER_RUNTIME: 'fixture', CTXROUTE_FIXTURE_SCENARIO: 'audit-shards' });
+  assert.equal(result.goal.status, 'COMPLETED', result.error);
+  assert.ok(existsSync(join(root, '.ctxroute/reports/goal-one-acceptance-initial-audit-shard-1.json')));
+  assert.ok(existsSync(join(root, '.ctxroute/reports/goal-one-acceptance-initial-audit-shard-2.json')));
+  assert.ok(existsSync(join(root, '.ctxroute/reports/goal-one-acceptance-initial-synthesis.json')));
+});
+
 test('local-only external goals and critical goals without an independent auditor fail closed', async () => {
   const localRoot = fixture();
   const external = request();
@@ -70,6 +122,7 @@ test('a fixture crash after mutation blocks the mission and preserves its dirty 
   const result = await runGoal(request(), root, { ...process.env, CTXROUTE_WORKER_RUNTIME: 'fixture', CTXROUTE_FIXTURE_SCENARIO: 'crash-after-change' });
   assert.equal(result.goal.status, 'BLOCKED');
   assert.equal(result.goal.missions[0].status, 'BLOCKED');
+  assert.ok(result.goal.execution_receipts.some(receipt => receipt.phase === 'work' && receipt.outcome === 'failed'));
   assert.equal(existsSync(join(root, result.goal.missions[0].worktree_allocation.path, 'src/result.mjs')), true);
 });
 
@@ -122,7 +175,7 @@ test('Codex and Claude commands are closed, ephemeral, sandboxed, and non-bypass
 
 test('adaptive adapter commands carry model, effort and budgets without permission bypasses', () => {
   const schema = join(repositoryRoot, '.project/schemas/orchestrator/worker-report.schema.json');
-  const route = { selected: { adapter: 'codex', model_id: 'model-one', provider_family: 'openai' }, effort: 'high' };
+  const route = { phase: 'work', selected: { adapter: 'codex', model_id: 'model-one', provider_family: 'openai', normalized_units: 2 }, effort: 'high' };
   const codex = buildWorkerCommand('codex', 'research', repositoryRoot, schema, 'bounded prompt', repositoryRoot, route);
   assert.ok(codex.args.includes('model-one'));
   assert.ok(codex.args.includes('model_reasoning_effort="high"'));
@@ -151,6 +204,12 @@ test('worker health exposes availability without executable paths', async () => 
   assert.equal(health.selected, 'fixture');
   assert.equal(health.available, true);
   assert.equal(JSON.stringify(health).includes('/Users/'), false);
+});
+
+test('an executable probe never promotes an unverified model', () => {
+  assert.equal(probedModelStatus('unverified', true), 'unverified');
+  assert.equal(probedModelStatus('degraded', true), 'degraded');
+  assert.equal(probedModelStatus('available', false), 'unavailable');
 });
 
 test('fixture planner crash and invalid JSON leave no durable goal', async () => {

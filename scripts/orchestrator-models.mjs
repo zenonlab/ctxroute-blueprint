@@ -11,10 +11,14 @@ export async function modelCatalog(root = process.cwd(), environment = process.e
   const configured = config.modelRouting?.catalog ?? [];
   const availability = Object.fromEntries(await Promise.all(['codex', 'claude', 'gemini'].map(async adapter => [adapter, await executableAvailable(EXECUTABLES[adapter], environment)])));
   availability.fixture = environment.CTXROUTE_WORKER_RUNTIME === 'fixture';
-  const catalog = configured.map(model => ({ ...model, status: availability[model.adapter] ? (model.status === 'degraded' ? 'degraded' : 'available') : 'unavailable' }));
+  const catalog = configured.map(model => ({ ...model, status: probedModelStatus(model.status, availability[model.adapter]) }));
   if (availability.fixture && !catalog.some(model => model.adapter === 'fixture')) catalog.push(fixtureDescriptor());
   catalog.forEach(model => assertOrchestratorContract('model-descriptor', model));
   return catalog;
+}
+
+export function probedModelStatus(configuredStatus, executablePresent) {
+  return executablePresent ? configuredStatus : 'unavailable';
 }
 
 export async function orchestratorModels(root = process.cwd(), environment = process.env) {
