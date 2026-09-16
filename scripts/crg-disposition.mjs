@@ -42,7 +42,31 @@ export async function validateCrgArtifact(directory, expectedPr, expectedSha) {
   if (!text.includes('## code-review-graph review') || !text.includes('*Powered by [code-review-graph]')) throw new Error('CRG report format is invalid');
   const match = /\*\*Overall risk:\s*(0(?:\.\d+)?|1(?:\.0+)?)\s*\((LOW|MEDIUM|HIGH|CRITICAL)\)\*\*/u.exec(text);
   if (!match) throw new Error('CRG report risk is missing');
-  return { score: Number(match[1]), risk: match[2], digest: createHash('sha256').update(bytes).digest('hex') };
+  const counts = /—\s*([0-9]+) changed function\(s\)\/class\(es\),\s*([0-9]+) affected flow\(s\),\s*([0-9]+) test gap\(s\)/u.exec(text);
+  const findings = [...text.matchAll(/^\|\s*(0(?:\.\d+)?|1(?:\.0+)?)\s*\|\s*(low|medium|high|critical)\s*\|\s*([^|\r\n]{1,240})\s*\|\s*([^|\r\n]{1,240})\s*\|\s*(yes|no)\s*\|$/gmu)]
+    .slice(0, 5)
+    .map(row => ({ score: Number(row[1]), risk: row[2].toUpperCase(), symbol: neutralize(row[3]), location: neutralize(row[4]), tested: row[5] === 'yes' }));
+  return {
+    score: Number(match[1]), risk: match[2], digest: createHash('sha256').update(bytes).digest('hex'),
+    counts: counts ? { changed_symbols: Number(counts[1]), affected_flows: Number(counts[2]), test_gaps: Number(counts[3]) } : null,
+    findings,
+  };
+}
+
+export function formatCrgDispositionSummary(result) {
+  const { report } = result;
+  const lines = [`CRG result: ${report.score.toFixed(2)} (${report.risk})`, `Disposition: ${result.reason}`];
+  if (report.counts) lines.push(`Scope: ${report.counts.changed_symbols} changed symbols, ${report.counts.affected_flows} affected flows, ${report.counts.test_gaps} direct-test gaps.`);
+  if (report.findings.length) {
+    lines.push('', 'Top findings:');
+    for (const finding of report.findings) lines.push(`- ${finding.score.toFixed(2)} ${finding.risk}: \`${finding.symbol}\` at \`${finding.location}\` — direct test: ${finding.tested ? 'yes' : 'no'}`);
+  }
+  lines.push('', 'The full graph-backed report is available in the sticky PR comment. Treat the score as review evidence, not as proof of a defect.');
+  if (result.reason === 'ADMIN_ACCEPTANCE_REQUIRED') {
+    lines.push('', 'To accept this bounded risk, a different repository administrator must submit an APPROVED review on this exact SHA containing:', '',
+      '```text', 'Justification: <32-512 characters explaining why the reported risk is acceptable>', 'Tracking: #<issue-number>', `CRG-report-sha256:${report.digest}`, '```');
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 export function selectRiskAcceptance(context, now = new Date(), reportDigest = context.report_digest) {
@@ -72,14 +96,16 @@ function assertAttestation(value) {
   if (!/^[A-Za-z0-9-]{1,128}$/u.test(value.approver) || value.justification.length < 32 || value.justification.length > 512 || !ISSUE.test(` ${value.tracking_issue}`)) throw new Error('invalid CRG acceptance evidence');
 }
 async function boundedRead(path, maximum, encoding) { const bytes = await readFile(path); if (bytes.length === 0 || bytes.length > maximum) throw new Error('CRG metadata size is invalid'); return bytes.toString(encoding); }
+function neutralize(value) { return value.trim().replaceAll('`', "'").replaceAll('@', '&#64;'); }
 
 async function main() {
-  const [artifactDirectory, contextPath, outputPath, attestationPath] = process.argv.slice(2);
+  const [artifactDirectory, contextPath, outputPath, attestationPath, summaryPath] = process.argv.slice(2);
   if (!artifactDirectory || !contextPath || !outputPath) throw new Error('usage: crg-disposition <artifact-dir> <context.json> <output.json>');
   const context = JSON.parse(await readFile(contextPath, 'utf8'));
   const result = await evaluateCrgDisposition({ artifactDirectory, context });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
   if (result.attestation && attestationPath) await writeFile(attestationPath, `${JSON.stringify(result.attestation, null, 2)}\n`, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+  if (summaryPath) await writeFile(summaryPath, formatCrgDispositionSummary(result), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
   process.stdout.write(`${JSON.stringify({ conclusion: result.conclusion, reason: result.reason, digest: result.report.digest, attestation: Boolean(result.attestation) })}\n`);
 }
 

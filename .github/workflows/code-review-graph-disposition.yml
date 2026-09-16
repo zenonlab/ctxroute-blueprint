@@ -113,9 +113,10 @@ jobs:
           ATTESTATION_PATH: ${{ runner.temp }}/crg-risk-acceptance.json
           CONTEXT_PATH: ${{ runner.temp }}/crg-context.json
           RESULT_PATH: ${{ runner.temp }}/crg-disposition.json
+          SUMMARY_PATH: ${{ runner.temp }}/crg-disposition-summary.md
         run: |
           set -euo pipefail
-          node scripts/crg-disposition.mjs "${RUNNER_TEMP}/crg-report" "${CONTEXT_PATH}" "${RESULT_PATH}" "${ATTESTATION_PATH}"
+          node scripts/crg-disposition.mjs "${RUNNER_TEMP}/crg-report" "${CONTEXT_PATH}" "${RESULT_PATH}" "${ATTESTATION_PATH}" "${SUMMARY_PATH}"
           node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); for (const [k,v] of Object.entries({conclusion:r.conclusion,reason:r.reason,digest:r.report.digest,attestation:String(Boolean(r.attestation))})) fs.appendFileSync(process.env.GITHUB_OUTPUT,`${k}=${v}\n`)' "${RESULT_PATH}"
 
       - name: Publish bounded exceptional acceptance
@@ -136,13 +137,16 @@ jobs:
           PR_NUMBER: ${{ steps.source.outputs.pr }}
           REASON: ${{ steps.evaluate.outputs.reason || 'DISPOSITION_ERROR' }}
           SHA: ${{ steps.source.outputs.sha }}
+          SUMMARY_PATH: ${{ runner.temp }}/crg-disposition-summary.md
         with:
           script: |
+            const fs = require('fs');
             const conclusion = process.env.CONCLUSION === 'success' ? 'success' : 'failure';
-            const summary = `${process.env.REASON}; report sha256:${process.env.DIGEST}`;
+            const fallback = `${process.env.REASON}; report sha256:${process.env.DIGEST}`;
+            const summary = fs.existsSync(process.env.SUMMARY_PATH) ? fs.readFileSync(process.env.SUMMARY_PATH, 'utf8').slice(0, 60000) : fallback;
             await github.rest.checks.create({ ...context.repo, name: 'CRG disposition', head_sha: process.env.SHA, status: 'completed', conclusion, output: { title: `CRG disposition: ${conclusion}`, summary } });
             const marker = '<!-- crg-disposition -->';
-            const body = `${marker}\n\n**CRG disposition:** ${conclusion}\n\nReason: \`${process.env.REASON}\`  \nReport: \`sha256:${process.env.DIGEST}\`  \nSHA: \`${process.env.SHA}\``;
+            const body = `${marker}\n\n**CRG disposition:** ${conclusion}\n\n${summary}\nSHA: \`${process.env.SHA}\``;
             const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: Number(process.env.PR_NUMBER), per_page: 100 });
             const prior = comments.find(comment => comment.user.login === 'github-actions[bot]' && comment.body.startsWith(marker));
             if (prior) await github.rest.issues.updateComment({ ...context.repo, comment_id: prior.id, body });
