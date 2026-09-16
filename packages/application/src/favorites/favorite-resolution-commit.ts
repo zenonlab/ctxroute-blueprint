@@ -1,5 +1,5 @@
 import { addWork, createFavoriteSource, createLibrary, createProgress, createReview, createWork, progressId, reviewId, workId } from '@tobirink/domain';
-import type { ExternalReference, FavoriteParseArtifact, FavoriteResolutionResult, LibraryId, Progress, ProviderCandidate, WorkId } from '@tobirink/domain';
+import type { ExternalReference, FavoriteParseArtifact, FavoriteResolutionResult, LibraryId, Progress, ProviderCandidate, Work, WorkId } from '@tobirink/domain';
 import type { FavoriteReviewCandidateSet, StoragePort } from '../ports/storage-port';
 import { commitTask, parseFavoriteResolutionTaskPayload, recordTaskEffect } from '../tasks';
 import type { DurableTask } from '../tasks';
@@ -16,6 +16,7 @@ interface FavoriteResolutionCommitDependencies {
 interface FavoriteResolvedIdentity {
   readonly workId?: WorkId | undefined;
   readonly hydratedAt?: string | undefined;
+  readonly publicDiscovery?: NonNullable<NonNullable<Work['hydration']>['publicDiscovery']>;
   readonly references?: readonly ExternalReference[];
 }
 
@@ -68,11 +69,15 @@ export async function persistFavoriteResolutionCompletion(
         const id = identity?.workId ?? favoriteCandidateWorkId(candidate);
         const previous = await session.getWork(id);
         const identities = [{ provider: candidate.provider, externalId: candidate.externalId }, ...(candidate.linkedReferences ?? [])];
-        if (identity?.workId !== undefined && !previous?.externalReferences.some(reference => identities.some(value => value.provider === reference.provider && value.externalId === reference.externalId))) throw new Error('STALE_WORK_IDENTITY');
+        if (identity?.workId !== undefined && previous !== undefined && !previous.externalReferences.some(reference => identities.some(value => value.provider === reference.provider && value.externalId === reference.externalId))) throw new Error('STALE_WORK_IDENTITY');
         const favoriteAliasKeys = [...new Set([...(previous?.hydration?.matcherVersion === versions.matcher ? previous.hydration.favoriteAliasKeys : []), ...favoriteArtifactAliasKeys(record.artifact, candidate)])].slice(0, 64);
+        const publicDiscovery = identity?.publicDiscovery ?? previous?.hydration?.publicDiscovery;
+        const hydration = publicDiscovery === undefined
+          ? { candidate, favoriteAliasKeys, hydratedAt: identity?.hydratedAt ?? dependencies.now(), matcherVersion: versions.matcher, providerTitleKeys: [...new Set(candidate.titles.map((title) => normalizeFavoriteTitle(title).normalized))] }
+          : { candidate, favoriteAliasKeys, hydratedAt: identity?.hydratedAt ?? dependencies.now(), matcherVersion: versions.matcher, providerTitleKeys: [...new Set(candidate.titles.map((title) => normalizeFavoriteTitle(title).normalized))], publicDiscovery };
         const work = createWork({
           externalReferences: [...new Map([...(previous?.externalReferences ?? []), ...(identity?.references ?? []), ...(candidate.linkedReferences ?? []), { externalId: candidate.externalId, provider: candidate.provider }].map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()],
-          hydration: { candidate, favoriteAliasKeys, hydratedAt: identity?.hydratedAt ?? dependencies.now(), matcherVersion: versions.matcher, providerTitleKeys: [...new Set(candidate.titles.map((title) => normalizeFavoriteTitle(title).normalized))] },
+          hydration,
           id,
           mediaKind: candidate.mediaKind === 'ANIME' ? 'anime' : 'manga',
           preferredTitle: candidate.displayTitle ?? candidate.titles.find((title) => title.trim().length > 0) ?? source.title,

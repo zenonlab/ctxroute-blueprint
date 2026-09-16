@@ -135,3 +135,7 @@
 ## Indexer les relations vérifiées entre œuvres — DONE
 
 - [x] **Publier les adaptations comme œuvres liées distinctes** — DONE _(evidence: Public Discovery 58/58, D1 27/27 et Worker 92/92 passent; tous les typechecks sont verts., Les tests prouvent des workId anime/manga distincts, une relation exacte atomique, une hydratation secondaire unique et le rattachement tardif de la cible., npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent.)_
+
+## Orchestrer les réhydratations depuis l’extension — DONE
+
+- [x] **Regrouper et étaler les vérifications des favoris échus** — DONE _(evidence: Le test de 500 favoris prouve dix lectures groupées de 50, un maximum de 20 admissions par réveil, 200 admissions sur dix réveils de données et une continuation persistante., Extension 145/145, Application 376/376, Domain 36/36, adaptateur navigateur 84/84, Public Discovery 59/59, Worker 93/93 et D1 28/28 passent; tous les typechecks sont verts., npm run verify, npm ls --all, npm audit (0 vulnérabilité), les builds Chrome/Firefox, le dry-run Wrangler et git diff --check réussissent.)_

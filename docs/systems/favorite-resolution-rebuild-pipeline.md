@@ -935,13 +935,20 @@ projeté dès son lot d’inventaire. Le snapshot sync v2 relie son empreinte
 normalisée aux références fournisseur publiques et reste compatible avec les
 listes v1. Sa restauration, son scan de publication et l’inventaire possèdent
 chacun une continuation durable jusqu’à `COMPLETE`; leurs résultats incomplets
-ne sont plus ignorés. Le resolver prépare ensuite, par lots dédupliqués de 50
-clés, l’association sync et le cache public D1, puis seulement les fournisseurs.
-Le Worker reçoit uniquement empreinte, type et versions pour le claim. Un seul
-client obtient un bail de recherche; les autres reçoivent `PENDING`. Après
-résolution locale, le client propose uniquement des identifiants publics. Le
-collecteur OIDC vérifie les profils et publie `VERIFIED`; un échec reste
-reprenable sans N+1 ni requête cache par œuvre.
+ne sont plus ignorés. Le resolver prépare ensuite le cache public D1 par lots
+dédupliqués de 50 clés avant de traiter les tâches locales. Le Worker reçoit
+uniquement empreinte, type, versions et au plus quatre titres lors d’un MISS;
+les demandes identiques partagent la même admission Queue. Après publication
+`VERIFIED`, l’extension conserve la clé, `verifiedAt` et `nextRefreshAt` dans le
+Work IndexedDB.
+
+Un checkpoint séparé inspecte ensuite cinquante sources observées par réveil.
+Pour 500 favoris, dix requêtes groupées suffisent. Les profils identiques ne
+réécrivent pas IndexedDB; une version plus récente remplace le Work local. Les
+fiches échues sont réparties par empreinte sur sept jours et au plus vingt POST
+de refresh sont admis dans un réveil. Une interruption MV3 reprend au dernier
+identifiant persisté et une œuvre qui n’est plus observée sort naturellement du
+parcours.
 
 Le producteur de snapshot lit cent œuvres ou sources par page, persiste chaque
 curseur et consomme au plus seize pages dans un réveil. Il publie ainsi les

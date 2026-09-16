@@ -42,6 +42,13 @@ démarrage du navigateur et une mutation des favoris imposent un nouveau parcour
 de l’autorité navigateur. L’action Options reprend une phase active; après
 convergence, elle lance volontairement une nouvelle vérification.
 
+La même alarme reprend ensuite un checkpoint versionné de maintenance du cache
+public. Une page inspecte au plus cinquante sources et conserve son dernier
+identifiant avant suspension. Un cycle complet attend vingt-quatre heures; une
+page restante demande une continuation immédiate. Le budget de réhydratation
+est indépendant : vingt œuvres échues au plus par réveil, même si davantage de
+fiches sont lues dans le lot.
+
 Après chaque passage, l’outbox calcule la prochaine tâche exécutable par trois
 lectures bornées de ses index composés : READY, RETRY_AT et claim expiré. Le
 background matérialise cette échéance par une alarme MV3 ponctuelle nommée à la

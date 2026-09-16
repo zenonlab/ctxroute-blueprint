@@ -18,6 +18,7 @@ export interface FavoriteResolutionRuntimeDependencies {
   readonly libraryId: LibraryId;
   readonly now: () => string;
   readonly outbox: FavoriteResolutionOutboxPort;
+  readonly refreshPublicDiscovery?: () => Promise<{ continuationRequired: boolean }>;
   readonly updateContinuation?: (availableAt: string | undefined) => Promise<void>;
   readonly sourceAdapters: readonly FavoriteSourceAdapter[];
   readonly storage: StoragePort;
@@ -95,6 +96,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
     for (let offset = 0; offset < prepared.length; offset += 50) {
       const batch = prepared.slice(offset, offset + 50);
       await Promise.allSettled([
+        dependencies.publicDiscovery?.lookup?.(batch),
         dependencies.synchronized?.lookup(batch),
       ]);
     }
@@ -146,10 +148,13 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
         }
         await prepareResolutionCaches();
         const result = await runFavoriteResolutionSlice(dependencies);
+        const refresh = inventoryComplete && result.completed === 0
+          ? await dependencies.refreshPublicDiscovery?.()
+          : undefined;
         const counts = { blocked: result.blocked, completed: result.completed, retried: result.retried };
         await recordDiagnostic({ counts, outcome: result.retried > 0 || result.blocked > 0 || result.continuationRequired ? 'retryable' : 'complete', runId, stage: 'resolution' });
         if (inventoryFailure !== undefined) throw inventoryFailure;
-        if (!inventoryComplete || result.continuationRequired) return dependencies.now();
+        if (!inventoryComplete || result.continuationRequired || refresh?.continuationRequired === true) return dependencies.now();
         return dependencies.outbox.nextAvailableAt({ kind: 'favorite-resolution', lane: 'routing' });
     });
   return function reconcileFavorites(inventoryRequested = false): Promise<void> {

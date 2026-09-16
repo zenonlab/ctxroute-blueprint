@@ -39,4 +39,22 @@ describe('HttpPublicDiscoveryAdapter', () => {
     expect(fetcher).toHaveBeenCalledOnce();
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/v3/catalogue/discoveries?'), expect.objectContaining({ method: 'GET' }));
   });
+
+  it('groups fifty reads, reuses the cached state and submits a bounded refresh', async () => {
+    const profile = {
+      candidate: { externalId: '154587', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Frieren'] },
+      references: [{ externalId: '154587', provider: 'anilist' as const }], workId: 'work_anilist_154587',
+    };
+    const verified = { nextRefreshAt: '2026-09-21T12:00:00.000Z', profile, state: 'VERIFIED' as const, verifiedAt: '2026-09-14T12:00:00.000Z' };
+    const fetcher = vi.fn(async (input: string) => Response.json(input.endsWith('/lookup') ? [{ key, state: verified }] : verified, { status: input.endsWith('/refreshes') ? 202 : 200 }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    await expect(adapter.lookup([key])).resolves.toEqual([{ key, state: verified }]);
+    await expect(adapter.resolveOrRequest(key, query)).resolves.toEqual(verified);
+    await expect(adapter.requestRefresh(key)).resolves.toEqual(verified);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls.map(([input]) => input)).toEqual([
+      'https://tobirink.com/v3/catalogue/discoveries/lookup',
+      'https://tobirink.com/v3/catalogue/discoveries/refreshes',
+    ]);
+  });
 });

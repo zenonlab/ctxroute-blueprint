@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-adaptive-public-refresh-step-5",
+  "stepId": "step-5",
+  "title": "Regrouper et étaler les vérifications des favoris échus",
+  "status": "DONE",
+  "approvedMode": "autonomous",
+  "objective": "Orchestrer depuis l’extension des lectures D1 groupées et des réhydratations échues bornées, étalées et reprenables.",
+  "rollback": "Revert du commit; les contrats ajoutés restent compatibles et aucune donnée locale ou distante n’est supprimée.",
+  "acceptance": [
+    "Un favori nouveau conserve sa résolution immédiate et un cache frais ne produit aucun POST.",
+    "Les lectures D1 groupent au plus 50 clés et une bibliothèque de 500 favoris nécessite exactement dix lots complets.",
+    "Chaque réveil admet au plus 20 réhydratations échues avec une répartition déterministe sur sept jours.",
+    "Le curseur MV3 persiste et reprend sans rescanner les pages déjà terminées.",
+    "Une version distante inchangée ne réécrit pas IndexedDB et un profil nouveau remplace le profil local seulement après validation.",
+    "Les tests ciblés, les builds extension, les validations documentaires, Archify 9/9 et npm run verify passent."
+  ],
+  "evidence": [
+    "Le test de 500 favoris prouve dix lectures groupées de 50, un maximum de 20 admissions par réveil, 200 admissions sur dix réveils de données et une continuation persistante.",
+    "Extension 145/145, Application 376/376, Domain 36/36, adaptateur navigateur 84/84, Public Discovery 59/59, Worker 93/93 et D1 28/28 passent; tous les typechecks sont verts.",
+    "npm run verify, npm ls --all, npm audit (0 vulnérabilité), les builds Chrome/Firefox, le dry-run Wrangler et git diff --check réussissent.",
+    "Archify favorite-resolution.lifecycle showcase 9/9, 0 erreur et 0 avertissement; artefact SHA-256 ef9aceeb70820107879ee371f96f7ae428a284e17a7af9fe965fa535dc59e45e."
+  ]
+}

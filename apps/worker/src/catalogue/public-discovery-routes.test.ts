@@ -117,6 +117,21 @@ describe('verified public discovery cache', () => {
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ count: 1 });
   });
 
+  it('reads up to fifty discovery states in one public request', async () => {
+    const keys = Array.from({ length: 50 }, (_, index) => ({ ...discoveryKey('8'), fingerprint: `${'8'.repeat(62)}${index.toString(16).padStart(2, '0')}` }));
+    const response = await SELF.fetch('https://tobirink.test/v3/catalogue/discoveries/lookup', {
+      body: JSON.stringify({ keys, schemaVersion: 3 }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json<unknown[]>();
+    expect(body).toHaveLength(50);
+    expect(body).toEqual(keys.map((key) => ({ key, state: { state: 'MISS' } })));
+    const oversized = await SELF.fetch('https://tobirink.test/v3/catalogue/discoveries/lookup', {
+      body: JSON.stringify({ keys: [...keys, { ...discoveryKey('f') }], schemaVersion: 3 }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(oversized.status).toBe(400);
+  });
+
   it('returns explicit admission outcomes and claims exact references before precise and ambiguous searches', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const now = '2026-09-16T12:00:00.000Z';

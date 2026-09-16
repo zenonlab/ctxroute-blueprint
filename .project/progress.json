@@ -1947,6 +1947,73 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-adaptive-public-refresh-step-5",
+      "title": "Orchestrer les réhydratations depuis l’extension",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-5",
+          "title": "Regrouper et étaler les vérifications des favoris échus",
+          "status": "DONE",
+          "acceptance": [
+            "Un favori nouveau conserve sa résolution immédiate et un cache frais ne produit aucun POST.",
+            "Les lectures D1 groupent au plus 50 clés et une bibliothèque de 500 favoris nécessite exactement dix lots complets.",
+            "Chaque réveil admet au plus 20 réhydratations échues avec une répartition déterministe sur sept jours.",
+            "Le curseur MV3 persiste et reprend sans rescanner les pages déjà terminées.",
+            "Une version distante inchangée ne réécrit pas IndexedDB et un profil nouveau remplace le profil local seulement après validation.",
+            "Les tests ciblés, les builds extension, les validations documentaires, Archify 9/9 et npm run verify passent."
+          ],
+          "files": [
+            "packages/public-discovery/src/contracts.ts",
+            "packages/public-discovery/src/contracts.test.ts",
+            "packages/application/src/public-discovery/public-discovery-contract.ts",
+            "packages/application/src/favorites/public-discovery-resolution.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/application/src/favorites/favorite-resolution-commit.ts",
+            "packages/domain/src/work.ts",
+            "packages/domain/src/work.test.ts",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.ts",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.test.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "apps/extension/runtime/public-discovery-refresh-runtime.ts",
+            "apps/extension/runtime/public-discovery-refresh-runtime.test.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/decisions/ADR-0042-local-first-library-projection.md",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/02-quality-strategy.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/favorite-resolution.lifecycle.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/adaptive-public-refresh-step-5.json"
+          ],
+          "commands": [
+            "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress prévues.",
+            "Exécuter les tests Domain, Application, adaptateur navigateur, D1, Worker et Extension puis tous les typechecks.",
+            "Construire les extensions Chrome et Firefox.",
+            "Valider ADR, documentation et favorite-resolution.lifecycle en showcase.",
+            "Exécuter le dry-run Wrangler, npm run verify, npm ls --all, npm audit --audit-level=high et git diff --check.",
+            "Créer le commit perf(extension): batch stale favorite refreshes sans .codex/config.toml."
+          ],
+          "evidence": [
+            "Le test de 500 favoris prouve dix lectures groupées de 50, un maximum de 20 admissions par réveil, 200 admissions sur dix réveils de données et une continuation persistante.",
+            "Extension 145/145, Application 376/376, Domain 36/36, adaptateur navigateur 84/84, Public Discovery 59/59, Worker 93/93 et D1 28/28 passent; tous les typechecks sont verts.",
+            "npm run verify, npm ls --all, npm audit (0 vulnérabilité), les builds Chrome/Firefox, le dry-run Wrangler et git diff --check réussissent.",
+            "Archify favorite-resolution.lifecycle showcase 9/9, 0 erreur et 0 avertissement; artefact SHA-256 ef9aceeb70820107879ee371f96f7ae428a284e17a7af9fe965fa535dc59e45e."
+          ]
+        }
+      ]
     }
   ]
 }

@@ -78,6 +78,9 @@ de projection. L’installation, la restauration, une demande humaine et l’aud
 périodique de six heures gardent le droit de
 forcer un inventaire et de réparer la projection; les événements de favoris
 traitent immédiatement chaque création, modification, déplacement ou suppression.
+La maintenance publique ne relance pas cet inventaire : elle parcourt son propre
+curseur de sources observées, lit D1 par cinquante clés et remplace uniquement
+une hydratation dont la version vérifiée a changé.
 
 ## Consequences
 

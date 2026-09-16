@@ -1,6 +1,7 @@
 import type { PublicDiscoveryV3Port } from '@tobirink/adapters-cloudflare';
 import {
   publicDiscoveryKeyV3Schema,
+  publicDiscoveryLookupSubmissionSchema,
   publicDiscoveryRefreshSubmissionSchema,
   publicDiscoveryResultBatchSchema,
   publicDiscoverySubmissionSchema,
@@ -59,6 +60,17 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     });
     if (!key.success) return noStore({ error: 'invalid-query' }, 400);
     return noStore(await v3Port(routeServices(context, injected)).read(key.data, new Date().toISOString()));
+  });
+
+  app.post('/v3/catalogue/discoveries/lookup', limitedBody, async (context) => {
+    const parsed = publicDiscoveryLookupSubmissionSchema.safeParse(await context.req.json().catch(() => undefined));
+    if (!parsed.success) return noStore({ error: 'invalid-request' }, 400);
+    const port = v3Port(routeServices(context, injected));
+    const now = new Date().toISOString();
+    const states = port.readMany === undefined
+      ? await Promise.all(parsed.data.keys.map(async (key) => ({ key, state: await port.read(key, now) })))
+      : await port.readMany(parsed.data.keys, now);
+    return noStore(states);
   });
 
   app.post('/v3/catalogue/discoveries/requests', limitedBody, async (context) => {

@@ -49,6 +49,13 @@ export const publicDiscoveryRefreshSubmissionSchema = z.strictObject({
   key: publicDiscoveryKeyV3Schema,
   schemaVersion: z.literal(3),
 });
+export const publicDiscoveryLookupSubmissionSchema = z.strictObject({
+  keys: z.array(publicDiscoveryKeyV3Schema).min(1).max(50).refine(
+    (keys) => new Set(keys.map((key) => JSON.stringify(key))).size === keys.length,
+    'duplicate-public-discovery-key',
+  ),
+  schemaVersion: z.literal(3),
+});
 
 const coverSchema = z.strictObject({ attribution: z.string().trim().min(1).max(200), url: z.string().url().max(2048) });
 const titleVariantSchema = z.strictObject({ language: z.string().trim().min(1).max(32).optional(), title: titleSchema });
@@ -122,6 +129,7 @@ export type PublicDiscoveryCandidate = z.output<typeof publicDiscoveryCandidateS
 export type PublicDiscoveryClaimBatch = z.output<typeof publicDiscoveryClaimBatchSchema>;
 export type PublicDiscoveryClaimedRequest = z.output<typeof publicDiscoveryClaimedRequestSchema>;
 export type PublicDiscoveryKeyV3 = z.output<typeof publicDiscoveryKeyV3Schema>;
+export type PublicDiscoveryLookupSubmission = z.output<typeof publicDiscoveryLookupSubmissionSchema>;
 export type PublicDiscoveryQuery = z.output<typeof publicDiscoveryQuerySchema>;
 export type PublicDiscoveryReceipt = z.output<typeof publicDiscoveryReceiptSchema>;
 export type PublicDiscoveryReferenceV3 = z.output<typeof publicDiscoveryReferenceV3Schema>;

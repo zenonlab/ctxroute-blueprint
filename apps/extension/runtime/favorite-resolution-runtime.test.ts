@@ -20,17 +20,21 @@ describe('createFavoriteResolutionRuntime', () => {
     const storage = new MemoryStoragePort();
     const order: string[] = [];
     const synchronized = vi.fn(async (keys: readonly { fingerprint: string }[]) => { order.push('sync'); return keys.map(({ fingerprint }) => ({ fingerprint, kind: 'MISS' as const })); });
+    const lookup = vi.fn(async (keys: readonly { fingerprint: string; mediaKind: 'ANIME' | 'MANGA' | 'MANHWA' | 'MANHUA' | 'UNKNOWN'; parserVersion: string; siteRulesVersion: string }[]) => { order.push('d1-batch'); return keys.map((key) => ({ key, state: { state: 'MISS' as const } })); });
     const claimNext = vi.fn(async () => { order.push('provider'); return undefined; });
     const reconcile = createFavoriteResolutionRuntime({
       bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [{ bookmarkId: 'media-1', folderPath: [], order: 0, title: 'Frieren Chapter 12', url: 'https://reader.example/manga/frieren/chapter/12' }] }) },
       candidates: unavailableCandidates, ensureReady: async () => ({ schemaVersion: 12 }), hydration: emptyHydration,
       libraryId: libraryId('library_primary'), now: () => '2026-09-12T12:00:00.000Z',
       outbox: { block: vi.fn(), claimNext, nextAvailableAt: async () => undefined, retry: vi.fn() },
+      publicDiscovery: { lookup, resolveOrRequest: async () => ({ reason: 'ATTEMPT_LIMIT', state: 'UNAVAILABLE' }) },
       sourceAdapters: [], storage,
       synchronized: { lookup: synchronized }, token: () => 'cache-first-run',
     });
     await reconcile();
     expect(synchronized).toHaveBeenCalledOnce();
+    expect(lookup).toHaveBeenCalledOnce();
+    expect(order.indexOf('provider')).toBeGreaterThan(order.indexOf('d1-batch'));
     expect(order.indexOf('provider')).toBeGreaterThan(order.indexOf('sync'));
   });
 

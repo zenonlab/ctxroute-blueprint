@@ -29,6 +29,7 @@ import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favor
 import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda } from '@tobirink/application';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
 import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, readFavoriteResolutionPaused, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteResolutionPaused } from '../runtime/favorite-resolution-continuation';
+import { createPublicDiscoveryRefreshRuntime } from '../runtime/public-discovery-refresh-runtime';
 
 const primaryLibraryId = libraryId('library_primary');
 const providerNetworkDisabled = Object.freeze({
@@ -87,6 +88,7 @@ export default defineBackground({
     const resolutionPaused = () => readFavoriteResolutionPaused(browser.storage.local);
     const privateRecovery = new DexiePrivateRecoveryStore(privateStorage.storage.database);
     const publicDiscovery = new HttpPublicDiscoveryAdapter(configuredSiteOrigin);
+    const refreshPublicDiscovery = createPublicDiscoveryRefreshRuntime({ checkpointStorage: browser.storage.local, client: publicDiscovery, now, storage: privateStorage.storage });
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, publicDiscovery, releaseAgenda);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
@@ -104,6 +106,7 @@ export default defineBackground({
       libraryId: primaryLibraryId,
       now,
       outbox: resolutionOutbox,
+      refreshPublicDiscovery,
       updateContinuation: async (availableAt) => {
         if (await resolutionPaused()) await browser.alarms.clear(favoriteResolutionContinuationAlarmName);
         else await updateFavoriteResolutionContinuation(browser.alarms, availableAt);

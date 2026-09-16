@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { publicDiscoveryCandidateSchema, publicDiscoveryQuerySchema, publicDiscoveryRefreshSubmissionSchema, publicDiscoverySubmissionSchema } from '.';
+import { publicDiscoveryCandidateSchema, publicDiscoveryLookupSubmissionSchema, publicDiscoveryQuerySchema, publicDiscoveryRefreshSubmissionSchema, publicDiscoverySubmissionSchema } from '.';
 
 const query = {
   discoveryTitles: ['One'],
@@ -23,6 +23,13 @@ describe('public discovery request minimization', () => {
     expect(publicDiscoverySubmissionSchema.safeParse({ key, query, schemaVersion: 2 }).success).toBe(false);
     expect(publicDiscoveryRefreshSubmissionSchema.safeParse({ key, schemaVersion: 3 }).success).toBe(true);
     expect(publicDiscoveryRefreshSubmissionSchema.safeParse({ key, query, schemaVersion: 3 }).success).toBe(false);
+  });
+
+  it('bounds grouped lookups to fifty unique keys', () => {
+    const key = { fingerprint: 'a'.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
+    expect(publicDiscoveryLookupSubmissionSchema.safeParse({ keys: Array.from({ length: 50 }, (_, index) => ({ ...key, fingerprint: index.toString(16).padStart(64, '0') })), schemaVersion: 3 }).success).toBe(true);
+    expect(publicDiscoveryLookupSubmissionSchema.safeParse({ keys: Array.from({ length: 51 }, (_, index) => ({ ...key, fingerprint: index.toString(16).padStart(64, '0') })), schemaVersion: 3 }).success).toBe(false);
+    expect(publicDiscoveryLookupSubmissionSchema.safeParse({ keys: [key, key], schemaVersion: 3 }).success).toBe(false);
   });
 
   it('keeps a linked adaptation distinct from aliases', () => {

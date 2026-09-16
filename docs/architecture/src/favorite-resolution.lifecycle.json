@@ -21,7 +21,7 @@
   "states": [
     { "id": "observed", "type": "start", "label": "Favoris observés", "sublabel": "autorité navigateur", "lane": "main", "col": 0, "step": "01" },
     { "id": "inventory", "type": "active", "label": "Inventaire", "sublabel": "pages atomiques", "lane": "main", "col": 1, "step": "02" },
-    { "id": "resolving", "type": "active", "label": "Résolution", "sublabel": "cache puis fournisseurs", "lane": "main", "col": 2, "step": "03" },
+    { "id": "resolving", "type": "active", "label": "Résolution", "sublabel": "D1 par lots de 50", "lane": "main", "col": 2, "step": "03" },
     { "id": "projecting", "type": "active", "label": "Projection locale", "sublabel": "titre puis métadonnées", "lane": "main", "col": 3, "step": "04" },
     { "id": "complete", "type": "success", "label": "À jour", "sublabel": "aucune tâche due", "lane": "main", "col": 4, "step": "05" },
     { "id": "scheduled", "type": "waiting", "label": "Reprise planifiée", "sublabel": "alarme ponctuelle", "lane": "waiting", "col": 0, "tag": "checkpoint actif" },
@@ -37,7 +37,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "État visible", "items": ["L’écran relit l’état pendant tout parcours actif", "Inventaire résolution et attente fournisseur ont des libellés distincts", "L’échéance affichée disparaît dès que la file converge"] },
-    { "dot": "amber", "title": "Bornes", "items": ["Huit pages d’inventaire et seize pages de snapshot par réveil", "Une échéance persistante par file et aucune boucle de timers", "Huit échecs automatiques avant intervention explicite"] },
+    { "dot": "amber", "title": "Bornes", "items": ["Huit pages d’inventaire puis cache D1 par lots de 50", "Vingt réhydratations au plus par réveil, étalées sur sept jours", "Huit échecs automatiques avant intervention explicite"] },
     { "dot": "emerald", "title": "Conservation", "items": ["Pause panne et suspension ne suppriment aucune donnée privée", "Le reçu IndexedDB termine ou annule une restauration interrompue", "La projection locale reste lisible avant hydratation"] }
   ]
 }

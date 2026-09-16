@@ -104,6 +104,10 @@ browser or `workerd` test when platform behavior is the risk.
   Les tests du runner prouvent qu’un MISS, un PENDING et un VERIFIED ne lancent
   aucune recherche ou hydratation fournisseur dans la découverte automatique
   de l’extension.
+  Les tests d’orchestration matérialisent 500 favoris : dix lectures D1 de 50
+  clés, un checkpoint repris jusqu’à la page terminale, vingt admissions de
+  refresh au plus par réveil, un jour stable sur sept et aucune écriture locale
+  lorsque `verifiedAt` et `nextRefreshAt` sont inchangés.
   Le package exportable exécute en plus les tests HTTP réels des cinq
   adaptateurs, vérifie les deux ordres de fallback et l’ambiguïté inter-lanes,
   refuse tout import `@tobirink/*` et produit son bundle depuis son propre

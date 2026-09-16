@@ -1,4 +1,4 @@
-import { createFavoriteSource, createProviderCandidate, createWork } from '@tobirink/domain';
+import { createFavoriteSource, createProviderCandidate, createWork, workId } from '@tobirink/domain';
 import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { favoriteIdentityKey, favoritePublicReferenceSchema, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
@@ -264,7 +264,10 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       const parsed = favoritePublicReferenceSchema.safeParse(reference);
       return parsed.success ? [parsed.data] : [];
     });
-    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-verified-discovery', candidate, undefined, { references });
+    const identity = discovery.nextRefreshAt === undefined
+      ? { hydratedAt: discovery.verifiedAt, references, workId: workId(discovery.profile.workId) }
+      : { hydratedAt: discovery.verifiedAt, publicDiscovery: { ...identityKey, nextRefreshAt: discovery.nextRefreshAt, verifiedAt: discovery.verifiedAt }, references, workId: workId(discovery.profile.workId) };
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-verified-discovery', candidate, undefined, identity);
     return 'completed';
   }
   if (explicit !== undefined) {

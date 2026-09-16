@@ -169,7 +169,10 @@ un réveil différé comme appel fournisseur.
 
 L’extension consulte d’abord IndexedDB, puis D1. Un
 `VERIFIED` fournit directement le candidat hydraté complet utilisé pour écrire
-le Work local. `PENDING` programme une relecture sans fournisseur. `NOT_FOUND`
+le Work local avec `verifiedAt`, `nextRefreshAt` et la clé publique exacte.
+Avant la résolution d’un lot, une unique requête HTTP lit jusqu’à cinquante
+clés D1 et alimente le cache mémoire du réveil; le runner ne refait donc pas un
+GET par favori. `PENDING` programme une relecture sans fournisseur. `NOT_FOUND`
 et `AMBIGUOUS` terminent la tâche en Review locale sans relancer le composant.
 Le chemin automatique, la réparation de couvertures et les actions manuelles ne
 consultent aucun adaptateur de recherche ou d'hydratation fournisseur dans
@@ -178,6 +181,14 @@ fournisseur et identifiant, puis suit le même cycle D1/Queue. `PENDING` conserv
 la Review; seul un profil `VERIFIED` qui contient cette référence peut être
 commité localement. Les parseurs d'URL fournisseur restent locaux et sans
 réseau; aucun adaptateur réseau fournisseur n'est composé par le background.
+
+Après convergence, un checkpoint MV3 parcourt les sources observées par pages
+de cinquante. Une fiche inchangée ne réécrit pas IndexedDB. Une fiche échue
+n’est proposée à la réhydratation que le jour stable dérivé de son empreinte,
+sur une fenêtre de sept jours, avec vingt admissions au plus par réveil. Le
+curseur est persisté avant la suspension; une page incomplète programme la même
+continuation ponctuelle que le runner. La réponse `VERIFIED` courante reste
+lisible et seule une version `verifiedAt` plus récente remplace le profil local.
 
 Le protocole ne possède aucun réglage Collectif, appairage ou consentement
 produit spécifique. La permission navigateur native `bookmarks` et la
