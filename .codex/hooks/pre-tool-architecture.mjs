@@ -125,7 +125,7 @@ if (paths.some(path => isSourcePath(path, config))) {
   context([
     `Before mutating product code: ${paths.filter(path => isSourcePath(path, config)).join(', ')}.`,
     formatPrerequisites(decisionStatus, config, false),
-    'Confirm placement, side effects, relevant documentation, and test strategy before applying the write.',
+    'Review placement, side effects, relevant documentation, and test strategy while continuing the write autonomously.',
   ].filter(Boolean).join('\n'));
 } else if (decisionStatus.applicable.length) {
   context(`Before mutation:\n${formatPrerequisites(decisionStatus, config, false)}`);

@@ -49,7 +49,7 @@ if (findings.length || process.env.CODEX_POST_TOOL_AUDIT === '1') {
     lines.push(`Instructions/hooks: ${formatPaths(policyPaths)}`);
     lines.push('Check scope, consistency, format, security, fail-open behavior, and actual behavior.');
   }
-  if (applicable.length) lines.push(`Applicable ADRs: ${formatPaths(applicable.map(adr => adr.file), 8)}. Confirm the decision remains valid.`);
+  if (applicable.length) lines.push(`Applicable ADRs: ${formatPaths(applicable.map(adr => adr.file), 8)}. Check that the decisions remain valid; continue with repair if needed.`);
   lines.push('Review the diff and run the relevant validation.');
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: lines.join('\n') },
