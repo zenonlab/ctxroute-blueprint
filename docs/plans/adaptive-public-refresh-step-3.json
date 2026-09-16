@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-adaptive-public-refresh-step-3",
+  "stepId": "step-3",
+  "title": "Rafraîchir une fiche VERIFIED sans bloquer sa lecture",
+  "status": "DONE",
+  "approvedMode": "autonomous",
+  "objective": "Réhydrater au plus chaque semaine une œuvre active tout en servant sans interruption son dernier profil VERIFIED.",
+  "rollback": "Revert du commit; la migration 0019 reste additive et les profils VERIFIED existants restent conservés.",
+  "acceptance": [
+    "VERIFIED expose verifiedAt et nextRefreshAt pendant le refresh.",
+    "Une seule admission hebdomadaire émet un signal Queue.",
+    "Le claim reconstruit une demande bornée sans ancien request_json.",
+    "Un profil identique ne réécrit pas le catalogue.",
+    "Un échec conserve l’ancien profil et un profil changé est validé avant remplacement.",
+    "Archify showcase et toutes les validations du plan passent."
+  ]
+}

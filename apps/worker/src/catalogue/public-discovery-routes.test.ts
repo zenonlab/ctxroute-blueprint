@@ -1,6 +1,6 @@
 import { applyD1Migrations, env, SELF } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
 
 const discoveryKey = (marker: string) => ({ fingerprint: marker.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' });
@@ -263,6 +263,107 @@ describe('verified public discovery cache', () => {
     const nonce = await env.PUBLIC_DB.prepare('SELECT purge_after AS purgeAfter FROM public_discovery_result_nonces_v3 WHERE nonce = ?1')
       .bind(payload.nonce).first<{ purgeAfter: string }>();
     expect(Date.parse(nonce?.purgeAfter ?? '') - Date.parse(verifiedAt)).toBeGreaterThan(6 * 86_400_000);
+  });
+
+  it('refreshes a due VERIFIED profile without interrupting reads or retaining its old request', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const key = { ...discoveryKey('7'), fingerprint: '70'.repeat(32) };
+    const admittedAt = '2026-09-01T12:00:00.000Z';
+    const request = {
+      key,
+      query: { discoveryTitles: ['Refresh Work'], mediaKind: 'ANIME' as const, sourceTitles: ['Refresh Work'] },
+      requestDigest: '7'.repeat(64), schemaVersion: 3 as const,
+    };
+    await adapter.request(request, admittedAt);
+    const initialClaim = await adapter.claimBatch({
+      claimToken: 'i'.repeat(48), leaseUntil: '2026-09-01T12:15:00.000Z', limit: 20,
+      now: admittedAt, tokenDigest: 'i'.repeat(64),
+    });
+    expect(initialClaim.requests.some(({ key: claimedKey }) => claimedKey.fingerprint === key.fingerprint)).toBe(true);
+    const result = verifiedResult(key, request.requestDigest, 'refresh', '754321', 'Refresh Work');
+    await adapter.publishBatch({
+      claimToken: initialClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440070',
+      results: [result], schemaVersion: 3, verifiedAt: admittedAt,
+    }, 'i'.repeat(64), '7'.repeat(64), admittedAt);
+    await env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3 SET next_refresh_at = '2026-09-15T00:00:00.000Z'
+      WHERE fingerprint = ?1`).bind(key.fingerprint).run();
+
+    const queue = { send: vi.fn(async () => undefined) };
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue });
+    const refresh = await app.request('https://tobirink.test/v3/catalogue/discoveries/refreshes', {
+      body: JSON.stringify({ key, schemaVersion: 3 }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(refresh.status).toBe(202);
+    await expect(refresh.json()).resolves.toMatchObject({ profile: { workId: 'work_refresh' }, state: 'VERIFIED' });
+    expect(queue.send).toHaveBeenCalledOnce();
+
+    const active = await env.PUBLIC_DB.prepare(`SELECT request_json AS requestJson, refresh_state AS refreshState
+      FROM public_discovery_requests_v3 WHERE fingerprint = ?1`).bind(key.fingerprint).first();
+    expect(active).toEqual({ requestJson: '{}', refreshState: 'PENDING' });
+    const now = new Date().toISOString();
+    const claim = await adapter.claimBatch({
+      claimToken: 'r'.repeat(48), leaseUntil: new Date(Date.parse(now) + 900_000).toISOString(), limit: 20,
+      now, tokenDigest: 'r'.repeat(64),
+    });
+    const refreshed = claim.requests.find(({ key: claimedKey }) => claimedKey.fingerprint === key.fingerprint);
+    expect(refreshed).toMatchObject({
+      attempt: 1,
+      query: { discoveryTitles: ['Refresh Work'], explicitProviderReference: { externalId: '754321', provider: 'anilist' } },
+      requestDigest: request.requestDigest,
+    });
+    await expect(adapter.read(key, now)).resolves.toMatchObject({ profile: { workId: 'work_refresh' }, state: 'VERIFIED' });
+    const before = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_revisions').first();
+    await adapter.publishBatch({
+      claimToken: claim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440071',
+      results: [result], schemaVersion: 3, verifiedAt: now,
+    }, 'r'.repeat(64), '8'.repeat(64), now);
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_revisions').first()).toEqual(before);
+    expect(await env.PUBLIC_DB.prepare(`SELECT request_json AS requestJson, refresh_state AS refreshState
+      FROM public_discovery_requests_v3 WHERE fingerprint = ?1`).bind(key.fingerprint).first())
+      .toEqual({ requestJson: '{}', refreshState: 'IDLE' });
+
+    expect((await app.request('https://tobirink.test/v3/catalogue/discoveries/refreshes', {
+      body: JSON.stringify({ key, schemaVersion: 3 }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    })).status).toBe(202);
+    expect(queue.send).toHaveBeenCalledOnce();
+
+    const changedAt = new Date(Date.parse(now) + 8 * 86_400_000).toISOString();
+    await env.PUBLIC_DB.prepare('UPDATE public_discovery_requests_v3 SET next_refresh_at = ?1 WHERE fingerprint = ?2')
+      .bind(changedAt, key.fingerprint).run();
+    await expect(adapter.requestRefresh(key, changedAt)).resolves.toMatchObject({ outcome: 'created' });
+    const changedClaim = await adapter.claimBatch({
+      claimToken: 's'.repeat(48), leaseUntil: new Date(Date.parse(changedAt) + 900_000).toISOString(), limit: 20,
+      now: changedAt, tokenDigest: 's'.repeat(64),
+    });
+    await expect(adapter.publishBatch({
+      claimToken: changedClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440072',
+      results: [{ key, requestDigest: request.requestDigest, resolution: { reason: 'temporary-provider-gap', state: 'NOT_FOUND' } }],
+      schemaVersion: 3, verifiedAt: changedAt,
+    }, 's'.repeat(64), '9'.repeat(64), changedAt)).rejects.toThrow('public-discovery-refresh-not-verified');
+    await expect(adapter.read(key, changedAt)).resolves.toMatchObject({ profile: { candidate: { displayTitle: 'Refresh Work' } }, state: 'VERIFIED' });
+
+    const changed = verifiedResult(key, request.requestDigest, 'refresh', '754321', 'Refresh Work Updated');
+    await expect(adapter.publishBatch({
+      claimToken: changedClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440073',
+      results: [changed], schemaVersion: 3, verifiedAt: changedAt,
+    }, 's'.repeat(64), 'a'.repeat(64), changedAt)).resolves.toEqual({ published: 1, replayed: 0 });
+    await expect(adapter.read(key, changedAt)).resolves.toMatchObject({
+      profile: { candidate: { displayTitle: 'Refresh Work Updated' }, workId: 'work_refresh' }, state: 'VERIFIED',
+    });
+    await env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3 SET
+      refresh_state = 'PROCESSING', refresh_attempt_count = 8, claim_token_hash = ?1, lease_until = ?2
+      WHERE fingerprint = ?3`).bind('e'.repeat(64), '2000-01-01T00:00:00.000Z', key.fingerprint).run();
+    const exhausted = await adapter.claimBatch({
+      claimToken: 't'.repeat(48), leaseUntil: new Date(Date.parse(changedAt) + 900_000).toISOString(), limit: 20,
+      now: changedAt, tokenDigest: 't'.repeat(64),
+    });
+    expect(exhausted.requests.some(({ key: claimedKey }) => claimedKey.fingerprint === key.fingerprint)).toBe(false);
+    await expect(adapter.read(key, changedAt)).resolves.toMatchObject({
+      profile: { candidate: { displayTitle: 'Refresh Work Updated' } }, state: 'VERIFIED',
+    });
+    expect(await env.PUBLIC_DB.prepare(`SELECT refresh_attempt_count AS attempts, refresh_state AS refreshState
+      FROM public_discovery_requests_v3 WHERE fingerprint = ?1`).bind(key.fingerprint).first())
+      .toEqual({ attempts: 0, refreshState: 'IDLE' });
   });
 
   it('rejects a normalized-title collision atomically', async () => {

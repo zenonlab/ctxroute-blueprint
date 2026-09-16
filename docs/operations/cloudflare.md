@@ -143,6 +143,16 @@ failure count. `NOT_FOUND` and `AMBIGUOUS` remain cache hits for seven days,
 then read as MISS and become admissible once more. Apply migration 0018 before
 deploying the batched consumer or its Worker code.
 
+Apply additive migration `0019_discovery_refresh_state.sql` before enabling
+the refresh endpoint. It backfills `next_refresh_at` for existing VERIFIED
+rows and adds an orthogonal refresh state; the public `state` must remain
+VERIFIED while refresh work is pending or processing. Inspect only counts and
+states, never `result_json`. A healthy refresh moves `IDLE → PENDING →
+PROCESSING → IDLE`, emits one Queue signal on the first transition, keeps
+`request_json = {}`, and advances `next_refresh_at` by seven days. An unchanged
+profile must not add a catalogue revision. A provider failure or non-VERIFIED
+result must leave the previous profile readable.
+
 The Queue consumer emits one bounded JSON record with
 `type=native-collector.queue`, `messageType`, `attempt` and `disposition`.
 Failures add only a classified code and the bounded retry delay; raw provider

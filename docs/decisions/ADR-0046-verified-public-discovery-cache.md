@@ -97,7 +97,10 @@ La clé D1 possède un index unique. Demande, prise de travail et publication so
 idempotentes. Un seul collecteur peut posséder un bail de traitement actif; les
 lectures voient `PENDING` et n’appellent aucun fournisseur. Un résultat rejoué
 avec le même digest ne change rien. Le collecteur checkpoint son étape avant
-chaque reprise. `VERIFIED` ne redevient jamais une demande. `NOT_FOUND` et
+chaque reprise. `VERIFIED` ne redevient jamais `PENDING` : `refresh_state`
+porte séparément `IDLE`, `PENDING` ou `PROCESSING`, de sorte que l’ancien profil
+reste servi avec `verifiedAt` et `nextRefreshAt` pendant toute réhydratation.
+`NOT_FOUND` et
 `AMBIGUOUS` restent frais sept jours; après leur échéance explicite, la lecture
 renvoie `MISS` et une nouvelle admission peut recréer exactement un travail. Une panne
 entre un appel fournisseur et son checkpoint peut encore répéter cet appel :
@@ -134,6 +137,16 @@ et les révisions orphelines
 deviennent éligibles après trente jours. Ces échéances n’autorisent aucune
 suppression automatique : toute purge D1 exige sauvegarde, plan borné et
 approbation destructive séparée.
+
+Une réhydratation n’est admissible qu’après `next_refresh_at` et avance cette
+échéance de sept jours dès l’admission atomique. Seule cette transition émet le
+signal Queue; les demandes concurrentes réutilisent la même ligne. Le claim
+reconstruit au plus quatre titres et une référence fournisseur exacte depuis le
+profil `VERIFIED`, sans restaurer ni conserver l’ancien `request_json`. Un
+résultat non `VERIFIED`, un échec ou l’épuisement des huit tentatives ne remplace
+jamais le profil servi. Un profil sémantiquement identique met à jour les dates
+sans réécrire les tables catalogue; un profil changé n’est publié qu’après les
+mêmes validations atomiques de références et de titres.
 
 Avant chaque requête HTTP réelle, le Worker réserve dans D1 la cadence et
 l’exclusivité du fournisseur. AniList est limité à une requête toutes les trois

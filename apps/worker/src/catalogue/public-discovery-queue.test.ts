@@ -50,6 +50,7 @@ describe('public discovery queue trigger', () => {
     const port = {
       claimBatch: vi.fn(), confirmQueueSignal: vi.fn(async () => undefined), publishBatch: vi.fn(), read: vi.fn(),
       releaseQueueSignal: vi.fn(async () => undefined),
+      requestRefresh: vi.fn(),
       request: vi.fn(async () => ({
         outcome: requests++ === 0 ? 'created' as const : 'existing' as const,
         state: { retryAt: '2026-09-16T12:01:00.000Z', state: 'PENDING' as const },

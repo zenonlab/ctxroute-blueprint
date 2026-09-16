@@ -127,3 +127,7 @@
 ## Dédupliquer et borner l’admission Discovery — DONE
 
 - [x] **Coalescer la demande publique Discovery** — DONE _(evidence: Public Discovery 55/55, D1 25/25, Worker 90/90 et tous les typechecks passent., Rafale de 10 000 POST: un signal; lot de 20: un seul claim; outbox reprend un envoi Queue non confirmé., npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent.)_
+
+## Réhydrater les œuvres actives sans interrompre les lectures — DONE
+
+- [x] **Rafraîchir une fiche VERIFIED sans bloquer sa lecture** — DONE _(evidence: D1 26/26, Worker 91/91, Public Discovery 55/55 et adaptateur navigateur 3/3 passent; tous les typechecks sont verts., Les tests prouvent VERIFIED lisible pendant refresh, admission hebdomadaire unique, reconstruction exacte avec request_json expurgé, résultat identique sans révision, échec conservant le profil, changement validé et huit tentatives bornées., npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent.)_

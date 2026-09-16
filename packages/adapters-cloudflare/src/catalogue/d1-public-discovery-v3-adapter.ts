@@ -19,6 +19,7 @@ const failedRetentionMilliseconds = 30 * 86_400_000;
 const negativeResultFreshnessMilliseconds = 7 * 86_400_000;
 const nonceRetentionMilliseconds = 7 * 86_400_000;
 const queueSignalLeaseMilliseconds = 60_000;
+const refreshFreshnessMilliseconds = 7 * 86_400_000;
 
 type SqlValue = null | number | string;
 interface Statement {
@@ -41,6 +42,9 @@ interface DiscoveryRow {
   leaseUntil: string | null;
   requestDigest: string;
   requestJson: string;
+  refreshAttemptCount: number;
+  refreshState: 'IDLE' | 'PENDING' | 'PROCESSING';
+  nextRefreshAt: string | null;
   resultExpiresAt: string | null;
   resultJson: string | null;
   retryAt: string;
@@ -50,6 +54,11 @@ interface DiscoveryRow {
 export type PublicDiscoveryAdmission =
   | { outcome: 'created' | 'existing'; state: PublicDiscoveryReadState }
   | { outcome: 'saturated' };
+export type PublicDiscoveryRefreshAdmission = {
+  outcome: 'created' | 'existing';
+  requestDigest: string;
+  state: Extract<PublicDiscoveryReadState, { state: 'VERIFIED' }>;
+};
 interface CanonicalFacts {
   mediaKind: 'anime' | 'manga';
   normalizedTitles: readonly string[];
@@ -60,6 +69,7 @@ export interface PublicDiscoveryV3Port {
   confirmQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
   publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ published: number; replayed: number }>;
   read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState>;
+  requestRefresh(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryRefreshAdmission>;
   releaseQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
   request(request: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryAdmission>;
 }
@@ -87,7 +97,10 @@ function stateFromRow(row: DiscoveryRow | null, now: string): PublicDiscoveryRea
   }
   if (!row.resultJson || !row.verifiedAt) throw new Error('invalid-terminal-public-discovery');
   const resolution = publicDiscoveryTerminalResolutionSchema.parse(JSON.parse(row.resultJson));
-  if (resolution.state === 'VERIFIED') return { profile: resolution.profile, state: 'VERIFIED', verifiedAt: row.verifiedAt };
+  if (resolution.state === 'VERIFIED') {
+    if (!row.nextRefreshAt) throw new Error('invalid-verified-refresh-time');
+    return { nextRefreshAt: row.nextRefreshAt, profile: resolution.profile, state: 'VERIFIED', verifiedAt: row.verifiedAt };
+  }
   if (resolution.state === 'NOT_FOUND') return { reason: resolution.reason, state: 'NOT_FOUND', verifiedAt: row.verifiedAt };
   return { candidates: resolution.candidates, reason: resolution.reason, state: 'AMBIGUOUS', verifiedAt: row.verifiedAt };
 }
@@ -102,7 +115,9 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   private row(key: PublicDiscoveryKeyV3): Promise<DiscoveryRow | null> {
     return this.database.prepare(`SELECT attempt_count AS attemptCount, claim_token_hash AS claimTokenHash,
       failure_reason AS failureReason, lease_until AS leaseUntil, request_digest AS requestDigest,
-      request_json AS requestJson, result_expires_at AS resultExpiresAt, result_json AS resultJson,
+      request_json AS requestJson, refresh_attempt_count AS refreshAttemptCount,
+      refresh_state AS refreshState, next_refresh_at AS nextRefreshAt,
+      result_expires_at AS resultExpiresAt, result_json AS resultJson,
       retry_at AS retryAt, state, verified_at AS verifiedAt FROM public_discovery_requests_v3
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4 LIMIT 1`)
       .bind(...keyValues(key)).first<DiscoveryRow>();
@@ -127,6 +142,14 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         WHERE state = 'PROCESSING' AND attempt_count >= 8 AND lease_until <= ?1
         ORDER BY updated_at, fingerprint LIMIT ?2)
       RETURNING fingerprint`).bind(now, limit, futureIso(now, failedRetentionMilliseconds)).all();
+    await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+      refresh_state = 'IDLE', refresh_attempt_count = 0,
+      claim_token_hash = NULL, lease_until = NULL, updated_at = ?1
+      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3
+        WHERE state = 'VERIFIED' AND refresh_state = 'PROCESSING'
+          AND refresh_attempt_count >= 8 AND lease_until <= ?1
+        ORDER BY updated_at, fingerprint LIMIT ?2)
+      RETURNING fingerprint`).bind(now, limit).all();
   }
 
   async read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState> {
@@ -178,6 +201,33 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     return { outcome: created !== null || resumedSignal !== null ? 'created' : 'existing', state: stateFromRow(row, now) };
   }
 
+  async requestRefresh(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryRefreshAdmission> {
+    const signalLeaseUntil = futureIso(now, queueSignalLeaseMilliseconds);
+    const nextRefreshAt = futureIso(now, refreshFreshnessMilliseconds);
+    const created = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+      refresh_state = 'PENDING', refresh_attempt_count = 0, refresh_requested_at = ?5,
+      next_refresh_at = ?6, queue_signal_state = 'SENDING', queue_signal_lease_until = ?7,
+      claim_token_hash = NULL, lease_until = NULL, admission_priority = 1, updated_at = ?5
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+        AND state = 'VERIFIED' AND refresh_state = 'IDLE' AND next_refresh_at <= ?5
+      RETURNING request_digest AS requestDigest`).bind(...keyValues(key), now, nextRefreshAt, signalLeaseUntil)
+      .first<{ requestDigest: string }>();
+    const resumed = created === null
+      ? await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+          queue_signal_state = 'SENDING', queue_signal_lease_until = ?6, updated_at = ?5
+          WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+            AND state = 'VERIFIED' AND refresh_state = 'PENDING'
+            AND (queue_signal_state = 'UNSENT'
+              OR (queue_signal_state = 'SENDING' AND queue_signal_lease_until <= ?5))
+          RETURNING request_digest AS requestDigest`).bind(...keyValues(key), now, signalLeaseUntil)
+        .first<{ requestDigest: string }>()
+      : null;
+    const row = await this.row(key);
+    const state = stateFromRow(row, now);
+    if (!row || state.state !== 'VERIFIED') throw new Error('public-discovery-refresh-unavailable');
+    return { outcome: created || resumed ? 'created' : 'existing', requestDigest: row.requestDigest, state };
+  }
+
   async confirmQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void> {
     const confirmed = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       queue_signal_state = 'SENT', queue_signal_lease_until = NULL, updated_at = ?6
@@ -198,20 +248,53 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   async claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch> {
     await this.failExhaustedBatch(input.now, input.limit);
     const rows = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
-      state = 'PROCESSING', claim_token_hash = ?1, lease_until = ?2,
-      attempt_count = attempt_count + 1, retry_at = ?2, updated_at = ?3
+      state = CASE WHEN state = 'VERIFIED' THEN state ELSE 'PROCESSING' END,
+      refresh_state = CASE WHEN state = 'VERIFIED' THEN 'PROCESSING' ELSE refresh_state END,
+      claim_token_hash = ?1, lease_until = ?2,
+      attempt_count = CASE WHEN state = 'VERIFIED' THEN attempt_count ELSE attempt_count + 1 END,
+      refresh_attempt_count = CASE WHEN state = 'VERIFIED' THEN refresh_attempt_count + 1 ELSE refresh_attempt_count END,
+      retry_at = ?2, updated_at = ?3
       WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3
-        WHERE ((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
-          AND attempt_count < 8 ORDER BY admission_priority, updated_at, fingerprint LIMIT ?4)
-      RETURNING request_json AS requestJson, attempt_count AS attemptCount,
-        admission_priority AS admissionPriority, updated_at AS updatedAt, fingerprint`)
+        WHERE (((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
+            AND attempt_count < 8)
+          OR (state = 'VERIFIED' AND ((refresh_state = 'PENDING')
+            OR (refresh_state = 'PROCESSING' AND lease_until <= ?3)) AND refresh_attempt_count < 8)
+        ORDER BY admission_priority, updated_at, fingerprint LIMIT ?4)
+      RETURNING request_json AS requestJson, result_json AS resultJson, request_digest AS requestDigest,
+        state, attempt_count AS attemptCount, refresh_attempt_count AS refreshAttemptCount,
+        admission_priority AS admissionPriority, updated_at AS updatedAt,
+        fingerprint, media_kind AS mediaKind, parser_version AS parserVersion, rules_version AS siteRulesVersion`)
       .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit)
-      .all<{ admissionPriority: number; attemptCount: number; fingerprint: string; requestJson: string; updatedAt: string }>();
+      .all<{ admissionPriority: number; attemptCount: number; fingerprint: string; mediaKind: PublicDiscoveryKeyV3['mediaKind']; parserVersion: string; refreshAttemptCount: number; requestDigest: string; requestJson: string; resultJson: string | null; siteRulesVersion: string; state: DiscoveryRow['state']; updatedAt: string }>();
     const ordered = rows.results.sort((left, right) => left.admissionPriority - right.admissionPriority
       || left.updatedAt.localeCompare(right.updatedAt) || left.fingerprint.localeCompare(right.fingerprint));
     const requests = ordered.map((row) => {
-      const request = publicDiscoveryRequestSchema.parse(JSON.parse(row.requestJson));
-      return publicDiscoveryClaimedRequestSchema.parse({ ...request, attempt: row.attemptCount });
+      if (row.state !== 'VERIFIED') {
+        const request = publicDiscoveryRequestSchema.parse(JSON.parse(row.requestJson));
+        return publicDiscoveryClaimedRequestSchema.parse({ ...request, attempt: row.attemptCount });
+      }
+      if (!row.resultJson) throw new Error('invalid-refresh-profile');
+      const resolution = publicDiscoveryTerminalResolutionSchema.parse(JSON.parse(row.resultJson));
+      if (resolution.state !== 'VERIFIED') throw new Error('invalid-refresh-profile');
+      const candidate = resolution.profile.candidate;
+      const titles = [...new Set([candidate.displayTitle, ...candidate.titles].filter((title): title is string => Boolean(title)))].slice(0, 4);
+      const exactReference = resolution.profile.references.find((reference) => reference.provider === candidate.provider && reference.externalId === candidate.externalId)
+        ?? resolution.profile.references[0];
+      return publicDiscoveryClaimedRequestSchema.parse({
+        attempt: row.refreshAttemptCount,
+        key: { fingerprint: row.fingerprint, mediaKind: row.mediaKind, parserVersion: row.parserVersion, siteRulesVersion: row.siteRulesVersion },
+        query: {
+          discoveryTitles: titles,
+          explicitProviderReference: exactReference,
+          mediaKind: candidate.mediaKind,
+          preSerialization: candidate.preSerialization,
+          season: candidate.season,
+          sourceFormat: candidate.format,
+          sourceTitles: titles,
+        },
+        requestDigest: row.requestDigest,
+        schemaVersion: 3,
+      });
     });
     return { claimToken: input.claimToken, requests, schemaVersion: 3 };
   }
@@ -248,7 +331,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       this.database.prepare(`INSERT OR IGNORE INTO catalogue_revisions(revision, published_at)
         SELECT ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
-          AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
+          AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
+          AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
             JOIN json_each(?) AS proposed
               ON existing.provider = json_extract(proposed.value, '$.provider')
@@ -260,7 +344,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       this.database.prepare(`INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision)
         SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
-          AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
+          AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
+          AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
             JOIN json_each(?) AS proposed
               ON existing.provider = json_extract(proposed.value, '$.provider')
@@ -275,7 +360,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       ...candidate.titles.map((title) => this.database.prepare(`INSERT OR IGNORE INTO catalogue_titles(work_id, locale, title)
         SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
-          AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
+          AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
+          AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
             JOIN json_each(?) AS proposed
               ON existing.provider = json_extract(proposed.value, '$.provider')
@@ -289,7 +375,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           normalization_version, normalized_title, media_kind, work_id, created_at)
         SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
-          AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
+          AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
+          AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
             JOIN json_each(?) AS proposed
               ON existing.provider = json_extract(proposed.value, '$.provider')
@@ -303,7 +390,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       ...profile.references.map((reference) => this.database.prepare(`INSERT INTO catalogue_external_references(provider, external_id, work_id)
         SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
-          AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
+          AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
+          AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
           AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
             JOIN json_each(?) AS proposed
               ON existing.provider = json_extract(proposed.value, '$.provider')
@@ -344,13 +432,26 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   private async publishOne(result: PublicDiscoveryResult, tokenDigest: string, verifiedAt: string, now: string): Promise<'published' | 'replayed'> {
     const row = await this.row(result.key);
     const resultJson = JSON.stringify(result.resolution);
+    const refreshing = row?.state === 'VERIFIED' && row.refreshState === 'PROCESSING';
+    if (refreshing && result.resolution.state !== 'VERIFIED') throw new Error('public-discovery-refresh-not-verified');
+    if (refreshing && row.resultJson === resultJson && row.claimTokenHash === tokenDigest && row.requestDigest === result.requestDigest) {
+      const completed = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+        verified_at = ?5, next_refresh_at = ?6, refresh_state = 'IDLE', refresh_attempt_count = 0,
+        claim_token_hash = NULL, lease_until = NULL, updated_at = ?5
+        WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+          AND state = 'VERIFIED' AND refresh_state = 'PROCESSING' AND claim_token_hash = ?7
+          AND request_digest = ?8 AND lease_until > ?9
+        RETURNING state`).bind(...keyValues(result.key), verifiedAt, futureIso(verifiedAt, refreshFreshnessMilliseconds), tokenDigest, result.requestDigest, now).first();
+      if (!completed) throw new Error('stale-public-discovery-result');
+      return 'replayed';
+    }
     if (row && row.state === result.resolution.state && row.requestDigest === result.requestDigest && row.resultJson === resultJson) {
       if (result.resolution.state === 'VERIFIED') {
         await this.materializeCanonicalReplay(result, publicDiscoveryVerifiedProfileSchema.parse(result.resolution.profile), resultJson, verifiedAt);
       }
       return 'replayed';
     }
-    if (!row || row.state !== 'PROCESSING' || row.claimTokenHash !== tokenDigest || row.requestDigest !== result.requestDigest) throw new Error('stale-public-discovery-result');
+    if (!row || (row.state !== 'PROCESSING' && !refreshing) || row.claimTokenHash !== tokenDigest || row.requestDigest !== result.requestDigest) throw new Error('stale-public-discovery-result');
     const profile = result.resolution.state === 'VERIFIED'
       ? publicDiscoveryVerifiedProfileSchema.parse(result.resolution.profile)
       : undefined;
@@ -362,9 +463,12 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     statements.push(this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = ?, result_json = ?, verified_at = ?, retry_at = ?,
       result_expires_at = ?, claim_token_hash = NULL, lease_until = NULL,
-      updated_at = ?, request_json = '{}', purge_after = NULL
+      updated_at = ?, request_json = '{}', purge_after = NULL,
+      next_refresh_at = CASE WHEN ?1 = 'VERIFIED' THEN ?7 ELSE next_refresh_at END,
+      refresh_state = 'IDLE', refresh_attempt_count = 0
       WHERE fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
-        AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?
+        AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
+        AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?
         AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
           JOIN json_each(?) AS proposed
             ON existing.provider = json_extract(proposed.value, '$.provider')
@@ -373,7 +477,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
           JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
           WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`)
-      .bind(result.resolution.state, resultJson, verifiedAt, verifiedAt, resultExpiresAt, verifiedAt, ...guardValues));
+      .bind(result.resolution.state, resultJson, verifiedAt, verifiedAt, resultExpiresAt, verifiedAt,
+        futureIso(verifiedAt, refreshFreshnessMilliseconds), ...guardValues));
     const outcomes = await this.database.batch(statements);
     const terminal = outcomes.at(-1);
     if (!terminal?.success || outcomes.some((outcome) => !outcome.success)) throw new Error('public-discovery-batch-failed');

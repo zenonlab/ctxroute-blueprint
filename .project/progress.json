@@ -1834,6 +1834,63 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-adaptive-public-refresh-step-3",
+      "title": "Réhydrater les œuvres actives sans interrompre les lectures",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-3",
+          "title": "Rafraîchir une fiche VERIFIED sans bloquer sa lecture",
+          "status": "DONE",
+          "acceptance": [
+            "Une lecture VERIFIED expose verifiedAt et nextRefreshAt pendant tout refresh.",
+            "D1 admet atomiquement au plus un refresh par œuvre et par semaine et seule une admission créée émet un signal Queue.",
+            "Le claim reconstruit une demande bornée depuis le profil et ses références publiques exactes sans conserver l’ancien request_json.",
+            "Un résultat identique termine le refresh sans réécrire le catalogue; un profil changé remplace l’ancien seulement après validation complète.",
+            "Un échec ou résultat non VERIFIED conserve le profil actuellement servi et reste reprenable jusqu’à huit tentatives.",
+            "Les tests D1, Worker, package et adaptateur navigateur, les validations documentaires, Archify 9/9 et npm run verify passent.",
+            "Un commit vérifié unique existe sans .codex/config.toml, push ni déploiement dans cette étape."
+          ],
+          "files": [
+            "apps/worker/migrations/0019_discovery_refresh_state.sql",
+            "packages/public-discovery/src/contracts.ts",
+            "packages/public-discovery/src/contracts.test.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.ts",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.test.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/native-collectors.test.ts",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/02-quality-strategy.md",
+            "docs/operations/cloudflare.md",
+            "docs/architecture/src/public-discovery.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/adaptive-public-refresh-step-3.json"
+          ],
+          "commands": [
+            "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress prévues.",
+            "Exécuter les tests Public Discovery, adaptateur navigateur, D1 et Worker puis tous les typechecks.",
+            "Valider ADR, documentation et public-discovery.dataflow en showcase.",
+            "Exécuter le dry-run Wrangler, npm run verify, npm ls --all, npm audit --audit-level=high et git diff --check.",
+            "Créer le commit feat(discovery): refresh active works without blocking reads sans .codex/config.toml."
+          ],
+          "evidence": [
+            "D1 26/26, Worker 91/91, Public Discovery 55/55 et adaptateur navigateur 3/3 passent; tous les typechecks sont verts.",
+            "Les tests prouvent VERIFIED lisible pendant refresh, admission hebdomadaire unique, reconstruction exacte avec request_json expurgé, résultat identique sans révision, échec conservant le profil, changement validé et huit tentatives bornées.",
+            "npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent.",
+            "Archify public-discovery showcase 9/9, 0 erreur et 0 avertissement; artefact SHA-256 f048ff67f383a7df7335499df1c0c7dbbd1c16258d3b7fea16a162bbd2a54115."
+          ]
+        }
+      ]
     }
   ]
 }

@@ -1,6 +1,7 @@
 import type { PublicDiscoveryV3Port } from '@tobirink/adapters-cloudflare';
 import {
   publicDiscoveryKeyV3Schema,
+  publicDiscoveryRefreshSubmissionSchema,
   publicDiscoveryResultBatchSchema,
   publicDiscoverySubmissionSchema,
 } from '@tobirink/public-discovery';
@@ -84,6 +85,30 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
       return noStore(admission.state, 202);
     } catch {
       return noStore({ error: 'request-conflict' }, 409);
+    }
+  });
+
+  app.post('/v3/catalogue/discoveries/refreshes', limitedBody, async (context) => {
+    const services = routeServices(context, injected);
+    const ip = context.req.header('CF-Connecting-IP') ?? 'unknown';
+    if (services.rateLimiter && !(await services.rateLimiter.limit({ key: ip })).success) return noStore({ error: 'rate-limited' }, 429);
+    const parsed = publicDiscoveryRefreshSubmissionSchema.safeParse(await context.req.json().catch(() => undefined));
+    if (!parsed.success) return noStore({ error: 'invalid-request' }, 400);
+    const port = v3Port(services);
+    try {
+      const admission = await port.requestRefresh(parsed.data.key, new Date().toISOString());
+      if (admission.outcome === 'created' && services.queue) {
+        try {
+          await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
+          await port.confirmQueueSignal(parsed.data.key, admission.requestDigest, new Date().toISOString());
+        } catch {
+          await port.releaseQueueSignal(parsed.data.key, admission.requestDigest, new Date().toISOString()).catch(() => undefined);
+          return noStore({ error: 'discovery-queue-unavailable' }, 503);
+        }
+      }
+      return noStore(admission.state, 202);
+    } catch {
+      return noStore({ error: 'refresh-unavailable' }, 409);
     }
   });
 

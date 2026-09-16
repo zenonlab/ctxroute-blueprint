@@ -38,6 +38,10 @@ export const publicDiscoveryRequestSchema = z.strictObject({
 });
 
 export const publicDiscoverySubmissionSchema = publicDiscoveryRequestSchema.omit({ requestDigest: true });
+export const publicDiscoveryRefreshSubmissionSchema = z.strictObject({
+  key: publicDiscoveryKeyV3Schema,
+  schemaVersion: z.literal(3),
+});
 
 const coverSchema = z.strictObject({ attribution: z.string().trim().min(1).max(200), url: z.string().url().max(2048) });
 const titleVariantSchema = z.strictObject({ language: z.string().trim().min(1).max(32).optional(), title: titleSchema });
@@ -114,6 +118,7 @@ export type PublicDiscoveryQuery = z.output<typeof publicDiscoveryQuerySchema>;
 export type PublicDiscoveryReceipt = z.output<typeof publicDiscoveryReceiptSchema>;
 export type PublicDiscoveryReferenceV3 = z.output<typeof publicDiscoveryReferenceV3Schema>;
 export type PublicDiscoveryRequest = z.output<typeof publicDiscoveryRequestSchema>;
+export type PublicDiscoveryRefreshSubmission = z.output<typeof publicDiscoveryRefreshSubmissionSchema>;
 export type PublicDiscoveryResult = z.output<typeof publicDiscoveryResultSchema>;
 export type PublicDiscoveryResultBatch = z.output<typeof publicDiscoveryResultBatchSchema>;
 export type PublicDiscoveryTerminalResolution = z.output<typeof publicDiscoveryTerminalResolutionSchema>;
@@ -124,6 +129,6 @@ export type PublicDiscoveryReadState =
   | { state: 'MISS' }
   | { retryAt: string; state: 'PENDING' }
   | { reason: 'ATTEMPT_LIMIT'; state: 'UNAVAILABLE' }
-  | { profile: PublicDiscoveryVerifiedProfile; state: 'VERIFIED'; verifiedAt: string }
+  | { nextRefreshAt?: string; profile: PublicDiscoveryVerifiedProfile; state: 'VERIFIED'; verifiedAt: string }
   | { reason: string; state: 'NOT_FOUND'; verifiedAt: string }
   | { candidates: readonly PublicDiscoveryReferenceV3[]; reason: string; state: 'AMBIGUOUS'; verifiedAt: string };

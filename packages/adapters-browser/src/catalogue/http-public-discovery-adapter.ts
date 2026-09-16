@@ -16,7 +16,7 @@ const stateSchema = z.discriminatedUnion('state', [
   z.strictObject({ state: z.literal('MISS') }),
   z.strictObject({ retryAt: z.iso.datetime({ offset: false }), state: z.literal('PENDING') }),
   z.strictObject({ reason: z.literal('ATTEMPT_LIMIT'), state: z.literal('UNAVAILABLE') }),
-  z.strictObject({ profile: publicDiscoveryTerminalResolutionSchema.options[0].shape.profile, state: z.literal('VERIFIED'), verifiedAt: z.iso.datetime({ offset: false }) }),
+  z.strictObject({ nextRefreshAt: z.iso.datetime({ offset: false }), profile: publicDiscoveryTerminalResolutionSchema.options[0].shape.profile, state: z.literal('VERIFIED'), verifiedAt: z.iso.datetime({ offset: false }) }),
   z.strictObject({ reason: z.string().min(1).max(200), state: z.literal('NOT_FOUND'), verifiedAt: z.iso.datetime({ offset: false }) }),
   z.strictObject({ candidates: publicDiscoveryTerminalResolutionSchema.options[2].shape.candidates, reason: z.string().min(1).max(200), state: z.literal('AMBIGUOUS'), verifiedAt: z.iso.datetime({ offset: false }) }),
 ]);

@@ -93,6 +93,11 @@ browser or `workerd` test when platform behavior is the risk.
   d’une collision de titre normalisé. Les tests de contrôle fournisseur
   vérifient les réservations D1 exclusives, les cadences de trois et six
   secondes, `Retry-After` et l’ouverture configurable du circuit.
+  La réhydratation couvre aussi l’admission hebdomadaire atomique, la lecture
+  continue du profil `VERIFIED`, la reconstruction bornée depuis une référence
+  exacte avec `request_json = {}`, l’absence de révision pour un résultat
+  identique, le maintien de l’ancien profil après un résultat non vérifié et le
+  remplacement seulement après validation d’un profil changé.
   Les tests du runner prouvent qu’un MISS, un PENDING et un VERIFIED ne lancent
   aucune recherche ou hydratation fournisseur dans la découverte automatique
   de l’extension.

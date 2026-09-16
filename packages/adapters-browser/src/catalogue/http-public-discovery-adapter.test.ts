@@ -26,9 +26,9 @@ describe('HttpPublicDiscoveryAdapter', () => {
       candidate: { externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Frieren'] },
       references: [{ externalId: '154587', provider: 'anilist' }], workId: 'work_anilist_154587',
     };
-    const fetcher = vi.fn(async () => Response.json({ profile, state: 'VERIFIED', verifiedAt: '2026-09-14T12:00:00.000Z' }));
+    const fetcher = vi.fn(async () => Response.json({ nextRefreshAt: '2026-09-21T12:00:00.000Z', profile, state: 'VERIFIED', verifiedAt: '2026-09-14T12:00:00.000Z' }));
     const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
-    await expect(adapter.resolveOrRequest(key, query)).resolves.toMatchObject({ profile, state: 'VERIFIED' });
+    await expect(adapter.resolveOrRequest(key, query)).resolves.toMatchObject({ nextRefreshAt: '2026-09-21T12:00:00.000Z', profile, state: 'VERIFIED' });
     expect(fetcher).toHaveBeenCalledOnce();
   });
 
