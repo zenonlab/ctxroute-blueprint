@@ -135,6 +135,12 @@ browser or `workerd` test when platform behavior is the risk.
   invalid signals, successful acknowledgement, bounded retry and the final
   retry that Cloudflare transfers to the configured DLQ. Agenda failures retain
   only the bounded `anilist`, `mangaupdates` or combined lane code.
+- Operational-metric tests prove that provider calls are counted at the real
+  transport boundary, D1 rows come only from `D1Result.meta`, and `worker.cost`
+  exposes no title, URL, IP, payload, secret, work key or installation ID.
+- Route tests preserve zero D1 writes on ordinary lookup while the closed
+  counters distinguish cache HIT/MISS, created/deduplicated admissions and
+  accepted refreshes. Daily sums are a log query, never a D1 counter table.
 - Agenda D1 tests execute every migration and prove one atomic lease per lane,
   four durable page checkpoints followed by a page-five resume, independent
   last-valid snapshots, `Retry-After` propagation, and semantic digests that

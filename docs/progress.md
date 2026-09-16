@@ -139,3 +139,7 @@
 ## Orchestrer les réhydratations depuis l’extension — DONE
 
 - [x] **Regrouper et étaler les vérifications des favoris échus** — DONE _(evidence: Le test de 500 favoris prouve dix lectures groupées de 50, un maximum de 20 admissions par réveil, 200 admissions sur dix réveils de données et une continuation persistante., Extension 145/145, Application 376/376, Domain 36/36, adaptateur navigateur 84/84, Public Discovery 59/59, Worker 93/93 et D1 28/28 passent; tous les typechecks sont verts., npm run verify, npm ls --all, npm audit (0 vulnérabilité), les builds Chrome/Firefox, le dry-run Wrangler et git diff --check réussissent.)_
+
+## Mesurer et documenter le rafraîchissement public adaptatif — DONE
+
+- [x] **Ajouter les compteurs expurgés et consolider l’architecture** — DONE _(evidence: Worker 96/96, D1 28/28 et Public Discovery 59/59 passent; tous les typechecks et les tests dédiés aux métriques expurgées sont verts., npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent; les builds Chrome et Firefox passent., Archify showcase passe 9/9 sans erreur ni avertissement: Agenda 29549fac4208f7b875d3c2f29049369792d299648524bb0bb75311ce9dbb78ef, Discovery 13a4049fc65d737e18cbd67c06056c04cb46ccc7a0dd6a3803bf1f5f11868239.)_

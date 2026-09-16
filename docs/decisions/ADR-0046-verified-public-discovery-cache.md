@@ -216,3 +216,9 @@ suppression distante est une opération destructive séparément approuvée.
 Les sauvegardes nouvellement produites n’embarquent plus d’identité owner; un
 champ owner présent dans une ancienne archive est accepté pour compatibilité de
 lecture mais ignoré par la composition actuelle lors de la restauration.
+
+Les événements `worker.cost` comptent séparément les HIT/MISS groupés, les
+admissions dédupliquées, les réhydratations acceptées, les appels fournisseur
+réels et les lignes D1 rapportées par `meta`. Ils n’enregistrent jamais la clé,
+les titres, les références, l’IP ou le profil. Une lecture ordinaire ne crée
+aucune écriture D1 pour alimenter l’observabilité.

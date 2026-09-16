@@ -55,5 +55,25 @@
     { "from": "releaseApi", "to": "releaseGeneration", "label": "pages + fenêtre + ETag", "classification": "moins de huit jours · fail-closed", "variant": "emphasis", "route": "auto", "labelAt": [835, 350] },
     { "from": "releaseGeneration", "to": "localAgenda", "label": "événements validés", "classification": "jointure locale par ID", "variant": "emphasis", "route": "auto", "labelAt": [858, 656] },
     { "from": "localAgenda", "to": "localSurfaces", "label": "projection paginée", "classification": "site sans accès D1", "variant": "security", "route": "auto", "labelAt": [960, 456] }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Coût mutualisé",
+      "items": [
+        "Une seule session hebdomadaire pour tous les utilisateurs",
+        "Chaque page fournisseur compte comme une requête HTTP réelle",
+        "Une génération inchangée avance checked_at sans recopier les événements"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Diagnostic expurgé",
+      "items": [
+        "Tâche, fournisseur, pages, résultats, issue, durée et retries uniquement",
+        "Lignes lues et écrites issues de D1Result.meta",
+        "Aucun titre, URL favorite, payload, secret ou identité d’installation"
+      ]
+    }
   ]
 }

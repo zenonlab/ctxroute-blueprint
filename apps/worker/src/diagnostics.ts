@@ -12,8 +12,33 @@ export interface WorkerDiagnosticEvent {
   readonly durationMs: number;
 }
 
-interface WorkerDiagnosticBindings {
+export interface WorkerDiagnosticBindings {
   readonly TOBIRINK_WORKER_DIAGNOSTICS?: string;
+}
+
+export type WorkerCostResult = 'backoff' | 'changed' | 'deduplicated' | 'failed' | 'unchanged';
+export type WorkerCostTask = 'agenda' | 'discovery' | 'discovery-admission' | 'discovery-lookup' | 'discovery-refresh';
+export type WorkerCostProvider = 'anilist' | 'kitsu' | 'mangadex' | 'mangaupdates' | 'mixed' | 'none';
+
+export interface WorkerCostDiagnosticEvent {
+  readonly schemaVersion: 1;
+  readonly type: 'worker.cost';
+  readonly task: WorkerCostTask;
+  readonly provider: WorkerCostProvider;
+  readonly pagesRequested: number;
+  readonly providerRequests: number;
+  readonly acceptedResults: number;
+  readonly result: WorkerCostResult;
+  readonly durationMs: number;
+  readonly retries: number;
+  readonly d1RowsRead?: number;
+  readonly d1RowsWritten?: number;
+  readonly d1Hits?: number;
+  readonly d1Misses?: number;
+  readonly deduplicated?: number;
+  readonly generationsCreated?: number;
+  readonly generationsAvoided?: number;
+  readonly rehydrations?: number;
 }
 
 export function classifyWorkerRoute(pathname: string): WorkerRouteFamily {
@@ -26,6 +51,11 @@ export function classifyWorkerRoute(pathname: string): WorkerRouteFamily {
 
 export function emitWorkerDiagnostic(bindings: WorkerDiagnosticBindings, event: WorkerDiagnosticEvent): void {
   if (bindings.TOBIRINK_WORKER_DIAGNOSTICS !== workerDiagnosticsLockValue) return;
+  console.info(JSON.stringify(event));
+}
+
+export function emitWorkerCostDiagnostic(bindings: WorkerDiagnosticBindings | undefined, event: WorkerCostDiagnosticEvent): void {
+  if (bindings?.TOBIRINK_WORKER_DIAGNOSTICS !== workerDiagnosticsLockValue) return;
   console.info(JSON.stringify(event));
 }
 

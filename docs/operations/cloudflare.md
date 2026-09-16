@@ -170,6 +170,32 @@ distinguish `agenda-anilist-unavailable`,
 `agenda-mangaupdates-unavailable`, their combined form and the unknown-provider
 fallback.
 
+### Daily adaptive-refresh counters
+
+Filter Worker logs on `type=worker.cost` and aggregate by UTC day. Sum only the
+closed numeric fields below:
+
+- `providerRequests` for real supplier calls, grouped by `provider`;
+- `d1Hits` and `d1Misses` for public cache effectiveness;
+- `deduplicated` for admissions that emitted no Queue message;
+- `generationsCreated` and `generationsAvoided` for Agenda publication;
+- `rehydrations` for accepted weekly work refreshes;
+- `d1RowsRead` and `d1RowsWritten`, sourced from `D1Result.meta` by collector
+  processing only.
+
+The other allowed dimensions are `task`, `pagesRequested`, `acceptedResults`,
+`result`, `durationMs` and `retries`. Do not add titles, fingerprints, work or
+provider IDs, request URLs, IP addresses, payloads, secrets or installation
+identifiers to a dashboard or export. A regular lookup reports HIT/MISS but
+performs zero D1 writes; no observability table exists.
+
+Expected invariants are one Agenda session per week, zero Agenda provider call
+between sessions, zero provider call on a fresh cache hit, zero Queue message
+for `deduplicated`, at most one accepted rehydration per work and week, and at
+most eight retries. Compare daily `d1RowsWritten` with the native Cloudflare D1
+usage view before investigating a regression; never inspect `request_json` or
+`result_json` for cost analysis.
+
 `ack-success` confirms a completed message. `ack-invalid` confirms that an
 untrusted malformed signal was discarded. `retry` remains recoverable.
 `retry-to-dlq` means the ninth delivery has failed after eight configured

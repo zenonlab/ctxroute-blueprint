@@ -19,10 +19,16 @@ describe('native collector queue', () => {
 
   it('acknowledges a successful discovery signal', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const item = message({ type: 'public-discovery-ready', version: 1 });
     await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery: async () => ({ claimed: 1, failed: 0, published: 1, replayed: 0 }) });
     expect(item.ack).toHaveBeenCalledOnce(); expect(item.retry).not.toHaveBeenCalled();
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({ disposition: 'ack-success', messageType: 'public-discovery-ready' });
+    expect(JSON.parse(String(info.mock.calls[0]?.[0]))).toEqual({
+      acceptedResults: 0, d1RowsRead: 0, d1RowsWritten: 0, durationMs: expect.any(Number),
+      pagesRequested: 0, provider: 'none', providerRequests: 0, result: 'unchanged', retries: 0,
+      schemaVersion: 1, task: 'discovery', type: 'worker.cost',
+    });
   });
 
   it('coalesces a Queue batch into one discovery claim and acknowledges duplicate signals', async () => {

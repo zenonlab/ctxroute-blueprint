@@ -9,13 +9,13 @@
       {
         "id": "discovery-path",
         "label": "Discovery instantanée",
-        "focus": ["extension", "worker", "queue", "transport", "gateway", "providers", "directProviders", "d1"],
+        "focus": ["extension", "worker", "queue", "transport", "gateway", "providers", "directProviders", "d1", "logs"],
         "note": "Une demande v3 alimente la Queue; AniList et MangaUpdates traversent la gateway signée."
       },
       {
         "id": "agenda-path",
         "label": "Agenda natif",
-        "focus": ["cron", "worker", "transport", "gateway", "providers", "directProviders", "d1"],
+        "focus": ["cron", "worker", "transport", "gateway", "providers", "directProviders", "d1", "logs"],
         "note": "Le cron utilise Deno pour AniList et MangaUpdates, puis conserve la dernière génération saine dans D1."
       },
       {
@@ -47,7 +47,7 @@
       "id": "cron",
       "type": "cloud",
       "label": "Cron Cloudflare",
-      "sublabel": "Agenda toutes les 10 minutes",
+      "sublabel": "dimanche 03:23 UTC",
       "pos": [340, 100],
       "size": [210, 72]
     },
@@ -106,13 +106,21 @@
       "sublabel": "ZIP Chrome / Firefox immuables",
       "pos": [325, 650],
       "size": [240, 72]
+    },
+    {
+      "id": "logs",
+      "type": "cloud",
+      "label": "Cloudflare Logs",
+      "sublabel": "compteurs expurgés · agrégation quotidienne",
+      "pos": [1030, 650],
+      "size": [270, 72]
     }
   ],
   "boundaries": [
     {
       "kind": "region",
       "label": "Cloudflare publié",
-      "wraps": ["cron", "worker", "queue", "transport", "d1", "r2"],
+      "wraps": ["cron", "worker", "queue", "transport", "d1", "r2", "logs"],
       "pad": 24
     },
     {
@@ -132,10 +140,11 @@
     { "id": "signed-gateway", "from": "transport", "to": "gateway", "label": "endpoints bloqués · HMAC", "variant": "security", "labelAt": [915, 336] },
     { "id": "provider-egress", "from": "gateway", "to": "providers", "label": "allowlist AniList + MU", "variant": "emphasis", "labelAt": [1260, 190] },
     { "id": "queue-sql", "from": "queue", "to": "d1", "label": "bail · publication", "labelAt": [915, 586] },
-    { "id": "worker-archives", "from": "worker", "to": "r2", "label": "lecture archives", "variant": "dashed", "labelAt": [445, 416] }
+    { "id": "worker-archives", "from": "worker", "to": "r2", "label": "lecture archives", "variant": "dashed", "labelAt": [360, 430] },
+    { "id": "worker-metrics", "from": "worker", "to": "logs", "label": "coût · résultat · retries", "variant": "dashed", "fromSide": "bottom", "toSide": "left", "via": [[445, 610], [980, 610], [980, 686]], "labelAt": [735, 600] }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Runtime natif", "items": ["Discovery déclenchée immédiatement par Queue", "Agenda collecté par Cron", "Logs JSON: lane, tentative et disposition", "D1 conserve la dernière génération saine"] },
+    { "dot": "emerald", "title": "Runtime natif", "items": ["Discovery déclenchée immédiatement par Queue", "Agenda collecté une fois par semaine", "Logs JSON sans contenu utilisateur", "D1 conserve la dernière génération saine"] },
     { "dot": "rose", "title": "Gateway sélective fermée", "items": ["Health servi avant l’initialisation KV", "KV indisponible : trafic signé en 503", "AniList + tous les endpoints MU", "MangaDex et Kitsu directs"] }
   ]
 }

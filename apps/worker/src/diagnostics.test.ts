@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { boundedDuration, classifyWorkerRoute, emitWorkerDiagnostic, workerDiagnosticsLockValue, workerMethod } from './diagnostics';
+import { boundedDuration, classifyWorkerRoute, emitWorkerCostDiagnostic, emitWorkerDiagnostic, workerDiagnosticsLockValue, workerMethod } from './diagnostics';
 
 describe('worker diagnostics', () => {
   it('emits only for the exact lock value and never serializes request content', () => {
@@ -23,5 +23,21 @@ describe('worker diagnostics', () => {
     expect(workerMethod('DELETE')).toBe('OTHER');
     expect(boundedDuration(20, 10)).toBe(0);
     expect(boundedDuration(0, Number.MAX_SAFE_INTEGER)).toBe(3_600_000);
+  });
+
+  it('emits a closed cost event without user or provider content', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    emitWorkerCostDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: workerDiagnosticsLockValue }, {
+      acceptedResults: 20, d1RowsRead: 24, d1RowsWritten: 20, durationMs: 120,
+      pagesRequested: 3, provider: 'mixed', providerRequests: 3, result: 'changed', retries: 0,
+      schemaVersion: 1, task: 'discovery', type: 'worker.cost',
+    });
+    const serialized = String(info.mock.calls[0]?.[0]);
+    expect(Object.keys(JSON.parse(serialized))).toEqual([
+      'acceptedResults', 'd1RowsRead', 'd1RowsWritten', 'durationMs', 'pagesRequested',
+      'provider', 'providerRequests', 'result', 'retries', 'schemaVersion', 'task', 'type',
+    ]);
+    expect(serialized).not.toMatch(/title|url|ip|payload|secret|installation/iu);
+    info.mockRestore();
   });
 });

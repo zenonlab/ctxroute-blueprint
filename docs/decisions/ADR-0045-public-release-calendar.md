@@ -152,3 +152,8 @@ opérationnelles; cette décision locale ne crée aucun secret ni ressource.
 Avec les volumes observés, une session représente environ cinq requêtes AniList
 et treize requêtes MangaUpdates. Les quotas et métriques comptent des requêtes
 HTTP réelles, jamais des œuvres ni des utilisateurs.
+
+L’événement `worker.cost` de la session compte ces requêtes au niveau du
+transport, le nombre de résultats acceptés, la création ou l’évitement d’une
+génération, la durée, les retries et les lignes D1 issues de `D1Result.meta`.
+Il ne contient aucun événement Agenda, titre, identifiant d’œuvre ou payload.

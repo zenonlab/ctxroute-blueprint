@@ -2014,6 +2014,64 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-adaptive-public-refresh-step-6",
+      "title": "Mesurer et documenter le rafraîchissement public adaptatif",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-6",
+          "title": "Ajouter les compteurs expurgés et consolider l’architecture",
+          "status": "DONE",
+          "acceptance": [
+            "Les diagnostics de traitement ne contiennent que type de tâche, fournisseur borné, pages et appels, résultats acceptés, résultat, métriques D1, durée et retries.",
+            "Aucun titre, URL favorite, adresse IP, payload fournisseur, secret ou identifiant d’installation n’est journalisé.",
+            "Les logs permettent d’agréger quotidiennement appels fournisseur, hits/misses D1, déduplications, générations créées ou évitées, réhydratations et écritures D1.",
+            "Les métriques de lignes D1 proviennent exclusivement de D1Result.meta et une lecture publique ordinaire n’ajoute aucune écriture D1.",
+            "Les quatre diagrammes demandés reflètent le produit sans composant de contrôle blueprint et passent showcase 9/9 sans avertissement."
+          ],
+          "files": [
+            "apps/worker/src/diagnostics.ts",
+            "apps/worker/src/diagnostics.test.ts",
+            "apps/worker/src/operational-metrics.ts",
+            "apps/worker/src/operational-metrics.test.ts",
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/native-collectors.test.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "docs/02-quality-strategy.md",
+            "docs/operations/cloudflare.md",
+            "docs/decisions/ADR-0045-public-release-calendar.md",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/decisions/ADR-0052-native-collector-operations.md",
+            "docs/decisions/ADR-0053-adaptive-refresh-observability.md",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            "docs/architecture/src/public-discovery.dataflow.json",
+            "docs/architecture/src/favorite-resolution.lifecycle.json",
+            "docs/architecture/src/public-pipeline.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/adaptive-public-refresh-step-6.json"
+          ],
+          "commands": [
+            "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress prévues.",
+            "Exécuter les tests Worker, D1 et Public Discovery puis tous les typechecks.",
+            "Valider ADR, documentation et les quatre diagrammes Archify en showcase.",
+            "Exécuter le dry-run Wrangler, npm run verify, npm ls --all, npm audit --audit-level=high et git diff --check.",
+            "Créer le commit docs(architecture): document adaptive public refresh sans .codex/config.toml."
+          ],
+          "evidence": [
+            "Worker 96/96, D1 28/28 et Public Discovery 59/59 passent; tous les typechecks et les tests dédiés aux métriques expurgées sont verts.",
+            "npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent; les builds Chrome et Firefox passent.",
+            "Archify showcase passe 9/9 sans erreur ni avertissement: Agenda 29549fac4208f7b875d3c2f29049369792d299648524bb0bb75311ce9dbb78ef, Discovery 13a4049fc65d737e18cbd67c06056c04cb46ccc7a0dd6a3803bf1f5f11868239.",
+            "Archify showcase passe 9/9 sans erreur ni avertissement: cycle favori 5672c8888a7576c0034f69a281fab262b9d223f5969f0514e8d51ba8aee3bf48, pipeline public 8fbe20ad0e6b62d047e7cb8a823bdc0bdad09cc4ff52a65d07ea17877b9f3bda."
+          ]
+        }
+      ]
     }
   ]
 }

@@ -49,6 +49,11 @@ fermée en 503 avec un code d’erreur. Le démarrage HTTP ne doit pas attendre
 `Deno.openKv()` : la santé sert le warm-up immédiatement et une requête signée
 sans KV disponible reçoit le 503 borné.
 
+Compléter la décision de Queue par l’événement de coût fermé de l’ADR-0053.
+La disposition explique le contrôle de livraison; `worker.cost` mesure la tâche
+une seule fois avec appels HTTP réels, résultats acceptés, issue, durée,
+retries et métriques D1. Aucun des deux événements ne porte de contenu métier.
+
 ## Conséquences
 
 Une panne AniList ou MangaUpdates devient identifiable sans exposer de donnée

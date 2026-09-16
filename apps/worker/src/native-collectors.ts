@@ -12,6 +12,8 @@ import {
 } from '@tobirink/public-discovery';
 import { D1AgendaCollectionAdapter, type AgendaLaneClaim } from './releases/public-release-collectors';
 import { createProviderTransportAdapter, type ProviderTransportBindings } from './provider-transport-adapter';
+import { boundedDuration, emitWorkerCostDiagnostic, workerDiagnosticsLockValue, type WorkerCostDiagnosticEvent, type WorkerCostProvider, type WorkerCostResult } from './diagnostics';
+import { instrumentD1, instrumentProviderFetch, type D1MetricTotals, type ProviderMetricTotals } from './operational-metrics';
 import { z } from 'zod';
 
 export const nativeCollectorSignalSchema = z.discriminatedUnion('type', [
@@ -39,11 +41,50 @@ interface CalendarWindow {
 interface AgendaProcessingReceipt {
   readonly changed: boolean;
   readonly count: number;
+  readonly metrics?: CollectorCostMetrics;
   readonly revision: string;
 }
 
+type DiscoveryProcessingReport = PublicDiscoveryBatchReport & { readonly metrics?: CollectorCostMetrics };
+interface CollectorCostMetrics extends D1MetricTotals {
+  readonly acceptedResults: number;
+  readonly pagesRequested: number;
+  readonly provider: WorkerCostProvider;
+  readonly providerRequests: number;
+  readonly result: WorkerCostResult;
+}
+
+interface ProviderCost { readonly provider: WorkerCostProvider; readonly providerRequests: number }
+
+function providerCost(totals: ProviderMetricTotals): ProviderCost {
+  const active = [
+    { provider: 'anilist' as const, requests: totals.anilist },
+    { provider: 'kitsu' as const, requests: totals.kitsu },
+    { provider: 'mangadex' as const, requests: totals.mangadex },
+    { provider: 'mangaupdates' as const, requests: totals.mangaupdates },
+  ].filter((entry) => entry.requests > 0);
+  const provider: WorkerCostProvider = active.length === 0 ? 'none' : active.length === 1 ? active[0]!.provider : 'mixed';
+  return { provider, providerRequests: active.reduce((sum, entry) => sum + entry.requests, 0) };
+}
+
+function collectorCost(d1: D1MetricTotals, providers: ProviderMetricTotals, acceptedResults: number, result: WorkerCostResult): CollectorCostMetrics {
+  const provider = providerCost(providers);
+  return { ...d1, acceptedResults, pagesRequested: provider.providerRequests, ...provider, result };
+}
+
+function emptyCollectorCost(result: WorkerCostResult): CollectorCostMetrics {
+  return { acceptedResults: 0, pagesRequested: 0, provider: 'none', providerRequests: 0, result, rowsRead: 0, rowsWritten: 0 };
+}
+
 export class AgendaCollectionRetryError extends Error {
-  constructor(message: string, readonly retryDelaySeconds: number) { super(message); this.name = 'AgendaCollectionRetryError'; }
+  constructor(message: string, readonly retryDelaySeconds: number, readonly metrics?: CollectorCostMetrics) { super(message); this.name = 'AgendaCollectionRetryError'; }
+}
+
+class PublicDiscoveryProcessingError extends Error {
+  constructor(readonly failure: Error | undefined, readonly metrics: CollectorCostMetrics) {
+    super('public-discovery-processing-failed');
+    this.name = 'PublicDiscoveryProcessingError';
+  }
 }
 
 type NativeCollectorDisposition = 'ack-invalid' | 'ack-success' | 'retry' | 'retry-to-dlq';
@@ -115,13 +156,17 @@ export function agendaCollectionFailureCode(failures: readonly string[]): string
   return 'agenda-provider-unavailable';
 }
 
-export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings): Promise<PublicDiscoveryBatchReport> {
-  const port = new D1PublicDiscoveryV3Adapter(bindings.PUBLIC_DB);
+export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings): Promise<DiscoveryProcessingReport> {
+  const d1 = instrumentD1(bindings.PUBLIC_DB);
+  const providers = instrumentProviderFetch(providerFetch(bindings));
+  let acceptedResults = 0;
+  try {
+  const port = new D1PublicDiscoveryV3Adapter(d1.database);
   let activeToken = '';
   let followUps: readonly { key: Parameters<typeof port.confirmQueueSignal>[0]; requestDigest: string }[] = [];
   const resolver = createPublicDiscoveryResolver(createPublicDiscoveryProviders(
-    providerFetch(bindings),
-    new D1ProviderRuntimeControl(bindings.PUBLIC_DB),
+    providers.fetch,
+    new D1ProviderRuntimeControl(d1.database),
   ));
   const report = await runPublicDiscoveryBatch({
     gateway: {
@@ -149,6 +194,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       },
     },
   });
+  acceptedResults = report.published;
   if (followUps.length > 0) {
     try {
       await bindings.PUBLIC_DISCOVERY_QUEUE.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
@@ -160,7 +206,11 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       throw error;
     }
   }
-  return report;
+  const result = report.replayed > 0 && report.published === 0 ? 'deduplicated' : report.published > 0 ? 'changed' : 'unchanged';
+  return { ...report, metrics: collectorCost(d1.snapshot(), providers.snapshot(), report.published, result) };
+  } catch (error) {
+    throw new PublicDiscoveryProcessingError(error instanceof Error ? error : undefined, collectorCost(d1.snapshot(), providers.snapshot(), acceptedResults, 'failed'));
+  }
 }
 
 function calendarWindow(scheduledFor: string): CalendarWindow {
@@ -170,8 +220,10 @@ function calendarWindow(scheduledFor: string): CalendarWindow {
 }
 
 export async function processAgendaQueue(bindings: NativeCollectorBindings, scheduledFor: string): Promise<AgendaProcessingReceipt> {
-  const transport = providerFetch(bindings); const window = calendarWindow(scheduledFor);
-  const state = new D1AgendaCollectionAdapter(bindings.PUBLIC_DB);
+  const d1 = instrumentD1(bindings.PUBLIC_DB);
+  const providers = instrumentProviderFetch(providerFetch(bindings));
+  const transport = providers.fetch; const window = calendarWindow(scheduledFor);
+  const state = new D1AgendaCollectionAdapter(d1.database);
   const attempts = await Promise.allSettled((['anilist', 'mangaupdates'] as const).map(async (provider) => {
     const startedAt = new Date();
     const tokenDigest = await digest(randomToken());
@@ -179,7 +231,7 @@ export async function processAgendaQueue(bindings: NativeCollectorBindings, sche
       collectionId: crypto.randomUUID(), leaseUntil: new Date(startedAt.valueOf() + 15 * 60_000).toISOString(),
       now: startedAt.toISOString(), provider, scheduledFor, tokenDigest, window,
     });
-    if (admission.status === 'complete' || admission.status === 'leased') return { changed: false, collected: false, provider };
+    if (admission.status === 'complete' || admission.status === 'leased') return { accepted: 0, changed: false, collected: false, provider };
     if (admission.status === 'deferred') {
       const delay = Math.max(1, Math.ceil((Date.parse(admission.retryAt) - startedAt.valueOf()) / 1_000));
       throw new AgendaCollectionRetryError(`agenda-${provider}-unavailable`, Math.min(delay, 86_400));
@@ -192,7 +244,7 @@ export async function processAgendaQueue(bindings: NativeCollectorBindings, sche
     try {
       await collector.collect(window, { nextPage: claim.nextPage, received: claim.received, skippedUnidentified: claim.skippedUnidentified });
       const completed = await state.completeLane({ checkedAt: new Date().toISOString(), claim, provider, scheduledFor });
-      return { changed: completed.changed, collected: true, provider };
+      return { accepted: completed.events.length, changed: completed.changed, collected: true, provider };
     } catch (error) {
       const now = Date.now();
       const retryAt = error instanceof PublicAgendaProviderError && error.retryAt !== undefined ? error.retryAt : now + 60_000;
@@ -202,21 +254,24 @@ export async function processAgendaQueue(bindings: NativeCollectorBindings, sche
     }
   }));
   const failures = attempts.filter((attempt): attempt is PromiseRejectedResult => attempt.status === 'rejected');
-  const completed = attempts.filter((attempt): attempt is PromiseFulfilledResult<{ changed: boolean; collected: boolean; provider: 'anilist' | 'mangaupdates' }> => attempt.status === 'fulfilled');
+  const completed = attempts.filter((attempt): attempt is PromiseFulfilledResult<{ accepted: number; changed: boolean; collected: boolean; provider: 'anilist' | 'mangaupdates' }> => attempt.status === 'fulfilled');
   const shouldPublish = completed.some((attempt) => attempt.value.collected)
     && (failures.length === 0 || completed.some((attempt) => attempt.value.changed));
   const generation = shouldPublish ? await state.publishMergedGeneration(new Date().toISOString()) : null;
   if (failures.length > 0) {
     const failureNames = failures.map((failure) => failure.reason instanceof Error ? failure.reason.message : 'agenda-provider-unavailable');
     const delay = Math.max(...failures.map((failure) => failure.reason instanceof AgendaCollectionRetryError ? failure.reason.retryDelaySeconds : 60));
-    throw new AgendaCollectionRetryError(agendaCollectionFailureCode(failureNames), delay);
+    const accepted = completed.reduce((sum, attempt) => sum + attempt.value.accepted, 0);
+    throw new AgendaCollectionRetryError(agendaCollectionFailureCode(failureNames), delay, collectorCost(d1.snapshot(), providers.snapshot(), accepted, 'backoff'));
   }
-  return generation ?? { changed: false, count: 0, revision: 'd1-empty' };
+  const receipt = generation ?? { changed: false, count: 0, revision: 'd1-empty' };
+  const result: WorkerCostResult = generation === null ? 'deduplicated' : receipt.changed ? 'changed' : 'unchanged';
+  return { ...receipt, metrics: collectorCost(d1.snapshot(), providers.snapshot(), receipt.count, result) };
 }
 
 export async function handleNativeCollectorQueue(
   messages: readonly QueueMessagePort[],
-  processors: { readonly agenda: (scheduledFor: string) => Promise<AgendaProcessingReceipt>; readonly discovery: () => Promise<PublicDiscoveryBatchReport> },
+  processors: { readonly agenda: (scheduledFor: string) => Promise<AgendaProcessingReceipt>; readonly discovery: () => Promise<DiscoveryProcessingReport> },
 ): Promise<void> {
   const discoveryMessages: QueueMessagePort[] = [];
   for (const message of messages) {
@@ -231,14 +286,17 @@ export async function handleNativeCollectorQueue(
       discoveryMessages.push(message);
       continue;
     }
+    const startedAt = Date.now();
     try {
-      await processors.agenda(signal.scheduledFor);
+      const receipt = await processors.agenda(signal.scheduledFor);
+      emitCollectorCost('agenda', receipt.metrics ?? emptyCollectorCost(receipt.changed ? 'changed' : 'unchanged'), startedAt, message.attempts);
       emitNativeCollectorDiagnostic({ attempt: Math.max(1, message.attempts), disposition: 'ack-success', messageType: signal.type });
       message.ack();
     } catch (error) {
       const retryDelaySeconds = error instanceof AgendaCollectionRetryError
         ? error.retryDelaySeconds
         : Math.min(60 * (2 ** Math.max(0, message.attempts - 1)), 60 * 60);
+      emitCollectorCost('agenda', error instanceof AgendaCollectionRetryError && error.metrics !== undefined ? error.metrics : emptyCollectorCost('failed'), startedAt, message.attempts);
       emitNativeCollectorDiagnostic({
         attempt: Math.max(1, message.attempts),
         code: collectorFailureCode(error instanceof Error ? error : undefined),
@@ -252,6 +310,7 @@ export async function handleNativeCollectorQueue(
   if (discoveryMessages.length === 0) return;
   const [leader, ...duplicates] = discoveryMessages;
   if (!leader) return;
+  const startedAt = Date.now();
   try {
     const report = await processors.discovery();
     if (report.failed > 0) {
@@ -266,17 +325,43 @@ export async function handleNativeCollectorQueue(
       emitNativeCollectorDiagnostic({ attempt: Math.max(1, leader.attempts), disposition: 'ack-success', messageType: 'public-discovery-ready' });
       leader.ack();
     }
+    const metrics = report.metrics ?? emptyCollectorCost(report.failed > 0 ? 'backoff' : 'unchanged');
+    emitCollectorCost('discovery', report.failed > 0 ? { ...metrics, result: 'backoff' } : metrics, startedAt, leader.attempts);
     for (const duplicate of duplicates) duplicate.ack();
   } catch (error) {
     const retryDelaySeconds = Math.min(60 * (2 ** Math.max(0, leader.attempts - 1)), 60 * 60);
+    const failure = error instanceof PublicDiscoveryProcessingError ? error.failure : error instanceof Error ? error : undefined;
     emitNativeCollectorDiagnostic({
-      attempt: Math.max(1, leader.attempts), code: collectorFailureCode(error instanceof Error ? error : undefined),
+      attempt: Math.max(1, leader.attempts), code: collectorFailureCode(failure),
       disposition: leader.attempts > nativeCollectorMaxRetryRequests ? 'retry-to-dlq' : 'retry',
       messageType: 'public-discovery-ready', retryDelaySeconds,
     });
     leader.retry({ delaySeconds: retryDelaySeconds });
+    emitCollectorCost('discovery', error instanceof PublicDiscoveryProcessingError ? error.metrics : emptyCollectorCost('failed'), startedAt, leader.attempts);
     for (const duplicate of duplicates) duplicate.ack();
   }
+}
+
+function emitCollectorCost(task: 'agenda' | 'discovery', metrics: CollectorCostMetrics, startedAt: number, attempt: number): void {
+  const agendaCounters = task === 'agenda'
+    ? { generationsAvoided: metrics.result === 'unchanged' ? 1 : 0, generationsCreated: metrics.result === 'changed' ? 1 : 0 }
+    : {};
+  const event: WorkerCostDiagnosticEvent = {
+    acceptedResults: metrics.acceptedResults,
+    d1RowsRead: metrics.rowsRead,
+    d1RowsWritten: metrics.rowsWritten,
+    durationMs: boundedDuration(startedAt, Date.now()),
+    pagesRequested: metrics.pagesRequested,
+    provider: metrics.provider,
+    providerRequests: metrics.providerRequests,
+    result: metrics.result,
+    retries: Math.max(0, attempt - 1),
+    schemaVersion: 1,
+    task,
+    type: 'worker.cost',
+    ...agendaCounters,
+  };
+  emitWorkerCostDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: workerDiagnosticsLockValue }, event);
 }
 
 export async function enqueueAgendaRefresh(controller: ScheduledController, bindings: NativeCollectorBindings): Promise<void> {

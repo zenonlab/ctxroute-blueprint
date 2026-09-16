@@ -10,6 +10,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { WorkerRuntime, WorkerServices } from '../composition';
 import type { NativeCollectorSignal } from '../native-collectors';
+import { boundedDuration, emitWorkerCostDiagnostic, type WorkerCostDiagnosticEvent, type WorkerCostResult, type WorkerCostTask } from '../diagnostics';
 interface DiscoveryQueuePort {
   send(body: NativeCollectorSignal, options?: { contentType?: 'json' }): Promise<QueueSendResponse | void>;
 }
@@ -37,6 +38,14 @@ function retiredV2(): Response {
   return noStore({ error: 'public-discovery-v2-retired' }, 410);
 }
 
+type PublicCostCounters = Pick<WorkerCostDiagnosticEvent, 'd1Hits' | 'd1Misses' | 'deduplicated' | 'rehydrations'>;
+function emitPublicCost(bindings: WorkerRuntime['Bindings'] | undefined, task: WorkerCostTask, result: WorkerCostResult, startedAt: number, counters: Partial<PublicCostCounters> = {}): void {
+  emitWorkerCostDiagnostic(bindings, {
+    acceptedResults: 0, durationMs: boundedDuration(startedAt, Date.now()), pagesRequested: 0,
+    provider: 'none', providerRequests: 0, result, retries: 0, schemaVersion: 1, task, type: 'worker.cost', ...counters,
+  });
+}
+
 async function digest(value: string): Promise<string> {
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -54,15 +63,20 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
   const limitedBody = bodyLimit({ maxSize: 64 * 1024, onError: () => noStore({ error: 'body-too-large' }, 413) });
 
   app.get('/v3/catalogue/discoveries', async (context) => {
+    const startedAt = Date.now();
     const key = publicDiscoveryKeyV3Schema.safeParse({
       fingerprint: context.req.query('fingerprint'), mediaKind: context.req.query('mediaKind'),
       parserVersion: context.req.query('parserVersion'), siteRulesVersion: context.req.query('siteRulesVersion'),
     });
     if (!key.success) return noStore({ error: 'invalid-query' }, 400);
-    return noStore(await v3Port(routeServices(context, injected)).read(key.data, new Date().toISOString()));
+    const state = await v3Port(routeServices(context, injected)).read(key.data, new Date().toISOString());
+    const miss = state.state === 'MISS' ? 1 : 0;
+    emitPublicCost(context.env, 'discovery-lookup', 'unchanged', startedAt, { d1Hits: 1 - miss, d1Misses: miss });
+    return noStore(state);
   });
 
   app.post('/v3/catalogue/discoveries/lookup', limitedBody, async (context) => {
+    const startedAt = Date.now();
     const parsed = publicDiscoveryLookupSubmissionSchema.safeParse(await context.req.json().catch(() => undefined));
     if (!parsed.success) return noStore({ error: 'invalid-request' }, 400);
     const port = v3Port(routeServices(context, injected));
@@ -70,10 +84,13 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     const states = port.readMany === undefined
       ? await Promise.all(parsed.data.keys.map(async (key) => ({ key, state: await port.read(key, now) })))
       : await port.readMany(parsed.data.keys, now);
+    const misses = states.filter(({ state }) => state.state === 'MISS').length;
+    emitPublicCost(context.env, 'discovery-lookup', 'unchanged', startedAt, { d1Hits: states.length - misses, d1Misses: misses });
     return noStore(states);
   });
 
   app.post('/v3/catalogue/discoveries/requests', limitedBody, async (context) => {
+    const startedAt = Date.now();
     const services = routeServices(context, injected);
     const ip = context.req.header('CF-Connecting-IP') ?? 'unknown';
     if (services.rateLimiter && !(await services.rateLimiter.limit({ key: ip })).success) return noStore({ error: 'rate-limited' }, 429);
@@ -84,23 +101,30 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     const now = new Date().toISOString();
     try {
       const admission = await port.request({ ...parsed.data, requestDigest }, now);
-      if (admission.outcome === 'saturated') return noStore({ error: 'discovery-capacity-unavailable' }, 503);
+      if (admission.outcome === 'saturated') {
+        emitPublicCost(context.env, 'discovery-admission', 'failed', startedAt);
+        return noStore({ error: 'discovery-capacity-unavailable' }, 503);
+      }
       if (admission.outcome === 'created' && services.queue) {
         try {
           await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
           await port.confirmQueueSignal(parsed.data.key, requestDigest, new Date().toISOString());
         } catch {
           await port.releaseQueueSignal(parsed.data.key, requestDigest, new Date().toISOString()).catch(() => undefined);
+          emitPublicCost(context.env, 'discovery-admission', 'backoff', startedAt);
           return noStore({ error: 'discovery-queue-unavailable' }, 503);
         }
       }
+      emitPublicCost(context.env, 'discovery-admission', admission.outcome === 'created' ? 'changed' : 'deduplicated', startedAt, admission.outcome === 'existing' ? { deduplicated: 1 } : {});
       return noStore(admission.state, 202);
     } catch {
+      emitPublicCost(context.env, 'discovery-admission', 'failed', startedAt);
       return noStore({ error: 'request-conflict' }, 409);
     }
   });
 
   app.post('/v3/catalogue/discoveries/refreshes', limitedBody, async (context) => {
+    const startedAt = Date.now();
     const services = routeServices(context, injected);
     const ip = context.req.header('CF-Connecting-IP') ?? 'unknown';
     if (services.rateLimiter && !(await services.rateLimiter.limit({ key: ip })).success) return noStore({ error: 'rate-limited' }, 429);
@@ -115,11 +139,14 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
           await port.confirmQueueSignal(parsed.data.key, admission.requestDigest, new Date().toISOString());
         } catch {
           await port.releaseQueueSignal(parsed.data.key, admission.requestDigest, new Date().toISOString()).catch(() => undefined);
+          emitPublicCost(context.env, 'discovery-refresh', 'backoff', startedAt);
           return noStore({ error: 'discovery-queue-unavailable' }, 503);
         }
       }
+      emitPublicCost(context.env, 'discovery-refresh', admission.outcome === 'created' ? 'changed' : 'deduplicated', startedAt, admission.outcome === 'created' ? { rehydrations: 1 } : { deduplicated: 1 });
       return noStore(admission.state, 202);
     } catch {
+      emitPublicCost(context.env, 'discovery-refresh', 'failed', startedAt);
       return noStore({ error: 'refresh-unavailable' }, 409);
     }
   });

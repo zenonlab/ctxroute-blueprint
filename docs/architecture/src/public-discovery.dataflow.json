@@ -276,6 +276,16 @@
         "Le mode direct reste disponible comme rollback mais le smoke réel reçoit HTTP 403 depuis Cloudflare",
         "Le mode selective-gateway est actif; Deno ne reçoit qu’AniList et MangaUpdates"
       ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Mesure sans identité",
+      "items": [
+        "Les lectures publient seulement les nombres de HIT et MISS",
+        "Les admissions comptent created, deduplicated, saturated et refresh",
+        "Le consumer compte les requêtes HTTP réelles et D1Result.meta",
+        "Les agrégats quotidiens ne contiennent aucune clé, aucun titre et aucune IP"
+      ]
     }
   ]
 }
