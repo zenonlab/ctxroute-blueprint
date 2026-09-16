@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   beginOrchestratorTransaction, blockOrchestratorTransaction, completeOrchestratorTransaction,
-  currentSwarmMode, findMission, loadOrchestratorConfig, readOrchestratorState, transactOrchestrator, updateMission, withGlobalMutationLock,
+  currentSwarmMode, findMission, loadOrchestratorConfig, readOrchestratorState, transactOrchestrator, updateGoal, updateMission, withGlobalMutationLock,
 } from './orchestrator-core.mjs';
 import { assertBootstrapAllows, bootstrapOrchestrator } from './orchestrator-bootstrap.mjs';
 import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
@@ -14,6 +14,7 @@ import {
   recoverMissionWorktree, rollbackMissionWorktree,
 } from './worktree-manager.mjs';
 import { queryCtxroute } from './ctxroute-query.mjs';
+import { assertDocumentCitations } from './orchestrator-documentation.mjs';
 
 export async function readCoordination(root = process.cwd(), environment = process.env) {
   const state = await readOrchestratorState(root);
@@ -26,6 +27,7 @@ export async function readCoordination(root = process.cwd(), environment = proce
   if (mission.dependencies) view.dependencies = mission.dependencies;
   if (mission.acceptance_criteria) view.acceptance_criteria = mission.acceptance_criteria;
   if (mission.skill_path) view.skill_path = mission.skill_path;
+  for (const field of ['assessment', 'phase_profile', 'documentation_evidence', 'documentation_freshness', 'consumption_policy', 'routing_decision', 'escalation_criteria']) if (mission[field] !== undefined) view[field] = mission[field];
   assertOrchestratorContract('mission-view', view);
   return view;
 }
@@ -102,6 +104,7 @@ export async function submitWorkerReport(command, root = process.cwd(), environm
   if (!found || found.goal.goal_id !== command.payload.goal_id) throw new Error(`unknown mission: ${report.mission_id}`);
   const mission = found.mission;
   if (!['RUNNING', 'BLOCKED'].includes(mission.status)) throw new Error(`mission cannot report from ${mission.status}`);
+  if (mission.documentation_evidence && report.documentation_sources_used) assertDocumentCitations(mission.documentation_evidence, report.documentation_sources_used);
   const begun = await beginOrchestratorTransaction(command, root, dependencies);
   if (begun.replayed && !begun.pending) return begun;
   try {
@@ -117,7 +120,10 @@ export async function submitWorkerReport(command, root = process.cwd(), environm
     const reinspection = await inspectMissionChanges(mission.worktree_allocation.path, mission.file_scope, root, mission.worktree_allocation.base_revision, dependencies);
     if (!reinspection.ok || JSON.stringify(reinspection.files) !== JSON.stringify(inspection.files)) throw categorized('VALIDATION_MUTATED_DIFF', 'validation changed the worker diff');
     const integration = await integrateMissionChanges(mission, root, dependencies);
-    return completeOrchestratorTransaction(command, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt, integration_status: 'INTEGRATED', worker_commit: integration.worker_commit, integrated_commit: integration.integrated_commit, blocking_cause: null })), 'UPDATED', root, dependencies);
+    return completeOrchestratorTransaction(command, current => {
+      const updated = updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt, integration_status: 'INTEGRATED', worker_commit: integration.worker_commit, integrated_commit: integration.integrated_commit, blocking_cause: null, execution_receipts: report.consumption ? [...(item.execution_receipts ?? []), report.consumption] : item.execution_receipts }));
+      return report.consumption ? updateGoal(updated, command.payload.goal_id, goal => ({ ...goal, execution_receipts: [...(goal.execution_receipts ?? []), report.consumption] })) : updated;
+    }, 'UPDATED', root, dependencies);
   } catch (error) {
     const cause = error.causeCode ?? 'REPORT_REJECTED';
     await blockOrchestratorTransaction(command, cause, root, dependencies, current => {
@@ -214,7 +220,7 @@ export async function purgeWorktree(command, root = process.cwd(), environment =
 
 export async function contextQuery(input, root = process.cwd()) { return queryCtxroute(input, root); }
 
-function missionRecord(request, reason) { const record = { ...request, response_format: 'worker-report', execution_reason: reason, status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null, blocking_cause: null, integration_status: 'NOT_STARTED', worker_commit: null, integrated_commit: null }; assertOrchestratorContract('mission-record', record); return record; }
+function missionRecord(request, reason) { const record = { ...request, response_format: 'worker-report', execution_reason: reason, status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null, blocking_cause: null, integration_status: 'NOT_STARTED', worker_commit: null, integrated_commit: null }; if (request.routing_decision) { record.escalations = []; record.execution_receipts = []; } assertOrchestratorContract('mission-record', record); return record; }
 function addPreparingMission(state, goalId, record, worktreeOperation) {
   const goalIndex = state.goals.findIndex(goal => goal.goal_id === goalId);
   if (goalIndex < 0 || state.goals[goalIndex].status !== 'ACTIVE') throw new Error(`unknown or terminal goal: ${goalId}`);

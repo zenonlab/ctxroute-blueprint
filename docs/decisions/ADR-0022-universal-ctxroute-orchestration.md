@@ -41,9 +41,10 @@ modes because execution mode is not part of skill routing.
 Every mutating `SWARM_ON` request enters through `orchestrator_run_goal`. A
 short-lived, read-only `goal-planner` process returns a schema-validated plan
 before the orchestrator persists a goal or allocates a worktree. The local
-dispatcher then runs dependency-ready missions with a bounded `codex`,
-`claude`, or test-only `fixture` adapter. Runtime selection accepts only those
-three names and never an executable path.
+dispatcher then runs dependency-ready missions through the closed `codex`,
+`claude`, `gemini`, or test-only `fixture` adapters. Adaptive selection is
+governed by ADR-0029; legacy configurations may still select one global
+runtime. Neither mode accepts an executable path.
 
 Workers do not commit or mutate global state. The orchestrator replays declared
 validations, commits only in-scope paths with a deterministic local identity,

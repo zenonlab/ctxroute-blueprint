@@ -15,6 +15,8 @@ export const CONTROL_FILES = Object.freeze([
   'scripts/orchestrator-service.mjs', 'scripts/orchestrator-bootstrap.mjs', 'scripts/orchestrator-contracts.mjs',
   'scripts/orchestrator-telemetry.mjs', 'scripts/orchestrator-validation.mjs',
   'scripts/orchestrator-goal.mjs', 'scripts/orchestrator-worker.mjs', 'scripts/orchestrator-fixture-worker.mjs',
+  'scripts/orchestrator-audit-sharding.mjs', 'scripts/orchestrator-documentation.mjs',
+  'scripts/orchestrator-models.mjs', 'scripts/orchestrator-routing-core.mjs', 'scripts/orchestrator-routing-service.mjs',
   'scripts/validate-orchestrator-contracts.mjs', 'scripts/worktree-manager.mjs',
   'scripts/session-audit.mjs', 'scripts/validate-blueprint-skills.mjs',
   'scripts/verify-blueprint-skills.mjs', 'scripts/blueprint-review.mjs', 'scripts/crg-disposition.mjs',

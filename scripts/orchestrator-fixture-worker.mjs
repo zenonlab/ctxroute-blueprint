@@ -9,7 +9,12 @@ const scenario = process.env.CTXROUTE_FIXTURE_SCENARIO ?? 'success';
 if (scenario === 'timeout') await new Promise(resolveWait => { setTimeout(resolveWait, 3_600_000); });
 if (scenario === 'crash') process.exit(17);
 if (scenario === 'invalid-json') { process.stdout.write('{not-json'); process.exit(0); }
-if (phase === 'plan') {
+if (phase === 'research') {
+  const requirements = mission.requirements ?? [];
+  const accessedAt = '2026-09-16T00:00:00Z';
+  const sources = requirements.map((requirement, index) => ({ source_id: `fixture-source-${index + 1}`, requirement_ids: [requirement.requirement_id], url: 'https://example.invalid/official-documentation', domain: 'example.invalid', authority: 'official', title: 'Fixture official documentation', version: requirement.installed_version, accessed_at: accessedAt, digest: 'd'.repeat(64), claims: [`Current fixture evidence covers ${requirement.subject}.`] }));
+  process.stdout.write(JSON.stringify({ report_id: `${mission.goal_id}-documentation`, goal_id: mission.goal_id, status: requirements.length ? 'SATISFIED' : 'NOT_APPLICABLE', requirements, sources, justification: requirements.length ? 'Fixture primary evidence covers every requirement.' : 'No external facts are required.', created_at: accessedAt, digest: 'e'.repeat(64), blocked_cause: null }));
+} else if (phase === 'plan') {
   const paths = mission.suggested_paths.length ? mission.suggested_paths : ['src/goal-change.mjs'];
   const criterionIds = mission.acceptance_criteria.map((_, index) => `criterion-${index + 1}`);
   const selectedSkill = process.env.CTXROUTE_FIXTURE_MISSING_SKILL ?? 'blueprint-audit';

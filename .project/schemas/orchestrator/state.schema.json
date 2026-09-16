@@ -26,8 +26,17 @@
         "acceptance_report": { "$ref": "goal-acceptance-report.schema.json" },
         "blocked_cause": { "$ref": "common.schema.json#/$defs/nullableCause" },
         "resume_action": { "type": ["string", "null"], "maxLength": 1024, "pattern": "^[^\\u0000]*$" },
-        "status": { "enum": ["ACTIVE", "BLOCKED", "COMPLETED", "CANCELLED"] },
-        "missions": { "type": "array", "maxItems": 1024, "items": { "$ref": "mission-record.schema.json" } }
+        "status": { "enum": ["RESEARCHING", "WAITING_FOR_RESEARCH", "ROUTING", "ACTIVE", "ESCALATING", "WAITING_FOR_CAPABILITY", "BLOCKED", "COMPLETED", "CANCELLED"] },
+        "missions": { "type": "array", "maxItems": 1024, "items": { "$ref": "mission-record.schema.json" } },
+        "importance": { "enum": ["low", "normal", "high", "critical"] },
+        "change_kind": { "enum": ["routine", "feature", "bugfix", "security", "migration", "incident", "audit"] },
+        "assessment": { "$ref": "task-assessment.schema.json" },
+        "consumption_policy": { "$ref": "consumption-policy.schema.json" },
+        "documentation_evidence": { "$ref": "documentation-evidence-report.schema.json" },
+        "documentation_freshness": { "$ref": "documentation-freshness-receipt.schema.json" },
+        "routing_decisions": { "type": "array", "maxItems": 1024, "items": { "$ref": "routing-decision.schema.json" } },
+        "execution_receipts": { "type": "array", "maxItems": 4096, "items": { "$ref": "execution-receipt.schema.json" } },
+        "escalations": { "type": "array", "maxItems": 1024, "items": { "$ref": "escalation-event.schema.json" } }
       },
       "unevaluatedProperties": false
     },

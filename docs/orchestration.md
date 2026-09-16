@@ -36,6 +36,11 @@ same service and is the emergency path when MCP is unavailable:
 ```sh
 npm run orchestrator:read
 npm run orchestrator:doctor
+npm run orchestrator:models
+npm run orchestrator:explain-route -- route.json
+npm run orchestrator:usage -- usage.json
+npm run orchestrator:refresh-documentation -- goal.json
+npm run orchestrator:model-evaluations
 npm run orchestrator:cli -- mutate transaction.json
 npm run orchestrator:run-goal -- goal.json
 npm run orchestrator:cli -- prepare-mission transaction.json
@@ -53,11 +58,71 @@ old. Reusing an operation identifier with any payload or action difference is
 rejected before physical effects. Transactions persist `PENDING` intent before
 Git mutation, then converge to `COMPLETED` or `BLOCKED`.
 
-The goal runner launches `goal-planner` as a short read-only process and
-validates the returned `GoalPlan` before creating durable state. Dependency-
-ready missions run with bounded local `codex`, `claude`, or test-only `fixture`
-adapters. Selection uses `CTXROUTE_WORKER_RUNTIME`, project configuration, host
-detection, then local availability. Arbitrary executable paths are refused.
+The goal runner performs a bounded local inventory and passes every goal
+through the documentation gate before planning or mutation. It then launches
+`goal-planner` as a short read-only process and validates the returned
+`GoalPlan` before creating durable state. Dependency-ready missions use the
+closed local `codex`, `claude`, `gemini`, or test-only `fixture` adapters.
+Arbitrary executable paths are refused.
+
+New blueprints use adaptive routing. The pure router computes an L0–L4 risk
+floor from the work type, importance, reproducibility, scope, context,
+validation strength, rollback, and risk signals. It removes candidates lacking
+the required context, capability, sandbox, structured output, provider
+permission, independence, or budget, then chooses the smallest qualified
+model. `economy`, `balanced`, `quality`, and `custom` tune preferences and
+attempts but cannot lower a safety floor. The effective cascade is safety
+floor, goal constraint, mission override, skill policy, phase profile, user
+preset, project policy, then framework default. `explain-route` returns that
+same decision and every rejected alternative.
+
+Legacy configuration containing only `workerRuntime` preserves global runtime
+selection. In adaptive mode `CTXROUTE_WORKER_RUNTIME=fixture` is test-only and
+narrows the provider allowlist; it is not a production fallback.
+
+### Documentation evidence gate
+
+Every adaptive goal records a `DocumentationEvidenceReport`, including the
+mechanical `NOT_APPLICABLE` outcome for strictly internal work. External SDKs,
+CLIs, APIs, protocols, platform behavior, security, authentication, models,
+pricing, or current technical recommendations require fresh evidence before
+mutation. A read-only `documentation-researcher` receives only the relevant
+requirements and records claims, official URL, authority, applicable version,
+access time, and digest—not full page contents.
+
+Model, price, quota, CLI, API, and security evidence is refreshed per goal;
+explicitly volatile or `latest` evidence is refreshed per dispatch. Installed
+version documentation wins over incompatible latest documentation. Official
+vendor/project documentation, primary standards, and official repositories
+are preferred in that order. Secondary-only evidence cannot authorize a high
+or critical decision. Web pages are untrusted data and never supply execution
+instructions. Missing required evidence blocks before worktree mutation with
+`FRESH_DOCUMENTATION_UNAVAILABLE`; `local_only` also blocks whenever current
+external evidence is necessary.
+
+### Providers, budgets, and escalation
+
+Provider dialects are adapter data behind one contract: probe capabilities,
+build a closed command, parse structured output, extract usage, classify
+failure, and redact diagnostics. Codex runs ephemerally with explicit model,
+effort, sandbox, approval policy, and schema. Claude uses explicit model,
+effort, bounded tools, `dontAsk`, schema, and optional provider-enforced USD
+budget/fallback. Gemini runs headless with explicit model, JSON output,
+sandbox, bounded extensions, and `auto_edit` only for isolated writing
+worktrees; `--yolo` is forbidden.
+
+Normalized units account conservatively for calls when monetary cost is not
+reported. Unknown cost stays `unknown`; it is never inferred. Provider faults
+first try an allowed peer at the same level, then escalation is monotone from
+L1 through L4. Invalid output, failed validation, expanded scope, insufficient
+confidence, stale evidence, or repeated failure can escalate. A dirty worktree
+after a crash is preserved and blocks concurrent retry. Critical goals require
+an independent provider for the final audit and block when none is available.
+
+To add a provider, implement the versioned adapter contract, add its fixed
+executable name to the allowlist, declare catalog capabilities from official
+evidence, and add exact command, parser, usage, failure, sandbox, and optional
+authenticated smoke tests. The pure routing core must not change.
 
 If a selected local skill is missing, the original mission remains unchanged
 in `WAITING_FOR_SKILL`. A separate `skill-creator` mission runs in its own

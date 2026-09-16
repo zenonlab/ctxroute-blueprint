@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { runGoal, validateGoalPlan } from '../scripts/orchestrator-goal.mjs';
-import { buildWorkerCommand, dispatchWorker, workerRuntimeHealth } from '../scripts/orchestrator-worker.mjs';
+import { buildWorkerCommand, classifyProviderFailure, dispatchWorker, extractUsage, providerAdapter, workerRuntimeHealth } from '../scripts/orchestrator-worker.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -34,6 +34,35 @@ test('independent fixture missions execute through separate worker processes and
   assert.equal(result.goal.status, 'COMPLETED', result.error);
   assert.equal(result.goal.missions.filter(item => item.status === 'COMPLETED').length, 2);
   assert.equal(existsSync(join(root, 'src/second.mjs')), true);
+});
+
+test('external adaptive goals refresh official evidence before each volatile dispatch', async () => {
+  const root = fixture();
+  const goal = request();
+  goal.objective = 'Update the module for the current external SDK API.';
+  const result = await runGoal(goal, root, { ...process.env, CTXROUTE_WORKER_RUNTIME: 'fixture' });
+  assert.equal(result.goal.status, 'COMPLETED', result.error);
+  assert.equal(result.goal.documentation_evidence.status, 'SATISFIED');
+  assert.equal(result.goal.missions[0].documentation_freshness.status, 'CURRENT');
+  assert.equal(result.goal.missions[0].documentation_freshness.dispatch_id, 'goal-one-mission-1-work');
+});
+
+test('local-only external goals and critical goals without an independent auditor fail closed', async () => {
+  const localRoot = fixture();
+  const external = request();
+  external.objective = 'Use the current external API.';
+  external.consumption = { preset: 'balanced', max_duration_ms: 900000, max_normalized_units: 100, max_cost_usd: null, allowed_providers: ['fixture'], denied_models: [], prefer_local: false, local_only: true };
+  const blockedDocumentation = await runGoal(external, localRoot, { ...process.env, CTXROUTE_WORKER_RUNTIME: 'fixture' });
+  assert.equal(blockedDocumentation.goal.status, 'BLOCKED');
+  assert.equal(blockedDocumentation.goal.blocked_cause, 'FRESH_DOCUMENTATION_UNAVAILABLE');
+  assert.equal(blockedDocumentation.goal.missions.length, 0);
+
+  const criticalRoot = fixture();
+  const critical = request();
+  critical.importance = 'critical';
+  const blockedAudit = await runGoal(critical, criticalRoot, { ...process.env, CTXROUTE_WORKER_RUNTIME: 'fixture' });
+  assert.equal(blockedAudit.goal.status, 'BLOCKED');
+  assert.equal(blockedAudit.goal.blocked_cause, 'INDEPENDENT_AUDITOR_UNAVAILABLE');
 });
 
 test('a fixture crash after mutation blocks the mission and preserves its dirty worktree', async () => {
@@ -89,6 +118,32 @@ test('Codex and Claude commands are closed, ephemeral, sandboxed, and non-bypass
   assert.ok(claude.args.includes('dontAsk'));
   assert.ok(claude.args.includes('--no-session-persistence'));
   assert.ok(!claude.args.some(item => /bypassPermissions|dangerously/u.test(item)));
+});
+
+test('adaptive adapter commands carry model, effort and budgets without permission bypasses', () => {
+  const schema = join(repositoryRoot, '.project/schemas/orchestrator/worker-report.schema.json');
+  const route = { selected: { adapter: 'codex', model_id: 'model-one', provider_family: 'openai' }, effort: 'high' };
+  const codex = buildWorkerCommand('codex', 'research', repositoryRoot, schema, 'bounded prompt', repositoryRoot, route);
+  assert.ok(codex.args.includes('model-one'));
+  assert.ok(codex.args.includes('model_reasoning_effort="high"'));
+  assert.ok(codex.args.includes('--search'));
+  const claude = buildWorkerCommand('claude', 'work', repositoryRoot, schema, 'bounded prompt', repositoryRoot, { ...route, selected: { ...route.selected, adapter: 'claude' } }, { max_cost_usd: 2, fallback_model: 'fallback-one' });
+  assert.ok(claude.args.includes('--max-budget-usd'));
+  assert.ok(claude.args.includes('--fallback-model'));
+  const gemini = buildWorkerCommand('gemini', 'work', repositoryRoot, schema, 'bounded prompt', repositoryRoot, { ...route, selected: { ...route.selected, adapter: 'gemini' } });
+  assert.ok(gemini.args.includes('--output-format'));
+  assert.ok(gemini.args.includes('--sandbox'));
+  assert.ok(gemini.args.includes('auto_edit'));
+  assert.ok(!gemini.args.some(item => /yolo/iu.test(item)));
+  assert.throws(() => providerAdapter('/tmp/arbitrary'), /unsupported/u);
+});
+
+test('provider failures and Gemini metrics remain categorical and bounded', () => {
+  assert.equal(classifyProviderFailure('401 authentication required'), 'PROVIDER_AUTH');
+  assert.equal(classifyProviderFailure('quota exceeded'), 'PROVIDER_QUOTA');
+  assert.equal(classifyProviderFailure('unknown model'), 'PROVIDER_MODEL_UNKNOWN');
+  const usage = extractUsage('gemini', JSON.stringify({ stats: { models: { one: { tokens: { prompt: 3, candidates: 2, total: 5 } } }, tools: { totalCalls: 1 } } }));
+  assert.deepEqual(usage, { input_tokens: 3, output_tokens: 2, total_tokens: 5, tool_calls: 1, cost_usd: null });
 });
 
 test('worker health exposes availability without executable paths', async () => {

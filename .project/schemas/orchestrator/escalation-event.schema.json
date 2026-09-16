@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/escalation-event.schema.json",
+  "type": "object",
+  "required": ["event_id", "mission_id", "from_level", "to_level", "cause", "attempt", "timestamp"],
+  "properties": {
+    "event_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "mission_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "from_level": { "enum": ["L1", "L2", "L3"] },
+    "to_level": { "enum": ["L2", "L3", "L4"] },
+    "cause": { "$ref": "common.schema.json#/$defs/nullableCause" },
+    "attempt": { "type": "integer", "minimum": 1, "maximum": 32 },
+    "timestamp": { "$ref": "common.schema.json#/$defs/timestamp" }
+  },
+  "unevaluatedProperties": false
+}

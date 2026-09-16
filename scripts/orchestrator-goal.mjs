@@ -9,6 +9,9 @@ import { mutateCoordination, prepareMission, reconcileWorktrees, resumeWaitingMi
 import { runMissionValidations } from './orchestrator-validation.mjs';
 import { inspectMissionChanges } from './worktree-manager.mjs';
 import { dispatchWorker } from './orchestrator-worker.mjs';
+import { documentationFreshness, documentationGate, inventoryDocumentationRequirements } from './orchestrator-documentation.mjs';
+import { modelCatalog } from './orchestrator-models.mjs';
+import { assessTask, nextLevel, resolveConsumptionPolicy, routeTask } from './orchestrator-routing-core.mjs';
 
 const execFile = promisify(execFileCallback);
 
@@ -20,11 +23,36 @@ export async function runGoal(request, root = process.cwd(), environment = proce
   const started = Date.now();
   const deadline = started + config.goalTimeoutMs;
   const dispatch = options => dispatchWorker(options, root, environment, dependencies);
-  const planned = await dispatch({ dispatch_id: `${request.goal_id}-plan`, phase: 'plan', mission: request, skill_path: '.agents/skills/goal-planner/SKILL.md', output_contract: 'goal-plan', worktree: '.' });
-  validateGoalPlan(planned.report, request);
+  if (config.modelRouting?.mode !== 'adaptive') return runLegacyGoal(request, root, environment, dependencies, config, deadline, dispatch);
+  const allowedProviders = environment.CTXROUTE_WORKER_RUNTIME === 'fixture' ? ['fixture'] : undefined;
+  const consumption = resolveConsumptionPolicy(request.consumption, { preset: config.modelRouting.defaultPreset, allowed_providers: allowedProviders });
+  const assessment = assessTask(request, assessmentFacts(request));
+  const catalog = await modelCatalog(root, environment);
+  const requirements = await inventoryDocumentationRequirements(request, root);
+  const routes = [];
+  let researchRoute = null;
+  if (requirements.length) {
+    researchRoute = routeTask({ decision_id: `${request.goal_id}-research-route`, phase: 'research', assessment, catalog, consumption, profile: config.modelRouting.profiles.research });
+    routes.push(researchRoute);
+  }
+  const evidence = await documentationGate({ request, root, consumption, dispatch: researchRoute?.selected ? options => dispatch({ ...options, routing: researchRoute }) : null });
+  const freshness = documentationFreshness(evidence);
   const baseRevision = await gitHead(root, dependencies);
-  let state = (await transactOrchestrator({ operation_id: `${request.goal_id}-create`, expected_revision: request.expected_revision, action: 'goal.create', payload: { goal_id: request.goal_id, title: request.title, objective: request.objective, acceptance_criteria: request.acceptance_criteria, base_revision: baseRevision } }, root, dependencies)).state;
-  for (const mission of planned.report.missions) {
+  if (evidence.status === 'BLOCKED') return createBlockedAdaptiveGoal(request, assessment, consumption, evidence, freshness, routes, baseRevision, root, dependencies);
+  const planningRoute = routeTask({ decision_id: `${request.goal_id}-planning-route`, phase: 'planning', assessment, catalog, consumption, profile: config.modelRouting.profiles.planning });
+  routes.push(planningRoute);
+  if (!planningRoute.selected) return createBlockedAdaptiveGoal(request, assessment, consumption, evidence, freshness, routes, baseRevision, root, dependencies, 'WAITING_FOR_CAPABILITY');
+  const planned = await dispatch({ dispatch_id: `${request.goal_id}-plan`, phase: 'plan', mission: { ...request, assessment, documentation_evidence: evidence, consumption }, skill_path: '.agents/skills/goal-planner/SKILL.md', output_contract: 'goal-plan', worktree: '.', routing: planningRoute });
+  const plan = { ...planned.report, assessment, documentation_requirements: evidence.requirements, importance: request.importance ?? 'normal', change_kind: request.change_kind ?? 'feature' };
+  const missions = plan.missions.map(mission => {
+    const route = routeTask({ decision_id: `${mission.mission_id}-work-route`, phase: mission.phase_profile ?? 'work', assessment, catalog, consumption, profile: config.modelRouting.profiles[mission.phase_profile ?? 'work'], planner_minimum: mission.minimum_level ?? null });
+    routes.push(route);
+    if (!route.selected) throw categorized('CAPABILITY_UNAVAILABLE', `no qualified model for ${mission.mission_id}`);
+    return { ...mission, assessment, phase_profile: mission.phase_profile ?? 'work', documentation_evidence: evidence, documentation_freshness: freshness, consumption_policy: consumption, routing_decision: route, escalation_criteria: ['invalid-output', 'validation-failed', 'scope-expanded', 'provider-unavailable', 'confidence-low'] };
+  });
+  validateGoalPlan({ ...plan, missions }, request);
+  let state = (await transactOrchestrator({ operation_id: `${request.goal_id}-create`, expected_revision: request.expected_revision, action: 'goal.create', payload: { goal_id: request.goal_id, title: request.title, objective: request.objective, acceptance_criteria: request.acceptance_criteria, base_revision: baseRevision, importance: request.importance ?? 'normal', change_kind: request.change_kind ?? 'feature', assessment, consumption_policy: consumption, documentation_evidence: evidence, documentation_freshness: freshness, routing_decisions: routes } }, root, dependencies)).state;
+  for (const mission of missions) {
     ensureDeadline(deadline);
     state = (await prepareMission({ operation_id: `${mission.mission_id}-prepare`, expected_revision: state.revision, action: 'mission.prepare', payload: { goal_id: request.goal_id, mission } }, root, environment, dependencies)).state;
   }
@@ -34,13 +62,19 @@ export async function runGoal(request, root = process.cwd(), environment = proce
     state = await readOrchestratorState(root);
     const goal = state.goals.find(item => item.goal_id === request.goal_id);
     const evidenceRefs = [...new Set(goal.missions.flatMap(mission => mission.report?.files_touched ?? []))].sort();
-    const audited = await dispatch({ dispatch_id: `${request.goal_id}-acceptance`, phase: 'goal-audit', mission: { goal_id: request.goal_id, objective: request.objective, acceptance_criteria: request.acceptance_criteria, base_revision: baseRevision, mission_ids: goal.missions.map(item => item.mission_id), evidence_refs: evidenceRefs }, skill_path: '.agents/skills/goal-auditor/SKILL.md', output_contract: 'goal-acceptance-report', worktree: '.' });
+    const auditRoute = routeTask({ decision_id: `${request.goal_id}-audit-route`, phase: 'goalAudit', assessment, catalog, consumption, profile: config.modelRouting.profiles.goalAudit, prior_provider_family: goal.missions[0]?.routing_decision?.selected?.provider_family ?? null, remaining_units: remainingUnits(goal) });
+    if (!auditRoute.selected) throw categorized('INDEPENDENT_AUDITOR_UNAVAILABLE', 'no qualified independent goal auditor');
+    const audited = await dispatch({ dispatch_id: `${request.goal_id}-acceptance`, phase: 'goal-audit', mission: { goal_id: request.goal_id, objective: request.objective, acceptance_criteria: request.acceptance_criteria, base_revision: baseRevision, mission_ids: goal.missions.map(item => item.mission_id), evidence_refs: evidenceRefs, documentation_evidence: evidence }, skill_path: '.agents/skills/goal-auditor/SKILL.md', output_contract: 'goal-acceptance-report', worktree: '.', routing: auditRoute });
     if (audited.report.decision === 'repair') {
       if (!audited.report.repair_missions.length) throw categorized('AUDIT_REPAIR_EMPTY', 'goal audit requested repair without missions');
       for (const mission of audited.report.repair_missions) {
         ensureDeadline(deadline);
         state = await readOrchestratorState(root);
-        await prepareMission({ operation_id: `${mission.mission_id}-repair-prepare`, expected_revision: state.revision, action: 'mission.prepare', payload: { goal_id: request.goal_id, mission } }, root, environment, dependencies);
+        const currentGoal = state.goals.find(item => item.goal_id === request.goal_id);
+        const repairRoute = routeTask({ decision_id: `${mission.mission_id}-repair-route`, phase: 'repair', assessment, catalog, consumption, profile: config.modelRouting.profiles.repair, remaining_units: remainingUnits(currentGoal) });
+        if (!repairRoute.selected) throw categorized('CAPABILITY_UNAVAILABLE', `no qualified repair model for ${mission.mission_id}`);
+        const routedMission = { ...mission, assessment, phase_profile: 'repair', documentation_evidence: evidence, documentation_freshness: freshness, consumption_policy: consumption, routing_decision: repairRoute, escalation_criteria: ['invalid-output', 'validation-failed', 'scope-expanded', 'provider-unavailable', 'confidence-low'] };
+        await prepareMission({ operation_id: `${mission.mission_id}-repair-prepare`, expected_revision: state.revision, action: 'mission.prepare', payload: { goal_id: request.goal_id, mission: routedMission } }, root, environment, dependencies);
       }
       await executeMissionGraph(request.goal_id, deadline, root, environment, dependencies, dispatch);
       return runFinalAudit(request, baseRevision, deadline, root, environment, dependencies, dispatch);
@@ -49,6 +83,28 @@ export async function runGoal(request, root = process.cwd(), environment = proce
   } catch (error) {
     return blockGoal(request.goal_id, error.causeCode ?? 'GOAL_RUN_FAILED', root, dependencies, error);
   }
+}
+
+async function runLegacyGoal(request, root, environment, dependencies, config, deadline, dispatch) {
+  const planned = await dispatch({ dispatch_id: `${request.goal_id}-plan`, phase: 'plan', mission: request, skill_path: '.agents/skills/goal-planner/SKILL.md', output_contract: 'goal-plan', worktree: '.' });
+  validateGoalPlan(planned.report, request);
+  const baseRevision = await gitHead(root, dependencies);
+  let state = (await transactOrchestrator({ operation_id: `${request.goal_id}-create`, expected_revision: request.expected_revision, action: 'goal.create', payload: { goal_id: request.goal_id, title: request.title, objective: request.objective, acceptance_criteria: request.acceptance_criteria, base_revision: baseRevision } }, root, dependencies)).state;
+  for (const mission of planned.report.missions) state = (await prepareMission({ operation_id: `${mission.mission_id}-prepare`, expected_revision: state.revision, action: 'mission.prepare', payload: { goal_id: request.goal_id, mission } }, root, environment, dependencies)).state;
+  try {
+    await executeMissionGraph(request.goal_id, deadline, root, environment, dependencies, dispatch);
+    state = await readOrchestratorState(root);
+    const goal = state.goals.find(item => item.goal_id === request.goal_id);
+    const audited = await dispatch({ dispatch_id: `${request.goal_id}-acceptance`, phase: 'goal-audit', mission: { goal_id: request.goal_id, objective: request.objective, acceptance_criteria: request.acceptance_criteria, base_revision: baseRevision, mission_ids: goal.missions.map(item => item.mission_id), evidence_refs: [...new Set(goal.missions.flatMap(item => item.report?.files_touched ?? []))].sort() }, skill_path: '.agents/skills/goal-auditor/SKILL.md', output_contract: 'goal-acceptance-report', worktree: '.' });
+    return finalizeGoal(request.goal_id, audited.report, root, environment, dependencies);
+  } catch (error) { return blockGoal(request.goal_id, error.causeCode ?? 'GOAL_RUN_FAILED', root, dependencies, error); }
+}
+
+async function createBlockedAdaptiveGoal(request, assessment, consumption, evidence, freshness, routes, baseRevision, root, dependencies, stateStatus = 'BLOCKED') {
+  let state = (await transactOrchestrator({ operation_id: `${request.goal_id}-create`, expected_revision: request.expected_revision, action: 'goal.create', payload: { goal_id: request.goal_id, title: request.title, objective: request.objective, acceptance_criteria: request.acceptance_criteria, base_revision: baseRevision, importance: request.importance ?? 'normal', change_kind: request.change_kind ?? 'feature', assessment, consumption_policy: consumption, documentation_evidence: evidence, documentation_freshness: freshness, routing_decisions: routes } }, root, dependencies)).state;
+  const cause = evidence.status === 'BLOCKED' ? evidence.blocked_cause : 'CAPABILITY_UNAVAILABLE';
+  const transitioned = await transactOrchestrator({ operation_id: `${request.goal_id}-blocked`, expected_revision: state.revision, action: 'goal.transition', payload: { goal_id: request.goal_id, status: stateStatus === 'WAITING_FOR_CAPABILITY' ? 'WAITING_FOR_CAPABILITY' : 'BLOCKED', blocked_cause: cause, resume_action: 'refresh documentation or provider capabilities, then resume with a new bounded goal' } }, root, dependencies);
+  return { goal: transitioned.state.goals.find(goal => goal.goal_id === request.goal_id), state: transitioned.state, error: cause };
 }
 
 async function executeMissionGraph(goalId, deadline, root, environment, dependencies, dispatch) {
@@ -67,12 +123,24 @@ async function executeMissionGraph(goalId, deadline, root, environment, dependen
     const ready = unfinished.filter(item => item.status === 'ASSIGNED' && (item.dependencies ?? []).every(id => completed.has(id))).slice(0, config.parallelWorktrees);
     if (!ready.length) throw categorized('MISSION_GRAPH_STALLED', 'mission dependency graph has no runnable mission');
     const running = [];
-    for (const mission of ready) {
+    for (let mission of ready) {
+      if (mission.documentation_evidence?.requirements.some(requirement => requirement.freshness === 'per-dispatch')) {
+        const researchRoute = goal.routing_decisions?.find(decision => decision.phase === 'research');
+        if (!researchRoute?.selected) throw categorized('FRESH_DOCUMENTATION_UNAVAILABLE', 'per-dispatch research has no qualified route');
+        const refreshRequest = { goal_id: goal.goal_id, title: goal.title, objective: goal.objective, acceptance_criteria: goal.acceptance_criteria, suggested_paths: mission.file_scope, expected_revision: state.revision, importance: goal.importance, change_kind: goal.change_kind, consumption: goal.consumption_policy };
+        const refreshed = await documentationGate({ request: refreshRequest, root, consumption: goal.consumption_policy, dispatch: options => dispatch({ ...options, routing: researchRoute }) });
+        if (refreshed.status !== 'SATISFIED') throw categorized('FRESH_DOCUMENTATION_UNAVAILABLE', 'per-dispatch evidence refresh failed');
+        const freshness = documentationFreshness(refreshed, { dispatch_id: `${mission.mission_id}-work` });
+        const refreshedState = await readOrchestratorState(root);
+        const updated = await transactOrchestrator({ operation_id: `${mission.mission_id}-documentation-refresh-${refreshedState.revision}`, expected_revision: refreshedState.revision, action: 'mission.transition', payload: { goal_id: goalId, mission_id: mission.mission_id, status: 'ASSIGNED', documentation_evidence: refreshed, documentation_freshness: freshness } }, root, dependencies);
+        mission = findMission(updated.state, mission.mission_id).mission;
+      }
       state = await readOrchestratorState(root);
       const transitioned = await transactOrchestrator({ operation_id: `${mission.mission_id}-run`, expected_revision: state.revision, action: 'mission.transition', payload: { goal_id: goalId, mission_id: mission.mission_id, status: 'RUNNING' } }, root, dependencies);
-      running.push(transitioned.state.goals.flatMap(item => item.missions).find(item => item.mission_id === mission.mission_id));
+      const transitionedGoal = transitioned.state.goals.find(item => item.goal_id === goalId);
+      running.push({ mission: transitionedGoal.missions.find(item => item.mission_id === mission.mission_id), goal: transitionedGoal });
     }
-    const outputs = await Promise.all(running.map(mission => runWorkerWithSafeRetry(mission, root, environment, dependencies, dispatch)));
+    const outputs = await Promise.all(running.map(item => runWorkerWithSafeRetry(item.mission, item.goal, root, environment, dependencies, dispatch)));
     for (const { mission, report } of outputs) {
       state = await readOrchestratorState(root);
       await submitWorkerReport({ operation_id: `${mission.mission_id}-report`, expected_revision: state.revision, action: 'report.submit', payload: { goal_id: goalId, report } }, root, environment, dependencies);
@@ -80,21 +148,42 @@ async function executeMissionGraph(goalId, deadline, root, environment, dependen
   }
 }
 
-async function runWorkerWithSafeRetry(mission, root, environment, dependencies, dispatch) {
+async function runWorkerWithSafeRetry(mission, goal, root, environment, dependencies, dispatch) {
   const worktree = mission.worktree_allocation.path;
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
+  const config = await loadOrchestratorConfig(root);
+  const routingPhase = mission.phase_profile ?? 'work';
+  const maximumAttempts = mission.routing_decision ? config.modelRouting.profiles[routingPhase].attempts : 2;
+  const catalog = mission.routing_decision ? await modelCatalog(root, environment) : [];
+  let current = mission;
+  let deniedModels = [...(mission.consumption_policy?.denied_models ?? [])];
+  let unitsRemaining = mission.consumption_policy ? remainingUnits(goal) : null;
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
     try {
-      const result = await dispatch({ dispatch_id: `${mission.mission_id}-work-${attempt}`, phase: 'work', mission: missionView(mission), skill_path: mission.skill_path ?? `.agents/skills/${mission.skill_id}/SKILL.md`, output_contract: 'worker-report', worktree });
-      return { mission, report: result.report };
+      if (unitsRemaining !== null && unitsRemaining <= 0) throw categorized('BUDGET_EXHAUSTED', 'normalized unit budget is exhausted');
+      const result = await dispatch({ dispatch_id: `${current.mission_id}-work-${attempt}`, phase: 'work', mission: missionView(current, goal), skill_path: current.skill_path ?? `.agents/skills/${current.skill_id}/SKILL.md`, output_contract: 'worker-report', worktree, routing: current.routing_decision ?? null });
+      return { mission: current, report: result.report };
     } catch (error) {
-      const inspection = await inspectMissionChanges(worktree, mission.file_scope, root, mission.worktree_allocation.base_revision, dependencies);
+      if (unitsRemaining !== null) unitsRemaining -= 1;
+      const inspection = await inspectMissionChanges(worktree, current.file_scope, root, current.worktree_allocation.base_revision, dependencies);
       if (inspection.files.length) {
         const state = await readOrchestratorState(root);
-        const found = findMission(state, mission.mission_id);
-        if (found?.mission.status === 'RUNNING') await transactOrchestrator({ operation_id: `${mission.mission_id}-dirty-block`, expected_revision: state.revision, action: 'mission.transition', payload: { goal_id: found.goal.goal_id, mission_id: mission.mission_id, status: 'BLOCKED' } }, root, dependencies);
+        const found = findMission(state, current.mission_id);
+        if (found?.mission.status === 'RUNNING') await transactOrchestrator({ operation_id: `${current.mission_id}-dirty-block`, expected_revision: state.revision, action: 'mission.transition', payload: { goal_id: found.goal.goal_id, mission_id: current.mission_id, status: 'BLOCKED' } }, root, dependencies);
         throw categorized('WORKER_DIED_DIRTY', error.message);
       }
-      if (attempt === 2) throw categorized(error.causeCode ?? 'WORKER_FAILED', error.message);
+      if (!current.routing_decision || attempt === maximumAttempts || error.causeCode === 'BUDGET_EXHAUSTED') throw categorized(error.causeCode ?? 'WORKER_FAILED', error.message);
+      const providerFailure = ['PROVIDER_AUTH', 'PROVIDER_QUOTA', 'PROVIDER_TIMEOUT', 'PROVIDER_MODEL_UNKNOWN', 'WORKER_CRASH'].includes(error.causeCode);
+      deniedModels = [...new Set([...deniedModels, current.routing_decision.selected.model_id])];
+      const fromLevel = current.routing_decision.level;
+      const minimum = providerFailure ? fromLevel : nextLevel(fromLevel);
+      const reroute = routeTask({ decision_id: `${current.mission_id}-reroute-${attempt}`, phase: routingPhase, assessment: current.assessment, catalog, consumption: { ...current.consumption_policy, denied_models: deniedModels }, profile: config.modelRouting.profiles[routingPhase], planner_minimum: minimum, remaining_units: unitsRemaining });
+      if (!reroute.selected) throw categorized(unitsRemaining <= 0 ? 'BUDGET_EXHAUSTED' : 'CAPABILITY_UNAVAILABLE', 'no fallback or escalation candidate is available');
+      const escalation = reroute.level === fromLevel ? null : { event_id: `${current.mission_id}-escalation-${attempt}`, mission_id: current.mission_id, from_level: fromLevel, to_level: reroute.level, cause: normalizeCause(error.causeCode ?? 'WORKER_FAILED'), attempt, timestamp: new Date().toISOString() };
+      const state = await readOrchestratorState(root);
+      const payload = { goal_id: goal.goal_id, mission_id: current.mission_id, status: 'RUNNING', routing_decision: reroute };
+      if (escalation) payload.escalation_event = escalation;
+      const updated = await transactOrchestrator({ operation_id: `${current.mission_id}-reroute-${attempt}`, expected_revision: state.revision, action: 'mission.transition', payload }, root, dependencies);
+      current = findMission(updated.state, current.mission_id).mission;
     }
   }
 }
@@ -104,9 +193,15 @@ async function runSkillSaga(goalId, original, deadline, root, environment, depen
   const skillId = original.requested_skill_id ?? original.skill_id;
   const creatorId = `${original.mission_id}-skill`;
   let state = await readOrchestratorState(root);
+  const goal = state.goals.find(item => item.goal_id === goalId);
+  const config = await loadOrchestratorConfig(root);
+  const catalog = original.assessment ? await modelCatalog(root, environment) : [];
+  const creatorRoute = original.assessment ? routeTask({ decision_id: `${creatorId}-creation-route`, phase: 'skillCreation', assessment: original.assessment, catalog, consumption: original.consumption_policy, profile: config.modelRouting.profiles.skillCreation, remaining_units: remainingUnits(goal) }) : null;
+  if (original.assessment && !creatorRoute.selected) throw categorized('CAPABILITY_UNAVAILABLE', 'skill creation requires an L2-capable model');
   let creator = findMission(state, creatorId)?.mission;
   if (!creator) {
     const request = { mission_id: creatorId, skill_id: 'skill-creator', requested_skill_id: null, skill_version: '1.0.0', skill_path: '.agents/skills/skill-creator/SKILL.md', objective: `Create the missing ${skillId} skill`, dependencies: [], acceptance_criteria: original.acceptance_criteria ?? [], file_scope: [`.agents/skills/${skillId}/`], acceptance: [`Create a valid ${skillId} skill`, 'Pass a separate blueprint audit'], validations: [{ id: 'skill-diff', executable: 'git', args: ['diff', '--check'], cwd: '.', timeout_ms: 30000 }], execution: 'coordinated' };
+    if (creatorRoute) Object.assign(request, { assessment: original.assessment, phase_profile: 'skillCreation', documentation_evidence: original.documentation_evidence, documentation_freshness: original.documentation_freshness, consumption_policy: original.consumption_policy, routing_decision: creatorRoute, escalation_criteria: original.escalation_criteria });
     const prepared = await prepareMission({ operation_id: `${creatorId}-prepare`, expected_revision: state.revision, action: 'mission.prepare', payload: { goal_id: goalId, mission: request } }, root, environment, dependencies);
     creator = findMission(prepared.state, creatorId).mission;
   }
@@ -116,12 +211,15 @@ async function runSkillSaga(goalId, original, deadline, root, environment, depen
     creator = findMission(state, creatorId).mission;
   }
   let worker; let audit; let accepted = false;
+  const auditRoute = original.assessment ? routeTask({ decision_id: `${creatorId}-audit-route`, phase: 'skillAudit', assessment: original.assessment, catalog, consumption: original.consumption_policy, profile: config.modelRouting.profiles.skillAudit, prior_provider_family: creatorRoute.selected.provider_family, remaining_units: remainingUnits(goal) }) : null;
+  if (auditRoute?.independence_required && !auditRoute.selected) throw categorized('INDEPENDENT_AUDITOR_UNAVAILABLE', 'skill audit requires an independent provider');
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     ensureDeadline(deadline);
-    worker = await runWorkerWithSafeRetry(creator, root, environment, dependencies, dispatch);
+    const creatorGoal = state.goals.find(item => item.goal_id === goalId);
+    worker = await runWorkerWithSafeRetry(creator, creatorGoal, root, environment, dependencies, dispatch);
     const receipt = await runMissionValidations(creator, resolve(root, creator.worktree_allocation.path), root, dependencies);
     if (receipt.status !== 'PASSED') throw categorized('SKILL_INVALID', 'created skill failed orchestrator validation');
-    audit = await dispatch({ dispatch_id: `${creatorId}-audit-${attempt}`, phase: 'audit', mission: missionView(creator), skill_path: '.agents/skills/blueprint-audit/SKILL.md', output_contract: 'audit-report', worktree: creator.worktree_allocation.path });
+    audit = await dispatch({ dispatch_id: `${creatorId}-audit-${attempt}`, phase: 'audit', mission: missionView(creator, creatorGoal), skill_path: '.agents/skills/blueprint-audit/SKILL.md', output_contract: 'audit-report', worktree: creator.worktree_allocation.path, routing: auditRoute ?? creator.routing_decision ?? null });
     state = await readOrchestratorState(root);
     state = (await transactOrchestrator({ operation_id: `${creatorId}-audit-apply-${attempt}`, expected_revision: state.revision, action: 'audit.apply', payload: { report: audit.report } }, root, dependencies)).state;
     if (audit.report.decision === 'accept') { accepted = true; break; }
@@ -141,7 +239,16 @@ async function runFinalAudit(request, baseRevision, deadline, root, environment,
   ensureDeadline(deadline);
   const state = await readOrchestratorState(root);
   const goal = state.goals.find(item => item.goal_id === request.goal_id);
-  const audited = await dispatch({ dispatch_id: `${request.goal_id}-acceptance-repair`, phase: 'goal-audit', mission: { goal_id: request.goal_id, objective: request.objective, acceptance_criteria: request.acceptance_criteria, base_revision: baseRevision, mission_ids: goal.missions.map(item => item.mission_id), evidence_refs: [...new Set(goal.missions.flatMap(item => item.report?.files_touched ?? []))] }, skill_path: '.agents/skills/goal-auditor/SKILL.md', output_contract: 'goal-acceptance-report', worktree: '.' });
+  const config = await loadOrchestratorConfig(root);
+  let routing = null;
+  if (goal.assessment) {
+    const catalog = await modelCatalog(root, environment);
+    routing = routeTask({ decision_id: `${request.goal_id}-repair-audit-route`, phase: 'goalAudit', assessment: goal.assessment, catalog, consumption: goal.consumption_policy, profile: config.modelRouting.profiles.goalAudit, prior_provider_family: goal.missions[0]?.routing_decision?.selected?.provider_family ?? null, remaining_units: remainingUnits(goal) });
+    if (!routing.selected) throw categorized('INDEPENDENT_AUDITOR_UNAVAILABLE', 'no qualified independent final repair auditor');
+  }
+  const mission = { goal_id: request.goal_id, objective: request.objective, acceptance_criteria: request.acceptance_criteria, base_revision: baseRevision, mission_ids: goal.missions.map(item => item.mission_id), evidence_refs: [...new Set(goal.missions.flatMap(item => item.report?.files_touched ?? []))] };
+  if (goal.documentation_evidence) mission.documentation_evidence = goal.documentation_evidence;
+  const audited = await dispatch({ dispatch_id: `${request.goal_id}-acceptance-repair`, phase: 'goal-audit', mission, skill_path: '.agents/skills/goal-auditor/SKILL.md', output_contract: 'goal-acceptance-report', worktree: '.', routing });
   return finalizeGoal(request.goal_id, audited.report, root, environment, dependencies);
 }
 
@@ -177,10 +284,12 @@ export function validateGoalPlan(plan, request) {
   return plan;
 }
 
-function missionView(mission) { return { goal_id: 'bounded-goal', goal_title: 'Bounded orchestrated goal', mission_id: mission.mission_id, skill_id: mission.skill_id, skill_version: mission.skill_version, skill_path: mission.skill_path ?? `.agents/skills/${mission.skill_id}/SKILL.md`, objective: mission.objective ?? mission.acceptance.join('; '), dependencies: mission.dependencies ?? [], acceptance_criteria: mission.acceptance_criteria ?? [], file_scope: mission.file_scope, acceptance: mission.acceptance, validations: mission.validations, response_format: 'worker-report', worktree: mission.worktree_allocation.path }; }
+function missionView(mission, goal) { const view = { goal_id: goal.goal_id, goal_title: goal.title, mission_id: mission.mission_id, skill_id: mission.skill_id, skill_version: mission.skill_version, skill_path: mission.skill_path ?? `.agents/skills/${mission.skill_id}/SKILL.md`, objective: mission.objective ?? mission.acceptance.join('; '), dependencies: mission.dependencies ?? [], acceptance_criteria: mission.acceptance_criteria ?? [], file_scope: mission.file_scope, acceptance: mission.acceptance, validations: mission.validations, response_format: 'worker-report', worktree: mission.worktree_allocation.path }; for (const field of ['assessment', 'phase_profile', 'documentation_evidence', 'documentation_freshness', 'consumption_policy', 'routing_decision', 'escalation_criteria']) if (mission[field] !== undefined) view[field] = mission[field]; assertOrchestratorContract('mission-view', view); return view; }
 function assertAcyclic(missions) { const byId = new Map(missions.map(item => [item.mission_id, item])); const visiting = new Set(); const visited = new Set(); const visit = id => { if (visiting.has(id)) throw categorized('PLAN_DEPENDENCY_CYCLE', 'plan dependency graph contains a cycle'); if (visited.has(id)) return; visiting.add(id); for (const dependency of byId.get(id).dependencies) visit(dependency); visiting.delete(id); visited.add(id); }; for (const id of byId.keys()) visit(id); }
 function scopesOverlap(left, right) { const a = left.replace(/\/$/u, '').toLocaleLowerCase('en-US'); const b = right.replace(/\/$/u, '').toLocaleLowerCase('en-US'); return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`); }
 function ensureDeadline(deadline) { if (Date.now() >= deadline) throw categorized('GOAL_TIMEOUT', 'goal exceeded its global timeout'); }
 async function gitHead(root, dependencies) { const runner = dependencies.execFile ?? execFile; return (await runner('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', shell: false })).stdout.trim(); }
 function normalizeCause(value) { return /^[A-Z][A-Z0-9_]{0,63}$/u.test(value) ? value : 'GOAL_RUN_FAILED'; }
 function categorized(code, message) { const error = new Error(message); error.causeCode = code; return error; }
+function assessmentFacts(request) { const text = `${request.title}\n${request.objective}\n${request.acceptance_criteria.join('\n')}`; const signals = []; const patterns = { 'public-api': /\b(?:public api|contract)\b/iu, authentication: /\b(?:auth|oauth|login)\b/iu, permissions: /\bpermissions?\b/iu, secrets: /\bsecrets?\b/iu, data: /\b(?:data|database|corruption)\b/iu, concurrency: /\b(?:race|concurren)\w*/iu, infrastructure: /\b(?:cloud|ci|infrastructure)\b/iu, distributed: /\bdistributed\b/iu, intermittent: /\b(?:intermittent|flaky)\b/iu, irreversible: /\b(?:irreversible|data loss)\b/iu }; for (const [signal, pattern] of Object.entries(patterns)) if (pattern.test(text)) signals.push(signal); return { file_count: request.suggested_paths.length, component_count: new Set(request.suggested_paths.map(path => path.split('/')[0])).size, context_bytes: Buffer.byteLength(text), risk_signals: signals, reproducibility: request.change_kind === 'bugfix' ? (/\breproduc(?:ed|ible)\b/iu.test(text) ? 'reproduced' : 'not-reproduced') : 'not-applicable', validation_strength: request.acceptance_criteria.length ? 'moderate' : 'none', rollback: /\birreversible\b/iu.test(text) ? 'irreversible' : 'bounded', ambiguity: request.suggested_paths.length ? 'low' : 'high' }; }
+function remainingUnits(goal) { return Math.max(0, goal.consumption_policy.max_normalized_units - (goal.execution_receipts ?? []).reduce((sum, receipt) => sum + receipt.normalized_units, 0)); }

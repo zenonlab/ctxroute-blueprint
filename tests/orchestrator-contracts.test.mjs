@@ -29,6 +29,18 @@ const plannedMission = { ...missionRequest, objective: 'Implement bounded contra
 const goalPlan = { goal_id: 'goal-one', missions: [plannedMission], criterion_coverage: [{ criterion_id: 'criterion-1', mission_ids: ['mission-one'] }] };
 const workerDispatch = { dispatch_id: 'dispatch-one', runtime: 'fixture', phase: 'work', mission: missionView, skill_path: '.agents/skills/blueprint-audit/SKILL.md', output_contract: 'worker-report' };
 const goalAcceptanceReport = { goal_id: 'goal-one', decision: 'accept', criteria: [{ criterion_id: 'criterion-1', status: 'PROVED', evidence_refs: ['src/change.mjs'], mission_ids: ['mission-one'] }], repair_missions: [], summary: 'All criteria are proved.' };
+const providerCapabilities = { adapter: 'codex', capabilities: ['code', 'structured-output'], context_classes: ['medium'], efforts: ['low', 'medium'], access_modes: ['read-only', 'workspace-write'], web_access: true };
+const modelDescriptor = { adapter: 'codex', model_id: 'model-one', provider_family: 'openai', level: 'small', capabilities: ['code', 'structured-output'], context_class: 'medium', cost_class: 'low', efforts: ['low', 'medium'], access_modes: ['read-only', 'workspace-write'], status: 'available', verified_at: '2026-09-16T12:00:00Z', verification_source: 'https://developers.openai.com/example', evaluation_score: 0.8 };
+const consumptionPolicy = { preset: 'balanced', max_duration_ms: 900000, max_normalized_units: 100, max_cost_usd: null, allowed_providers: ['codex', 'claude'], denied_models: [], prefer_local: false, local_only: false };
+const taskAssessment = { assessment_id: 'assessment-one', importance: 'normal', change_kind: 'feature', minimum_level: 'L1', context_class: 'small', risk_signals: [], reproducibility: 'not-applicable', validation_strength: 'strong', rollback: 'bounded', ambiguity: 'low', failure_count: 0, reasons: ['Bounded feature work requires L1.'] };
+const routingDecision = { decision_id: 'route-one', phase: 'work', level: 'L1', selected: { adapter: 'codex', model_id: 'model-one', provider_family: 'openai' }, effort: 'low', access_mode: 'workspace-write', required_capabilities: ['code', 'structured-output'], cascade: [{ source: 'safety-floor', effect: 'minimum L1' }], rejected: [], independence_required: false, reason: 'Selected the smallest qualified model.' };
+const executionReceipt = { receipt_id: 'execution-one', dispatch_id: 'dispatch-one', adapter: 'codex', model_id: 'model-one', provider_family: 'openai', effort: 'low', duration_ms: 50, normalized_units: 2, input_tokens: 10, output_tokens: 5, cost_usd: null, outcome: 'success', cause: null };
+const escalationEvent = { event_id: 'escalation-one', mission_id: 'mission-one', from_level: 'L1', to_level: 'L2', cause: 'VALIDATION_FAILED', attempt: 1, timestamp: '2026-09-16T12:00:00Z' };
+const modelEvaluation = { model_id: 'model-one', phase: 'work', samples: 10, success_rate: 0.9, structured_output_rate: 1, scope_rate: 0.9, median_duration_ms: 50, updated_at: '2026-09-16T12:00:00Z' };
+const documentationRequirement = { requirement_id: 'documentation-one', subject: 'sdk-one', installed_version: '1.0.0', reason: 'The SDK behavior is external.', freshness: 'per-goal', primary_required: true };
+const documentationSource = { source_id: 'source-one', requirement_ids: ['documentation-one'], url: 'https://example.com/docs', domain: 'example.com', authority: 'official', title: 'Official documentation', version: '1.0.0', accessed_at: '2026-09-16T12:00:00Z', digest, claims: ['The supported behavior is documented.'] };
+const documentationEvidenceReport = { report_id: 'documentation-report', goal_id: 'goal-one', status: 'SATISFIED', requirements: [documentationRequirement], sources: [documentationSource], justification: 'Primary evidence covers the requirement.', created_at: '2026-09-16T12:00:00Z', digest, blocked_cause: null };
+const documentationFreshnessReceipt = { receipt_id: 'freshness-one', report_id: 'documentation-report', goal_id: 'goal-one', dispatch_id: null, status: 'CURRENT', checked_at: '2026-09-16T12:00:00Z', source_digests: [digest], cause: null };
 
 const examples = {
   config,
@@ -47,10 +59,22 @@ const examples = {
   goalPlan,
   workerDispatch,
   goalAcceptanceReport,
+  providerCapabilities,
+  modelDescriptor,
+  consumptionPolicy,
+  taskAssessment,
+  routingDecision,
+  executionReceipt,
+  escalationEvent,
+  modelEvaluation,
+  documentationRequirement,
+  documentationSource,
+  documentationEvidenceReport,
+  documentationFreshnessReceipt,
 };
 
 test('all public orchestrator schemas compile once and accept their canonical examples', () => {
-  assert.equal(listOrchestratorContracts().length, 16);
+  assert.equal(listOrchestratorContracts().length, 28);
   for (const [name, value] of Object.entries(examples)) {
     assert.equal(validateOrchestratorContract(name, value).valid, true, name);
     assert.equal(getOrchestratorValidator(name), getOrchestratorValidator(ORCHESTRATOR_SCHEMA_IDS[name]));

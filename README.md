@@ -10,12 +10,12 @@
 [![code-review-graph v2.3.8](https://img.shields.io/badge/context-code--review--graph_v2.3.8-10b981)](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8)
 [![Archify v2.16.0](https://img.shields.io/badge/architecture-Archify_v2.16.0-06b6d4)](https://github.com/tt-a1i/archify/releases/tag/v2.16.0)
 [![tree-sitter Sensor](https://img.shields.io/badge/security-tree--sitter_Sensor-ef4444)](https://tree-sitter.github.io/tree-sitter/)
-[![Codex + Claude](https://img.shields.io/badge/agents-Codex_%2B_Claude-111827)](AGENTS.md)
+[![Codex + Claude + Gemini](https://img.shields.io/badge/agents-Codex_%2B_Claude_%2B_Gemini-111827)](AGENTS.md)
 [![Linux, macOS, Windows](https://img.shields.io/badge/CI-Linux_%7C_macOS_%7C_Windows-2563eb)](.github/workflows/validate.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-An architecture-first GitHub template for building software with Codex or
-Claude while keeping decisions, context, diagrams, checks, and review evidence
+An architecture-first GitHub template for building software with Codex,
+Claude, or Gemini while keeping decisions, context, diagrams, checks, and review evidence
 inside the repository.
 
 The generated product stays stack-neutral: the blueprint does not impose a
@@ -33,7 +33,7 @@ deliberately and verify the result.
 
 | Capability | What it provides |
 | --- | --- |
-| Agent governance | One repository doctrine for Codex and Claude, enforced by project-local lifecycle and Git hooks. |
+| Agent governance | One repository doctrine for Codex, Claude, and Gemini workers, enforced by project-local lifecycle and Git hooks. |
 | Relevant context | CTXRoute injects only the guidance needed for the current action and reinjects bounded context after compaction. |
 | Universal execution | `SWARM_ON` delegates minimal missions through the orchestrator; `SWARM_OFF` executes directly without tickets or worktrees. |
 | Code intelligence | `npm run setup` installs the official [Code Review Graph](https://github.com/tirth8205/code-review-graph) Python package at [`code-review-graph==2.3.8`](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8) for bounded MCP context, impact analysis, and fork-safe PR risk review. |
@@ -103,6 +103,9 @@ without a ticket, worktree, or MCP call; skills remain unchanged in both modes.
 
 ```sh
 npm run orchestrator:read
+npm run orchestrator:models
+npm run orchestrator:explain-route -- route.json
+npm run orchestrator:usage -- usage.json
 npm run orchestrator:cli -- mutate transaction.json
 npm run orchestrator:cli -- prepare-mission transaction.json
 npm run orchestrator:cli -- submit-report transaction.json

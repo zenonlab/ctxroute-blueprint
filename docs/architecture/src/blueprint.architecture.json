@@ -19,7 +19,7 @@
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
     { "id": "orchestrator", "type": "backend", "label": "Goal orchestrator", "sublabel": "Plan + dispatch + Git + audit", "pos": [30, 230], "size": [170, 60] },
-    { "id": "workers", "type": "external", "label": "Local worker adapters", "sublabel": "Codex / Claude / fixture", "pos": [30, 410], "size": [200, 60] },
+    { "id": "workers", "type": "external", "label": "Local worker adapters", "sublabel": "Codex / Claude / Gemini / fixture", "pos": [30, 410], "size": [200, 60] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Blocking security checks", "pos": [280, 230], "size": [180, 60] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "Sensor-only parsing", "pos": [540, 230], "size": [180, 60] },
     { "id": "graph", "type": "database", "label": "CRG graph.db", "sublabel": "Ignored local graph", "pos": [790, 230], "size": [190, 60] },

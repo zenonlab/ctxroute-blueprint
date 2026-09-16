@@ -195,6 +195,90 @@
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {
+      "id": "orchestrator-provider-capabilities-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/provider-capabilities.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-model-descriptor-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/model-descriptor.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-consumption-policy-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/consumption-policy.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-task-assessment-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/task-assessment.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-routing-decision-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/routing-decision.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-execution-receipt-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/execution-receipt.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-escalation-event-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/escalation-event.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-model-evaluation-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/model-evaluation.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-documentation-requirement-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/documentation-requirement.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-documentation-source-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/documentation-source.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-documentation-evidence-report-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/documentation-evidence-report.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-documentation-freshness-receipt-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/documentation-freshness-receipt.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
       "id": "orchestrator-worker-dispatch-schema",
       "kind": "json-schema",
       "format": "json-schema-2020-12",

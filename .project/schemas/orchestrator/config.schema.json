@@ -9,7 +9,57 @@
     "worktreeRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
     "recoveryRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
     "telemetryPath": { "$ref": "common.schema.json#/$defs/relativePath" },
-    "workerRuntime": { "enum": ["auto", "codex", "claude"] },
+    "workerRuntime": { "enum": ["auto", "codex", "claude", "gemini"] },
+    "modelRouting": {
+      "type": "object",
+      "required": ["mode", "defaultPreset", "catalog", "profiles", "riskFloors", "evaluation", "documentation"],
+      "properties": {
+        "mode": { "enum": ["legacy", "adaptive"] },
+        "defaultPreset": { "enum": ["economy", "balanced", "quality", "custom"] },
+        "catalog": { "type": "array", "maxItems": 128, "items": { "$ref": "model-descriptor.schema.json" } },
+        "profiles": {
+          "type": "object",
+          "propertyNames": { "enum": ["research", "planning", "work", "skillCreation", "skillAudit", "repair", "goalAudit", "conflictAnalysis", "synthesis"] },
+          "additionalProperties": {
+            "type": "object",
+            "required": ["minimum_level", "timeout_ms", "attempts", "fallback", "independence"],
+            "properties": {
+              "minimum_level": { "enum": ["L0", "L1", "L2", "L3", "L4"] },
+              "effort": { "enum": ["none", "low", "medium", "high", "xhigh", "max"] },
+              "timeout_ms": { "type": "integer", "minimum": 1000, "maximum": 3600000 },
+              "attempts": { "type": "integer", "minimum": 1, "maximum": 8 },
+              "fallback": { "type": "boolean" },
+              "independence": { "type": "boolean" }
+            },
+            "unevaluatedProperties": false
+          }
+        },
+        "riskFloors": {
+          "type": "object",
+          "propertyNames": { "enum": ["routine", "feature", "bugfix", "security", "migration", "incident", "audit"] },
+          "additionalProperties": { "enum": ["L0", "L1", "L2", "L3", "L4"] }
+        },
+        "evaluation": {
+          "type": "object",
+          "required": ["minimumSamples", "allowAutomaticPromotion"],
+          "properties": { "minimumSamples": { "type": "integer", "minimum": 1, "maximum": 10000 }, "allowAutomaticPromotion": { "const": false } },
+          "unevaluatedProperties": false
+        },
+        "documentation": {
+          "type": "object",
+          "required": ["required", "defaultFreshness", "volatileFreshness", "primarySourcesRequired", "blockWhenUnavailable"],
+          "properties": {
+            "required": { "type": "boolean" },
+            "defaultFreshness": { "const": "per-goal" },
+            "volatileFreshness": { "const": "per-dispatch" },
+            "primarySourcesRequired": { "type": "boolean" },
+            "blockWhenUnavailable": { "type": "boolean" }
+          },
+          "unevaluatedProperties": false
+        }
+      },
+      "unevaluatedProperties": false
+    },
     "limits": {
       "type": "object",
       "required": ["stateBytes", "reportBytes", "contextBytes", "lockTimeoutMs", "subprocessTimeoutMs", "goalTimeoutMs", "workerTimeoutMs", "parallelWorktrees", "workerStdoutBytes", "workerStderrBytes", "minimumFreeBytes", "telemetryBytes", "recoveryBytes", "auditTraceBytes", "auditTraceFiles"],
