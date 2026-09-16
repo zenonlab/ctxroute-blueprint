@@ -40,8 +40,8 @@
     { "id": "admissionQueue", "type": "messagebus", "label": "Admission D1 + Queue", "sublabel": "created envoie un signal opaque", "stage": 1, "row": 2, "width": 168, "tag": "déduplication globale" },
     { "id": "agendaLanes", "type": "backend", "label": "Lanes Agenda", "sublabel": "AniList + MangaUpdates", "stage": 2, "row": 0, "tag": "baux et checkpoints" },
     { "id": "discoveryJob", "type": "backend", "label": "Discovery", "sublabel": "identité et titres", "stage": 2, "row": 2, "tag": "claim partagé" },
-    { "id": "refreshJob", "type": "backend", "label": "Réhydratation", "sublabel": "profil et relations", "stage": 2, "row": 4, "tag": "1 / œuvre / semaine" },
-    { "id": "catalogueD1", "type": "database", "label": "Catalogue D1", "sublabel": "snapshots et fiches vérifiés", "stage": 3, "row": 2, "width": 154, "tag": "publication atomique" },
+    { "id": "refreshJob", "type": "backend", "label": "Réhydratation", "sublabel": "profil et relations", "stage": 2, "row": 4, "tag": "admission hebdo / clé" },
+    { "id": "catalogueD1", "type": "database", "label": "Catalogue D1", "sublabel": "projection active + 3 snapshots", "stage": 3, "row": 2, "width": 168, "tag": "diff atomique" },
     { "id": "privateIndexedDb", "type": "database", "label": "IndexedDB privée", "sublabel": "lookup groupé par 50 clés", "stage": 4, "row": 2, "width": 154, "tag": "ETag · continuation MV3" }
   ],
   "flows": [
@@ -51,10 +51,10 @@
     { "id": "queue-agenda", "from": "admissionQueue", "to": "agendaLanes", "label": "deux lanes", "classification": "indépendantes", "variant": "emphasis" },
     { "id": "queue-discovery", "from": "admissionQueue", "to": "discoveryJob", "label": "claim(20)", "classification": "priorité exacte", "variant": "default", "labelAt": [525, 450] },
     { "id": "queue-refresh", "from": "admissionQueue", "to": "refreshJob", "label": "claim refresh", "classification": "VERIFIED reste servi", "variant": "default" },
-    { "id": "agenda-publish", "from": "agendaLanes", "to": "catalogueD1", "label": "génération changée", "classification": "digest sémantique", "variant": "emphasis" },
+    { "id": "agenda-publish", "from": "agendaLanes", "to": "catalogueD1", "label": "ajouts · changements · retraits", "classification": "une transaction D1", "variant": "emphasis" },
     { "id": "discovery-publish", "from": "discoveryJob", "to": "catalogueD1", "label": "fiche VERIFIED", "classification": "publication atomique", "variant": "emphasis", "labelAt": [780, 485] },
     { "id": "refresh-publish", "from": "refreshJob", "to": "catalogueD1", "label": "profil validé", "classification": "relations distinctes", "variant": "emphasis" },
-    { "id": "catalogue-read", "from": "catalogueD1", "to": "privateIndexedDb", "label": "HIT · MISS · version", "classification": "lecture sans écriture", "variant": "emphasis", "labelDy": 53 }
+    { "id": "catalogue-read", "from": "catalogueD1", "to": "privateIndexedDb", "label": "HIT · MISS · version", "classification": "hit frais testé : 0 écriture", "variant": "emphasis", "labelDy": 53 }
   ],
   "cards": [
     {
@@ -70,9 +70,10 @@
       "dot": "cyan",
       "title": "Budgets",
       "items": [
-        "Une session Agenda et un refresh par œuvre chaque semaine",
+        "Un changement Agenda écrit seulement le diff après amorçage",
         "Zéro appel fournisseur sur cache hit frais",
-        "Lots extension de 50 lectures et 20 admissions par réveil"
+        "13 pages actives au lieu d’un historique sans borne",
+        "Les transitions, clés nouvelles et refreshes peuvent écrire"
       ]
     },
     {

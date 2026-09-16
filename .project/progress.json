@@ -937,16 +937,17 @@
     {
       "schemaVersion": 1,
       "id": "goal-publish-public-collector-v3-51742d9",
-      "title": "Publier le collecteur Public Discovery v3 à cadence dix minutes",
+      "title": "Historique remplacé — collecteur GitHub v3, ne pas réexécuter",
       "status": "BLOCKED",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
         {
           "id": "push-public-collector-v3",
-          "title": "Pousser exactement 51742d9 vers le dépôt public et vérifier le trafic",
+          "title": "Conserver la preuve historique sans relancer le collecteur GitHub",
           "status": "BLOCKED",
           "acceptance": [
+            "Objectif remplacé par les collecteurs natifs; critères suivants conservés comme historique non exécutable. Reprise unique via goal-controlled-d1-service-resumption.",
             "Le push est fast-forward et public main pointe exactement sur 51742d92602d91e66a45e7a62b6d687dbd566219.",
             "Le workflow déployé conserve schedule */10, workflow_dispatch, permissions minimales et OIDC v3 workers.dev.",
             "npm run verify et npm ls réussissent dans le dépôt public.",
@@ -2076,16 +2077,17 @@
     {
       "schemaVersion": 1,
       "id": "goal-adaptive-public-refresh-step-7",
-      "title": "Déployer progressivement le rafraîchissement public adaptatif",
+      "title": "Preuves du déploiement adaptatif — reprise via objectif contrôlé",
       "status": "ACTIVE",
       "executionMode": "autonomous",
       "modeOffered": false,
       "steps": [
         {
           "id": "deploy-and-certify",
-          "title": "Sauvegarder D1, migrer, pousser et déployer le Worker",
+          "title": "Rattacher le déploiement bloqué à la reprise contrôlée, sans deuxième exécution",
           "status": "BLOCKED",
           "acceptance": [
+            "Ne pas relancer directement cette ancienne étape: goal-controlled-d1-service-resumption est le point d’entrée unique, après les gates de docs/plans/d1-cost-audit-roadmap.json.",
             "Un export D1 distant ignoré par Git est créé, non vide et vérifié par SHA-256 avant toute mutation distante.",
             "origin/main pointe sur les six commits validés du rafraîchissement adaptatif et .codex/config.toml reste exclu.",
             "La gate Cloudflare applique uniquement d1:tobirink-public puis worker:tobirink-public-api à partir d’un plan frais et hashé.",
@@ -2118,13 +2120,9 @@
             "Production D1 and HTTP verification"
           ],
           "evidence": [
-            "Backup D1 ignoré et restaurable: 1000960 octets, 30 tables, integrity_check ok, SHA-256 c5b94e9566be330a8db0a9a7b54be54c73a603166432bcb48d088a87639b33ed.",
-            "origin/main pointe sur 9cfd468 après passage des hooks pré-push; .codex/config.toml est resté local et non indexé.",
-            "external: plan frais d5ae98b2 appliqué le 2026-09-16T11:04:42Z; Cloudflare refuse D1 avec le code 7500 jusqu’au reset de minuit UTC, 0017 à 0020 restent toutes en attente et le Worker 2267a691 reste servi à 100 %.",
-            "Les builds locaux Chrome MV3 et Firefox MV3 version 1.0.31 réussissent; aucune extension n’a été publiée.",
-            "Le dataflow adaptatif passe Archify showcase 9/9 sans erreur ni avertissement; artefact SHA-256 db696e4b7bf06c17833686dda4cef643ecfe2de23ace3e960ad0a5b2db8865de.",
-            "La vue architecture adaptative passe, avec toutes les architectures enregistrées, Archify showcase 9/9 sans erreur ni avertissement; artefact SHA-256 8b642652b99f2d5cda9ea0280066b25a02d0ad23a17a3d06c364c82f3a66cb20.",
-            "npm run verify passe sur le diff final; npm ls --all, npm audit avec 0 vulnérabilité et git diff --check réussissent."
+            "Historique uniquement: ne pas réexécuter cette étape; goal-controlled-d1-service-resumption et le plan maître A à Z sont l’unique parcours opérationnel.",
+            "La cible actuelle comprend les migrations 0017–0021; les anciennes preuves 0017–0020 restent historiques et ne certifient pas la production corrigée.",
+            "external: le dernier résultat fournisseur reste le refus D1 code 7500 du 2026-09-16T11:04:42Z; la disponibilité actuelle du quota n’est pas prouvée."
           ]
         },
         {
@@ -2207,6 +2205,357 @@
             "D1 tobirink-public, R2 tobirink-covers et tobirink-public-releases, Queue principale et DLQ sont toujours inventoriés.",
             "Archify lifecycle passe showcase 9/9 sans erreur ni avertissement; artefact SHA-256 42317bdb66f3c802e9afd150daaa915e9e71ddc5b0ba8b384ccfa772bd725309.",
             "npm run verify, npm ls --all, npm audit avec 0 vulnérabilité, les validations documentaires et git diff --check réussissent."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-cost-audit-measured-capacity",
+      "title": "Mesurer les coûts par œuvre, utilisateur simulé et Agenda",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "measure-costs",
+          "title": "Compléter la référence locale puis certifier les budgets natifs et distants",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Réutiliser goal-cost-baseline-and-roadmap et docs/operations/d1-cost-audit.md; suivre les étapes B/C puis G/H du parcours, sans présenter les projections comme tests de charge.",
+            "Mesurer les appels natifs complets, concurrence, négatifs, batch50, CPU et postes hors D1; réconcilier logs et métriques natives avant certification finale.",
+            "Séparer lignes présentes, event_count déclaré, mutations réussies et meta.rows_written incluant les index; 57321 déclarations ne prouvent pas 57321 insertions.",
+            "Mesurer première résolution, cache hit, refresh identique/modifié, retry et relations; vérifier déduplication par œuvre versus clé.",
+            "Tableaux de capacité pour 10/100/500/1000 œuvres et 1/100/1000/10000 utilisateurs, partage du catalogue et cache froid/chaud explicites; aucun suivi individuel.",
+            "Auditer Agenda: generations staging, pagination, rétention, cache client/ETag, coût inchangé/changé, lectures et écritures HTTP manquantes dans worker.cost.",
+            "Aucune affirmation de coût nul par nouvel utilisateur; aucune certification du pipeline sur les seuls tests fonctionnels."
+          ],
+          "files": [
+            "docs/operations/cloudflare.md",
+            "apps/worker/src/operational-metrics.test.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "apps/worker/src/releases/public-release-collectors.test.ts",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Étapes locales B/C terminées: worker.cost HTTP inclut les deltas D1, publication Agenda différentielle et rétention bornée.",
+            "Budgets locaux après amorçage: Agenda inchangé 70 écritures, un événement changé 76–77; même œuvre/nouvelle clé 19 sans révision ni réécriture de fiche.",
+            "Reste non certifié: concurrence et volume, cycle natif distant, rapprochement métriques Cloudflare et observation sept jours; aucune reprise production."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-adult-content-local-visibility",
+      "title": "Collecter les contenus adultes et contrôler leur affichage dans l’extension",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "verify-provider-contracts",
+          "title": "Vérifier toutes les API : AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu Manga",
+          "status": "TODO",
+          "acceptance": [
+            "Inventorier toutes les API et tous leurs chemins actifs : AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu Manga; appliquer la même politique à tout fournisseur ajouté ultérieurement.",
+            "Vérifier par API les paramètres explicites et filtres implicites de recherche, pagination, hydratation exacte, relations, jaquettes et collecte Agenda lorsqu’elle existe; ne pas inventer un paramètre adulte universel.",
+            "Auditer notamment isAdult pour AniList, genres/catégories et options documentées pour MangaUpdates, contentRating et blocages de covers pour MangaDex, nsfw/ageRating et différences Anime/Manga pour Kitsu; aucun filtrage adulte prématuré ne doit empêcher la réception des données autorisées par le fournisseur.",
+            "Inclure contenus adultes et ordinaires dans Discovery, hydratation, relations et Agenda, indépendamment de la préférence locale; ne pas remplacer le catalogue complet par un filtre adult-only.",
+            "Conserver une classification adulte/non-adulte/inconnue et sa provenance; préciser le traitement des inconnus.",
+            "Documenter contrats, ADR et IR Archify avant changement de structure; showcase validé."
+          ],
+          "files": [
+            "docs/02-quality-strategy.md",
+            "docs/operations/cloudflare.md",
+            "packages/public-discovery/src/providers/anilist.ts",
+            "packages/public-discovery/src/providers/mangaupdates.ts",
+            "packages/public-discovery/src/providers/mangadex.ts",
+            "packages/public-discovery/src/providers/kitsu.ts",
+            "packages/public-discovery/src/resolver.ts",
+            "packages/public-discovery/src/provider-kit.ts",
+            "packages/public-discovery/src/agenda/collectors.ts",
+            "packages/public-discovery/src/contracts.ts",
+            "docs/architecture/src/public-discovery.dataflow.json",
+            "docs/architecture/src/agenda-release.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:contracts",
+            "npm run validate:architecture",
+            "npm run validate:decisions"
+          ],
+          "evidence": [
+            "L’étape commence seulement après la stabilisation D1 de sept jours; elle couvre tous les adaptateurs et chemins actifs, pas seulement AniList et MangaUpdates.",
+            "Le serveur doit collecter les données autorisées indépendamment du réglage local; classification adult/non-adult/unknown avec provenance avant l’UI.",
+            "Aucune recherche fournisseur, implémentation ou publication n’a été exécutée pendant l’audit documentaire."
+          ]
+        },
+        {
+          "id": "implement-local-toggle",
+          "title": "Ajouter le paramètre et bloquer affichage et actions lorsque désactivé",
+          "status": "TODO",
+          "acceptance": [
+            "Prérequis: verify-provider-contracts; compléter et approuver l’inventaire des fichiers de toutes les surfaces/commandes, les fichiers ci-dessous ne constituent pas un scope exhaustif.",
+            "Option persistante dans les paramètres de l’extension, désactivée par défaut.",
+            "Données adultes toujours reçues et conservées; basculer l’option ne supprime ni données ni favoris et ne relance pas les fournisseurs.",
+            "Masquer titres, jaquettes et entrées adultes dans bibliothèque, recherche, Review, popup, relations, Agenda et vues WebBridge concernées.",
+            "Bloquer actions liées aux œuvres masquées dans les gestionnaires de commandes, même par ancien lien ou événement; suspendre les notifications correspondantes sans détruire la progression.",
+            "Tests activé/désactivé pour chacun des cinq adaptateurs, contenus adultes/non-adultes/inconnus, redémarrage, bascule et actions indirectes; Chrome/Firefox; pas de nouvelle télémétrie personnelle."
+          ],
+          "files": [
+            "apps/extension/entrypoints/options/Settings.tsx",
+            "apps/extension/entrypoints/options/settings.contract.ts",
+            "apps/extension/runtime/use-quick-preferences.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/runtime/local-notification-runtime.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "docs/02-quality-strategy.md"
+          ],
+          "commands": [
+            "npm run typecheck",
+            "npm run test:e2e",
+            "npm run test:agenda",
+            "npm run build:extension",
+            "npm run build:extension:firefox"
+          ],
+          "evidence": [
+            "OFF doit masquer titres, jaquettes et entrées puis bloquer commandes, anciens liens, actions et notifications sur toutes les surfaces, sans suppression ni recollecte.",
+            "ON réaffiche les données déjà reçues; Chrome et Firefox doivent couvrir adult/non-adult/unknown, redémarrage, bascule et hors-ligne.",
+            "La publication de l’extension est une étape séparée avec approbations propres."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-controlled-d1-service-resumption",
+      "title": "Reprendre D1 et le runtime corrigé après l’arrêt d’urgence",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "preflight",
+          "title": "Accès rétabli à la dernière inspection; vérifier quota, sauvegarde et barrières",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Inspection authentifiée du compte cible, quota D1, migrations, version Worker, routes, crons et Queue.",
+            "Sauvegarde fraîche vérifiée avant migrations; maintien des barrières jusqu’à validation.",
+            "Aucun abonnement payant ni suppression automatique."
+          ],
+          "files": [
+            "docs/operations/cloudflare.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Certification locale 2026-09-16: npm run verify exit 0; Worker 103/103, adaptateur Cloudflare 20/20, extension 145/145, application 376/376, tous les workspaces et builds Chrome/Firefox passent; npm audit 0 vulnérabilité.",
+            "Workflow adaptive-public-refresh-continuation showcase 9/9; artifact HTML SHA-256 0fb5133944ebea70a530f7f294b97f842f68c1aa2453462371af99d54548b7f6.",
+            "Inspection distante: Worker ancien 2267a691 à 100%, migrations 0017–0021 en attente, D1 lecture changes=0/rows_written=0; l’inventaire Wrangler ne recertifie pas delivery_paused ni le quota d’écriture.",
+            "Backup frais ignoré: 1 011 839 octets, integrity_check ok, SHA-256 da9b5db986d51b5d887f6652c5dc7fc4910ce23f4329693fd4733c0e1864dd2e.",
+            "Plan Cloudflare non appliqué: deux actions exactes d1:tobirink-public + worker:tobirink-public-api, digest acbc740b9c96fb23c1cb848c77547889106baa74008229788e4ce14accf02315, expiration 2026-09-16T17:58:43.655Z.",
+            "Restent avant mutation: approbation fournisseur exacte, plan frais après expiration, preuve routes/crons/workers.dev/Queue paused et disponibilité d’écriture; aucun déploiement ni reprise exécuté."
+          ]
+        },
+        {
+          "id": "resume",
+          "title": "Migrer puis déployer sous barrières et réactiver progressivement",
+          "status": "TODO",
+          "acceptance": [
+            "Point d’entrée unique pour la reprise; satisfaire les gates F/G de docs/plans/d1-cost-audit-roadmap.json et approuver séparément les opérations fournisseur exactes.",
+            "Avant ouverture, fixer budget canari et seuils d’arrêt chiffrés, vérifier la version corrigée sous barrières et les opérations de rollback autorisées.",
+            "Rattachement à goal-adaptive-public-refresh-step-7; ne pas déclarer son déploiement terminé sans preuve.",
+            "Gate inspect-plan-apply pour migrations 0017–0020 et Worker corrigé; aucune suppression de staging.",
+            "Routes puis cron hebdomadaire 23 3 * * 0 puis Queue en dernier; workers.dev reste désactivé.",
+            "Mesurer consommation et arrêter la reprise sur dérive; ne pas rouvrir l’ancien Worker seul.",
+            "Critères d’observation et rollback documentés; les coûts estimés ne sont pas présentés comme mesurés."
+          ],
+          "files": [
+            "apps/worker/wrangler.jsonc",
+            "docs/operations/cloudflare.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation d1-migrate:PUBLIC_DB --operation worker-deploy",
+            "npm run infra:apply -- --plan <plan-verifie> --approve <digest-verifie> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow d1:tobirink-public --allow worker:tobirink-public-api"
+          ],
+          "evidence": [
+            "Plan maître docs/operations/tobirink-a-z-master-plan.md: release certifiée, commit/push séparés, backup frais, migrations 0017–0021, déploiement scellé, route, cron, Queue en dernier, canari puis sept jours.",
+            "Les anciens critères 0017–0020 et gates F/G sont remplacés par les références 0017–0021 et A–G du plan maître; aucune mutation fournisseur n’est autorisée par cette mise à jour.",
+            "Seuils proposés à approuver avant canari: alerte/recoupure 20k/50k UTC, Agenda 10k/500 et Discovery 0/30/100."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-cost-baseline-and-roadmap",
+      "title": "Établir une référence de coûts locale et un parcours auditable de reprise",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "local-baseline",
+          "title": "Mesurer les scénarios D1 locaux et consolider les objectifs sans mutation de production",
+          "status": "DONE",
+          "acceptance": [
+            "Utiliser D1 local avec migrations réelles et fixtures synthétiques; mesurer meta.rows_read/rows_written, distinguer ces résultats de la facturation distante; aucun appel fournisseur.",
+            "Couvrir création, hit, doublon même clé et alias de même œuvre, refresh identique/modifié, échecs/reprises et Agenda complet inchangé/modifié.",
+            "Présenter lignes conservées, mutations, lectures, requêtes fournisseur simulées et limites des mesures, sans exporter de données privées.",
+            "Définir les projections utilisateurs/œuvres en séparant catalogue partagé et disjoint, cache froid/chaud et pic quotidien; aucune extrapolation non étiquetée.",
+            "Consolider les dépendances entre audit, correctifs, contenus adultes tous fournisseurs, reprise et observation; conserver les preuves historiques et signaler les objectifs remplacés sans fausse clôture.",
+            "Corriger les affirmations non démontrées du plan de continuation; ne pas modifier son workflow produit pendant cette étape.",
+            "Aucun changement de code produit, dépendance, secret, abonnement, déploiement, push, suppression ou commit; préserver les modifications existantes."
+          ],
+          "files": [
+            "apps/worker/src/cost-baseline.test.ts",
+            "docs/operations/d1-cost-audit.md",
+            "docs/plans/d1-cost-audit-roadmap.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/adaptive-public-refresh-safe-continuation.json"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions",
+            "git diff --check"
+          ],
+          "evidence": [
+            "102 tests Worker / 13 fichiers passent, dont 6 scénarios nouveaux; TypeScript Worker, Oxlint ciblé, docs, 54 ADR/478 scopes et diff --check réussis.",
+            "Rapport docs/operations/d1-cost-audit.md: compteurs D1 locaux, stock, 16 projections utilisateurs/œuvres, hypothèses, tarifs sourcés et lacunes; aucune attribution distante inventée.",
+            "Objectifs consolidés et roadmap B–H validée non approuvée; ancien plan corrigé; aucune mutation produit/fournisseur, dépendance, secret, purge, push ou commit."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-d1-write-amplification-remediation",
+      "title": "Réduire localement les amplifications D1 mesurées",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "instrument-and-optimize",
+          "title": "Instrumenter HTTP et publier l’Agenda par différence atomique",
+          "status": "DONE",
+          "acceptance": [
+            "Migration additive 0021 backfills a stable active Agenda projection and bounded rollback snapshots without deleting remote data.",
+            "A changed generation updates only added, changed or removed active events in one transactional D1 batch; one changed event no longer inserts 579 event rows.",
+            "The active public query remains indexed and preserves cursor ordering, contract validation, last-valid snapshot behavior and two rollback generation records.",
+            "Completed Agenda pages retain only each lane active snapshot plus an interrupted resumable collection; unchanged and superseded pages are removed.",
+            "Discovery HTTP worker.cost includes rows_read/rows_written from D1Result.meta without persisting metrics or logging identity/payload data.",
+            "A second key resolving to an unchanged known work avoids catalogue revision/work rewrites while preserving the terminal cache row and collision checks.",
+            "Tests freeze before/after budgets for creation, hit, retry, semantic replay, relations, unchanged/changed Agenda and page retention.",
+            "ADR, quality strategy, runbook, cost report and Archify dataflow match implemented behavior and pass showcase validation.",
+            "No provider call, deployment, remote migration, subscription, remote deletion, push or commit; existing user changes remain preserved."
+          ],
+          "files": [
+            "apps/worker/migrations/0021_agenda_active_projection.sql",
+            "apps/worker/src/composition.ts",
+            "apps/worker/src/index.ts",
+            "apps/worker/src/operational-metrics.ts",
+            "apps/worker/src/operational-metrics.test.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "apps/worker/src/releases/public-release-collectors.ts",
+            "apps/worker/src/releases/public-release-calendar.ts",
+            "apps/worker/src/releases/public-release-collectors.test.ts",
+            "apps/worker/src/releases/public-release-contract-migration.test.ts",
+            "apps/worker/src/cost-baseline.test.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts",
+            "docs/decisions/ADR-0055-d1-write-amplification-budgets.md",
+            "docs/02-quality-strategy.md",
+            "docs/operations/cloudflare.md",
+            "docs/operations/d1-cost-audit.md",
+            "docs/architecture/src/adaptive-public-refresh.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run test --workspace @tobirink/adapters-cloudflare",
+            "npm run typecheck",
+            "npm run lint:anti-slop",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- adaptive-public-refresh.dataflow",
+            "npm run validate:architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Worker 103/103 and adapters-cloudflare 20/20 pass; both workspace typechecks, anti-slop gate, ADR/docs validation and git diff --check pass.",
+            "Measured Agenda budgets are frozen: first reconciliation 1798 writes, unchanged 70, then one-event changes 76/76/77; retained pages drop from 65 to 13 and active projection remains 579 rows.",
+            "Discovery same-work/new-key keeps catalogue revision and work revision unchanged; HTTP worker.cost includes exact D1 meta without fingerprint. Migration 0021 and Archify dataflow validate locally; no provider mutation, deployment, purge, subscription, push or commit."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-audit-master-roadmap",
+      "title": "Consolider le plan maître et tous les objectifs actifs",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "consolidate-master-plan",
+          "title": "Créer la documentation A à Z et supprimer les contradictions d’objectifs",
+          "status": "DONE",
+          "acceptance": [
+            "Un document maître autonome expose état réel, décisions, dépendances, coûts mesurés, seuils proposés, approbations, ordre d’exécution, rollback et preuves attendues.",
+            "Les objectifs actifs séparent récupération D1, certification distante, contenus adultes tous fournisseurs, préférence locale et publication extension; les objectifs historiques ne sont jamais réexécutés.",
+            "Toutes les cibles de reprise utilisent les migrations 0017–0021 et les budgets locaux 55/19/70/76–77/1798 sans présenter les projections comme des mesures distantes.",
+            "La reprise suit certification locale et commit/push séparés, backup frais, déploiement sous scellé, route, cron, Queue en dernier, canari et observation sept jours.",
+            "Free/Paid/R2 est une décision post-observation sans souscription automatique; R2 ne remplace pas D1 dans la remédiation.",
+            "Les contenus adultes sont reçus selon les capacités de chaque API indépendamment du réglage local; OFF masque et bloque toutes les actions/notifications sans supprimer les données.",
+            "Le workflow Archify est déclaré, corrigé puis passe showcase; le dataflow adaptatif ne promet plus zéro écriture universelle.",
+            "Progress, documentation, décisions existantes et Git sont audités; aucune modification produit, fournisseur, coût, secret, suppression, push ou commit."
+          ],
+          "files": [
+            "docs/operations/tobirink-a-z-master-plan.md",
+            "docs/operations/d1-cost-audit.md",
+            "docs/operations/cloudflare.md",
+            "docs/plans/d1-cost-audit-roadmap.json",
+            "docs/plans/adaptive-public-refresh-safe-continuation.json",
+            "docs/architecture/src/adaptive-public-refresh-continuation.workflow.json",
+            "docs/architecture/src/adaptive-public-refresh.dataflow.json",
+            ".project/project-config.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "progress_status",
+            "progress_approve_plan after explicit user approval",
+            "progress_update_step for revised active goals",
+            "npm run archify:validate -- adaptive-public-refresh-continuation.workflow",
+            "npm run archify:validate -- adaptive-public-refresh.dataflow",
+            "npm run validate:config",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:architecture",
+            "npm run lint:anti-slop",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Plan maître A–J créé: état réel, explication des 100k, tableaux par œuvre/utilisateur, budgets 55/19/70/76–77/1798, seuils proposés, approbations, rollback et preuves.",
+            "Roadmap et continuation corrigées vers 0017–0021; ordre D1 puis audit adulte tous fournisseurs, préférence OFF locale et publication extension séparée; objectifs historiques signalés non réexécutables.",
+            "Archify workflow et dataflow passent showcase sans erreur/avertissement; validate:architecture, config, docs, 55 ADR/489 scopes, anti-slop et git diff --check passent; aucune mutation fournisseur, coût, secret, suppression, commit ou push."
           ]
         }
       ]

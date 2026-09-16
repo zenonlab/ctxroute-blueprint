@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-adaptive-public-refresh-safe-continuation",
+  "title": "Référence de reprise sous barrières — à rattacher au parcours de certification D1",
+  "executionMode": "collaborative",
+  "modeOffered": false,
+  "approved": false,
+  "steps": [
+    {
+      "id": "materialize-continuation",
+      "title": "Matérialiser la passation de reprise",
+      "status": "TODO",
+      "acceptance": [
+        "L’épuisement du quota est historique; son attribution exacte reste à mesurer. Le pipeline corrigé doit aussi être audité: mesures locales dans docs/operations/d1-cost-audit.md.",
+        "Dépendre de docs/plans/d1-cost-audit-roadmap.json et de goal-controlled-d1-service-resumption; ce document corrigé n’autorise aucun second parcours parallèle.",
+        "Le plan sépare préflight, déploiement sous scellé, réactivation et observation.",
+        "Aucune mutation Cloudflare ni aucun appel fournisseur n’a lieu pendant cette étape documentaire.",
+        "Le runbook contient les barrières, critères d’arrêt, rollback et preuves attendues pour un contexte neuf.",
+        "Le workflow Archify passe showcase 9/9 sans erreur ni avertissement.",
+        "Les validations passent; commit et push restent soumis à leurs approbations distinctes et .codex/config.toml reste exclu."
+      ],
+      "files": [
+        "docs/plans/adaptive-public-refresh-safe-continuation.json",
+        "docs/plans/adaptive-public-refresh-safe-continuation-materialize-update.json",
+        "docs/operations/adaptive-public-refresh-continuation.md",
+        "docs/operations/cloudflare.md",
+        "docs/architecture/src/adaptive-public-refresh-continuation.workflow.json",
+        ".project/project-config.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run progress:validate -- docs/plans/adaptive-public-refresh-safe-continuation.json",
+        "npm run progress:approve -- docs/plans/adaptive-public-refresh-safe-continuation.json",
+        "npm run archify:validate -- adaptive-public-refresh-continuation.workflow",
+        "npm run validate:config",
+        "npm run validate:docs -- --all",
+        "npm run verify",
+        "npm ls --all",
+        "npm audit --audit-level=high",
+        "git diff --check"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "verify-reset-and-seal",
+      "title": "Confirmer le reset D1 et le scellé de production",
+      "status": "TODO",
+      "acceptance": [
+        "Le quota D1 est de nouveau disponible avant toute mutation distante.",
+        "Routes et schedules restent vides, workers.dev reste désactivé et la Queue reste suspendue.",
+        "Les migrations 0017 à 0021 sont les migrations en attente; 0021 crée la projection Agenda différentielle et doit précéder le Worker corrigé.",
+        "Un export D1 frais, non vide, ignoré par Git, vérifié par integrity_check et SHA-256 est prêt.",
+        "origin/main et le HEAD local correspondent; .codex/config.toml reste exclu.",
+        "Aucun retry de migration, déploiement, reprise Queue ou appel fournisseur n’est exécuté."
+      ],
+      "files": [
+        "build/backups/tobirink-public-adaptive-refresh-resume.sql",
+        ".project/progress.json",
+        "docs/progress.md",
+        "docs/plans/adaptive-public-refresh-safe-continuation-preflight-update.json",
+        "docs/operations/adaptive-public-refresh-continuation.md"
+      ],
+      "commands": [
+        "Read-only Cloudflare D1 quota, migration, routes, schedules, subdomain, Queue and deployment inspection",
+        "npm exec -- wrangler d1 export PUBLIC_DB --remote --output ../../build/backups/tobirink-public-adaptive-refresh-resume.sql",
+        "SQLite integrity_check and SHA-256 verification",
+        "git status --short",
+        "git rev-parse HEAD",
+        "git ls-remote origin refs/heads/main"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "deploy-under-seal",
+      "title": "Migrer et déployer le Worker corrigé sous scellé",
+      "status": "TODO",
+      "acceptance": [
+        "Une approbation fournisseur séparée couvre exactement D1 tobirink-public et Worker tobirink-public-api.",
+        "Un plan Cloudflare frais et hashé applique les migrations additives 0017 à 0021 puis déploie le Worker corrigé.",
+        "La configuration déployée conserve routes=[], crons=[], workers_dev=false et la Queue suspendue.",
+        "D1 ne rapporte plus de migration en attente et le nouveau Worker sert 100% sans trafic public.",
+        "Les vérifications D1 n’exposent aucune donnée privée et aucun appel fournisseur n’est émis.",
+        "Les builds Chrome et Firefox réussissent localement sans publication."
+      ],
+      "files": [
+        "build/plans/adaptive-public-refresh-resume-cloudflare.json",
+        ".project/progress.json",
+        "docs/progress.md",
+        "docs/plans/adaptive-public-refresh-safe-continuation-deploy-update.json",
+        "docs/operations/adaptive-public-refresh-continuation.md"
+      ],
+      "commands": [
+        "npm run infra:plan -- --provider cloudflare --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation d1-migrate:PUBLIC_DB --operation worker-deploy",
+        "npm run infra:apply with the reviewed digest and only d1:tobirink-public plus worker:tobirink-public-api",
+        "npm run build:extension",
+        "npm run build:extension:firefox",
+        "Post-deployment D1, Worker, routes, schedules, subdomain and Queue verification"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "reactivate-controlled-runtime",
+      "title": "Réactiver progressivement le runtime corrigé",
+      "status": "TODO",
+      "acceptance": [
+        "Des approbations fournisseur séparées autorisent exactement la restauration de la route, puis du cron hebdomadaire, puis de la livraison Queue.",
+        "workers.dev et les Preview URLs restent désactivés.",
+        "La route tobirink.com/* est restaurée avant les lectures HTTP de santé.",
+        "Le cron 23 3 * * 0 est restauré sans ancien cron */10.",
+        "La Queue est reprise en dernier après validation HTTP et D1.",
+        "Tout échec remet immédiatement la Queue en pause et retire routes et schedules sans supprimer de données.",
+        "Le retour à l'ancien Worker après publication d'une génération 0021 n'est pas un rollback sûr: préférer le scellé, un correctif avant ou la restauration contrôlée du backup."
+      ],
+      "files": [
+        "apps/worker/wrangler.jsonc",
+        ".project/progress.json",
+        "docs/progress.md",
+        "docs/plans/adaptive-public-refresh-safe-continuation-reactivation-update.json",
+        "docs/operations/adaptive-public-refresh-continuation.md",
+        "docs/operations/cloudflare.md"
+      ],
+      "commands": [
+        "Restore only tobirink.com/* and cron 23 3 * * 0 in the versioned Wrangler configuration",
+        "npm exec -- wrangler triggers deploy --dry-run",
+        "npm exec -- wrangler triggers deploy",
+        "Production HTTP and D1 read verification",
+        "npm exec -- wrangler queues resume-delivery tobirink-public-discovery",
+        "Final routes, schedules, subdomain, Queue and deployment verification"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "observe-corrected-weekly-run",
+      "title": "Observer la collecte corrigée pendant sept jours",
+      "status": "TODO",
+      "acceptance": [
+        "Une collecte Agenda contrôlée ou le premier cron hebdomadaire termine les deux lanes ou conserve le snapshot valide de la lane en échec.",
+        "Mesurer les requêtes fournisseur réelles par page, lane et reprise sans imposer 18 comme résultat attendu; les 13 pages du benchmark sont synthétiques.",
+        "Aucun appel Agenda n’apparaît entre deux sessions et une génération inchangée n’ajoute aucun événement.",
+        "Les hits frais ne produisent aucun appel fournisseur et les demandes dupliquées aucun message Queue.",
+        "Faire approuver avant ouverture les seuils proposés: alerte à 20 000 écritures UTC, recoupure à 50 000, première réconciliation Agenda au-delà de 10 000 ou cycle Agenda post-amorçage au-delà de 500; réconcilier HTTP et Queue avec D1.",
+        "Pour Discovery, arrêter le canari si un hit frais ou un doublon de même clé écrit, si une nouvelle clé de la même œuvre dépasse 30 écritures ou si une première résolution comparable dépasse 100; toute exception documentée ferme d'abord les entrées.",
+        "Les références locales sont 55 écritures pour une première résolution, 19 pour une nouvelle clé de la même œuvre, 70 pour un Agenda inchangé, 76–77 pour un événement changé et 1 798 pour le premier amorçage; ce ne sont pas des mesures distantes.",
+        "L’observation couvre sept jours calendaires sans publication Chrome ou Firefox."
+      ],
+      "files": [
+        ".project/progress.json",
+        "docs/progress.md",
+        "docs/plans/adaptive-public-refresh-safe-continuation-observation-update.json",
+        "docs/operations/adaptive-public-refresh-continuation.md"
+      ],
+      "commands": [
+        "Read-only Cloudflare Worker log, Queue, D1 usage and deployment inspection",
+        "Production HTTP verification after the weekly trigger",
+        "Emergency shutdown if the documented cost invariants regress"
+      ],
+      "evidence": []
+    }
+  ],
+  "validationEvidence": [
+    "Révision documentaire du 16/09/2026: ce plan est une référence non approuvée pour exécution; dépendances dans d1-cost-audit-roadmap.json.",
+    "Les formulations antérieures de certification du déploiement et d’observation décrivaient des cibles, non des résultats acquis.",
+    "Benchmark local corrigé: Discovery 55/19; Agenda 70 inchangé, 76–77 pour un événement changé et 1 798 au premier amorçage; aucune certification distante.",
+    "Le document maître docs/operations/tobirink-a-z-master-plan.md fixe l'ordre et les frontières d'approbation; ce plan n'autorise aucune mutation."
+  ]
+}

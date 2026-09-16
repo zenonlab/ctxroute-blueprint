@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-d1-end-to-end-certification",
+  "title": "Parcours A à Z après la référence locale D1",
+  "approved": false,
+  "executionMode": "collaborative",
+  "modeOffered": false,
+  "steps": [
+    {
+      "id": "complete-cost-observability",
+      "title": "B — Compléter les mesures natives et fixer les budgets",
+      "status": "DONE",
+      "acceptance": [
+        "Prérequis: référence goal-cost-baseline-and-roadmap validée; suivre goal-cost-audit-measured-capacity, sans le clôturer sur une mesure locale.",
+        "Étendre les mesures à HTTP/Queue, exceptions, contrôles fournisseur, négatifs, relations, batch50, alias/références et concurrence réelle D1; zéro données personnelles.",
+        "Définir seuil quotidien, pic, débit et seuil d’arrêt chiffrés avant déploiement; distinguer limite fournisseur, objectif produit et marge.",
+        "Présenter le périmètre exact, ADR et IR produit avant tout changement structurel; approbation d’implémentation séparée."
+      ],
+      "files": [
+        "apps/worker/src/operational-metrics.ts",
+        "apps/worker/src/native-collectors.ts",
+        "apps/worker/src/catalogue/public-discovery-routes.ts",
+        "docs/operations/d1-cost-audit.md"
+      ],
+      "commands": [
+        "npm run test:worker",
+        "npm run typecheck"
+      ],
+      "evidence": [
+        "worker.cost HTTP inclut les deltas D1 sans identité; références locales Discovery 55/19 et Agenda 70/76–77/1798.",
+        "Les seuils canari 20k/50k, 10k/500 et 0/30/100 restent proposés jusqu’à leur approbation opérationnelle."
+      ]
+    },
+    {
+      "id": "optimize-measured-amplification",
+      "title": "C — Réduire les amplifications démontrées",
+      "status": "DONE",
+      "acceptance": [
+        "Dépend de B; comparer avant/après sur mêmes fixtures et empêcher régression des budgets.",
+        "Traiter les pages Agenda conservées, les clés multiples d’une œuvre, l’égalité sémantique des profils et le coût de republication complète.",
+        "Préserver dernier snapshot valide, concurrence et reprise après échec; choisir delta ou snapshots après comparaison, sans refonte spéculative.",
+        "Toute purge distante a une cible, sauvegarde et approbation distinctes; aucune suppression autorisée par cette feuille de route."
+      ],
+      "files": [
+        "apps/worker/src/releases/public-release-collectors.ts",
+        "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts",
+        "docs/architecture/src/adaptive-public-refresh.dataflow.json",
+        "docs/operations/d1-cost-audit.md"
+      ],
+      "commands": [
+        "npm run test:worker",
+        "npm run validate:architecture",
+        "npm run validate:decisions"
+      ],
+      "evidence": [
+        "Migration locale 0021: projection Agenda différentielle, trois snapshots maximum et treize pages actives.",
+        "Une nouvelle clé d’une œuvre connue ne crée plus de révision ni de réécriture de fiche."
+      ]
+    },
+    {
+      "id": "preflight-deploy-sealed",
+      "title": "D — Certifier la release puis préparer le déploiement sous barrières",
+      "acceptance": [
+        "Point d’entrée unique: goal-controlled-d1-service-resumption; reprendre les preuves historiques goal-adaptive-public-refresh-step-7 sans exécuter un second déploiement parallèle.",
+        "Avant Cloudflare: validation locale complète, diff audité, puis commit et push sous leurs autorisations distinctes; le SHA distant à déployer doit correspondre au candidat certifié.",
+        "Vérifier accès, usage réel D1, migrations, routes/crons, sous-domaine et livraison Queue; une lecture réussie ne prouve pas un quota d’écriture disponible.",
+        "Sauvegarde fraîche vérifiée avant migrations; approuver séparément le plan fournisseur exact; routes/cron coupés et Queue suspendue durant la mise à niveau.",
+        "Vérifier toutes les étapes locales nécessaires à la version à déployer; aucune modification de forfait, secret, suppression ou publication d’extension implicite."
+      ],
+      "files": [
+        "docs/operations/cloudflare.md",
+        "apps/worker/wrangler.jsonc",
+        ".project/progress.json"
+      ],
+      "commands": [
+        "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+        "npm run test:worker"
+      ]
+    },
+    {
+      "id": "controlled-resumption",
+      "title": "E — Réactiver par canari et rapprocher les métriques distantes",
+      "acceptance": [
+        "Dépend de D; autorisation distincte pour migration/Worker, route, cron hebdomadaire et Queue reprise en dernier; jamais rouvrir l’ancien Worker seul.",
+        "Faire approuver les seuils proposés avant ouverture: alerte 20 000 écritures UTC, recoupure 50 000, première réconciliation Agenda >10 000, Agenda post-amorçage >500, ou régression Discovery par rapport aux plafonds 0/30/100.",
+        "Rapprocher méta D1 et métriques Cloudflare en tenant compte des logs perdus/échantillonnés, erreurs et autres sources d’écriture.",
+        "Séparer mesure distante du canari, estimation à grande échelle et tests locaux; ne pas multiplier le trafic de production pour simuler des utilisateurs."
+      ],
+      "files": [
+        "docs/operations/cloudflare.md",
+        "docs/operations/d1-cost-audit.md",
+        ".project/progress.json"
+      ],
+      "commands": [
+        "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+        "Read-only native D1 metrics and Worker log reconciliation"
+      ]
+    },
+    {
+      "id": "seven-day-certification",
+      "title": "F — Observer sept jours et décider du budget",
+      "acceptance": [
+        "Dépend de E; une collecte complète, un changement réel, fraîcheur suffisante et absence de boucle; panne d’une lane sans perte de l’autre.",
+        "Bilan par jour UTC, pics et estimation mensuelle: D1, Worker requêtes/CPU, Queue, R2 objets/images et gateway, sans données utilisateur.",
+        "Comparer Free/Paid selon la marge constatée; aucune souscription automatique. R2 complément ou snapshots uniquement après benchmark et décision d’architecture.",
+        "Mettre à jour les preuves des objectifs existants; publication extension et push exigent leurs autorisations spécifiques."
+      ],
+      "files": [
+        "docs/operations/d1-cost-audit.md",
+        "docs/operations/cloudflare.md",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "Read-only seven-day UTC usage review",
+        "npm run test:worker",
+        "git diff --check"
+      ]
+    },
+    {
+      "id": "verify-all-provider-content-contracts",
+      "title": "G — Vérifier les contrats de toutes les API après stabilisation D1",
+      "acceptance": [
+        "Dépend de la certification distante F; suivre goal-adult-content-local-visibility/verify-provider-contracts; AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu Manga, plus inventaire de tous les chemins actifs et futurs fournisseurs.",
+        "Vérifier les docs officielles pour recherche, lookup exact, pagination, relations, covers et Agenda lorsque disponible; aucun paramètre adulte universel inventé.",
+        "Classer adulte/non-adulte/inconnu avec provenance, décider les inconnus; les données autorisées restent collectées et transmises indépendamment du réglage local.",
+        "Évaluer le coût du catalogue élargi et les limites fournisseurs; ne pas promettre une collecte exhaustive si l’API ne la permet pas."
+      ],
+      "files": [
+        "packages/public-discovery/src/providers/anilist.ts",
+        "packages/public-discovery/src/providers/mangaupdates.ts",
+        "packages/public-discovery/src/providers/mangadex.ts",
+        "packages/public-discovery/src/providers/kitsu.ts",
+        "packages/public-discovery/src/agenda/collectors.ts",
+        "docs/02-quality-strategy.md"
+      ],
+      "commands": [
+        "npm run test --workspace @tobirink/public-discovery",
+        "npm run test:contracts"
+      ]
+    },
+    {
+      "id": "certify-local-visibility-journeys",
+      "title": "H — Certifier les parcours extension et visibilité",
+      "acceptance": [
+        "Dépend de G; suivre goal-adult-content-local-visibility/implement-local-toggle avec inventaire complet des fichiers avant autorisation.",
+        "Option persistante OFF par défaut; masquer titres/covers/entrées et bloquer commandes, liens anciens et notifications, sans effacer les données ou la progression.",
+        "Couvrir bibliothèque, recherche, Review, popup, relations, Agenda et WebBridge; ON réaffiche sans réinterroger les fournisseurs.",
+        "Chrome/Firefox: installation, import, reprise, offline, cache froid/chaud, ETag/304, restauration et changements de paramètres; budgets de requêtes mesurés."
+      ],
+      "files": [
+        "apps/extension/entrypoints/options/Settings.tsx",
+        "apps/extension/runtime/local-notification-runtime.ts",
+        "apps/extension/runtime/web-bridge-adapter.ts",
+        "docs/02-quality-strategy.md"
+      ],
+      "commands": [
+        "npm run test:e2e",
+        "npm run test:agenda",
+        "npm run build:extension",
+        "npm run build:extension:firefox"
+      ]
+    },
+    {
+      "id": "publish-extension-separately",
+      "title": "I — Certifier puis publier l’extension séparément",
+      "acceptance": [
+        "Dépend de H; candidate Chrome/Firefox reproductible, manifestes, permissions, hashes et parcours navigateur vérifiés.",
+        "Commit, push, upload R2, publication Chrome et publication Firefox ont chacun leur approbation explicite et leur preuve.",
+        "Aucune publication n’est incluse dans la reprise D1 ou dans l’implémentation du réglage local."
+      ],
+      "files": [
+        "apps/extension/package.json",
+        "docs/operations/tobirink-a-z-master-plan.md",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run verify",
+        "npm run build:extension",
+        "npm run build:extension:firefox",
+        "Reproducible package and hash verification"
+      ]
+    }
+  ],
+  "validationEvidence": [
+    "Étape A suivie dans goal-cost-baseline-and-roadmap; mesures locales Discovery 55/19 et Agenda 70/76–77/1798, sans mesure distante.",
+    "L'ordre d'exécution autoritatif est A–F pour stabiliser D1, puis G–H pour les contenus adultes et la préférence locale; la publication extension est une opération I séparée.",
+    "Feuille de route non approuvée pour implémentation: chaque étape précise son scope exact et ses opérations externes avant exécution."
+  ]
+}

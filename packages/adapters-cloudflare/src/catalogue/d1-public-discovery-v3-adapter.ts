@@ -361,6 +361,45 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     };
   }
 
+  private async catalogueNeedsPublication(profile: PublicDiscoveryVerifiedProfile): Promise<boolean> {
+    const candidate = profile.candidate;
+    const canonical = this.canonicalFacts(profile);
+    const preferredTitle = candidate.displayTitle ?? candidate.titles[0] ?? candidate.externalId;
+    const result = await this.database.prepare(`SELECT CASE WHEN
+      NOT EXISTS (SELECT 1 FROM catalogue_works
+        WHERE work_id = ?1 AND media_kind = ?2 AND preferred_title = ?3)
+      OR EXISTS (SELECT 1 FROM json_each(?4) AS proposed
+        WHERE NOT EXISTS (SELECT 1 FROM catalogue_titles
+          WHERE work_id = ?1 AND locale = 'und' AND title = proposed.value))
+      OR EXISTS (SELECT 1 FROM json_each(?5) AS proposed
+        WHERE NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1
+          WHERE normalization_version = ?6 AND normalized_title = proposed.value
+            AND media_kind = ?2 AND work_id = ?1))
+      OR EXISTS (SELECT 1 FROM json_each(?7) AS proposed
+        WHERE NOT EXISTS (SELECT 1 FROM catalogue_external_references
+          WHERE provider = json_extract(proposed.value, '$.provider')
+            AND external_id = json_extract(proposed.value, '$.externalId') AND work_id = ?1))
+      OR EXISTS (SELECT 1 FROM json_each(?8) AS proposed
+        WHERE NOT EXISTS (SELECT 1 FROM catalogue_work_relations
+          WHERE source_work_id = ?1
+            AND relation_type = json_extract(proposed.value, '$.relationType')
+            AND target_provider = json_extract(proposed.value, '$.reference.provider')
+            AND target_external_id = json_extract(proposed.value, '$.reference.externalId')
+            AND target_media_kind = json_extract(proposed.value, '$.mediaKind')))
+      THEN 1 ELSE 0 END AS needsPublication`)
+      .bind(
+        profile.workId,
+        candidate.mediaKind === 'ANIME' ? 'anime' : 'manga',
+        preferredTitle,
+        JSON.stringify(candidate.titles),
+        JSON.stringify(canonical.normalizedTitles),
+        favoriteTitlePreparationVersion,
+        JSON.stringify(profile.references),
+        JSON.stringify(candidate.relations ?? []),
+      ).first<{ needsPublication: number }>();
+    return result?.needsPublication === 1;
+  }
+
   private catalogueStatements(profile: PublicDiscoveryVerifiedProfile, verifiedAt: string, guardValues: SqlValue[]): Statement[] {
     const revision = Math.max(1, Date.parse(verifiedAt));
     const candidate = profile.candidate;
@@ -449,7 +488,9 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         ON CONFLICT(source_work_id, relation_type, target_provider, target_external_id) DO UPDATE SET
           target_media_kind = excluded.target_media_kind,
           target_work_id = COALESCE(excluded.target_work_id, catalogue_work_relations.target_work_id),
-          verified_at = excluded.verified_at`)
+          verified_at = excluded.verified_at
+        WHERE catalogue_work_relations.target_media_kind IS NOT excluded.target_media_kind
+          OR (catalogue_work_relations.target_work_id IS NULL AND excluded.target_work_id IS NOT NULL)`)
         .bind(profile.workId, relation.relationType, relation.reference.provider, relation.reference.externalId,
           relation.mediaKind, relation.reference.provider, relation.reference.externalId, verifiedAt, ...guardValues.slice(0, 7))),
       this.database.prepare(`UPDATE catalogue_work_relations SET target_work_id = ?
@@ -559,7 +600,9 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       ? publicDiscoveryVerifiedProfileSchema.parse(result.resolution.profile)
       : undefined;
     const guardValues = this.publicationGuardValues(result, profile, tokenDigest, now);
-    const statements = profile ? this.catalogueStatements(profile, verifiedAt, guardValues) : [];
+    const statements = profile && await this.catalogueNeedsPublication(profile)
+      ? this.catalogueStatements(profile, verifiedAt, guardValues)
+      : [];
     const resultExpiresAt = result.resolution.state === 'VERIFIED'
       ? null
       : futureIso(verifiedAt, negativeResultFreshnessMilliseconds);

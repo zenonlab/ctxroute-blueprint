@@ -70,6 +70,8 @@ export type AgendaLaneAdmission =
 export interface AgendaLaneCompletion { readonly changed: boolean; readonly digest: string; readonly events: readonly PublicAgendaReleaseEvent[] }
 export interface AgendaGenerationReceipt { readonly changed: boolean; readonly count: number; readonly revision: string }
 
+const maxAgendaSnapshotBytes = 1_800_000;
+
 async function sha256(value: string): Promise<string> {
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -90,6 +92,12 @@ function semanticAgendaEvents(events: readonly PublicAgendaReleaseEvent[]): read
       source: event.provenance.source,
       state: event.state,
     }));
+}
+
+function agendaSnapshot(events: readonly PublicReleaseEventContract[]): string {
+  const snapshot = JSON.stringify([...events].sort((left, right) => left.id.localeCompare(right.id)));
+  if (new TextEncoder().encode(snapshot).byteLength > maxAgendaSnapshotBytes) throw new Error('agenda-snapshot-too-large');
+  return snapshot;
 }
 
 export async function digestPublicAgendaEvents(events: readonly PublicAgendaReleaseEvent[]): Promise<string> {
@@ -212,12 +220,22 @@ export class D1AgendaCollectionAdapter {
       WHERE pointer.id = 'active'`).first<{ revision: string; windowFrom: string; windowTo: string }>();
     if (active?.revision === revision) {
       await this.db.prepare('UPDATE public_release_generation SET checked_at = ?1 WHERE revision = ?2').bind(checkedAt, revision).run();
+      await this.pruneCompletedPages();
       return { changed: false, count: events.length, revision };
     }
     const from = [anilist.window?.from, mangaupdates.window?.from, active?.windowFrom].filter((value): value is string => value !== undefined).sort()[0] ?? checkedAt.slice(0, 10);
     const to = [anilist.window?.to, mangaupdates.window?.to, active?.windowTo].filter((value): value is string => value !== undefined).sort().at(-1) ?? checkedAt.slice(0, 10);
     await commitPublicReleaseGeneration(this.db, events, { from, to }, revision, checkedAt);
+    await this.pruneCompletedPages();
     return { changed: true, count: events.length, revision };
+  }
+
+  private async pruneCompletedPages(): Promise<void> {
+    await this.db.prepare(`DELETE FROM public_release_agenda_page
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public_release_agenda_lane_state AS lane
+        WHERE public_release_agenda_page.collection_id IN (lane.active_snapshot_id, lane.collection_id)
+      )`).run();
   }
 
   private async readLaneEvents(provider: AgendaProvider): Promise<AgendaLaneEvents> {
@@ -240,8 +258,8 @@ export class D1AgendaCollectionAdapter {
       release_kind AS releaseKind, sequence_label AS sequence, occurrence_kind AS occurrenceKind,
       occurrence_value AS occurrenceValue, state, source, fetched_at AS fetchedAt,
       parser_version AS parserVersion, rules_version AS rulesVersion, expires_at AS expiresAt
-      FROM public_release_generation_event WHERE generation_revision = ?1 AND provider = ?2 ORDER BY id`)
-      .bind(generation.revision, provider).all<AgendaGenerationEventRow>();
+      FROM public_release_current_event WHERE provider = ?1 ORDER BY id`)
+      .bind(provider).all<AgendaGenerationEventRow>();
     const events = rows.results.map((row) => {
       const candidate: AgendaEventCandidate = {
         expiresAt: row.expiresAt, id: row.id,
@@ -265,18 +283,57 @@ export function upsertPublicReleaseEvents(db: PublicReleaseD1Writer, events: rea
   return db.batch(publicReleaseUpsertStatements(db, events));
 }
 export async function commitPublicReleaseGeneration(db: PublicReleaseD1Writer, events: readonly PublicReleaseEventContract[], window: { from: string; to: string }, revision: string, generatedAt: string): Promise<readonly D1Result[]> {
-  const results: D1Result[] = [];
-  results.push(...await db.batch([db.prepare("INSERT OR IGNORE INTO public_release_generation (revision, status, generated_at, window_from, window_to, event_count, checked_at) VALUES (?1, 'staging', ?2, ?3, ?4, ?5, ?2)").bind(revision, generatedAt, window.from, window.to, events.length)]));
-  for (let offset = 0; offset < events.length; offset += 50) {
-    const statements = events.slice(offset, offset + 50).map((event) => db.prepare('INSERT OR IGNORE INTO public_release_generation_event (generation_revision, id, provider, provider_work_id, release_kind, sequence_label, occurrence_kind, occurrence_value, state, source, fetched_at, parser_version, rules_version, expires_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)').bind(revision, event.id, event.provider, event.providerWorkId, event.releaseKind, event.sequence ?? null, event.occurrence.kind, event.occurrence.value, event.state, event.provenance.source, event.provenance.fetchedAt, event.provenance.parserVersion, event.provenance.rulesVersion, event.expiresAt));
-    results.push(...await db.batch(statements));
-  }
-  results.push(...await db.batch([
-    db.prepare("UPDATE public_release_generation SET status = 'staging' WHERE status = 'active' AND revision <> ?1 AND generated_at <= ?2 AND EXISTS (SELECT 1 FROM public_release_generation AS candidate WHERE candidate.revision = ?1 AND candidate.event_count = (SELECT COUNT(*) FROM public_release_generation_event WHERE generation_revision = ?1))").bind(revision, generatedAt),
-    db.prepare("UPDATE public_release_generation SET status = 'active' WHERE revision = ?1 AND event_count = (SELECT COUNT(*) FROM public_release_generation_event WHERE generation_revision = ?1) AND NOT EXISTS (SELECT 1 FROM public_release_active_generation AS pointer JOIN public_release_generation AS current ON current.revision = pointer.revision WHERE pointer.id = 'active' AND current.generated_at > ?2)").bind(revision, generatedAt),
-    db.prepare("INSERT INTO public_release_active_generation (id, revision) SELECT 'active', ?1 WHERE EXISTS (SELECT 1 FROM public_release_generation AS candidate WHERE candidate.revision = ?1 AND candidate.event_count = (SELECT COUNT(*) FROM public_release_generation_event WHERE generation_revision = ?1)) AND NOT EXISTS (SELECT 1 FROM public_release_active_generation AS pointer JOIN public_release_generation AS current ON current.revision = pointer.revision WHERE pointer.id = 'active' AND current.generated_at > ?2) ON CONFLICT(id) DO UPDATE SET revision = excluded.revision").bind(revision, generatedAt),
+  const snapshot = agendaSnapshot(events);
+  return db.batch([
+    db.prepare("INSERT OR IGNORE INTO public_release_generation (revision, status, generated_at, window_from, window_to, event_count, checked_at, events_json) VALUES (?1, 'staging', ?2, ?3, ?4, ?5, ?2, ?6)")
+      .bind(revision, generatedAt, window.from, window.to, events.length, snapshot),
+    db.prepare(`INSERT INTO public_release_current_event (
+      id, provider, provider_work_id, release_kind, sequence_label,
+      occurrence_kind, occurrence_value, state, source, fetched_at,
+      parser_version, rules_version, expires_at
+    ) SELECT
+      json_extract(value, '$.id'), json_extract(value, '$.provider'),
+      json_extract(value, '$.providerWorkId'), json_extract(value, '$.releaseKind'),
+      json_extract(value, '$.sequence'), json_extract(value, '$.occurrence.kind'),
+      json_extract(value, '$.occurrence.value'), json_extract(value, '$.state'),
+      json_extract(value, '$.provenance.source'), json_extract(value, '$.provenance.fetchedAt'),
+      json_extract(value, '$.provenance.parserVersion'), json_extract(value, '$.provenance.rulesVersion'),
+      json_extract(value, '$.expiresAt')
+    FROM json_each(?1)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public_release_active_generation AS pointer
+      JOIN public_release_generation AS current ON current.revision = pointer.revision
+      WHERE pointer.id = 'active' AND current.generated_at > ?2
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      provider = excluded.provider, provider_work_id = excluded.provider_work_id,
+      release_kind = excluded.release_kind, sequence_label = excluded.sequence_label,
+      occurrence_kind = excluded.occurrence_kind, occurrence_value = excluded.occurrence_value,
+      state = excluded.state, source = excluded.source, fetched_at = excluded.fetched_at,
+      parser_version = excluded.parser_version, rules_version = excluded.rules_version,
+      expires_at = excluded.expires_at
+    WHERE public_release_current_event.provider IS NOT excluded.provider
+      OR public_release_current_event.provider_work_id IS NOT excluded.provider_work_id
+      OR public_release_current_event.release_kind IS NOT excluded.release_kind
+      OR public_release_current_event.sequence_label IS NOT excluded.sequence_label
+      OR public_release_current_event.occurrence_kind IS NOT excluded.occurrence_kind
+      OR public_release_current_event.occurrence_value IS NOT excluded.occurrence_value
+      OR public_release_current_event.state IS NOT excluded.state
+      OR public_release_current_event.source IS NOT excluded.source
+      OR public_release_current_event.parser_version IS NOT excluded.parser_version
+      OR public_release_current_event.rules_version IS NOT excluded.rules_version`)
+      .bind(snapshot, generatedAt),
+    db.prepare(`DELETE FROM public_release_current_event
+      WHERE id NOT IN (SELECT json_extract(value, '$.id') FROM json_each(?1))
+        AND NOT EXISTS (
+          SELECT 1 FROM public_release_active_generation AS pointer
+          JOIN public_release_generation AS current ON current.revision = pointer.revision
+          WHERE pointer.id = 'active' AND current.generated_at > ?2
+        )`).bind(snapshot, generatedAt),
+    db.prepare("UPDATE public_release_generation SET status = 'staging' WHERE status = 'active' AND revision <> ?1 AND generated_at <= ?2 AND EXISTS (SELECT 1 FROM public_release_generation AS candidate WHERE candidate.revision = ?1 AND json_array_length(candidate.events_json) = candidate.event_count)").bind(revision, generatedAt),
+    db.prepare("UPDATE public_release_generation SET status = 'active' WHERE revision = ?1 AND json_array_length(events_json) = event_count AND NOT EXISTS (SELECT 1 FROM public_release_active_generation AS pointer JOIN public_release_generation AS current ON current.revision = pointer.revision WHERE pointer.id = 'active' AND current.generated_at > ?2)").bind(revision, generatedAt),
+    db.prepare("INSERT INTO public_release_active_generation (id, revision) SELECT 'active', ?1 WHERE EXISTS (SELECT 1 FROM public_release_generation AS candidate WHERE candidate.revision = ?1 AND json_array_length(candidate.events_json) = candidate.event_count) AND NOT EXISTS (SELECT 1 FROM public_release_active_generation AS pointer JOIN public_release_generation AS current ON current.revision = pointer.revision WHERE pointer.id = 'active' AND current.generated_at > ?2) ON CONFLICT(id) DO UPDATE SET revision = excluded.revision").bind(revision, generatedAt),
     db.prepare("DELETE FROM public_release_generation_event WHERE generation_revision IN (SELECT candidate.revision FROM public_release_generation AS candidate WHERE candidate.revision <> (SELECT revision FROM public_release_active_generation WHERE id = 'active') AND candidate.revision NOT IN (SELECT retained.revision FROM public_release_generation AS retained WHERE retained.revision <> (SELECT revision FROM public_release_active_generation WHERE id = 'active') ORDER BY retained.generated_at DESC, retained.revision DESC LIMIT 2)) AND (SELECT revision FROM public_release_active_generation WHERE id = 'active') = ?1").bind(revision),
     db.prepare("DELETE FROM public_release_generation WHERE revision <> (SELECT revision FROM public_release_active_generation WHERE id = 'active') AND revision NOT IN (SELECT retained.revision FROM public_release_generation AS retained WHERE retained.revision <> (SELECT revision FROM public_release_active_generation WHERE id = 'active') ORDER BY retained.generated_at DESC, retained.revision DESC LIMIT 2) AND (SELECT revision FROM public_release_active_generation WHERE id = 'active') = ?1").bind(revision),
-  ]));
-  return results;
+  ]);
 }

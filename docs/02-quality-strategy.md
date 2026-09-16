@@ -140,12 +140,17 @@ browser or `workerd` test when platform behavior is the risk.
   exposes no title, URL, IP, payload, secret, work key or installation ID.
 - Route tests preserve zero D1 writes on ordinary lookup while the closed
   counters distinguish cache HIT/MISS, created/deduplicated admissions and
-  accepted refreshes. Daily sums are a log query, never a D1 counter table.
+  accepted refreshes. They require exact HTTP `D1Result.meta` deltas and prove
+  that no fingerprint enters `worker.cost`. Daily sums are a log query, never
+  a D1 counter table.
 - Agenda D1 tests execute every migration and prove one atomic lease per lane,
   four durable page checkpoints followed by a page-five resume, independent
   last-valid snapshots, `Retry-After` propagation, and semantic digests that
-  ignore observation timestamps. An unchanged weekly collection must update
-  `checked_at` without increasing the generation-event row count.
+  ignore observation timestamps. Migration 0021 must backfill the indexed
+  active projection and rollback snapshots. An unchanged weekly collection
+  advances `checked_at`; a one-event change mutates only its differential row,
+  keeps at most two rollback snapshots and retains only active or interrupted
+  lane pages.
 - Collector timing tests enforce at most twenty AniList and ten MangaUpdates
   HTTP requests per minute with one concurrent collection per provider. The
   configured cron is exactly one UTC session per week.

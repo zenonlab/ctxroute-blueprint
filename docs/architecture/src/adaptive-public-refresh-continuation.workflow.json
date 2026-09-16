@@ -1,0 +1,111 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Reprise sûre du rafraîchissement adaptatif",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "sealed-deployment",
+        "label": "Déploiement sous scellé",
+        "focus": ["quotaReady", "sealVerified", "freshBackup", "deployCorrected", "sealedValidation"],
+        "note": "Le quota est confirmé puis migrations et Worker sont appliqués sans route, cron ni livraison Queue."
+      },
+      {
+        "id": "ordered-reactivation",
+        "label": "Réactivation ordonnée",
+        "focus": ["sealedValidation", "restoreRoute", "restoreCron", "resumeQueue"],
+        "note": "La route revient avant le cron hebdomadaire; la Queue reprend toujours en dernier."
+      },
+      {
+        "id": "fail-closed-observation",
+        "label": "Observation en échec fermé",
+        "focus": ["weeklyObservation", "shutdownAgain"],
+        "note": "Toute dérive de coût réapplique la coupure sans supprimer D1, R2 ni les messages."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "safety", "label": "Barrières de sécurité" },
+    { "id": "cloudflare", "label": "Cloudflare" },
+    { "id": "evidence", "label": "Preuves et observation" },
+    { "id": "fallback", "label": "Retour en sécurité", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "preflight", "label": "Préflight", "fromCol": 0, "toCol": 1, "variant": "security" },
+    { "id": "sealed", "label": "Déploiement scellé", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "operate", "label": "Réactivation + preuve", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": [
+    "quotaReady",
+    "sealVerified",
+    "freshBackup",
+    "deployCorrected",
+    "sealedValidation",
+    "restoreRoute",
+    "restoreCron",
+    "resumeQueue",
+    "weeklyObservation"
+  ],
+  "semanticChecks": {
+    "allowedRoots": ["quotaReady"],
+    "allowedTerminals": ["weeklyObservation", "shutdownAgain"],
+    "requiredPaths": [
+      { "from": "quotaReady", "to": "weeklyObservation" },
+      { "from": "weeklyObservation", "to": "shutdownAgain" }
+    ]
+  },
+  "nodes": [
+    { "id": "quotaReady", "lane": "safety", "col": 0, "width": 100, "type": "external", "label": "Quota rétabli", "sublabel": "preuve avant mutation", "tag": "gate" },
+    { "id": "sealVerified", "lane": "safety", "col": 1, "width": 100, "type": "security", "label": "Scellé actif", "sublabel": "aucune entrée" },
+    { "id": "freshBackup", "lane": "cloudflare", "col": 1, "width": 100, "type": "database", "label": "Backup D1", "sublabel": "intégrité + SHA" },
+    { "id": "deployCorrected", "lane": "cloudflare", "col": 2, "width": 115, "type": "cloud", "label": "Déployer corrigé", "sublabel": "0017–0021 + Worker" },
+    { "id": "sealedValidation", "lane": "evidence", "col": 3, "width": 110, "type": "security", "label": "Valider scellé", "sublabel": "D1 · version" },
+    { "id": "restoreRoute", "lane": "cloudflare", "col": 4, "width": 105, "type": "frontend", "label": "Route publique", "sublabel": "tobirink.com/*" },
+    { "id": "restoreCron", "lane": "cloudflare", "col": 5, "width": 95, "type": "messagebus", "label": "Cron hebdo", "sublabel": "23 3 * * 0" },
+    { "id": "resumeQueue", "lane": "safety", "col": 5, "width": 110, "type": "messagebus", "label": "Queue en dernier", "sublabel": "reprise contrôlée", "tag": "gate" },
+    { "id": "weeklyObservation", "lane": "evidence", "col": 5, "width": 115, "type": "external", "label": "Observer 7 jours", "sublabel": "coûts · lanes · digest" },
+    { "id": "shutdownAgain", "lane": "fallback", "col": 5, "width": 115, "type": "security", "label": "Recouper", "sublabel": "toutes les entrées" }
+  ],
+  "edges": [
+    { "id": "quota-to-seal", "from": "quotaReady", "to": "sealVerified", "label": "quota disponible", "variant": "security", "role": "main" },
+    { "id": "seal-to-backup", "from": "sealVerified", "to": "freshBackup", "label": "aucune entrée active", "role": "main" },
+    { "id": "backup-to-deploy", "from": "freshBackup", "to": "deployCorrected", "label": "backup vérifié", "variant": "emphasis", "role": "main" },
+    { "id": "deploy-to-validation", "from": "deployCorrected", "to": "sealedValidation", "label": "nouvelle version sans trafic", "variant": "emphasis", "role": "main" },
+    { "id": "validation-to-route", "from": "sealedValidation", "to": "restoreRoute", "label": "migrations complètes", "variant": "security", "role": "main" },
+    { "id": "route-to-cron", "from": "restoreRoute", "to": "restoreCron", "label": "HTTP sain", "role": "main" },
+    { "id": "cron-to-queue", "from": "restoreCron", "to": "resumeQueue", "label": "hebdomadaire uniquement", "variant": "security", "role": "main" },
+    { "id": "queue-to-observation", "from": "resumeQueue", "to": "weeklyObservation", "label": "runtime corrigé actif", "variant": "emphasis", "role": "main" },
+    { "id": "regression-to-stop", "from": "weeklyObservation", "to": "shutdownAgain", "label": "dérive de coût ou boucle", "variant": "security", "role": "error" }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Constat et limite",
+      "items": [
+        "Le quota a été épuisé pendant l’ancien pipeline",
+        "L’attribution exacte des 100 000 écritures reste non mesurée",
+        "Les budgets corrigés sont validés localement, pas à distance"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Ordre non négociable",
+      "items": [
+        "Sauvegarder avant les migrations additives",
+        "Déployer et vérifier pendant que la production reste scellée",
+        "Réactiver route, cron hebdomadaire puis Queue"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Canari et arrêt",
+      "items": [
+        "Alerte à 20 000 et recoupure à 50 000 écritures UTC proposées",
+        "Cycle Agenda post-amorçage au-delà de 500 écritures : recoupure",
+        "Une dérive recoupe toutes les entrées sans supprimer les données",
+        "Seuils à approuver avec chaque mutation fournisseur"
+      ]
+    }
+  ]
+}

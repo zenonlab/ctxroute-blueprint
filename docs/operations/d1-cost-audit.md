@@ -1,0 +1,334 @@
+# Audit des coûts D1 et parcours de certification
+
+Date : 16 septembre 2026. État : optimisations locales mesurées, production non certifiée.
+
+Le [plan maître A à Z](./tobirink-a-z-master-plan.md) est la source de vérité
+pour l'ordre d'exécution, les seuils proposés et les frontières d'approbation.
+
+## Verdict
+
+Le nombre de lignes conservées n'est pas le nombre d'écritures.
+Une fiche synthétique de dix lignes catalogue coûte ici **55 écritures** pour
+son admission, son traitement et sa publication. Aucun appel fournisseur n'est
+inclus dans ces 55 écritures.
+
+La déduplication d'une même clé et les lectures VERIFIED fraîches passent sans
+écriture. Une autre clé pour la même œuvre coûte 19 écritures de cycle, mais ne
+crée plus de révision et ne réécrit plus sa fiche catalogue. Le rafraîchissement
+inchangé ou sans changement dans les champs matériellement persistés conserve
+12 écritures de suivi.
+
+L'Agenda utilise désormais une projection active différentielle. Après
+amorçage, une collecte identique coûte 70 écritures pour les deux lanes et
+leurs treize pages ; un seul événement modifié coûte 76–77 écritures, rétention
+incluse. Après cinq cycles, seules les treize pages actives restent. La première
+réconciliation locale coûte encore 1 798 écritures et doit rester un pic séparé.
+
+Ces résultats ne reconstituent pas les 100 000 écritures historiques et ne
+certifient pas le montant facturé en production.
+
+## Méthode et reproductibilité
+
+Source exécutable : [banc de mesure](../../apps/worker/src/cost-baseline.test.ts).
+Moteur local workerd/D1 via le plugin Cloudflare déjà installé, migrations du
+dépôt jusqu'à 0021, sans modification de dépendance.
+
+Commande de reproduction avec sortie des compteurs :
+
+```sh
+npm run test --workspace @tobirink/worker -- src/cost-baseline.test.ts --reporter=verbose --silent=false
+```
+
+Le wrapper existant additionne uniquement les métadonnées
+`D1Result.meta.rows_read/rows_written`. Les migrations, la préparation explicite
+hors blocs mesurés et les SELECT de contrôle du stock sont exclus.
+Les tests utilisent des identifiants et titres synthétiques, sans dump privé.
+Les résultats fournisseur sont injectés : **zéro requête HTTP fournisseur**,
+pas de simulation de CPU, de tarif Queue, de réseau ou de latence distante.
+Le test du contrôle fournisseur mesure ses opérations D1 sans lancer HTTP.
+
+Les lectures dépendent de la taille et de l'état des tables : elles ne constituent
+pas un coefficient universel. Les assertions figent les écritures du scénario
+Discovery et des cinq cycles Agenda pour rendre une dérive visible.
+Un changement légitime de schéma doit donner lieu à une nouvelle mesure, pas à
+une mise à jour aveugle des chiffres attendus.
+
+Les tableaux correspondent à l'exécution du fichier complet dans son ordre
+déclaré. Les migrations sont idempotentes, mais ne remettent pas à zéro la base
+entre chaque test : les scénarios suivants peuvent retrouver des révisions et
+des lignes des scénarios précédents. Les fixtures de nouvelles œuvres ont des
+identifiants distincts. Exécuter un seul test isolément peut donc modifier les
+lectures et la création d'une révision commune ; reproduire la commande complète.
+
+## Discovery : mesures locales
+
+Fixture : une œuvre, quatre titres distincts normalisés, une référence AniList,
+aucune relation. Stock final : 1 fiche + 4 titres + 4 clés canoniques + 1 référence
+= **10 lignes**, hors demandes, révisions, nonces et index.
+
+| Opération | Lignes lues | Écritures |
+|---|---:|---:|
+| Nouvelle demande | 11 | 5 |
+| Confirmation du signal Queue | 3 | 4 |
+| Attribution au collecteur | 20 | 4 |
+| Publication de la fiche à quatre titres | 52 | 42 |
+| **Total première résolution, hors fournisseur** | **86** | **55** |
+| 100 admissions identiques pendant PENDING | 1 400 | 0 |
+| 100 lectures VERIFIED unitaires | 300 | 0 |
+| Lookup groupé contenant une clé VERIFIED | 2 | 0 |
+| Admission identique déjà VERIFIED | 14 | 0 |
+| Nouvelle clé aboutissant à la même œuvre, cycle complet | 67 | 19 |
+| Refresh identique : admission, confirmation, claim, publication | 36 | 12 |
+| Refresh sans changement des champs catalogue persistés | 61 | 12 |
+| Réservation fournisseur + succès | 4 | 2 |
+| Réservation fournisseur + échec | 4 | 2 |
+
+Les 19 écritures de la nouvelle clé démontrent la distinction clé/œuvre : elles
+proviennent du cycle de demande, signal et claim, tandis que le compteur de
+révisions catalogue reste inchangé. La fixture ne prétend pas reproduire toutes
+les variantes du parseur de favoris.
+Le test de lookup avec une clé ne mesure pas un lot de cinquante clés.
+
+### Échecs et relations
+
+| Scénario | Lignes lues | Écritures |
+|---|---:|---:|
+| Admission d'une demande qui échouera | 11 | 5 |
+| Huit claims avec expiration du bail | 208 | 32 |
+| Première lecture après épuisement : transition FAILED | 5 | 3 |
+| Lecture UNAVAILABLE suivante | 3 | 0 |
+| Publication d'une nouvelle fiche à un titre et une relation | 88 | 28 |
+| Confirmation du signal de l'œuvre liée | 3 | 4 |
+| Rejeu du même résultat et du même nonce | 36 | 0 |
+
+Les huit claims coûtent **40 écritures avec admission et clôture**, hors
+confirmation du signal initial et hors contrôle/appels fournisseur.
+Il s'agit d'expirations de baux synthétiques, pas de huit erreurs HTTP réelles.
+La publication avec relation exclut son admission/claim initial et ne résout pas
+l'œuvre cible : ce n'est pas le coût complet de deux œuvres.
+
+La lecture unitaire n'est pas universellement sans écriture : elle clôt une
+demande PROCESSING épuisée. Ne pas promettre zéro écriture pour tout GET.
+
+## Agenda : mesures locales
+
+Fixture : 220 événements AniList et 359 MangaUpdates, cinq et huit pages de
+cinquante événements au maximum. La fenêtre reste fixe pour isoler la détection
+de changement. Chaque cycle couvre claim, pages, fin des deux lanes et publication
+fusionnée, sans le transport, le contrôle fournisseur ni le gestionnaire Queue.
+
+| Cycle | Lignes lues | Écritures | Publication |
+|---|---:|---:|---|
+| Première réconciliation, 579 événements / 13 pages | 3 004 | 1 798 | Projection active initialisée |
+| Collecte identique, horodatage différent | 156 | 70 | Aucune nouvelle génération |
+| Un événement changé, deuxième génération | 3 660 | 76 | Diff d'un événement |
+| Un événement changé, troisième génération | 3 667 | 76 | Diff d'un événement |
+| Un événement changé, quatrième génération | 3 679 | 77 | Diff + rétention d'un snapshot |
+
+Stock final vérifié : **579 lignes actives**, trois métadonnées de génération
+avec leur snapshot JSON restaurable et **13 pages JSON** correspondant aux deux
+snapshots de lane actifs. Une collecte interrompue reste conservée tant qu'elle
+est la collecte courante reprenable ; les pages terminées remplacées sont
+supprimées par le cycle local, sans purge distante dans cette étape.
+
+Treize paires réservation/succès coûteraient 26 écritures supplémentaires selon
+le test de contrôle fournisseur, si exactement un appel est requis par page.
+C'est une composition de mesures, pas un cycle natif complet mesuré :
+**96** écritures pour la collecte inchangée et **103** pour un cycle différentiel
+avec rétention dans cette hypothèse. Les métadonnées supplémentaires et les retries
+du gestionnaire natif restent à mesurer.
+
+### Reprise après interruption
+
+| Opération | Lignes lues | Écritures |
+|---|---:|---:|
+| Claim | 3 | 1 |
+| Sauvegarde de la première page | 2 | 4 |
+| Enregistrement de l'échec | 1 | 1 |
+| Réessai avant échéance | 1 | 0 |
+| Reprise après échéance | 3 | 1 |
+| Sauvegarde de la deuxième page | 2 | 4 |
+| Fin de lane | 5 | 1 |
+| Rejeu du déclenchement terminé | 1 | 0 |
+
+Ce scénario utilise des pages vides pour isoler le checkpoint. Il vérifie le
+refus de publication incomplète et la reprise à la page 2 avec le même
+collection_id. Le coût de lecture du refus volontaire n'est pas dans le tableau.
+Les premiers événements d'une génération interrompue et les échecs en plein
+`db.batch` exigent une campagne distincte.
+
+## Historique : ce qui est prouvé et ce qui ne l'est pas
+
+La sauvegarde du 16 septembre examinée lors du diagnostic contient 99
+générations pour 18 horaires distincts, 96 sans événement actuellement et trois
+avec 579 événements. Le cron de l'ancien commit 0b44a59 est `*/10`, pas `*/5`.
+Le hash ancien incluait la date du déclenchement et les horodatages de collecte.
+
+La somme 99 × 579 = 57 321 est un nombre déclaré dans les générations, pas un
+compteur d'insertions réussies. Une sauvegarde ne restitue pas les opérations
+supprimées ni toutes les tentatives échouées. Les précédentes affirmations
+« 231 000 écritures prouvées », « 1 737 événements actifs » et
+« saturation en 3,57 heures » ne sont pas établies.
+
+Illustration, sans attribution historique : 144 collectes quotidiennes × 579
+insertions = 83 376 insertions. Leur renouvellement avec suppression des copies
+anciennes peut dépasser 100 000 mutations avant même les index.
+Le déficit historique exact reste à rapprocher des métriques Cloudflare.
+
+## Capacité : œuvres et utilisateurs
+
+Hypothèses de projection, **pas tests de charge exécutés** :
+U utilisateurs, W œuvres par utilisateur, quatre titres et une référence par
+œuvre, une clé par œuvre, résolution unique sans relation ni retry.
+Tous les utilisateurs arrivent le même jour, depuis un catalogue initialement
+froid. La colonne partagée suppose exactement les mêmes W œuvres et les mêmes
+clés pour tous ; la colonne distincte suppose U × W œuvres différentes.
+
+Les écritures sont le sous-total 55 × nouvelles œuvres.
+La dernière colonne illustre une consultation unitaire de chaque œuvre par
+chaque utilisateur une fois le catalogue chaud, selon 3 lectures observées par
+GET dans la petite fixture ; ce n'est ni la mesure du lookup par 50 ni une
+garantie à grande échelle.
+
+| Utilisateurs U | Œuvres / utilisateur W | Écritures catalogue partagé | Écritures catalogues distincts | Lectures chaudes unitaires, projection |
+|---:|---:|---:|---:|---:|
+| 1 | 10 | 550 | 550 | 30 |
+| 1 | 100 | 5 500 | 5 500 | 300 |
+| 1 | 500 | 27 500 | 27 500 | 1 500 |
+| 1 | 1 000 | 55 000 | 55 000 | 3 000 |
+| 100 | 10 | 550 | 55 000 | 3 000 |
+| 100 | 100 | 5 500 | 550 000 | 30 000 |
+| 100 | 500 | 27 500 | 2 750 000 | 150 000 |
+| 100 | 1 000 | 55 000 | 5 500 000 | 300 000 |
+| 1 000 | 10 | 550 | 550 000 | 30 000 |
+| 1 000 | 100 | 5 500 | 5 500 000 | 300 000 |
+| 1 000 | 500 | 27 500 | 27 500 000 | 1 500 000 |
+| 1 000 | 1 000 | 55 000 | 55 000 000 | 3 000 000 |
+| 10 000 | 10 | 550 | 5 500 000 | 300 000 |
+| 10 000 | 100 | 5 500 | 55 000 000 | 3 000 000 |
+| 10 000 | 500 | 27 500 | 275 000 000 | 15 000 000 |
+| 10 000 | 1 000 | 55 000 | 550 000 000 | 30 000 000 |
+
+Coût marginal pour un utilisateur arrivant après le préremplissage :
+zéro écriture sur les hits frais testés ; **55 × W** pour W nouvelles œuvres
+dans cette fixture, avant les autres postes. Avec d'autres clés pour les mêmes
+œuvres, une nouvelle résolution peut encore écrire : le partage du titre seul
+ne garantit pas le partage de clé.
+
+Pour D nouvelles œuvres, A nouvelles clés d'œuvres existantes, H refreshes
+inchangés, M refreshes modifiés et P paires de contrôle fournisseur, le modèle
+local indicatif est :
+
+`writes = 55D + 19A + 12H + 12M + 2P + Agenda + échecs + autres écritures`.
+
+Ces coefficients sont propres aux fixtures. La première publication d'une
+révision commune peut être mutualisée par un batch ; les alias, références,
+relations et index changent aussi le coût. Ne pas additionner deux fois le
+contrôle fournisseur dans un cycle déjà mesuré intégralement.
+
+Une moyenne hebdomadaire ne protège pas du pic d'un jour. Par exemple,
+2 000 créations de cette fixture donnent 110 000 écritures avant Agenda.
+Le stockage en Go, les requêtes HTTP, le CPU Worker, les messages Queue,
+les images et la gateway ne se déduisent pas de ce tableau.
+
+## Budget D1 et place de R2
+
+Au 16/09/2026, D1 Free inclut 100 000 écritures et 5 millions de lectures par
+jour ; le quota quotidien n'est pas un crédit mensuel transférable.
+Workers Paid inclut 50 millions d'écritures D1 par mois, puis 1 USD par million
+supplémentaire ; les lectures et le stockage ont leurs propres tarifs.
+[Source officielle D1](https://developers.cloudflare.com/d1/platform/pricing/).
+
+Workers Paid commence à 5 USD/mois, pas un prix garanti de 5 EUR TTC.
+Le total peut inclure requêtes et CPU supplémentaires.
+[Source officielle Workers](https://developers.cloudflare.com/workers/platform/pricing/).
+
+Illustration mensuelle du **seul sous-total d'écritures de création** :
+un million de nouvelles œuvres à 55 écritures donnent 55 millions, soit 5 USD
+d'écritures au-delà de l'inclus, plus la base Workers de 5 USD et tous les autres
+postes. Une petite charge sous l'inclus ne produit aucun supplément d'écritures
+D1, mais ne garantit pas une facture totale de 5 USD.
+
+R2 ne remplace pas directement les recherches relationnelles et les états D1.
+Il peut servir les objets et, après benchmark, des snapshots partitionnés
+d'Agenda. Il n'est pas nécessaire de charger un catalogue JSON entier à chaque
+requête : l'ancienne affirmation d'une impossibilité absolue était excessive.
+Cette option constitue une autre conception, pas une correction automatique.
+
+R2 Standard a une franchise mensuelle de 10 Go-mois, 1 million d'opérations A
+et 10 millions B, avec tarification propre au-delà.
+[Source officielle R2](https://developers.cloudflare.com/r2/pricing/).
+Aucun abonnement, déplacement de données ou coût R2 du compte n'a été validé.
+
+Décision : aucune obligation de migration R2 démontrée ; ne pas acheter un
+forfait pour masquer les réécritures. Choisir Free/Paid après mesure distante
+des pics et de tous les postes, avec une marge explicitement acceptée.
+
+## Audit des objectifs et parcours A à Z
+
+La [feuille de route](../plans/d1-cost-audit-roadmap.json) décrit les étapes
+suivantes ; elle n'autorise pas leur exécution ni les opérations fournisseur.
+
+| Ordre | Résultat attendu | Critère de passage |
+|---|---|---|
+| A — Référence locale | Ce banc et les tableaux | Mesures reproductibles, limites explicites |
+| B — Observabilité et budgets | **Local réalisé** : HTTP et Queue exposent les deltas D1 sans identité | Reste à rapprocher sept jours de logs des métriques natives distantes |
+| C — Optimisations justifiées | **Local réalisé** : œuvre/clé, projection Agenda différentielle, snapshots et pages bornées | Reste à migrer et canarier sous approbation fournisseur ; aucune purge distante incluse |
+| D — Préflight distant | Release locale certifiée, commit/push séparés, backup restaurable | Quota et scellé vérifiés, migrations 0017–0021, plan frais et approbation fournisseur exacte |
+| E — Déploiement et canari | Worker corrigé sous scellé puis route, cron et Queue en dernier | Seuils approuvés, aucun ancien Worker rouvert, métriques rapprochées |
+| F — Sept jours et décision économique | Cycle complet observé | Pannes/reprises maîtrisées, bilan UTC et mensuel, décision Free/Paid/R2 |
+| G — Contrats de tous les fournisseurs | AniList, MangaUpdates, MangaDex, Kitsu Anime et Manga, plus tout adaptateur actif | Recherche, exact lookup, pagination, relations, couvertures, Agenda où disponible ; classification adulte/non-adulte/inconnue et provenance |
+| H — Préférences et parcours client | Réception indépendante du réglage d'affichage | OFF masque et bloque actions/notifications ; ON restaure sans nouvelle collecte ; Chrome/Firefox, bibliothèque, recherche, popup, Review, Agenda, WebBridge |
+| I/J — Certification et publication extension | Candidate reproductible | Publication séparément approuvée par cible |
+
+L'ordre G/H ne doit pas transformer l'enrichissement serveur en filtre adulte
+global : toutes les données autorisées sont reçues indépendamment du choix
+local. Le comportement des classifications inconnues et des références liées
+doit être décidé puis testé. Aucun paramètre universel « adult » n'est supposé.
+
+### Corrections de gouvernance
+
+- L'ancien objectif GitHub */10 est historique/remplacé : ne pas le réexécuter
+  ni le déclarer réussi artificiellement.
+- Le déploiement adaptatif ancien conserve ses preuves et son blocage ; la
+  reprise contrôlée est l'unique point d'entrée opérationnel.
+- L'accès Cloudflare a refonctionné pendant l'audit préalable (ancienne version
+  2267a691 observée) ; ce constat ne prouve ni quota libre ni barrières complètes.
+  L'ancien blocage d'authentification ne doit plus être présenté comme actuel.
+- La certification distante reste ouverte : ce banc ne clôt pas l'objectif
+  complet de capacité.
+- Les étapes adultes nécessitent un périmètre fichiers complet avant validation :
+  les six fichiers UI listés historiquement ne suffisent pas à tous les chemins.
+- La cadence hebdomadaire doit aussi satisfaire la fraîcheur fonctionnelle :
+  changements de planning, reports et nouvelles sorties à tester, pas seulement
+  la réduction du coût.
+- Le dataflow qualifie désormais le zéro écriture comme un résultat limité au
+  hit frais testé et décrit l'admission hebdomadaire par clé, pas une garantie
+  universelle par œuvre.
+
+## Limites et audit de fin d'étape
+
+CONFORME : uniquement test et documentation/Progress ; aucun appel fournisseur,
+déploiement, migration distante, abonnement, secret, purge, push ou commit.
+AGENTS.md, CLAUDE.md, .codex/hooks.json et les hooks ne sont pas modifiés.
+Les modifications utilisateur .codex/config.toml et le workflow non suivi sont
+préservés. La compétence stack-audit impose de conserver les preuves manquantes
+comme manquantes, sans assimiler tests fonctionnels et validation économique.
+
+MANQUE pour la certification globale : profilage natif complet avec transport
+simulé, négatifs et 429/5xx, concurrence D1 réelle, payloads égaux avec ordre JSON
+différent, nombre variable d'alias/références, lots de cinquante clés, CPU,
+ETag/304/cache navigateur, cycle client complet, couverture de toutes les API,
+métriques distantes et observation sept jours.
+
+N/A pour cette étape : nouvelle architecture/ADR, car aucun module produit,
+contrat, flux, schéma ou dépendance n'est changé. Les nouvelles décisions
+structurelles sont explicitement reportées aux étapes approuvées correspondantes.
+Le test monofichier déclenche un avertissement Sensor de taille AST, sans erreur ;
+le périmètre approuvé est conservé, sans désactiver de règle.
+
+Validations de cette étape : 102 tests Worker sur 13 fichiers, dont six nouveaux
+scénarios ; TypeScript Worker, Oxlint ciblé, documentation complète, 54 ADR / 478
+scopes et git diff --check réussis. La feuille de route passe la validation
+Progress sans être approuvée pour implémentation. Le verify global et les parcours
+navigateur n'ont pas été relancés : aucun code produit ou composant UI n'a changé.

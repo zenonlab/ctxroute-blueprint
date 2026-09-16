@@ -1,6 +1,7 @@
 import { applyD1Migrations, env, SELF } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
 
 const discoveryKey = (marker: string) => ({ fingerprint: marker.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' });
@@ -9,6 +10,12 @@ type DiscoverySubmission = {
   query: { discoveryTitles: string[]; mediaKind: 'ANIME'; sourceTitles: string[] };
   schemaVersion: 3;
 };
+const costEventSchema = z.object({
+  d1RowsRead: z.number().int().nonnegative(),
+  d1RowsWritten: z.number().int().nonnegative(),
+  task: z.string(),
+  type: z.literal('worker.cost'),
+});
 
 async function jsonDigest(value: DiscoverySubmission): Promise<string> {
   const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))));
@@ -89,6 +96,28 @@ describe('verified public discovery cache', () => {
       { requestJson, state: 'PROCESSING' },
       { requestJson: '{}', state: 'VERIFIED' },
     ]);
+  });
+
+  it('emits exact D1 read and write metadata for public HTTP lookups', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    try {
+      const key = discoveryKey('6');
+      const url = new URL('https://tobirink.test/v3/catalogue/discoveries');
+      for (const [name, value] of Object.entries(key)) url.searchParams.set(name, value);
+      const response = await SELF.fetch(url);
+      expect(response.status).toBe(200);
+      const events = info.mock.calls.flatMap(([value]) => {
+        const parsed = costEventSchema.safeParse(JSON.parse(String(value)));
+        return parsed.success ? [parsed.data] : [];
+      });
+      expect(events).toContainEqual(expect.objectContaining({
+        d1RowsRead: expect.any(Number), d1RowsWritten: 0, task: 'discovery-lookup', type: 'worker.cost',
+      }));
+      expect(events[0]?.d1RowsRead).toBeGreaterThan(0);
+      expect(JSON.stringify(events)).not.toContain(key.fingerprint);
+    } finally {
+      info.mockRestore();
+    }
   });
 
   it('retires both external collector routes', async () => {

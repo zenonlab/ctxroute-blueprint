@@ -72,9 +72,9 @@
 
 - [x] **Pousser exactement 6dfe27c vers origin/main** — DONE _(evidence: Push fast-forward réussi: ce6f43d..6dfe27c; origin/main pointe exactement sur 6dfe27c41839fac8f2b78b74167737b135530431., Les gates pré-push locales lint, couverture, intégration et build documentaire ont réussi., Les runs 34975288611, 34975288507 et 34975288676 ont été créés puis arrêtés avant exécution par le blocage GitHub paiement/plafond.)_
 
-## Publier le collecteur Public Discovery v3 à cadence dix minutes — BLOCKED
+## Historique remplacé — collecteur GitHub v3, ne pas réexécuter — BLOCKED
 
-- [ ] **Pousser exactement 51742d9 vers le dépôt public et vérifier le trafic** — BLOCKED _(evidence: Commit public 51742d9 poussé et vérifié; tests locaux 51/51 et npm ls réussis., Routes publiques vérifiées: Discovery v3 et Agenda v3 répondent 200; Discovery v2 répond 410., external: aucun run schedule créé sur 51742d9 après plusieurs fenêtres */10; GitHub reste sans garantie de démarrage et ne satisfait pas la latence demandée.)_
+- [ ] **Conserver la preuve historique sans relancer le collecteur GitHub** — BLOCKED _(evidence: Commit public 51742d9 poussé et vérifié; tests locaux 51/51 et npm ls réussis., Routes publiques vérifiées: Discovery v3 et Agenda v3 répondent 200; Discovery v2 répond 410., external: aucun run schedule créé sur 51742d9 après plusieurs fenêtres */10; GitHub reste sans garantie de démarrage et ne satisfait pas la latence demandée.)_
 
 ## Remplacer GitHub Actions par des collecteurs Cloudflare et un proxy sortant — DONE
 
@@ -144,11 +144,37 @@
 
 - [x] **Ajouter les compteurs expurgés et consolider l’architecture** — DONE _(evidence: Worker 96/96, D1 28/28 et Public Discovery 59/59 passent; tous les typechecks et les tests dédiés aux métriques expurgées sont verts., npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent; les builds Chrome et Firefox passent., Archify showcase passe 9/9 sans erreur ni avertissement: Agenda 29549fac4208f7b875d3c2f29049369792d299648524bb0bb75311ce9dbb78ef, Discovery 13a4049fc65d737e18cbd67c06056c04cb46ccc7a0dd6a3803bf1f5f11868239.)_
 
-## Déployer progressivement le rafraîchissement public adaptatif — ACTIVE
+## Preuves du déploiement adaptatif — reprise via objectif contrôlé — ACTIVE
 
-- [ ] **Sauvegarder D1, migrer, pousser et déployer le Worker** — BLOCKED _(evidence: Backup D1 ignoré et restaurable: 1000960 octets, 30 tables, integrity_check ok, SHA-256 c5b94e9566be330a8db0a9a7b54be54c73a603166432bcb48d088a87639b33ed., origin/main pointe sur 9cfd468 après passage des hooks pré-push; .codex/config.toml est resté local et non indexé., external: plan frais d5ae98b2 appliqué le 2026-09-16T11:04:42Z; Cloudflare refuse D1 avec le code 7500 jusqu’au reset de minuit UTC, 0017 à 0020 restent toutes en attente et le Worker 2267a691 reste servi à 100 %.)_
+- [ ] **Rattacher le déploiement bloqué à la reprise contrôlée, sans deuxième exécution** — BLOCKED _(evidence: Historique uniquement: ne pas réexécuter cette étape; goal-controlled-d1-service-resumption et le plan maître A à Z sont l’unique parcours opérationnel., La cible actuelle comprend les migrations 0017–0021; les anciennes preuves 0017–0020 restent historiques et ne certifient pas la production corrigée., external: le dernier résultat fournisseur reste le refus D1 code 7500 du 2026-09-16T11:04:42Z; la disponibilité actuelle du quota n’est pas prouvée.)_
 - [ ] **Observer une collecte hebdomadaire complète** — PENDING
 
 ## Arrêter immédiatement tous les traitements fournisseur — DONE
 
 - [x] **Suspendre Queue, routes et crons sans supprimer de données** — DONE _(evidence: API Cloudflare: routes=[], schedules=[], workers.dev enabled=false et previews_enabled=false pour tobirink-public-api., Queue ed005a14ec534110b350b06922100056: delivery_paused=true; producteur, consommateur et messages non purgés restent conservés., La version Worker 2267a691-68cf-4612-9ec8-e36e3c839ef3 reste servie à 100%; aucune migration ni version Worker n’a été déployée.)_
+
+## Mesurer les coûts par œuvre, utilisateur simulé et Agenda — ACTIVE
+
+- [ ] **Compléter la référence locale puis certifier les budgets natifs et distants** — IN_PROGRESS _(evidence: Étapes locales B/C terminées: worker.cost HTTP inclut les deltas D1, publication Agenda différentielle et rétention bornée., Budgets locaux après amorçage: Agenda inchangé 70 écritures, un événement changé 76–77; même œuvre/nouvelle clé 19 sans révision ni réécriture de fiche., Reste non certifié: concurrence et volume, cycle natif distant, rapprochement métriques Cloudflare et observation sept jours; aucune reprise production.)_
+
+## Collecter les contenus adultes et contrôler leur affichage dans l’extension — ACTIVE
+
+- [ ] **Vérifier toutes les API : AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu Manga** — PENDING _(evidence: L’étape commence seulement après la stabilisation D1 de sept jours; elle couvre tous les adaptateurs et chemins actifs, pas seulement AniList et MangaUpdates., Le serveur doit collecter les données autorisées indépendamment du réglage local; classification adult/non-adult/unknown avec provenance avant l’UI., Aucune recherche fournisseur, implémentation ou publication n’a été exécutée pendant l’audit documentaire.)_
+- [ ] **Ajouter le paramètre et bloquer affichage et actions lorsque désactivé** — PENDING _(evidence: OFF doit masquer titres, jaquettes et entrées puis bloquer commandes, anciens liens, actions et notifications sur toutes les surfaces, sans suppression ni recollecte., ON réaffiche les données déjà reçues; Chrome et Firefox doivent couvrir adult/non-adult/unknown, redémarrage, bascule et hors-ligne., La publication de l’extension est une étape séparée avec approbations propres.)_
+
+## Reprendre D1 et le runtime corrigé après l’arrêt d’urgence — ACTIVE
+
+- [ ] **Accès rétabli à la dernière inspection; vérifier quota, sauvegarde et barrières** — IN_PROGRESS _(evidence: Certification locale 2026-09-16: npm run verify exit 0; Worker 103/103, adaptateur Cloudflare 20/20, extension 145/145, application 376/376, tous les workspaces et builds Chrome/Firefox passent; npm audit 0 vulnérabilité., Workflow adaptive-public-refresh-continuation showcase 9/9; artifact HTML SHA-256 0fb5133944ebea70a530f7f294b97f842f68c1aa2453462371af99d54548b7f6., Inspection distante: Worker ancien 2267a691 à 100%, migrations 0017–0021 en attente, D1 lecture changes=0/rows_written=0; l’inventaire Wrangler ne recertifie pas delivery_paused ni le quota d’écriture.)_
+- [ ] **Migrer puis déployer sous barrières et réactiver progressivement** — PENDING _(evidence: Plan maître docs/operations/tobirink-a-z-master-plan.md: release certifiée, commit/push séparés, backup frais, migrations 0017–0021, déploiement scellé, route, cron, Queue en dernier, canari puis sept jours., Les anciens critères 0017–0020 et gates F/G sont remplacés par les références 0017–0021 et A–G du plan maître; aucune mutation fournisseur n’est autorisée par cette mise à jour., Seuils proposés à approuver avant canari: alerte/recoupure 20k/50k UTC, Agenda 10k/500 et Discovery 0/30/100.)_
+
+## Établir une référence de coûts locale et un parcours auditable de reprise — DONE
+
+- [x] **Mesurer les scénarios D1 locaux et consolider les objectifs sans mutation de production** — DONE _(evidence: 102 tests Worker / 13 fichiers passent, dont 6 scénarios nouveaux; TypeScript Worker, Oxlint ciblé, docs, 54 ADR/478 scopes et diff --check réussis., Rapport docs/operations/d1-cost-audit.md: compteurs D1 locaux, stock, 16 projections utilisateurs/œuvres, hypothèses, tarifs sourcés et lacunes; aucune attribution distante inventée., Objectifs consolidés et roadmap B–H validée non approuvée; ancien plan corrigé; aucune mutation produit/fournisseur, dépendance, secret, purge, push ou commit.)_
+
+## Réduire localement les amplifications D1 mesurées — DONE
+
+- [x] **Instrumenter HTTP et publier l’Agenda par différence atomique** — DONE _(evidence: Worker 103/103 and adapters-cloudflare 20/20 pass; both workspace typechecks, anti-slop gate, ADR/docs validation and git diff --check pass., Measured Agenda budgets are frozen: first reconciliation 1798 writes, unchanged 70, then one-event changes 76/76/77; retained pages drop from 65 to 13 and active projection remains 579 rows., Discovery same-work/new-key keeps catalogue revision and work revision unchanged; HTTP worker.cost includes exact D1 meta without fingerprint. Migration 0021 and Archify dataflow validate locally; no provider mutation, deployment, purge, subscription, push or commit.)_
+
+## Consolider le plan maître et tous les objectifs actifs — DONE
+
+- [x] **Créer la documentation A à Z et supprimer les contradictions d’objectifs** — DONE _(evidence: Plan maître A–J créé: état réel, explication des 100k, tableaux par œuvre/utilisateur, budgets 55/19/70/76–77/1798, seuils proposés, approbations, rollback et preuves., Roadmap et continuation corrigées vers 0017–0021; ordre D1 puis audit adulte tous fournisseurs, préférence OFF locale et publication extension séparée; objectifs historiques signalés non réexécutables., Archify workflow et dataflow passent showcase sans erreur/avertissement; validate:architecture, config, docs, 55 ADR/489 scopes, anti-slop et git diff --check passent; aucune mutation fournisseur, coût, secret, suppression, commit ou push.)_

@@ -153,6 +153,24 @@ incident has been resolved.
 
 ## Native collector observability
 
+The authoritative recovery order, approval boundaries and local budget table
+are in [the A-to-Z master plan](./tobirink-a-z-master-plan.md). The only active
+operational entry point is `goal-controlled-d1-service-resumption`; historical
+deployment goals must not start a parallel recovery.
+
+Before any canary, approve explicit stop thresholds. The current proposal is a
+warning at 20,000 D1 writes in one UTC day and a full reseal at 50,000; reseal
+also when the first Agenda reconciliation exceeds 10,000 writes, a later Agenda
+cycle exceeds 500, a fresh Discovery hit writes anything, a same-work/new-key
+cycle exceeds 30, or a comparable first resolution exceeds 100. These are
+operating guards derived from local references 55/19/70/76–77/1,798, not remote
+measurements or Cloudflare billing guarantees.
+
+After migration 0021 and a new Agenda publication, rolling back to the old
+Worker can expose a stale legacy projection. Prefer keeping all entries sealed
+and deploying a forward fix. Restoring the pre-migration backup is a separate,
+destructive provider operation and requires exact approval.
+
 Outside the emergency shutdown, Agenda is scheduled by Wrangler at
 `23 3 * * 0` (UTC). During the shutdown, `triggers.crons` remains empty.
 Cloudflare cron changes can take up to fifteen minutes to propagate. Between
@@ -168,11 +186,20 @@ leave its active snapshot and the currently served generation untouched while
 allowing a changed successful lane to merge with that snapshot.
 
 The semantic generation digest excludes collection timestamps and expirations.
-For an unchanged merge, `public_release_generation.checked_at` advances without
-new `public_release_generation_event` rows. Before deploying the cron change,
-apply migration `0017_agenda_collection_state.sql`; after deployment, verify the
-two lane rows, the active generation pointer, and the absence of provider calls
-outside the controlled collection.
+Migration `0021_agenda_active_projection.sql` backfills the indexed
+`public_release_current_event` projection and stores a bounded JSON rollback
+snapshot on each retained generation. A changed merge mutates only added,
+materially changed or removed active events in one D1 batch; an unchanged merge
+advances `checked_at`. The active generation plus two rollback generations are
+retained. Completed Agenda pages are retained only for each lane's active
+snapshot or its current interrupted collection.
+
+Apply migrations 0017 through 0021 before deploying code that reads the active
+projection. Verify the two lane rows, active pointer, 579-row projection for the
+reference fixture, three retained snapshots at most and the cursor query plan.
+The first reconciliation is a separate write-budget event; do not combine it
+with Queue or Cron reactivation. A migration, Worker deployment, Queue resume,
+route restoration and Cron restoration are five separately observable phases.
 
 Public Discovery uses migration `0018_discovery_admission_state.sql`. Only an
 admission `created` sends the opaque Queue signal; `existing` returns the
@@ -229,8 +256,8 @@ closed numeric fields below:
 - `deduplicated` for admissions that emitted no Queue message;
 - `generationsCreated` and `generationsAvoided` for Agenda publication;
 - `rehydrations` for accepted weekly work refreshes;
-- `d1RowsRead` and `d1RowsWritten`, sourced from `D1Result.meta` by collector
-  processing only.
+- `d1RowsRead` and `d1RowsWritten`, sourced from `D1Result.meta` by Queue
+  processing and by Discovery HTTP routes.
 
 The other allowed dimensions are `task`, `pagesRequested`, `acceptedResults`,
 `result`, `durationMs` and `retries`. Do not add titles, fingerprints, work or

@@ -17,6 +17,7 @@ import { cloudPolicy } from './cloud-policy';
 import type { PublicReleaseCalendarPort } from './releases/public-release-calendar';
 import { D1PublicReleaseCalendarAdapter } from './releases/public-release-calendar';
 import type { NativeCollectorBindings, NativeCollectorSignal } from './native-collectors';
+import { instrumentD1, type InstrumentedD1 } from './operational-metrics';
 
 export interface WorkerServices {
   catalogue: PublicCatalogueReadPort;
@@ -28,6 +29,7 @@ export interface WorkerServices {
   policy: CloudPolicy;
   releases: PublicReleaseObjectPort;
   releaseCalendar: PublicReleaseCalendarPort;
+  d1Metrics: Pick<InstrumentedD1, 'snapshot'>;
 }
 
 export type WorkerRuntime = {
@@ -36,15 +38,17 @@ export type WorkerRuntime = {
 };
 
 export function createWorkerServices(bindings: NativeCollectorBindings): WorkerServices {
+  const d1 = instrumentD1(bindings.PUBLIC_DB);
   return {
-    catalogue: new D1PublicCatalogueAdapter(bindings.PUBLIC_DB),
-    publicDiscoveryV3: new D1PublicDiscoveryV3Adapter(bindings.PUBLIC_DB),
+    catalogue: new D1PublicCatalogueAdapter(d1.database),
+    publicDiscoveryV3: new D1PublicDiscoveryV3Adapter(d1.database),
     publicDiscoveryRateLimiter: bindings.PUBLIC_DISCOVERY_RATE_LIMITER,
     publicDiscoveryQueue: bindings.PUBLIC_DISCOVERY_QUEUE,
     coverImages: new CloudflareCoverImageAdapter(bindings.COVER_IMAGES),
     coverMasters: new R2CoverMasterReadAdapter(bindings.COVER_BUCKET),
     policy: cloudPolicy,
     releases: new R2PublicReleaseObjectAdapter(bindings.RELEASE_SNAPSHOTS),
-    releaseCalendar: new D1PublicReleaseCalendarAdapter(bindings.PUBLIC_DB),
+    releaseCalendar: new D1PublicReleaseCalendarAdapter(d1.database),
+    d1Metrics: d1,
   };
 }

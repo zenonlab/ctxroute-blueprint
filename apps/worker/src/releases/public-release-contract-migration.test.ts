@@ -26,6 +26,13 @@ describe('public release contract migration', () => {
       .bind('legacy-release')
       .first<{ provider: string; provider_key: string; sequence_number: number; sequence_label: string }>();
     expect(row).toEqual({ provider: 'mangaUpdates', provider_key: 'mangaupdates', sequence_label: '58', sequence_number: 58 });
+    expect(await env.PUBLIC_DB.prepare('SELECT provider, sequence_label AS sequenceLabel FROM public_release_current_event WHERE id = ?1')
+      .bind('legacy-release').first()).toEqual({ provider: 'mangaupdates', sequenceLabel: '58' });
+    const rollback = await env.PUBLIC_DB.prepare("SELECT events_json AS eventsJson FROM public_release_generation WHERE revision = 'legacy-v1'")
+      .first<{ eventsJson: string }>();
+    expect(JSON.parse(rollback?.eventsJson ?? '[]')).toEqual([
+      expect.objectContaining({ id: 'legacy-release', provider: 'mangaupdates', sequence: '58' }),
+    ]);
   });
 
   it('claims one lane once and resumes at page five after four stored pages', async () => {
@@ -80,8 +87,8 @@ describe('public release contract migration', () => {
     const first = await calendar.query({ from: '2026-09-12', limit: 1, to: '2026-09-30' });
     expect(first).toMatchObject({ entries: [{ id: 'release_z' }], generatedAt: '2026-09-14T00:00:00.000Z', nextCursor: '2026-09-13T00:00:00.000Z|release_z', revision: 'calendar-fixture' });
     await expect(calendar.query({ cursor: first.nextCursor!, from: '2026-09-12', limit: 1, to: '2026-09-30' })).resolves.toMatchObject({ entries: [{ id: 'release_a' }] });
-    const plan = await env.PUBLIC_DB.prepare("EXPLAIN QUERY PLAN SELECT id FROM public_release_generation_event WHERE generation_revision = ?1 AND occurrence_value >= ?2 AND occurrence_value <= ?3 AND (occurrence_value > ?4 OR (occurrence_value = ?4 AND id > ?5)) ORDER BY occurrence_value, id LIMIT ?6").bind('calendar-fixture', '2026-09-12', '2026-09-30T23:59:59.999Z', '2026-09-12', '', 2).all<{ detail: string }>();
-    expect(plan.results.map(({ detail }) => detail).join(' ')).toContain('public_release_generation_event_cursor_idx');
+    const plan = await env.PUBLIC_DB.prepare("EXPLAIN QUERY PLAN SELECT id FROM public_release_current_event WHERE occurrence_value >= ?1 AND occurrence_value <= ?2 AND (occurrence_value > ?3 OR (occurrence_value = ?3 AND id > ?4)) ORDER BY occurrence_value, id LIMIT ?5").bind('2026-09-12', '2026-09-30T23:59:59.999Z', '2026-09-12', '', 2).all<{ detail: string }>();
+    expect(plan.results.map(({ detail }) => detail).join(' ')).toContain('public_release_current_event_cursor_idx');
   });
 
   it('replays the same complete generation and never replaces it with an older one', async () => {
@@ -98,7 +105,7 @@ describe('public release contract migration', () => {
     const stale = await calendar.ingest({ ...current, generatedAt: '2026-09-14T12:00:00.000Z', nonce: '30225ff8-6a45-49ad-809d-dbd62d8483d1' });
     expect(stale.accepted).toBe(false);
     await expect(calendar.query({ from: '2026-09-13', limit: 10, to: '2026-09-28' })).resolves.toMatchObject({ revision: first.revision, entries: [{ id: 'shared-refresh-release' }] });
-    const rows = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_generation_event WHERE generation_revision = ?1').bind(first.revision).first<{ count: number }>();
+    const rows = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_current_event').first<{ count: number }>();
     expect(rows?.count).toBe(1);
   });
 
@@ -112,7 +119,7 @@ describe('public release contract migration', () => {
     const active = await env.PUBLIC_DB.prepare("SELECT generated_at AS generatedAt FROM public_release_generation WHERE status = 'active'").first<{ generatedAt: string }>();
     const generatedAt = new Date(Date.parse(active?.generatedAt ?? '2026-09-14T00:00:00.000Z') + 86_400_000).toISOString();
     await commitPublicReleaseGeneration(env.PUBLIC_DB, [event], { from: '2026-09-13', to: '2026-09-29' }, 'calendar-corrupt', generatedAt);
-    await env.PUBLIC_DB.prepare("UPDATE public_release_generation_event SET provider = 'unknown' WHERE generation_revision = 'calendar-corrupt'").run();
+    await env.PUBLIC_DB.prepare("UPDATE public_release_current_event SET provider = 'unknown' WHERE id = 'corrupt-release'").run();
     await expect(new D1PublicReleaseCalendarAdapter(env.PUBLIC_DB).query({ from: '2026-09-13', limit: 10, to: '2026-09-29' })).rejects.toThrow();
   });
 
@@ -134,8 +141,11 @@ describe('public release contract migration', () => {
       { revision: 'calendar-retention-3', status: 'staging' },
       { revision: 'calendar-retention-4', status: 'active' },
     ]);
-    const removedEvents = await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM public_release_generation_event WHERE generation_revision = 'calendar-retention-1'").first<{ count: number }>();
-    expect(removedEvents?.count).toBe(0);
+    expect((await env.PUBLIC_DB.prepare('SELECT id FROM public_release_current_event ORDER BY id').all()).results)
+      .toEqual([{ id: 'retained-release-3' }]);
+    const snapshots = await env.PUBLIC_DB.prepare('SELECT events_json AS eventsJson FROM public_release_generation ORDER BY generated_at').all<{ eventsJson: string }>();
+    expect(snapshots.results).toHaveLength(3);
+    expect(snapshots.results.every(({ eventsJson }) => JSON.parse(eventsJson) instanceof Array)).toBe(true);
   });
 
   it('keeps event rows unchanged when a weekly snapshot is semantically identical', async () => {
@@ -160,7 +170,7 @@ describe('public release contract migration', () => {
     const published = await state.publishMergedGeneration(firstCheck);
     expect(published?.changed).toBe(true);
     expect(published?.count).toBeGreaterThan(0);
-    const before = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_generation_event').first<{ count: number }>();
+    const before = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_current_event').first<{ count: number }>();
     const failedCheck = new Date(base + 2 * 86_400_000).toISOString();
     const failedAdmission = await state.claimLane({ collectionId: 'weekly-failed', leaseUntil: new Date(Date.parse(failedCheck) + 60 * 60_000).toISOString(), now: failedCheck, provider: 'anilist', scheduledFor: failedCheck, tokenDigest: 'f'.repeat(64), window: { from: '2026-09-15', to: '2026-10-01' } });
     if (failedAdmission.status !== 'claimed') throw new Error('Expected claimed failed Agenda lane.');
@@ -170,7 +180,7 @@ describe('public release contract migration', () => {
     const second = await run('weekly-b', secondCheck, secondCheck, secondCheck);
     expect(second.changed).toBe(false);
     await expect(state.publishMergedGeneration(secondCheck)).resolves.toMatchObject({ changed: false, count: published?.count, revision: published?.revision });
-    const after = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_generation_event').first<{ count: number }>();
+    const after = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_current_event').first<{ count: number }>();
     expect(after).toEqual(before);
     const freshness = await env.PUBLIC_DB.prepare('SELECT checked_at AS checkedAt FROM public_release_generation WHERE revision = ?1').bind(published?.revision).first<{ checkedAt: string }>();
     expect(freshness?.checkedAt).toBe(secondCheck);
