@@ -182,7 +182,7 @@ function executionDecision(effective, request) {
   if (effective.mode === 'SWARM_OFF') return { coordinated: false, reason: effective.mode_source === 'environment' ? 'ENVIRONMENT_SWARM_OFF' : effective.mode_source === 'state' ? 'PERSISTED_MODE' : 'DEFAULT_MODE' };
   if (request.execution === 'direct') return { coordinated: false, reason: 'EXPLICIT_DIRECT' };
   if (request.execution === 'coordinated') return { coordinated: true, reason: 'EXPLICIT_COORDINATED' };
-  return request.file_scope.length === 1 ? { coordinated: false, reason: 'AUTO_SINGLE_SCOPE' } : { coordinated: true, reason: 'AUTO_COORDINATED' };
+  return { coordinated: true, reason: 'AUTO_COORDINATED' };
 }
 function routeMissingSkill(mission, root) {
   assertOrchestratorContract('mission-request', mission);

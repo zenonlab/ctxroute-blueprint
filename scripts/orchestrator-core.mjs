@@ -211,7 +211,7 @@ function applyOperation(state, command) {
   if (command.action === 'mission.prepare') {
     const request = payload.mission;
     if (state.goals.some(goal => goal.missions.some(mission => mission.mission_id === request.mission_id))) throw new Error(`mission already exists: ${request.mission_id}`);
-    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : request.file_scope.length === 1 ? 'AUTO_SINGLE_SCOPE' : 'AUTO_COORDINATED', status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null };
+    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : 'AUTO_COORDINATED', status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null };
     assertOrchestratorContract('mission-record', record);
     return addMission(state, payload.goal_id, record);
   }

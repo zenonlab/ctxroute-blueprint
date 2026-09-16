@@ -21,8 +21,10 @@ decision reports `mode_source` as `environment`, `state`, or `default`.
 Persistent mode changes use a `mode.set` orchestrator transaction.
 
 Mission requests declare `execution: auto | direct | coordinated`. `direct`
-never allocates a worktree, `coordinated` always uses a mission, and `auto` may
-apply the bounded scope heuristic while returning its structured reason.
+never allocates a worktree. In the default `SWARM_ON` mode, both `auto` and
+`coordinated` create a durable mission, isolate its worktree, and route the
+selected skill; only an explicit `direct` request or `SWARM_OFF` bypasses the
+worker pipeline. The decision still records its structured reason.
 
 ## Local interfaces
 

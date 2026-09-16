@@ -3,8 +3,9 @@
 ## Orchestrator and Stop
 
 The orchestrator is the sole writer for global goals and worker missions.
-`SWARM_ON` prepares minimal contracts and isolated worktrees; `SWARM_OFF`
-executes directly without coordination artifacts. Stop is always fail-open,
+`SWARM_ON` always prepares a durable mission, routes its selected skill, and
+allocates an isolated worktree; `SWARM_OFF` executes directly without
+coordination artifacts. Stop is always fail-open,
 honors `stop_hook_active`, may record an explicitly supplied worker report,
 cleans CTXRoute session state, and never requests automatic continuation.
 
