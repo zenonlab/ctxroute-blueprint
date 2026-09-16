@@ -2,8 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ctxroute.dev/schemas/orchestrator/mission-view.schema.json",
   "type": "object",
-  "required": ["mission_id", "skill_id", "skill_version", "file_scope", "acceptance", "validations", "response_format", "worktree"],
+  "required": ["goal_id", "goal_title", "mission_id", "skill_id", "skill_version", "file_scope", "acceptance", "validations", "response_format", "worktree"],
   "properties": {
+    "goal_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "goal_title": { "$ref": "common.schema.json#/$defs/text" },
     "mission_id": { "$ref": "common.schema.json#/$defs/identifier" },
     "skill_id": { "$ref": "common.schema.json#/$defs/identifier" },
     "skill_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32 },

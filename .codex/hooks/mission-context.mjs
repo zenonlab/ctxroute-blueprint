@@ -16,23 +16,29 @@ export async function missionContext(missionId = process.env.CTXROUTE_MISSION_ID
     systemMessage: `Mission ${String(missionId).slice(0, 128)} is not registered; continuing without injected mission context.`,
   };
   const contract = {
+    goal_id: foundGoal(state, mission.mission_id)?.goal_id,
+    goal_title: foundGoal(state, mission.mission_id)?.title,
     mission_id: mission.mission_id,
     file_scope: mission.file_scope,
     skill_id: mission.skill_id,
     skill_version: mission.skill_version,
     acceptance: mission.acceptance,
-    validation_commands: mission.validation_commands,
+    validations: mission.validations,
     response_format: mission.response_format,
   };
   const routingText = routing.hookSpecificOutput?.additionalContext ?? 'Canonical change routing is unavailable; inspect .project/project-config.json before mutation.';
   const output = {
     hookSpecificOutput: {
-      hookEventName: 'SessionStart',
+      hookEventName: event,
       additionalContext: `${routingText}\n\nWorker mission contract (no global history):\n${JSON.stringify(contract, null, 2)}`,
     },
   };
   if (routing.systemMessage) output.systemMessage = routing.systemMessage;
   return output;
+}
+
+function foundGoal(state, missionId) {
+  return state.goals.find(goal => goal.missions.some(item => item.mission_id === missionId));
 }
 
 export function routingContext(projectRoot = root, event = 'SessionStart') {

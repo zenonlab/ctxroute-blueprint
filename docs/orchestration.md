@@ -59,11 +59,13 @@ that registration themselves.
 
 JSON Schema 2020-12 is canonical. `MissionRequest` is the accepted request,
 `MissionRecord` is orchestrator-owned state, and `MissionView` is the
-positive worker projection. A worker view contains only mission identity,
-relative file scope, skill/version, acceptance criteria, structured
-validations, `response_format: worker-report`, and its managed worktree
-reference. Conversation, prompts, reasoning, history, and raw environment are
-rejected. Active missions with overlapping scopes are rejected before work;
+positive worker projection. A worker view contains the goal identity and title,
+mission identity, relative file scope, skill/version, acceptance criteria,
+structured validations, `response_format: worker-report`, and its managed
+worktree reference. This gives the worker the objective as well as the
+implementation boundary without exposing global conversation. Conversation,
+prompts, reasoning, history, and raw environment are rejected. Active missions
+with overlapping scopes are rejected before work;
 distinct concurrent missions receive distinct worktrees.
 
 Mission status transitions are closed: `PREPARING` may become `ASSIGNED`,

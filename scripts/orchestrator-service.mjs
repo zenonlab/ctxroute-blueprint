@@ -21,7 +21,7 @@ export async function readCoordination(root = process.cwd(), environment = proce
   const found = findMission(state, environment.CTXROUTE_MISSION_ID);
   if (!found?.mission.worktree_allocation?.path) throw new Error('worker role requires an assigned CTXROUTE_MISSION_ID');
   const mission = found.mission;
-  const view = { mission_id: mission.mission_id, file_scope: mission.file_scope, skill_id: mission.skill_id, skill_version: mission.skill_version, acceptance: mission.acceptance, validations: mission.validations, response_format: mission.response_format, worktree: mission.worktree_allocation.path };
+  const view = { goal_id: found.goal.goal_id, goal_title: found.goal.title, mission_id: mission.mission_id, file_scope: mission.file_scope, skill_id: mission.skill_id, skill_version: mission.skill_version, acceptance: mission.acceptance, validations: mission.validations, response_format: mission.response_format, worktree: mission.worktree_allocation.path };
   assertOrchestratorContract('mission-view', view);
   return view;
 }

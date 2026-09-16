@@ -7,6 +7,7 @@ scope:
   - .codex/hooks/
   - .mcp.json
   - .project/orchestrator-config.json
+  - .project/schemas/orchestrator/mission-view.schema.json
   - docs/architecture/src/blueprint.architecture.json
   - docs/architecture/src/traffic.dataflow.json
   - scripts/orchestrator-*.mjs
