@@ -11,6 +11,7 @@ export const CONTROL_FILES = Object.freeze([
   '.github/workflows/code-review-graph-comment.yml', '.github/workflows/code-review-graph-disposition.yml',
   '.github/schemas/crg-risk-acceptance.schema.json', 'eslint.config.mjs',
   '.project/blueprint-version.json', '.project/orchestrator-config.json',
+  'scripts/code-context-policy.mjs',
   'scripts/orchestrator-core.mjs', 'scripts/orchestrator-cli.mjs', 'scripts/orchestrator-mcp.mjs',
   'scripts/orchestrator-service.mjs', 'scripts/orchestrator-bootstrap.mjs', 'scripts/orchestrator-contracts.mjs',
   'scripts/orchestrator-telemetry.mjs', 'scripts/orchestrator-validation.mjs',

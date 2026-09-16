@@ -8,7 +8,7 @@
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex SessionStart",
             "timeout": 30,
-            "additionalContextLimit": 1200
+            "additionalContextLimit": 1600
           }
         ]
       }
@@ -80,7 +80,8 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex PreCompact",
-            "timeout": 15
+            "timeout": 15,
+            "additionalContextLimit": 1600
           }
         ]
       }

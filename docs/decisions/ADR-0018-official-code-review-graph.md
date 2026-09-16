@@ -62,6 +62,16 @@ impact radius, graph query, review context, graph stats, and architecture
 overview. Build, refactor, embedding, wiki, and secondary exploration remain
 available through controlled CLI commands when needed. The MCP schema budget
 is kept below 8,000 characters for each server and 16,000 characters combined.
+For relational code questions, coding agents use CRG before native text and
+file tools: minimal context first, then at most the targeted impact, review,
+query, or architecture operation needed by the task. Native search and reads
+remain the confirmation path for exact text, exact lines, unsupported or
+unindexed files, and deterministic validation. SessionStart, PreCompact, and
+bounded worker prompts all carry this policy so it survives compaction and
+applies to orchestrated subprocesses. A stale or unavailable graph is reported
+explicitly; consumers update and retry once before using native tools as a
+declared fallback. The SessionStart and PreCompact envelope is bounded at 1,600
+characters and mechanically checked not to truncate the tool policy.
 The Sensor keeps its own pinned Tree-sitter registry solely for security
 checks. `apply_refactor_tool` is allowed only with `dry_run: true`; accepted
 changes use normal editors so architecture, Sensor, and audit hooks remain in
@@ -87,3 +97,5 @@ generated. The custom AST context MCP, tokenizer benchmark, watcher, and fake
 database are removed. CRG failures remain visible without blocking agents;
 the PR risk report remains visible; approved broad refactors may use the
 non-blocking `none` threshold while deterministic validation remains required.
+CRG reduces broad exploratory reads but does not replace exact source
+inspection or tests.

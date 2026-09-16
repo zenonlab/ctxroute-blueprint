@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { remainingCost, runGoal, validateGoalPlan } from '../scripts/orchestrator-goal.mjs';
 import { orchestratorModelEvaluations, orchestratorUsage } from '../scripts/orchestrator-routing-service.mjs';
 import { probedModelStatus } from '../scripts/orchestrator-models.mjs';
-import { buildWorkerCommand, classifyProviderFailure, dispatchWorker, extractUsage, providerAdapter, workerRuntimeHealth } from '../scripts/orchestrator-worker.mjs';
+import { buildWorkerCommand, classifyProviderFailure, dispatchWorker, extractUsage, providerAdapter, workerPrompt, workerRuntimeHealth } from '../scripts/orchestrator-worker.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -171,6 +171,18 @@ test('Codex and Claude commands are closed, ephemeral, sandboxed, and non-bypass
   assert.ok(claude.args.includes('dontAsk'));
   assert.ok(claude.args.includes('--no-session-persistence'));
   assert.ok(!claude.args.some(item => /bypassPermissions|dangerously/u.test(item)));
+});
+
+test('bounded worker prompts preserve CRG-first relational code routing', () => {
+  const prompt = workerPrompt({
+    skill_path: '.agents/skills/goal-planner/SKILL.md',
+    output_contract: 'goal-plan',
+    mission: { objective: 'Trace the affected callers.' },
+  });
+  assert.match(prompt, /use the code-review-graph MCP before native search/u);
+  assert.match(prompt, /start with get_minimal_context_tool/u);
+  assert.match(prompt, /Use rg and direct file reads for exact-text lookup/u);
+  assert.ok(prompt.indexOf('Code-context tool routing') < prompt.indexOf('{"objective"'));
 });
 
 test('adaptive adapter commands carry model, effort and budgets without permission bypasses', () => {

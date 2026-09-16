@@ -64,6 +64,16 @@ CTXRoute lookup; `SWARM_OFF` requires neither interface for ordinary work. A
 trusted project and a refreshed Codex session may be needed before `/mcp` shows
 a newly added manifest.
 
+SessionStart and PreCompact also inject the code-context tool policy. For
+cross-file relationships, impact, architecture, and review scope, agents call
+CRG minimal context first and add only the targeted CRG query required. Native
+search and file reads confirm exact text and lines, cover unindexed files, and
+perform deterministic verification. If graph metadata does not match `HEAD`,
+the agent runs `npm run crg:update`, retries once, and states any native-tool
+fallback instead of silently treating stale graph context as evidence.
+Their 1,600-character portable envelope is bounded and large enough to retain
+the complete routing policy; other lifecycle events keep the smaller default.
+
 CRG's `apply_refactor_tool` is permitted only for `dry_run: true`. Normal edit
 tools own accepted mutations so architecture, Sensor, and audit enforcement
 cannot be bypassed.
