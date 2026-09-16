@@ -9,9 +9,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 function commandHook(config, event, lane) {
   const groups = config?.hooks?.[event] ?? [];
   const hooks = groups.flatMap(group => group.hooks ?? []);
-  return hooks.find(hook => Boolean(hook.async) === (lane === 'maintenance'))
-    ?? hooks.find(hook => !hook.async)
-    ?? hooks[0];
+  return hooks.find(hook => Boolean(hook.async) === (lane === 'maintenance'));
 }
 
 function readConfig(root, harness) {
@@ -25,6 +23,7 @@ export function hookContract(harness, event, lane = 'synchronous', root = projec
   // equivalent field, so both dispatchers deliberately use the same cap.
   const portable = commandHook(readConfig(root, 'codex'), event, lane);
   return {
+    declared: Boolean(selected),
     timeoutMs: Math.max(250, Number(selected?.timeout ?? DEFAULT_TIMEOUT_MS / 1000) * 1000),
     contextLimit: Number(portable?.additionalContextLimit ?? DEFAULT_CONTEXT_LIMIT),
   };

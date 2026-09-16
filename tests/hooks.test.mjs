@@ -15,17 +15,23 @@ import { runStep } from '../.githooks/setup.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-test('Codex and Claude expose exactly one handler for the same six lifecycle events', () => {
+test('Codex and Claude expose one synchronous dispatcher plus explicit PostToolUse maintenance', () => {
   for (const [file, harness] of [['.codex/hooks.json', 'codex'], ['.claude/settings.json', 'claude']]) {
     const config = JSON.parse(readFileSync(join(root, file), 'utf8'));
     assert.deepEqual(Object.keys(config.hooks).sort(), [...lifecycleEvents].sort());
     for (const event of lifecycleEvents) {
       const handlers = config.hooks[event].flatMap(block => block.hooks ?? []);
-      assert.equal(handlers.length, 1, `${file} ${event}`);
+      assert.equal(handlers.length, event === 'PostToolUse' ? 2 : 1, `${file} ${event}`);
       assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
       assert.ok(handlers[0].timeout > 0, `${file} ${event} timeout`);
       assert.equal('statusMessage' in handlers[0], false, `${file} ${event} should remain quiet`);
-      if (harness === 'codex') assert.equal(handlers[0].additionalContextLimit, 1200, `${file} ${event} context limit`);
+      if (harness === 'codex' && !['PreCompact', 'Stop'].includes(event)) assert.equal(handlers[0].additionalContextLimit, 1200, `${file} ${event} context limit`);
+      if (event === 'PostToolUse') {
+        assert.equal(handlers[1].command, `node ./.codex/hooks/lifecycle.mjs ${harness} PostToolUse maintenance`);
+        assert.equal(handlers[1].async, true);
+        assert.ok(handlers[1].timeout > 0, `${file} maintenance timeout`);
+        assert.equal(config.hooks.PostToolUse[1].matcher, 'apply_patch|Edit|Write');
+      }
     }
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
   }
@@ -103,6 +109,20 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   }
   assert.equal(handlerPlan('claude', 'PreToolUse', root).length, 2);
   assert.equal(handlerPlan('codex', 'PostToolUse', root).some(handler => /doc-inject|session-inject/u.test(handler.name)), false);
+  for (const harness of ['codex', 'claude']) {
+    assert.deepEqual(handlerPlan(harness, 'PostToolUse', root, 'maintenance').map(handler => handler.name), ['post-tool-crg.mjs']);
+    assert.deepEqual(handlerPlan(harness, 'PreToolUse', root, 'maintenance'), []);
+  }
+});
+
+test('the maintenance lane is dispatched independently from synchronous context', () => {
+  const synchronous = [];
+  const maintenance = [];
+  const input = JSON.stringify({ tool_name: 'Edit', tool_response: {} });
+  dispatch({ harness: 'codex', event: 'PostToolUse', input, root, execute(handler) { synchronous.push(handler.name); return { outputs: [] }; } });
+  dispatch({ harness: 'codex', event: 'PostToolUse', lane: 'maintenance', input, root, execute(handler) { maintenance.push(handler.name); return { outputs: [] }; } });
+  assert.deepEqual(synchronous, ['post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs']);
+  assert.deepEqual(maintenance, ['post-tool-crg.mjs']);
 });
 
 test('the lifecycle dispatcher executes sequentially and merges non-blocking context', () => {
@@ -256,7 +276,7 @@ test('postinstall verifies the complete local installation', () => {
   assert.deepEqual(inspectInstallation(root), []);
   const result = spawnSync('node', [join(root, '.githooks/postinstall.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /open \/hooks and approve the six workspace definitions/u);
+  assert.match(result.stdout, /trust this exact workspace, then open \/hooks and approve the seven workspace definitions/u);
 });
 
 test('postinstall diagnoses a missing CTXRoute installation', () => {
@@ -289,6 +309,7 @@ test('both lifecycle dialects route unowned SWARM_ON mutations to the goal runne
     const pseudoPatch = ['***', 'Update File: .project/project-config.json'].join(' ');
     const result = spawnSync('node', [join(root, '.codex/hooks/lifecycle.mjs'), harness, 'PreToolUse'], {
       cwd: root,
+      env: { ...process.env, CTXROUTE_SWARM_MODE: 'SWARM_ON' },
       input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'apply_patch', tool_input: { patch: pseudoPatch } }),
       encoding: 'utf8',
     });

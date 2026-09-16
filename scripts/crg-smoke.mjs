@@ -35,6 +35,8 @@ let stderr = '';
 transport.stderr?.on('data', chunk => { stderr += chunk; });
 let names;
 let schemaCharacters;
+let graphFresh;
+let minimalContextStatus;
 try {
   await client.connect(transport);
   const listed = await client.listTools();
@@ -45,6 +47,14 @@ try {
   if (!names.includes('list_graph_stats_tool')) throw new Error('official read tool list_graph_stats_tool is missing');
   const response = await client.callTool({ name: 'list_graph_stats_tool', arguments: { repo_root: fixture } });
   if (response.isError) throw new Error(`read tool failed: ${JSON.stringify(response.content)}`);
+  const stats = structured(response);
+  graphFresh = stats?._graph?.head_matches_build;
+  if (graphFresh !== true) throw new Error(`fixture graph is not current at HEAD: ${JSON.stringify(stats?._graph)}`);
+  const minimal = await client.callTool({ name: 'get_minimal_context_tool', arguments: { repo_root: fixture, task: 'understand add', changed_files: ['src/math.py'] } });
+  if (minimal.isError) throw new Error(`minimal context failed: ${JSON.stringify(minimal.content)}`);
+  const minimalData = structured(minimal);
+  minimalContextStatus = minimalData?.status ?? null;
+  if (minimalContextStatus === 'not_ready' || minimalData?._graph?.head_matches_build === false) throw new Error(`minimal context did not use a current graph: ${JSON.stringify(minimalData)}`);
 } catch (error) {
   throw new Error(`${error.message}${stderr ? `\nMCP stderr:\n${stderr.slice(0, 2000)}` : ''}`);
 } finally {
@@ -65,11 +75,18 @@ try {
 } finally {
   await orchestratorClient.close();
 }
-console.log(JSON.stringify({ ok: true, version: CRG_VERSION, tools: names.length, schemaCharacters, orchestratorSchemaCharacters, combinedSchemaCharacters: schemaCharacters + orchestratorSchemaCharacters, readTool: 'list_graph_stats_tool' }));
+console.log(JSON.stringify({ ok: true, version: CRG_VERSION, tools: names.length, schemaCharacters, orchestratorSchemaCharacters, combinedSchemaCharacters: schemaCharacters + orchestratorSchemaCharacters, readTool: 'list_graph_stats_tool', graphFresh, minimalContextStatus }));
 
 async function expectSuccess(args, predicate, label) {
   const result = await runCrgCommand({ root, args, timeoutMs: 30_000 });
   if (result.code !== 0 || result.timedOut || (predicate && !predicate(result.stdout + result.stderr))) {
     throw new Error(`${label} failed: ${result.stderr || result.stdout || `exit ${result.code}`}`);
   }
+}
+
+function structured(response) {
+  if (response.structuredContent) return response.structuredContent;
+  const text = response.content?.find(item => item.type === 'text')?.text;
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { return null; }
 }

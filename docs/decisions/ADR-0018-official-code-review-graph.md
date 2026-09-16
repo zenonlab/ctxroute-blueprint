@@ -39,10 +39,20 @@ The official graph at `.code-review-graph/graph.db` and the project virtual
 environment are ignored.
 
 The project lifecycle remains local and minimal. CRG builds and updates are
-explicit or asynchronously scheduled outside the synchronous per-tool path,
-behind a cross-process single-flight lock, a 30-second timeout, bounded output,
-and fail-open diagnostics. No CRG daemon, watcher, generated CRG hooks, or
-synthetic update database is used.
+explicit or scheduled through the lifecycle dispatcher's asynchronous
+`maintenance` lane, outside the synchronous per-tool path. The lane accepts
+only successful editor writes, coalesces edit bursts, and runs behind a
+cross-process single-flight lock, a 30-second timeout, bounded output, and
+fail-open diagnostics. Its plan is validated for both Codex and Claude; it is
+not inferred from a comment or a benchmark flag. No CRG daemon, watcher,
+generated CRG hooks, or synthetic update database is used.
+
+Graph freshness is part of the public local contract. `npm run crg:health`
+compares the graph build commit with repository `HEAD` and emits a bounded JSON
+receipt. A stale or missing graph reports `npm run crg:update` as the single
+deterministic remediation. MCP consumers continue to receive the official
+graph metadata and must not treat stale or unindexed responses as useful
+context.
 
 The only project MCP servers are the CTXRoute orchestrator and official code-review-graph. The
 CRG MCP default exposure is an exact six-tool allowlist: minimal context,

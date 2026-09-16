@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isLatestMaintenanceRequest, shouldUpdate } from '../.codex/hooks/post-tool-crg.mjs';
-import { CRG_MCP_TOOLS, CRG_VERSION, MAX_OUTPUT_BYTES, crgInvocation, runCrgCommand, runCrgUpdate } from '../scripts/crg-runner.mjs';
+import { CRG_MCP_TOOLS, CRG_REMEDIATION, CRG_VERSION, MAX_OUTPUT_BYTES, crgHealth, crgInvocation, parseCrgStatus, runCrgCommand, runCrgUpdate } from '../scripts/crg-runner.mjs';
 
 const nodeChild = source => () => spawn(process.execPath, ['-e', source], { stdio: ['ignore', 'pipe', 'pipe'] });
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -49,6 +49,35 @@ test('CRG child timeout and output are bounded', async () => {
   });
   assert.equal(result.timedOut, true);
   assert.ok(Buffer.byteLength(result.stdout) <= MAX_OUTPUT_BYTES);
+});
+
+test('CRG health compares the graph build commit with HEAD and gives one remediation', async () => {
+  assert.deepEqual(parseCrgStatus('Built at commit: abc123\n'), { builtAtCommit: 'abc123' });
+  const fresh = await crgHealth({
+    root: '/workspace',
+    readHead: async () => 'abc123def456',
+    runCommand: async () => ({ code: 0, timedOut: false, stdout: 'Built at commit: abc123\n', stderr: '' }),
+  });
+  assert.equal(fresh.status, 'fresh');
+  assert.equal(fresh.head_matches_build, true);
+  assert.equal(fresh.remediation, null);
+
+  const stale = await crgHealth({
+    root: '/workspace',
+    readHead: async () => 'fff999',
+    runCommand: async () => ({ code: 0, timedOut: false, stdout: 'Built at commit: abc123\n', stderr: '' }),
+  });
+  assert.equal(stale.status, 'stale');
+  assert.equal(stale.head_matches_build, false);
+  assert.equal(stale.remediation, CRG_REMEDIATION);
+
+  const missing = await crgHealth({
+    root: '/workspace',
+    readHead: async () => 'fff999',
+    runCommand: async () => ({ code: 0, timedOut: false, stdout: 'No graph yet\n', stderr: '' }),
+  });
+  assert.equal(missing.status, 'missing');
+  assert.equal(missing.cause, 'GRAPH_BUILD_COMMIT_MISSING');
 });
 
 test('PostToolUse triggers only one successful normal write', () => {

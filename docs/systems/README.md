@@ -13,6 +13,9 @@ frozen uv lock. Public npm commands invoke `uv run --project ... --frozen`.
 The runner owns a 30-second child timeout, bounded output, and a cross-process
 single-flight lock. The official graph lives in ignored
 `.code-review-graph/graph.db`; no watcher, daemon, or synthetic journal exists.
+The lifecycle core exposes a distinct asynchronous maintenance plan for
+successful editor writes. `crg:health` makes readiness explicit by comparing
+the graph build commit to `HEAD` and naming `crg:update` as remediation.
 
 ## Sensor separation
 

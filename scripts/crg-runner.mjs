@@ -8,6 +8,7 @@ export const CRG_VERSION = '2.3.8';
 export const DEFAULT_TIMEOUT_MS = 30_000;
 export const MAX_OUTPUT_BYTES = 32 * 1024;
 export const CRG_MCP_TOOLS = Object.freeze(['get_minimal_context_tool', 'get_impact_radius_tool', 'query_graph_tool', 'get_review_context_tool', 'list_graph_stats_tool', 'get_architecture_overview_tool']);
+export const CRG_REMEDIATION = 'npm run crg:update';
 
 export function crgInvocation(args, root = process.cwd()) {
   const boundedArgs = args[0] === 'serve' && !args.includes('--tools')
@@ -47,6 +48,39 @@ export async function runCrgUpdate({ root = process.cwd(), timeoutMs, spawnImpl,
   } finally {
     await rm(lockDirectory, { recursive: true, force: true });
   }
+}
+
+export function parseCrgStatus(value) {
+  const commit = String(value).match(/^Built at commit:\s*([0-9a-f]+)\s*$/imu)?.[1] ?? null;
+  return { builtAtCommit: commit };
+}
+
+export async function crgHealth({ root = process.cwd(), runCommand = runCrgCommand, readHead = readGitHead } = {}) {
+  const [graph, headSha] = await Promise.all([
+    runCommand({ root, args: ['status', '--repo', root], timeoutMs: DEFAULT_TIMEOUT_MS }),
+    readHead(root),
+  ]);
+  const { builtAtCommit } = parseCrgStatus(`${graph.stdout ?? ''}\n${graph.stderr ?? ''}`);
+  const fresh = graph.code === 0 && !graph.timedOut && Boolean(builtAtCommit) && headSha.startsWith(builtAtCommit);
+  return {
+    status: fresh ? 'fresh' : builtAtCommit ? 'stale' : 'missing',
+    head_sha: headSha,
+    graph_commit: builtAtCommit,
+    head_matches_build: fresh,
+    remediation: fresh ? null : CRG_REMEDIATION,
+    cause: fresh ? null : graph.timedOut ? 'CRG_STATUS_TIMEOUT' : graph.code !== 0 ? 'CRG_STATUS_FAILED' : builtAtCommit ? 'GRAPH_HEAD_MISMATCH' : 'GRAPH_BUILD_COMMIT_MISSING',
+  };
+}
+
+async function readGitHead(root) {
+  const result = await runBoundedProcess({ executable: 'git', args: ['rev-parse', 'HEAD'], root, timeoutMs: 5_000 });
+  if (result.code !== 0 || result.timedOut) throw new Error(`Unable to read repository HEAD: ${result.stderr || result.stdout || `exit ${result.code}`}`);
+  return result.stdout.trim();
+}
+
+async function runBoundedProcess({ executable, args, root, timeoutMs }) {
+  const child = defaultSpawn(executable, args, { cwd: root, shell: false, stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
+  return collectChild(child, timeoutMs);
 }
 
 async function isFile(path) {
@@ -93,9 +127,15 @@ function publicArgs(command, root) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const args = publicArgs(process.argv[2], process.cwd());
+  const command = process.argv[2];
+  if (command === 'health') {
+    const receipt = await crgHealth({ root: process.cwd() });
+    process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
+    process.exit(0);
+  }
+  const args = publicArgs(command, process.cwd());
   if (!args) {
-    console.error('Usage: node scripts/crg-runner.mjs build|update|status|review|mcp|version');
+    console.error('Usage: node scripts/crg-runner.mjs build|update|status|health|review|mcp|version');
     process.exit(2);
   }
   const invocation = crgInvocation(args);
