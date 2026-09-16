@@ -265,7 +265,7 @@
       "format": "json",
       "source": ".project/orchestrator-config.json",
       "narrative": "docs/orchestration.md",
-      "requiredKeys": ["default_mode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
+      "requiredKeys": ["defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
       "validator": "npm run orchestrator:contracts"
     },
     {

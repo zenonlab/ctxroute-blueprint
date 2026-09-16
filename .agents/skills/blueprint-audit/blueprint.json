@@ -2,11 +2,7 @@
   "schemaVersion": 2,
   "skillId": "blueprint-audit",
   "version": "1.0.0",
-  "phases": ["audit"],
-  "capabilities": ["architecture-audit"],
-  "access": "read-only",
-  "tools": ["read", "search"],
-  "independent": true,
+  "modes": ["SWARM_ON", "SWARM_OFF"],
   "mutationAuthority": "orchestrator",
   "validations": [
     {

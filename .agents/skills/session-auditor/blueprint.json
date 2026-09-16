@@ -2,11 +2,7 @@
   "schemaVersion": 2,
   "skillId": "session-auditor",
   "version": "1.0.0",
-  "phases": ["audit"],
-  "capabilities": ["session-audit"],
-  "access": "read-only",
-  "tools": ["read", "search"],
-  "independent": true,
+  "modes": ["SWARM_ON", "SWARM_OFF"],
   "mutationAuthority": "orchestrator",
   "validations": [
     {
