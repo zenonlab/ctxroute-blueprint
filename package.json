@@ -47,6 +47,7 @@
     "crg:build": "node scripts/crg-runner.mjs build",
     "crg:update": "node scripts/crg-runner.mjs update",
     "crg:status": "node scripts/crg-runner.mjs status",
+    "crg:health": "node scripts/crg-runner.mjs health",
     "crg:review": "node scripts/crg-runner.mjs review",
     "crg:mcp": "node scripts/crg-runner.mjs mcp",
     "crg:version": "node scripts/crg-runner.mjs version",

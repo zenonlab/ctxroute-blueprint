@@ -32,9 +32,9 @@ sa stratégie de rollback.
 Pendant une modification, utiliser le test ou validateur ciblé. Exécuter
 `npm run validate` une fois par chantier cohérent, puis `npm run verify` avant
 une livraison. Le job d'installation propre exécute le bootstrap réel. Dans
-Codex, l'approbation des
-neuf définitions de `/hooks` reste une action manuelle ; le dépôt ne modifie pas
-les réglages globaux Codex ou Claude.
+Codex, la confiance du workspace exact puis l'approbation des sept définitions
+de `/hooks` restent des actions manuelles ; le dépôt ne modifie pas les réglages
+globaux Codex ou Claude.
 
 Trois workflows distincts gèrent la revue CRG des PR. Le workflow non privilégié
 checkout le code PR avec `contents: read`, exécute l'Action officielle épinglée

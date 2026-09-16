@@ -18,11 +18,13 @@ export const lifecycleEvents = [
 const MAX_CONTEXT_LENGTH = 4096;
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
-export function handlerPlan(harness, event, root = projectRoot) {
+export function handlerPlan(harness, event, root = projectRoot, lane = 'synchronous') {
   const local = name => ({ name, path: join(root, '.codex', 'hooks', name), args: [] });
   const problemMemory = event => ({ name: 'problem-memory.mjs', path: join(root, '.codex', 'hooks', 'problem-memory.mjs'), args: [event] });
   const direct = (name, ...args) => ({ name, path: join(root, 'node_modules', 'ctxroute', 'src', 'hooks', name), args });
   if (harness !== 'codex' && harness !== 'claude') return [];
+  if (lane === 'maintenance') return event === 'PostToolUse' ? [local('post-tool-crg.mjs')] : [];
+  if (lane !== 'synchronous') return [];
 
   return {
     SessionStart: [local('worktree-reconcile.mjs'), local('mission-context.mjs')],
@@ -79,16 +81,17 @@ export function isBlocking(output) {
     || output?.continue === false;
 }
 
-export function dispatch({ harness, event, input, root = projectRoot, execute = executeHandler }) {
-  const plan = applicableHandlers(handlerPlan(harness, event, root), event, input);
+export function dispatch({ harness, event, input, root = projectRoot, lane = 'synchronous', execute = executeHandler }) {
+  const plan = applicableHandlers(handlerPlan(harness, event, root, lane), event, input);
   if (!lifecycleEvents.includes(event) || !plan.length) {
-    return { systemMessage: `Lifecycle ${event || '(missing)'} failed open: unsupported ${harness || '(missing)'} configuration.` };
+    return { systemMessage: `Lifecycle ${event || '(missing)'} ${lane} failed open: unsupported ${harness || '(missing)'} configuration.` };
   }
 
   const outputs = [];
   const notices = [];
+  const contract = hookContract(harness, event, lane, root);
   for (const handler of plan) {
-    const result = execute(handler, input, root);
+    const result = execute(handler, input, root, contract.timeoutMs);
     if (result.error) {
       notices.push(`Lifecycle ${event} handler ${handler.name} failed open: ${result.error}`);
       continue;
@@ -99,7 +102,7 @@ export function dispatch({ harness, event, input, root = projectRoot, execute = 
       outputs.push(output);
     }
   }
-  return mergeOutputs(event, outputs, notices, hookContract(harness, event, 'synchronous', root).contextLimit);
+  return mergeOutputs(event, outputs, notices, contract.contextLimit);
 }
 
 export function applicableHandlers(plan, event, input) {
@@ -111,13 +114,13 @@ export function applicableHandlers(plan, event, input) {
   return plan.filter(handler => !['pre-tool-goal.mjs', 'pre-tool-architecture.mjs'].includes(handler.name));
 }
 
-export function executeHandler(handler, input, root) {
+export function executeHandler(handler, input, root, timeoutMs = 30_000) {
   const result = spawnSync(process.execPath, [handler.path, ...handler.args], {
     cwd: root,
     env: ctxrouteEnvironment(root),
     input,
     encoding: 'utf8',
-    timeout: 30_000,
+    timeout: timeoutMs,
   });
   const stderr = actionableStderr(result.stderr);
   if (result.error || (result.status !== 0 && result.status !== null)) {
@@ -159,6 +162,6 @@ async function stdin() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const result = dispatch({ harness: process.argv[2], event: process.argv[3], input: await stdin() });
+  const result = dispatch({ harness: process.argv[2], event: process.argv[3], lane: process.argv[4] ?? 'synchronous', input: await stdin() });
   if (result) process.stdout.write(JSON.stringify(result));
 }

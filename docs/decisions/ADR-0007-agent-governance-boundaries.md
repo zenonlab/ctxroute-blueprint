@@ -47,5 +47,10 @@ diagnostics remain visible while full reports belong in CI or local
 validation output.
 Deterministic safety gates run before a mutation. PostToolUse analysis reports
 against the already-modified file without rejecting or hiding the successful
-tool result, and maintenance-only CRG, problem-memory, and Archify work runs in
-an asynchronous lane.
+tool result. The lifecycle dispatcher has two closed lanes: `synchronous`
+contains the bounded Sensor, audit, and agent-context handlers; `maintenance`
+contains only coalesced, fail-open work that must not delay the tool response.
+Hosts declare the maintenance command as asynchronous and pass the lane to the
+same dispatcher, so the configuration cannot bypass lifecycle planning. CRG
+incremental maintenance is the first such handler. It runs only after a
+successful `apply_patch`, `Edit`, or `Write`, never after generic shell tools.

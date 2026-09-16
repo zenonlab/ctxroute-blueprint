@@ -34,16 +34,18 @@ CTXRoute document lookup is explicit through the orchestrator MCP or mirror
 CLI; it is not injected automatically on tool events. Both agents query the
 same tracked rule corpus.
 
-Keep exactly one configured handler per event in both `.codex/hooks.json` and
-`.claude/settings.json`. Run governance for mutation-capable `PreToolUse`
-events, Sensor and passive audit after writes, and CTXRoute reset during
-`PreCompact` and Stop.
+Keep exactly one synchronous configured handler per event in both
+`.codex/hooks.json` and `.claude/settings.json`. `PostToolUse` additionally
+declares one asynchronous maintenance handler routed through the same central
+dispatcher. Run governance for mutation-capable `PreToolUse` events, Sensor
+and passive audit after writes, CRG maintenance after successful editor writes,
+and CTXRoute reset during `PreCompact` and Stop.
 
 Add a lightweight `postinstall` check. It verifies the installed CTXRoute
 package, the on-demand query and reset entry points, both hook configurations, and the
-Claude doctrine import. It reports one manual Codex action: open `/hooks` and
-approve the six workspace definitions. It never changes Codex trust settings,
-which are stored outside the repository.
+Claude doctrine import. It reports two manual Codex checks: trust the exact
+workspace, then open `/hooks` and approve the seven workspace definitions. It
+never changes Codex trust settings, which are stored outside the repository.
 
 Do not configure custom lifecycle status messages. Restrict `PostToolUse` to
 mutation-capable tools, and skip the architecture subprocess on read-only

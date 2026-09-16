@@ -29,6 +29,7 @@ const inputs = {
 };
 const latencyLimits = { SessionStart: 1_500, PreToolUse: 1_500, PostToolUse: 1_800, UserPromptSubmit: 1_000, PreCompact: 1_000, Stop: 1_000, SubagentStart: 750, SubagentStop: 750, SessionEnd: 1_000 };
 const results = [];
+const maintenancePlans = [];
 let failed = false;
 
 try {
@@ -58,7 +59,11 @@ try {
       failed ||= !ok;
       results.push({ harness, event, durationMs, samples, latencyLimit: latencyLimits[event], contextChars, contextLimit: contract.contextLimit, handlers: handlerPlan(harness, event, root).map(item => item.name), ok, error });
     }
-    if (!handlerPlan(harness, 'PostToolUse', root, 'maintenance').length) failed = true;
+    const handlers = handlerPlan(harness, 'PostToolUse', root, 'maintenance').map(item => item.name);
+    const contract = hookContract(harness, 'PostToolUse', 'maintenance', root);
+    const ok = contract.declared && handlers.length === 1 && handlers[0] === 'post-tool-crg.mjs';
+    maintenancePlans.push({ harness, handlers, declared: contract.declared, timeoutMs: contract.timeoutMs, ok });
+    failed ||= !ok;
   }
 } finally {
   rmSync(state, { recursive: true, force: true });
@@ -67,7 +72,8 @@ try {
 
 const maximumObservedLatencyMs = Math.max(...results.flatMap(result => result.samples));
 const maximumObservedContextChars = Math.max(...results.map(result => result.contextChars));
-process.stdout.write(`${JSON.stringify({ ok: !failed, samplesPerCase, lifecycleEvents, harnesses: ['codex', 'claude'], maintenancePlanCovered: true, maximumObservedLatencyMs, maximumObservedContextChars, results }, null, 2)}\n`);
+const maintenancePlanCovered = maintenancePlans.every(plan => plan.ok);
+process.stdout.write(`${JSON.stringify({ ok: !failed, samplesPerCase, lifecycleEvents, harnesses: ['codex', 'claude'], maintenancePlanCovered, maintenancePlans, maximumObservedLatencyMs, maximumObservedContextChars, results }, null, 2)}\n`);
 if (failed) process.exitCode = 1;
 
 function median(values) {

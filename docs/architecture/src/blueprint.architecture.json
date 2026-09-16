@@ -6,7 +6,7 @@
     "quality_profile": "showcase",
     "viewBox": [1390, 700],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The orchestrator validates separate request, record, and worker-view contracts before durable two-phase effects." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The lifecycle returns bounded synchronous context while an explicit asynchronous maintenance lane keeps CRG current for later MCP queries." },
       { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "state", "worktrees", "recovery", "telemetry"], "note": "A single fail-closed bootstrap owns the global mutation lock, resumes pending intent, and preserves ambiguous worktrees." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg", "githubActions", "ciArtifacts"], "note": "Sensor blocks unsafe changes; CRG stays fail-closed at high and accepts only exact-SHA, digest-bound administrator dispositions." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
@@ -14,7 +14,7 @@
   },
   "components": [
     { "id": "agents", "type": "external", "label": "Coding agents", "sublabel": "Codex / Claude", "pos": [40, 50], "size": [150, 60] },
-    { "id": "lifecycle", "type": "backend", "label": "Lifecycle dispatch", "sublabel": "Session routes + timed gates", "pos": [280, 50], "size": [180, 60] },
+    { "id": "lifecycle", "type": "backend", "label": "Lifecycle dispatch", "sublabel": "Sync + async maintenance lanes", "pos": [280, 50], "size": [180, 60] },
     { "id": "ctxroute", "type": "external", "label": "CTXRoute", "sublabel": "On-demand context", "pos": [540, 50], "size": [170, 60] },
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
@@ -43,8 +43,8 @@
     { "id": "orchestrator-workers", "from": "orchestrator", "to": "workers", "label": "scope + worktree", "fromSide": "bottom", "toSide": "top", "labelAt": [90, 350] },
     { "id": "workers-orchestrator", "from": "workers", "to": "orchestrator", "label": "bounded report", "variant": "emphasis", "fromSide": "right", "toSide": "right", "via": [[250, 440], [250, 260]], "labelAt": [285, 395] },
     { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
-    { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "status / single-flight update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
-    { "id": "crg-graph", "from": "crg", "to": "graph", "label": "build / incremental update", "labelAt": [800, 170] },
+    { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "async coalesced update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
+    { "id": "crg-graph", "from": "crg", "to": "graph", "label": "update + HEAD freshness", "labelAt": [800, 170] },
     { "id": "json-archify", "from": "jsonIr", "to": "archify", "label": "showcase validation", "labelAt": [1070, 170] },
     { "id": "ci-crg", "from": "githubActions", "to": "crg", "label": "high gate + disposition", "variant": "security", "fromSide": "top", "toSide": "bottom", "via": [[1155, 330], [1000, 330], [1000, 170], [885, 170]], "labelAt": [1080, 315] },
     { "id": "ci-archify", "from": "githubActions", "to": "archify", "label": "build + visual-check", "fromSide": "right", "toSide": "right", "via": [[1260, 440], [1260, 80]], "labelAt": [1195, 320] },

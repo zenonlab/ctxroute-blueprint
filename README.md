@@ -53,8 +53,10 @@ Python 3.12 is the reference runtime for official code-review-graph.
    npm run setup
    ```
 
-3. In Codex, open `/hooks` and approve the six workspace definitions. Claude
-   reads the tracked `.claude/settings.json` configuration directly.
+3. In Codex, trust the exact generated workspace, then open `/hooks` and
+   approve the seven workspace definitions. Until both steps are complete,
+   Codex deliberately ignores local hooks. Claude reads the tracked
+   `.claude/settings.json` configuration directly.
 4. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
    [`CLAUDE.md`](CLAUDE.md), then initialize the project from your requirements.
 5. Review the generated [project brief](docs/00-project-brief.md),
@@ -137,6 +139,7 @@ servers.
 npm run mcp:validate
 npm run mcp:smoke
 npm run crg:smoke
+npm run crg:health
 ```
 
 CRG embeddings are disabled by default. Local embeddings require an explicit
@@ -155,8 +158,11 @@ The lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
 `UserPromptSubmit`, `PreCompact`, and `Stop`. Session start injects only an
 explicit worker mission. `PostToolUse` runs the blocking Sensor, opportunistic
 problem memory, and the local documentation audit. CRG maintenance is explicit
-or asynchronous. `PreCompact` and Stop clean CTXRoute session state; Stop is
-fail-open and never schedules continuation.
+or runs through a separate asynchronous lifecycle lane after successful editor
+writes. `npm run crg:health` confirms whether MCP context matches `HEAD` and
+names `npm run crg:update` when remediation is required. `PreCompact` and Stop
+clean CTXRoute session state; Stop is fail-open and never schedules
+continuation.
 
 Keep only the project-local lifecycle definitions after approval. Legacy global
 CTXRoute hooks would run in addition to them, duplicating context and process

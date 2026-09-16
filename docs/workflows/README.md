@@ -15,9 +15,17 @@ goal runner retains the loop.
 ## File change to CRG update
 
 CRG updates are explicit or asynchronous rather than a synchronous per-tool
-context injection. PreToolUse permits generated graph maintenance and
-`apply_refactor_tool` only with `dry_run: true`; real changes continue through
-normal editing tools and Sensor controls. CTXRoute context lookup is available
-on demand through MCP and CLI.
+context injection. After a successful `apply_patch`, `Edit`, or `Write`, the
+host starts the lifecycle `maintenance` lane asynchronously. That lane contains
+only `post-tool-crg.mjs`, coalesces bursts, and uses the runner's cross-process
+single-flight lock; generic shell tools never schedule it. The synchronous lane
+still returns Sensor and audit diagnostics immediately to the agent.
+
+`npm run crg:health` is the machine-readable readiness check. It compares the
+ignored graph's build commit with `HEAD`; stale or missing state always points
+to `npm run crg:update`. Agents obtain current minimal context and impact data
+on demand through the allowlisted official MCP tools. PreToolUse permits
+`apply_refactor_tool` only with `dry_run: true`; accepted edits remain normal
+editor operations so all lifecycle controls execute.
 
 The architecture JSON IR is the executable diagram source for this flow.
