@@ -34,6 +34,8 @@ export async function runCrgCommand({ root = process.cwd(), args = [], timeoutMs
 export async function runCrgUpdate({ root = process.cwd(), timeoutMs, spawnImpl, env } = {}) {
   const graphDirectory = resolve(root, '.code-review-graph');
   const lockDirectory = join(graphDirectory, '.ctxroute-update.lock');
+  const deadlineMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const startedAt = Date.now();
   await mkdir(graphDirectory, { recursive: true });
   try {
     await mkdir(lockDirectory);
@@ -44,10 +46,21 @@ export async function runCrgUpdate({ root = process.cwd(), timeoutMs, spawnImpl,
   try {
     const graph = join(graphDirectory, 'graph.db');
     const command = (await isFile(graph)) ? ['update', '--repo', root, '--skip-flows'] : ['build', '--repo', root];
-    return { ...(await runCrgCommand({ root, args: command, timeoutMs, spawnImpl, env })), command };
+    const result = await runCrgCommand({ root, args: command, timeoutMs: deadlineMs, spawnImpl, env });
+    if (command[0] === 'update' && result.code === 0 && !result.timedOut && isNoopUpdate(result)) {
+      const rebuildCommand = ['build', '--repo', root];
+      const remainingMs = deadlineMs - (Date.now() - startedAt);
+      if (remainingMs <= 0) return { ...result, timedOut: true, stderr: `${result.stderr}\nNo time remained to refresh no-op graph metadata.`.trim(), command, refreshedNoop: false };
+      return { ...(await runCrgCommand({ root, args: rebuildCommand, timeoutMs: remainingMs, spawnImpl, env })), command: rebuildCommand, previousCommand: command, refreshedNoop: true };
+    }
+    return { ...result, command };
   } finally {
     await rm(lockDirectory, { recursive: true, force: true });
   }
+}
+
+function isNoopUpdate(result) {
+  return /Incremental:\s+0 files updated\b/iu.test(`${result.stdout ?? ''}\n${result.stderr ?? ''}`);
 }
 
 export function parseCrgStatus(value) {
@@ -132,6 +145,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     const receipt = await crgHealth({ root: process.cwd() });
     process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
     process.exit(0);
+  }
+  if (command === 'update') {
+    const result = await runCrgUpdate({ root: process.cwd() });
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+    process.exit(result.code ?? (result.signal ? 1 : 0));
   }
   const args = publicArgs(command, process.cwd());
   if (!args) {

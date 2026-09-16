@@ -50,9 +50,11 @@ generated CRG hooks, or synthetic update database is used.
 Graph freshness is part of the public local contract. `npm run crg:health`
 compares the graph build commit with repository `HEAD` and emits a bounded JSON
 receipt. A stale or missing graph reports `npm run crg:update` as the single
-deterministic remediation. MCP consumers continue to receive the official
-graph metadata and must not treat stale or unindexed responses as useful
-context.
+deterministic remediation. When the official incremental updater reports zero
+changed files and therefore retains a parent commit after a merge, the runner
+performs one bounded full build to bind graph metadata to the current `HEAD`.
+MCP consumers continue to receive the official graph metadata and must not
+treat stale or unindexed responses as useful context.
 
 The only project MCP servers are the CTXRoute orchestrator and official code-review-graph. The
 CRG MCP default exposure is an exact six-tool allowlist: minimal context,
