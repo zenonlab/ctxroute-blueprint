@@ -33,6 +33,23 @@ test('CRG update builds a missing graph and updates an existing graph', async ()
   assert.equal(result.stdout, 'updated');
 });
 
+test('CRG update rebuilds once when an incremental merge update cannot refresh HEAD metadata', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'crg-noop-update-'));
+  await mkdir(join(root, '.code-review-graph'), { recursive: true });
+  await writeFile(join(root, '.code-review-graph', 'graph.db'), 'fixture');
+  let calls = 0;
+  const spawnImpl = () => {
+    calls += 1;
+    return nodeChild(calls === 1 ? 'process.stdout.write("Incremental: 0 files updated, 0 nodes, 0 edges")' : 'process.stdout.write("rebuilt")')();
+  };
+  const result = await runCrgUpdate({ root, spawnImpl });
+  assert.equal(calls, 2);
+  assert.equal(result.refreshedNoop, true);
+  assert.deepEqual(result.previousCommand, ['update', '--repo', root, '--skip-flows']);
+  assert.deepEqual(result.command, ['build', '--repo', root]);
+  assert.equal(result.stdout, 'rebuilt');
+});
+
 test('CRG update lock is cross-process single-flight and fail-open', async () => {
   const root = await mkdtemp(join(tmpdir(), 'crg-lock-'));
   await mkdir(join(root, '.code-review-graph', '.ctxroute-update.lock'), { recursive: true });

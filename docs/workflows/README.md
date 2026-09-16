@@ -23,8 +23,10 @@ still returns Sensor and audit diagnostics immediately to the agent.
 
 `npm run crg:health` is the machine-readable readiness check. It compares the
 ignored graph's build commit with `HEAD`; stale or missing state always points
-to `npm run crg:update`. Agents obtain current minimal context and impact data
-on demand through the allowlisted official MCP tools. PreToolUse permits
+to `npm run crg:update`. An incremental no-op after a merge falls back once to
+a bounded full build because the upstream no-op does not refresh commit
+metadata. Agents obtain current minimal context and impact data on demand
+through the allowlisted official MCP tools. PreToolUse permits
 `apply_refactor_tool` only with `dry_run: true`; accepted edits remain normal
 editor operations so all lifecycle controls execute.
 
