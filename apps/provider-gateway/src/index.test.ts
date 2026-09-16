@@ -1,4 +1,5 @@
 import {
+  DenoKvNonceStore,
   createProviderGatewayHandler,
   createUnconfiguredGatewayHandler,
   type GatewayNonceStore,
@@ -165,4 +166,19 @@ Deno.test('starts closed while Deno provisions the secret and KV binding', async
   );
   assert(response.status === 503);
   assert((await response.json()).error === 'gateway-not-configured');
+});
+
+Deno.test('serves health before lazy KV initialization and fails signed traffic closed', async () => {
+  const handler = createProviderGatewayHandler({
+    nonceStore: new DenoKvNonceStore(Promise.resolve(undefined)),
+    now: () => now,
+    secrets: [secret],
+  });
+  const health = await handler(new Request('https://gateway.example/healthz'));
+  assert(health.status === 200);
+  assert((await health.json()).status === 'healthy');
+
+  const signed = await handler(await gatewayRequest());
+  assert(signed.status === 503);
+  assert((await signed.json()).error === 'gateway-not-configured');
 });

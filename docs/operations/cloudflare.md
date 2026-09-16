@@ -126,6 +126,9 @@ provider mutation and requires an exact approved target.
 The Deno gateway health probe is `GET /healthz`. A configured instance returns
 HTTP 200 with `{ "status": "healthy" }`; an instance missing its secret or KV
 binding remains closed with HTTP 503 and `{ "error": "gateway-not-configured" }`.
+The server starts before awaiting the Deno KV connection so platform warm-up
+can probe health immediately. Only signed traffic awaits the lazy KV promise;
+an unavailable binding fails that request closed with the same bounded 503.
 
 ## Zero-downtime gateway key rotation
 

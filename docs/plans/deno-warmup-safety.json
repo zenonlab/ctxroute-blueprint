@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-deno-warmup-safety",
+  "title": "Éviter le blocage de warm-up de la gateway Deno",
+  "status": "ACTIVE",
+  "executionMode": "collaborative",
+  "steps": [
+    {
+      "id": "defer-kv-and-republish",
+      "title": "Démarrer HTTP avant Deno KV puis republier la gateway",
+      "status": "IN_PROGRESS",
+      "acceptance": [
+        "La gateway démarre son serveur HTTP avant d’attendre Deno KV et répond 503 de façon bornée si l’initialisation KV échoue.",
+        "La gateway Deno passe ses tests ciblés, npm run verify, npm ls --all, npm audit et public-pipeline.architecture passe Archify showcase.",
+        "Le commit fix(gateway): avoid Deno warm-up deadlock est poussé sur origin/main sans .codex/config.toml.",
+        "La gate Deno déploie uniquement deno-app:tobirink-provider-gateway/production sans modifier secret ni KV et la nouvelle révision atteint routed.",
+        "Deno health répond 200 status healthy; Discovery AniList et MangaUpdates atteignent VERIFIED; Agenda v3 répond 200 et les routes retirées restent 410."
+      ],
+      "files": [
+        ".project/progress.json",
+        "docs/progress.md",
+        "apps/provider-gateway/src/index.ts",
+        "apps/provider-gateway/src/index.test.ts",
+        "docs/02-quality-strategy.md",
+        "docs/operations/cloudflare.md",
+        "docs/decisions/ADR-0051-provider-transport-gate.md",
+        "docs/decisions/ADR-0052-native-collector-operations.md",
+        "docs/architecture/src/public-pipeline.architecture.json",
+        "docs/plans/deno-warmup-safety.json",
+        "docs/plans/deno-warmup-safety-start.json",
+        "docs/plans/deno-warmup-safety-done.json",
+        "docs/plans/publish-pipeline-hardening-done.json"
+      ],
+      "commands": [
+        "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress prévues.",
+        "Exécuter les tests et typecheck Deno ciblés puis npm run verify, npm ls --all, npm audit --audit-level=high et git diff --check.",
+        "Valider public-pipeline.architecture avec Archify showcase.",
+        "Créer le commit fix(gateway): avoid Deno warm-up deadlock sans .codex/config.toml puis pousser HEAD vers origin/main.",
+        "Appliquer gateway-deploy via une authentification Deno éphémère en mémoire avec l’allowlist deno-app:tobirink-provider-gateway/production.",
+        "Certifier la révision Deno, /healthz, Discovery AniList et MangaUpdates, Agenda v3 et les routes retirées."
+      ],
+      "evidence": [
+        "Correction matérialisée après autorisation explicite; révision précédente 5kdjjznp5w03 timed_out en warming."
+      ]
+    }
+  ]
+}

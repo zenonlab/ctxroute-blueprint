@@ -120,6 +120,9 @@ browser or `workerd` test when platform behavior is the risk.
   only the bounded `anilist`, `mangaupdates` or combined lane code.
 - The Deno gateway health contract is HTTP 200 with
   `{ "status": "healthy" }`; error responses retain `{ "error": code }`.
+- Deno startup tests require `/healthz` to resolve without waiting for KV and
+  require signed traffic to return bounded HTTP 503 while lazy KV
+  initialization is unavailable.
 - Gateway rotation tests admit exactly one distinct previous HMAC key, reject
   weak, duplicate and excessive key sets, preserve nonce replay protection and
   prove that the Deno gate redacts both values while inspecting only secret

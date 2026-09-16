@@ -184,14 +184,16 @@ function forwardedHeaders(response: Response): Headers {
 }
 
 export class DenoKvNonceStore implements GatewayNonceStore {
-  constructor(private readonly kv: Deno.Kv, private readonly now: () => number = Date.now) {}
+  constructor(private readonly kv: Deno.Kv | Promise<Deno.Kv | undefined>, private readonly now: () => number = Date.now) {}
 
   async claim(nonce: string, expiresAt: number): Promise<boolean> {
+    const kv = await this.kv;
+    if (kv === undefined) throw new Error('gateway-kv-unavailable');
     const key = ['provider-gateway-nonce', nonce] as const;
-    const current = await this.kv.get(key);
+    const current = await kv.get(key);
     if (current.value !== null) return false;
     const expireIn = Math.max(1, expiresAt - this.now());
-    return (await this.kv.atomic().check(current).set(key, expiresAt, { expireIn }).commit()).ok;
+    return (await kv.atomic().check(current).set(key, expiresAt, { expireIn }).commit()).ok;
   }
 }
 
@@ -216,7 +218,11 @@ export function createProviderGatewayHandler(options: GatewayOptions): (request:
     const currentTime = now();
     const envelope = parseEnvelope(raw, currentTime);
     if (envelope === undefined) return json(400, 'invalid-envelope');
-    if (!await options.nonceStore.claim(envelope.nonce, currentTime + replayWindowMs)) return json(409, 'replayed-request');
+    try {
+      if (!await options.nonceStore.claim(envelope.nonce, currentTime + replayWindowMs)) return json(409, 'replayed-request');
+    } catch {
+      return json(503, 'gateway-not-configured');
+    }
     let upstream: Response;
     try {
       upstream = await fetcher(envelope.target, {
@@ -253,7 +259,7 @@ if (import.meta.main) {
     handler = createUnconfiguredGatewayHandler();
   } else {
     try {
-      const kv = await Deno.openKv();
+      const kv = Deno.openKv().catch(() => undefined);
       handler = createProviderGatewayHandler({ nonceStore: new DenoKvNonceStore(kv), secrets: previousSecret === undefined ? [secret] : [secret, previousSecret] });
     } catch {
       handler = createUnconfiguredGatewayHandler();

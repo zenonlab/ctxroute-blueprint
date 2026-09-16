@@ -97,7 +97,10 @@ Deno Deploy est retenu comme premier candidat gratuit pour une passerelle
 séparée : ses règles autorisent explicitement une API qui interroge une API
 externe et un reverse proxy, contrairement à un forward proxy générique. La
 passerelle utilise une base Deno KV attachée pour réclamer chaque nonce par
-transaction atomique avec expiration. Vercel Hobby reste un candidat de repli,
+transaction atomique avec expiration. Le serveur HTTP démarre avant d’attendre
+la connexion KV : `/healthz` reste disponible pendant le warm-up, tandis que
+seul le trafic signé attend la promesse KV et échoue fermé en 503 si elle est
+indisponible. Vercel Hobby reste un candidat de repli,
 mais son offre gratuite est limitée aux usages personnels non commerciaux.
 Render gratuit est exclu car sa mise en veille peut ajouter environ une minute
 au premier appel. Une passerelle publique ouverte est exclue : elle ne fournit

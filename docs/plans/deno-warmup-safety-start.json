@@ -1,0 +1,10 @@
+{
+  "goalId": "goal-deno-warmup-safety",
+  "stepId": "defer-kv-and-republish",
+  "status": "IN_PROGRESS",
+  "evidence": [
+    "Révision Deno 5kdjjznp5w03: build terminé et serveur à l’écoute en six secondes, puis expiration timed_out après cinq minutes pendant warming.",
+    "Deno status annonçait tous les systèmes opérationnels; la production servait encore l’ancienne réponse de santé.",
+    "Le démarrage runtime attendait Deno.openKv avant Deno.serve."
+  ]
+}

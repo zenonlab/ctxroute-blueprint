@@ -87,7 +87,7 @@
       "id": "gateway",
       "type": "backend",
       "label": "Gateway fournisseur",
-      "sublabel": "Deno · HMAC ×2 · anti-rejeu",
+      "sublabel": "Deno · HTTP immédiat · KV paresseux",
       "pos": [960, 250],
       "size": [240, 72]
     },
@@ -136,6 +136,6 @@
   ],
   "cards": [
     { "dot": "emerald", "title": "Runtime natif", "items": ["Discovery déclenchée immédiatement par Queue", "Agenda collecté par Cron", "Logs JSON: lane, tentative et disposition", "D1 conserve la dernière génération saine"] },
-    { "dot": "rose", "title": "Gateway sélective fermée", "items": ["Deux secrets HMAC maximum pendant rotation", "Nonce et horodatage vérifiés", "AniList + tous les endpoints MU", "MangaDex et Kitsu directs"] }
+    { "dot": "rose", "title": "Gateway sélective fermée", "items": ["Health servi avant l’initialisation KV", "KV indisponible : trafic signé en 503", "AniList + tous les endpoints MU", "MangaDex et Kitsu directs"] }
   ]
 }

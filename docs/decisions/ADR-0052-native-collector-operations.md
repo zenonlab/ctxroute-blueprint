@@ -45,7 +45,9 @@ mutation fournisseur approuvée séparément.
 
 Séparer enfin la réponse de succès Deno de la forme d’erreur : `/healthz`
 retourne `{ "status": "healthy" }`, tandis qu’une gateway non configurée reste
-fermée en 503 avec un code d’erreur.
+fermée en 503 avec un code d’erreur. Le démarrage HTTP ne doit pas attendre
+`Deno.openKv()` : la santé sert le warm-up immédiatement et une requête signée
+sans KV disponible reçoit le 503 borné.
 
 ## Conséquences
 

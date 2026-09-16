@@ -115,3 +115,7 @@
 ## Publier le durcissement du pipeline fournisseur — ACTIVE
 
 - [ ] **Pousser, déployer les deux runtimes et certifier le trafic** — IN_PROGRESS
+
+## Éviter le blocage de warm-up de la gateway Deno — ACTIVE
+
+- [ ] **Démarrer HTTP avant Deno KV puis republier la gateway** — IN_PROGRESS _(evidence: Correction materialisée après autorisation explicite; révision précédente 5kdjjznp5w03 timed_out en warming.)_
