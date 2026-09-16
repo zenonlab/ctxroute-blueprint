@@ -146,5 +146,5 @@
 
 ## Déployer progressivement le rafraîchissement public adaptatif — ACTIVE
 
-- [ ] **Sauvegarder D1, migrer, pousser et déployer le Worker** — BLOCKED _(evidence: Backup D1 ignoré et restaurable: 1000960 octets, 30 tables, integrity_check ok, SHA-256 c5b94e9566be330a8db0a9a7b54be54c73a603166432bcb48d088a87639b33ed., origin/main pointe sur 43e3397 après passage des hooks pré-push; .codex/config.toml est resté local et non indexé., external: repoll du 2026-09-16T10:43:06Z après le code D1 7500; 0017 à 0020 restent toutes en attente jusqu’au reset de minuit UTC et le Worker 2267a691 reste servi à 100 %.)_
+- [ ] **Sauvegarder D1, migrer, pousser et déployer le Worker** — BLOCKED _(evidence: Backup D1 ignoré et restaurable: 1000960 octets, 30 tables, integrity_check ok, SHA-256 c5b94e9566be330a8db0a9a7b54be54c73a603166432bcb48d088a87639b33ed., origin/main pointe sur 2bb44ea après passage des hooks pré-push; .codex/config.toml est resté local et non indexé., external: repoll du 2026-09-16T10:43:06Z après le code D1 7500; 0017 à 0020 restent toutes en attente jusqu’au reset de minuit UTC et le Worker 2267a691 reste servi à 100 %.)_
 - [ ] **Observer une collecte hebdomadaire complète** — PENDING

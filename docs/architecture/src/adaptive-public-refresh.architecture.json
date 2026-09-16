@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Architecture du rafraîchissement public adaptatif",
+    "quality_profile": "showcase",
+    "viewBox": [1280, 820],
+    "views": [
+      {
+        "id": "lecture-cache",
+        "label": "Lecture cache-first",
+        "focus": ["extension", "indexedDb", "publicApi", "catalogueD1"],
+        "note": "L’extension projette immédiatement le favori, lit D1 en lot et conserve sa donnée privée dans IndexedDB."
+      },
+      {
+        "id": "collectes-independantes",
+        "label": "Collectes indépendantes",
+        "focus": ["weeklyCron", "publicQueue", "collectors", "catalogueD1"],
+        "note": "Agenda, Discovery et réhydratation possèdent leurs propres admissions, reprises et publications validées."
+      },
+      {
+        "id": "sortie-fournisseur",
+        "label": "Sortie fournisseur",
+        "focus": ["collectors", "providerGateway", "providers"],
+        "note": "Tous les appels fournisseur passent par la gateway signée; aucun fournisseur n’est appelé depuis l’extension."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "extension",
+      "type": "frontend",
+      "label": "Extension MV3",
+      "sublabel": "favoris et continuation locale",
+      "pos": [30, 140],
+      "size": [160, 66],
+      "tag": "aucun appel fournisseur"
+    },
+    {
+      "id": "indexedDb",
+      "type": "database",
+      "label": "IndexedDB privée",
+      "sublabel": "profils et état de reprise",
+      "pos": [30, 300],
+      "size": [160, 66],
+      "tag": "données utilisateur locales"
+    },
+    {
+      "id": "weeklyCron",
+      "type": "cloud",
+      "label": "Cron hebdomadaire",
+      "sublabel": "23 3 * * 0",
+      "pos": [270, 300],
+      "size": [170, 66],
+      "tag": "Agenda uniquement"
+    },
+    {
+      "id": "publicApi",
+      "type": "backend",
+      "label": "Worker Public API",
+      "sublabel": "lookup et admission v3",
+      "pos": [270, 140],
+      "size": [170, 66],
+      "tag": "D1 avant Queue"
+    },
+    {
+      "id": "catalogueD1",
+      "type": "database",
+      "label": "Catalogue D1",
+      "sublabel": "fiches et snapshots validés",
+      "pos": [740, 140],
+      "size": [180, 66],
+      "tag": "lecture partagée"
+    },
+    {
+      "id": "publicQueue",
+      "type": "messagebus",
+      "label": "Queue publique",
+      "sublabel": "signaux opaques",
+      "pos": [270, 500],
+      "size": [170, 66],
+      "tag": "déduplication avant envoi"
+    },
+    {
+      "id": "collectors",
+      "type": "backend",
+      "label": "3 collecteurs indépendants",
+      "sublabel": "Agenda · Discovery · Réhydratation",
+      "pos": [560, 400],
+      "size": [220, 80],
+      "tag": "baux, reprises et publications isolés"
+    },
+    {
+      "id": "providerGateway",
+      "type": "security",
+      "label": "Gateway fournisseur",
+      "sublabel": "HMAC et anti-rejeu",
+      "pos": [850, 407],
+      "size": [180, 66],
+      "tag": "sortie contrôlée"
+    },
+    {
+      "id": "providers",
+      "type": "external",
+      "label": "Fournisseurs publics",
+      "sublabel": "AniList · MangaUpdates",
+      "pos": [1080, 407],
+      "size": [180, 66],
+      "tag": "quotas HTTP réels"
+    }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Navigateur — état privé", "wraps": ["extension", "indexedDb"], "pad": 18 },
+    { "kind": "region", "label": "Cloudflare — données publiques", "wraps": ["weeklyCron", "publicApi", "catalogueD1", "publicQueue", "collectors"], "pad": 18 },
+    { "kind": "security-group", "label": "Deno — sortie signée", "wraps": ["providerGateway"], "pad": 18 }
+  ],
+  "connections": [
+    { "id": "local-state", "from": "extension", "to": "indexedDb", "label": "profils versionnés", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [110, 250] },
+    { "id": "public-lookup", "from": "extension", "to": "publicApi", "label": "lots de 50 clés", "variant": "emphasis", "route": "straight", "labelAt": [230, 90] },
+    { "id": "cache-first", "from": "publicApi", "to": "catalogueD1", "label": "HIT · MISS · fraîcheur", "variant": "emphasis", "route": "straight", "labelAt": [590, 125] },
+    { "id": "admit-created", "from": "publicApi", "to": "publicQueue", "label": "created uniquement", "fromSide": "bottom", "toSide": "left", "via": [[355, 230], [230, 230], [230, 533]], "labelAt": [215, 420] },
+    { "id": "weekly-agenda", "from": "weeklyCron", "to": "collectors", "label": "Agenda hebdomadaire", "variant": "emphasis", "fromSide": "right", "toSide": "top", "via": [[480, 333], [480, 380], [670, 380]], "labelAt": [545, 365] },
+    { "id": "queued-work", "from": "publicQueue", "to": "collectors", "label": "Discovery · réhydratation", "fromSide": "right", "toSide": "left", "via": [[500, 533], [500, 440]], "labelAt": [505, 545] },
+    { "id": "validated-publish", "from": "collectors", "to": "catalogueD1", "label": "publication validée", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "via": [[670, 250], [830, 250]], "labelAt": [750, 235] },
+    { "id": "provider-egress", "from": "collectors", "to": "providerGateway", "label": "requêtes HTTP bornées", "variant": "security", "route": "straight", "labelAt": [815, 360] },
+    { "id": "provider-http", "from": "providerGateway", "to": "providers", "label": "HTTP limité", "variant": "security", "route": "straight", "labelAt": [1040, 390] }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Indépendance",
+      "items": [
+        "Une panne Agenda ne bloque ni Discovery ni la réhydratation",
+        "Chaque parcours possède son admission, son bail et sa reprise",
+        "La dernière donnée vérifiée reste servie pendant tout traitement"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Mutualisation",
+      "items": [
+        "La charge fournisseur dépend des œuvres uniques",
+        "D1 coalesce les demandes avant toute insertion Queue",
+        "Tous les utilisateurs lisent le même catalogue public"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Frontières",
+      "items": [
+        "Favoris, dossiers et historique restent dans le navigateur",
+        "La gateway signe chaque sortie fournisseur",
+        "Les logs de coût sont agrégés et dépourvus d’identité"
+      ]
+    }
+  ]
+}
