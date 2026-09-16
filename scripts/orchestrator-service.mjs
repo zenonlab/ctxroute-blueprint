@@ -14,6 +14,7 @@ import {
   recoverMissionWorktree, rollbackMissionWorktree,
 } from './worktree-manager.mjs';
 import { queryCtxroute } from './ctxroute-query.mjs';
+import { MODE_DESCRIPTORS, WORKFLOW_DESCRIPTORS, canonicalMode, explainExecutionPolicy } from './orchestration-policy-core.mjs';
 
 export async function readCoordination(root = process.cwd(), environment = process.env) {
   const state = await readOrchestratorState(root);
@@ -21,7 +22,7 @@ export async function readCoordination(root = process.cwd(), environment = proce
   const found = findMission(state, environment.CTXROUTE_MISSION_ID);
   if (!found?.mission.worktree_allocation?.path) throw new Error('worker role requires an assigned CTXROUTE_MISSION_ID');
   const mission = found.mission;
-  const view = { mission_id: mission.mission_id, file_scope: mission.file_scope, skill_id: mission.skill_id, skill_version: mission.skill_version, acceptance: mission.acceptance, validations: mission.validations, response_format: mission.response_format, worktree: mission.worktree_allocation.path };
+  const view = { mission_id: mission.mission_id, file_scope: mission.file_scope, skill_id: mission.skill_id, skill_version: mission.skill_version, acceptance: mission.acceptance, validations: mission.validations, response_format: mission.response_format, worktree: mission.worktree_allocation.path, requested_mode: found.goal.requested_mode ?? canonicalMode(state.mode), resolved_mode: found.goal.resolved_mode ?? canonicalMode(state.mode), workflow: found.goal.workflow ?? 'STANDARD', strategy: mission.strategy ?? 'single-worker', policy_digest: found.goal.policy_digest ?? '0'.repeat(64), reinforcements: mission.reinforcements ?? [] };
   assertOrchestratorContract('mission-view', view);
   return view;
 }
@@ -33,6 +34,41 @@ export async function mutateCoordination(command, root = process.cwd(), environm
   if (command.action === 'skill.register') await assertSkillRegistration(command.payload, root);
   if (['mission.prepare', 'report.submit', 'worktree.reconcile', 'mission.rollback', 'worktree.purge'].includes(command.action)) throw new Error(`${command.action} must use its dedicated service operation`);
   return transactOrchestrator(command, root, dependencies);
+}
+
+export function listOperatingModes() {
+  return { modes: Object.values(MODE_DESCRIPTORS), workflows: Object.values(WORKFLOW_DESCRIPTORS), default: { mode: 'SWARM', workflow: 'STANDARD' } };
+}
+
+export async function setOperatingMode(input, root = process.cwd(), environment = process.env, dependencies = {}) {
+  assertOrchestratorRole(environment);
+  const state = await readOrchestratorState(root);
+  const mode = canonicalMode(input.mode);
+  if (!mode) throw new Error(`unknown operating mode: ${input.mode}`);
+  const command = { operation_id: input.operation_id, expected_revision: input.expected_revision ?? state.revision, action: 'operating-mode.set', payload: { mode } };
+  return mutateCoordination(command, root, { ...environment, CTXROUTE_CONTROL_CHANNEL: 'mcp' }, dependencies);
+}
+
+export async function explainExecution(input = {}, root = process.cwd()) {
+  const state = await readOrchestratorState(root).catch(error => error.causeCode === 'STATE_MISSING' ? null : Promise.reject(error));
+  const goal = input.goal_id ? state?.goals.find(item => item.goal_id === input.goal_id) : null;
+  return explainExecutionPolicy({ ...input, requested_mode: input.requested_mode ?? goal?.requested_mode ?? canonicalMode(state?.mode ?? 'SWARM'), workflow: input.workflow ?? goal?.workflow ?? 'STANDARD', capabilities: input.capabilities ?? ['git'] });
+}
+
+export async function pendingDecisions(root = process.cwd()) {
+  const state = await readOrchestratorState(root);
+  return (state.decision_requests ?? []).filter(item => item.status === 'PENDING').map(request => ({ request, checkpoint: [...(state.checkpoints ?? [])].reverse().find(item => item.goal_id === request.goal_id && item.policy_digest === request.policy_digest) ?? null }));
+}
+
+export async function resolveDecision(input, root = process.cwd(), environment = process.env, dependencies = {}) {
+  const state = await readOrchestratorState(root);
+  const receipt = { ...input.receipt, resolved_via: input.receipt.resolved_via ?? 'mcp', resolved_at: input.receipt.resolved_at ?? new Date().toISOString(), subject: input.receipt.subject ?? 'local-user-unverified' };
+  return mutateCoordination({ operation_id: input.operation_id, expected_revision: input.expected_revision ?? state.revision, action: 'decision.resolve', payload: { receipt } }, root, environment, dependencies);
+}
+
+export async function promoteExperiment(input, root = process.cwd(), environment = process.env, dependencies = {}) {
+  const state = await readOrchestratorState(root);
+  return mutateCoordination({ operation_id: input.operation_id, expected_revision: input.expected_revision ?? state.revision, action: 'experiment.promote', payload: { goal_id: input.goal_id, decision_receipt_id: input.decision_receipt_id } }, root, environment, dependencies);
 }
 
 export async function prepareMission(command, root = process.cwd(), environment = process.env, dependencies = {}) {
@@ -179,7 +215,7 @@ function addPreparingMission(state, goalId, record, worktreeOperation) {
   const goals = [...state.goals]; goals[goalIndex] = { ...goals[goalIndex], missions: [...goals[goalIndex].missions, record] }; return { ...state, goals, worktree_operations: [...state.worktree_operations, worktreeOperation] };
 }
 function executionDecision(effective, request) {
-  if (effective.mode === 'SWARM_OFF') return { coordinated: false, reason: effective.mode_source === 'environment' ? 'ENVIRONMENT_SWARM_OFF' : effective.mode_source === 'state' ? 'PERSISTED_MODE' : 'DEFAULT_MODE' };
+  if (['SWARM_OFF', 'DIRECT', 'GUARDED'].includes(effective.mode)) return { coordinated: false, reason: effective.mode_source === 'environment' ? 'ENVIRONMENT_SWARM_OFF' : effective.mode_source === 'state' ? 'PERSISTED_MODE' : 'DEFAULT_MODE' };
   if (request.execution === 'direct') return { coordinated: false, reason: 'EXPLICIT_DIRECT' };
   if (request.execution === 'coordinated') return { coordinated: true, reason: 'EXPLICIT_COORDINATED' };
   return request.file_scope.length === 1 ? { coordinated: false, reason: 'AUTO_SINGLE_SCOPE' } : { coordinated: true, reason: 'AUTO_COORDINATED' };

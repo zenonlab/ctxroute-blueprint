@@ -16,7 +16,7 @@ const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
 test('state is created atomically and mode reports its source', async () => {
   const root = fixture();
-  assert.deepEqual(await currentSwarmMode(root, {}), { mode: 'SWARM_ON', mode_source: 'default' });
+  assert.deepEqual(await currentSwarmMode(root, {}), { mode: 'SWARM', mode_source: 'default' });
   assert.deepEqual(await currentSwarmMode(root, { CTXROUTE_SWARM_MODE: 'SWARM_OFF' }), { mode: 'SWARM_OFF', mode_source: 'environment' });
   await bootstrapOrchestrator(root);
   const state = await readOrchestratorState(root);

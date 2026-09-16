@@ -6,9 +6,9 @@
     "quality_profile": "showcase",
     "viewBox": [1390, 700],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The orchestrator validates separate request, record, and worker-view contracts before durable two-phase effects." },
-      { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "state", "worktrees", "recovery", "telemetry"], "note": "A single fail-closed bootstrap owns the global mutation lock, resumes pending intent, and preserves ambiguous worktrees." },
-      { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg"], "note": "Sensor keeps Tree-sitter for blocking security checks; CRG supplies code context and impact analysis." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "policy", "contracts", "state", "decisions", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The pure resolver freezes mode, workflow, stage strategy, and policy digest before durable two-phase effects." },
+      { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "policy", "state", "decisions", "worktrees", "recovery", "telemetry"], "note": "A single repository mutation lock resumes pending intent while bounded checkpoints preserve human decisions across sessions." },
+      { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg", "githubActions", "ciArtifacts"], "note": "Sensor blocks unsafe changes; CRG stays fail-closed at high and accepts only exact-SHA, digest-bound administrator dispositions." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
   },
@@ -32,6 +32,8 @@
     ,{ "id": "worktrees", "type": "database", "label": "Managed worktrees", "sublabel": "reconciled Git state", "pos": [280, 580], "size": [210, 60] }
     ,{ "id": "recovery", "type": "database", "label": "Recovery proofs", "sublabel": "bounded restorable patch", "pos": [540, 580], "size": [190, 60] }
     ,{ "id": "telemetry", "type": "database", "label": "Decision events", "sublabel": "bounded JSONL rotation", "pos": [790, 580], "size": [190, 60] }
+    ,{ "id": "policy", "type": "backend", "label": "Policy resolver", "sublabel": "pure mode + workflow + stage", "pos": [1060, 560], "size": [170, 60] }
+    ,{ "id": "decisions", "type": "database", "label": "Human checkpoints", "sublabel": "closed receipts + artifact refs", "pos": [1060, 640], "size": [200, 45] }
   ],
   "connections": [
     { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "six lifecycle events", "variant": "emphasis", "labelAt": [235, 124] },

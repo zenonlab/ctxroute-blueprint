@@ -1,5 +1,5 @@
 {
-  "defaultMode": "SWARM_ON",
+  "default_mode": "SWARM",
   "statePath": ".ctxroute/orchestrator/state.json",
   "worktreeRoot": ".ctxroute/worktrees",
   "recoveryRoot": ".ctxroute/recovery",

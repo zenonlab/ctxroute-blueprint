@@ -5,13 +5,18 @@
   "required": ["revision", "mode", "telemetry_sequence", "goals", "skills", "audits", "transactions", "worktree_operations"],
   "properties": {
     "revision": { "type": "integer", "minimum": 0 },
-    "mode": { "enum": ["SWARM_ON", "SWARM_OFF"] },
+    "mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT", "SWARM_ON", "SWARM_OFF"] },
     "telemetry_sequence": { "type": "integer", "minimum": 0 },
     "goals": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/goal" } },
     "skills": { "type": "array", "maxItems": 512, "items": { "$ref": "#/$defs/skill" } },
     "audits": { "type": "array", "maxItems": 1024, "items": { "$ref": "audit-report.schema.json" } },
     "transactions": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/transactionReceipt" } },
-    "worktree_operations": { "type": "array", "maxItems": 4096, "items": { "$ref": "worktree-operation.schema.json" } }
+    "worktree_operations": { "type": "array", "maxItems": 4096, "items": { "$ref": "worktree-operation.schema.json" } },
+    "decision_requests": { "type": "array", "maxItems": 1024, "items": { "$ref": "decision-request.schema.json" } },
+    "decision_receipts": { "type": "array", "maxItems": 1024, "items": { "$ref": "decision-receipt.schema.json" } },
+    "checkpoints": { "type": "array", "maxItems": 4096, "items": { "$ref": "stage-checkpoint.schema.json" } },
+    "experiment_receipts": { "type": "array", "maxItems": 1024, "items": { "$ref": "experiment-receipt.schema.json" } },
+    "outcome_receipts": { "type": "array", "maxItems": 1024, "items": { "$ref": "outcome-receipt.schema.json" } }
   },
   "$defs": {
     "goal": {
@@ -20,8 +25,14 @@
       "properties": {
         "goal_id": { "$ref": "common.schema.json#/$defs/identifier" },
         "title": { "$ref": "common.schema.json#/$defs/text" },
-        "status": { "enum": ["ACTIVE", "COMPLETED", "CANCELLED"] },
-        "missions": { "type": "array", "maxItems": 1024, "items": { "$ref": "mission-record.schema.json" } }
+        "status": { "enum": ["ACTIVE", "WAITING_FOR_USER_DECISION", "READY_FOR_PROMOTION", "COMPLETED", "CANCELLED"] },
+        "missions": { "type": "array", "maxItems": 1024, "items": { "$ref": "mission-record.schema.json" } },
+        "requested_mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] },
+        "resolved_mode": { "enum": ["SWARM", "SOLO", "GUARDED", "DIRECT"] },
+        "workflow": { "enum": ["STANDARD", "RESEARCH", "AUDIT", "SECURITY", "MIGRATION", "INCIDENT", "EXPERIMENT", "RECOVERY"] },
+        "policy_digest": { "$ref": "common.schema.json#/$defs/digest" },
+        "stage": { "type": "string" },
+        "outcome_receipt_id": { "oneOf": [{ "$ref": "common.schema.json#/$defs/identifier" }, { "type": "null" }] }
       },
       "unevaluatedProperties": false
     },
@@ -45,7 +56,7 @@
       "properties": {
         "operation_id": { "$ref": "common.schema.json#/$defs/identifier" },
         "digest": { "$ref": "common.schema.json#/$defs/digest" },
-        "action": { "enum": ["mode.set", "goal.create", "goal.transition", "mission.prepare", "mission.transition", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
+        "action": { "enum": ["operating-mode.set", "mode.set", "goal.create", "goal.transition", "goal.policy.rebase", "decision.request", "decision.resolve", "experiment.promote", "mission.prepare", "mission.transition", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
         "intent": { "type": ["object", "null"] },
         "status": { "enum": ["PENDING", "COMPLETED", "BLOCKED"] },
         "start_revision": { "type": "integer", "minimum": 0 },

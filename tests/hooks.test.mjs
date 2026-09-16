@@ -6,7 +6,7 @@ import { get as requestLoopback } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
+import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, isBlocking, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
 import { stopReview } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
@@ -145,6 +145,23 @@ test('applicable lifecycle handlers reserve architecture policy for mutations', 
     applicableHandlers(plan, 'PreToolUse', JSON.stringify({ tool_name: 'Edit' })).map(handler => handler.name),
     ['pre-tool-architecture.mjs', 'codex-doc-inject.js'],
   );
+});
+
+test('both hosts block worker Git mutations before handler execution', () => {
+  for (const harness of ['codex', 'claude']) {
+    let calls = 0;
+    const result = dispatch({
+      harness,
+      event: 'PreToolUse',
+      input: JSON.stringify({ tool_name: harness === 'codex' ? 'exec_command' : 'Bash', tool_input: { cmd: 'git commit -m forbidden' } }),
+      root,
+      environment: { CTXROUTE_AGENT_ROLE: 'worker', CTXROUTE_POLICY_DIGEST: 'a'.repeat(64) },
+      execute() { calls += 1; return { outputs: [] }; },
+    });
+    assert.equal(calls, 0);
+    assert.equal(isBlocking(result), true);
+    assert.match(JSON.stringify(result), /WORKER_GIT_MUTATION_FORBIDDEN/u);
+  }
 });
 
 test('the lifecycle dispatcher keeps architecture feedback local and targeted', () => {

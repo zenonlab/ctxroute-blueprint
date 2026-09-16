@@ -13,6 +13,7 @@ export const CONTROL_FILES = Object.freeze([
   '.project/blueprint-version.json', '.project/orchestrator-config.json',
   'scripts/orchestrator-core.mjs', 'scripts/orchestrator-cli.mjs', 'scripts/orchestrator-mcp.mjs',
   'scripts/orchestrator-service.mjs', 'scripts/orchestrator-bootstrap.mjs', 'scripts/orchestrator-contracts.mjs',
+  'scripts/orchestration-policy-core.mjs', 'scripts/orchestrator-policy-snapshot.mjs', 'scripts/git-command-policy.mjs',
   'scripts/orchestrator-telemetry.mjs', 'scripts/orchestrator-validation.mjs',
   'scripts/validate-orchestrator-contracts.mjs', 'scripts/worktree-manager.mjs',
   'scripts/session-audit.mjs', 'scripts/validate-blueprint-skills.mjs',

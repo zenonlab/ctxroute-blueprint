@@ -6,13 +6,18 @@
   "properties": {
     "operation_id": { "$ref": "common.schema.json#/$defs/identifier" },
     "expected_revision": { "type": "integer", "minimum": 0 },
-    "action": { "enum": ["mode.set", "goal.create", "goal.transition", "mission.prepare", "mission.transition", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
+    "action": { "enum": ["operating-mode.set", "mode.set", "goal.create", "goal.transition", "goal.policy.rebase", "decision.request", "decision.resolve", "experiment.promote", "mission.prepare", "mission.transition", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
     "payload": { "type": "object" }
   },
   "oneOf": [
     { "properties": { "action": { "const": "mode.set" }, "payload": { "$ref": "#/$defs/modeSet" } } },
+    { "properties": { "action": { "const": "operating-mode.set" }, "payload": { "$ref": "#/$defs/canonicalModeSet" } } },
     { "properties": { "action": { "const": "goal.create" }, "payload": { "$ref": "#/$defs/goalCreate" } } },
     { "properties": { "action": { "const": "goal.transition" }, "payload": { "$ref": "#/$defs/goalTransition" } } },
+    { "properties": { "action": { "const": "goal.policy.rebase" }, "payload": { "$ref": "#/$defs/policyRebase" } } },
+    { "properties": { "action": { "const": "decision.request" }, "payload": { "$ref": "#/$defs/decisionRequest" } } },
+    { "properties": { "action": { "const": "decision.resolve" }, "payload": { "$ref": "#/$defs/decisionResolve" } } },
+    { "properties": { "action": { "const": "experiment.promote" }, "payload": { "$ref": "#/$defs/experimentPromote" } } },
     { "properties": { "action": { "const": "mission.prepare" }, "payload": { "$ref": "#/$defs/missionPrepare" } } },
     { "properties": { "action": { "const": "mission.transition" }, "payload": { "$ref": "#/$defs/missionTransition" } } },
     { "properties": { "action": { "const": "report.submit" }, "payload": { "$ref": "#/$defs/reportSubmit" } } },
@@ -23,9 +28,14 @@
     { "properties": { "action": { "const": "worktree.purge" }, "payload": { "$ref": "#/$defs/purge" } } }
   ],
   "$defs": {
-    "modeSet": { "type": "object", "required": ["mode"], "properties": { "mode": { "enum": ["SWARM_ON", "SWARM_OFF"] } }, "unevaluatedProperties": false },
-    "goalCreate": { "type": "object", "required": ["goal_id", "title"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "title": { "$ref": "common.schema.json#/$defs/text" } }, "unevaluatedProperties": false },
-    "goalTransition": { "type": "object", "required": ["goal_id", "status"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "status": { "enum": ["COMPLETED", "CANCELLED"] } }, "unevaluatedProperties": false },
+    "modeSet": { "type": "object", "required": ["mode"], "properties": { "mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT", "SWARM_ON", "SWARM_OFF"] } }, "unevaluatedProperties": false },
+    "canonicalModeSet": { "type": "object", "required": ["mode"], "properties": { "mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] } }, "unevaluatedProperties": false },
+    "goalCreate": { "type": "object", "required": ["goal_id", "title"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "title": { "$ref": "common.schema.json#/$defs/text" }, "requested_mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] }, "workflow": { "enum": ["STANDARD", "RESEARCH", "AUDIT", "SECURITY", "MIGRATION", "INCIDENT", "EXPERIMENT", "RECOVERY"] }, "capabilities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true } }, "unevaluatedProperties": false },
+    "goalTransition": { "type": "object", "required": ["goal_id", "status"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "status": { "enum": ["WAITING_FOR_USER_DECISION", "READY_FOR_PROMOTION", "COMPLETED", "CANCELLED"] }, "outcome_receipt": { "$ref": "outcome-receipt.schema.json" } }, "unevaluatedProperties": false },
+    "policyRebase": { "type": "object", "required": ["goal_id", "expected_policy_digest", "policy"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "expected_policy_digest": { "$ref": "common.schema.json#/$defs/digest" }, "policy": { "$ref": "resolved-execution-policy.schema.json" } }, "unevaluatedProperties": false },
+    "decisionRequest": { "type": "object", "required": ["request", "checkpoint"], "properties": { "request": { "$ref": "decision-request.schema.json" }, "checkpoint": { "$ref": "stage-checkpoint.schema.json" } }, "unevaluatedProperties": false },
+    "decisionResolve": { "type": "object", "required": ["receipt"], "properties": { "receipt": { "$ref": "decision-receipt.schema.json" } }, "unevaluatedProperties": false },
+    "experimentPromote": { "type": "object", "required": ["goal_id", "decision_receipt_id"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "decision_receipt_id": { "$ref": "common.schema.json#/$defs/identifier" } }, "unevaluatedProperties": false },
     "missionPrepare": { "type": "object", "required": ["goal_id", "mission"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "mission": { "$ref": "mission-request.schema.json" } }, "unevaluatedProperties": false },
     "missionTransition": { "type": "object", "required": ["goal_id", "mission_id", "status"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "mission_id": { "$ref": "common.schema.json#/$defs/identifier" }, "status": { "enum": ["ASSIGNED", "RUNNING", "BLOCKED", "COMPLETED", "CANCELLED"] } }, "unevaluatedProperties": false },
     "reportSubmit": { "type": "object", "required": ["goal_id", "report"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "report": { "$ref": "worker-report.schema.json" } }, "unevaluatedProperties": false },

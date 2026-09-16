@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://ctxroute.dev/schemas/orchestrator/decision-receipt.schema.json",
+  "type": "object", "required": ["receipt_id", "decision_id", "policy_digest", "selection", "resolved_via", "resolved_at", "subject"],
+  "properties": {
+    "receipt_id": { "$ref": "common.schema.json#/$defs/identifier" }, "decision_id": { "$ref": "common.schema.json#/$defs/identifier" }, "policy_digest": { "$ref": "common.schema.json#/$defs/digest" },
+    "selection": { "type": "string" }, "resolved_via": { "enum": ["mcp", "cli"] }, "resolved_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "subject": { "type": "string", "minLength": 1, "maxLength": 256 }
+  }, "unevaluatedProperties": false
+}

@@ -2,9 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ctxroute.dev/schemas/orchestrator/config.schema.json",
   "type": "object",
-  "required": ["defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
+  "required": ["statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
+  "anyOf": [
+    { "required": ["default_mode"], "properties": { "default_mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] } } },
+    { "required": ["defaultMode"], "properties": { "defaultMode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT", "SWARM_ON", "SWARM_OFF"] } } }
+  ],
   "properties": {
-    "defaultMode": { "enum": ["SWARM_ON", "SWARM_OFF"] },
+    "default_mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] },
+    "defaultMode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT", "SWARM_ON", "SWARM_OFF"] },
     "statePath": { "$ref": "common.schema.json#/$defs/relativePath" },
     "worktreeRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
     "recoveryRoot": { "$ref": "common.schema.json#/$defs/relativePath" },

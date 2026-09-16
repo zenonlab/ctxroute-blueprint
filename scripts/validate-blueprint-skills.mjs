@@ -3,9 +3,9 @@ import { basename, dirname, isAbsolute, join, normalize, relative, resolve } fro
 import { pathToFileURL } from 'node:url';
 
 export const LOCAL_SKILLS = Object.freeze(['blueprint-audit', 'session-auditor', 'skill-creator']);
-export const SKILL_MODES = Object.freeze(['SWARM_ON', 'SWARM_OFF']);
+export const SKILL_PHASES = Object.freeze(['inventory', 'research', 'decision', 'planning', 'work', 'validation', 'audit', 'integration', 'recovery', 'promotion']);
 export const RESEARCH_LABELS = Object.freeze(['official-documentation', 'implementation', 'recommendation', 'hypothesis']);
-const COMPANION_FIELDS = new Set(['schemaVersion', 'skillId', 'version', 'modes', 'mutationAuthority', 'researchLabels', 'validations']);
+const COMPANION_FIELDS = new Set(['schemaVersion', 'skillId', 'version', 'phases', 'capabilities', 'access', 'tools', 'independent', 'mutationAuthority', 'researchLabels', 'validations']);
 const VALIDATION_FIELDS = new Set(['id', 'executable', 'args', 'cwd', 'timeout_ms']);
 const FORBIDDEN_NPM_SCRIPTS = new Set(['validate', 'verify', 'blueprint:review', 'skills:verify']);
 const SAFE_EXECUTABLE = /^(?:[a-zA-Z0-9._-]+|[a-zA-Z0-9._-]+(?:[\\/][a-zA-Z0-9._-]+)+)$/u;
@@ -51,7 +51,11 @@ function validateCompanion(name, companion, errors) {
   const unknown = Object.keys(companion).filter(key => !COMPANION_FIELDS.has(key));
   if (unknown.length) errors.push(`${name}: unknown companion fields ${unknown.sort().join(', ')}`);
   if (companion.schemaVersion !== 2 || companion.skillId !== name || !/^\d+\.\d+\.\d+$/u.test(companion.version ?? '')) errors.push(`${name}: invalid blueprint companion identity`);
-  if (!sameSet(companion.modes, SKILL_MODES)) errors.push(`${name}: modes must contain SWARM_ON and SWARM_OFF exactly once`);
+  if (!Array.isArray(companion.phases) || !companion.phases.length || new Set(companion.phases).size !== companion.phases.length || companion.phases.some(item => !SKILL_PHASES.includes(item))) errors.push(`${name}: phases must be unique known workflow stages`);
+  if (!stringSet(companion.capabilities)) errors.push(`${name}: capabilities must be a unique non-empty string set`);
+  if (!['read-only', 'write'].includes(companion.access)) errors.push(`${name}: access must be read-only or write`);
+  if (!stringSet(companion.tools)) errors.push(`${name}: tools must be a unique non-empty string set`);
+  if (![true, false].includes(companion.independent)) errors.push(`${name}: independent must be boolean`);
   if (companion.mutationAuthority !== 'orchestrator') errors.push(`${name}: mutationAuthority must be orchestrator`);
   if (name === 'skill-creator') {
     if (!sameSet(companion.researchLabels, RESEARCH_LABELS)) errors.push(`${name}: invalid researchLabels`);
@@ -103,6 +107,7 @@ function isRegularFile(path) {
 function hasControlCharacter(value) { return [...value].some(character => { const code = character.codePointAt(0); return code <= 31 || code === 127; }); }
 function isPlainObject(value) { return value && value === Object(value) && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype; }
 function sameSet(actual, expected) { return Array.isArray(actual) && actual.length === expected.length && new Set(actual).size === expected.length && expected.every(value => actual.includes(value)); }
+function stringSet(value) { return Array.isArray(value) && value.length > 0 && value.length <= 32 && new Set(value).size === value.length && value.every(item => item === String(item) && /^[a-z][a-z0-9._-]{0,63}$/u.test(item)); }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const errors = validateBlueprintSkills();

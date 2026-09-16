@@ -7,18 +7,24 @@ global conversation into a worker mission.
 
 ## Modes
 
-`SWARM_ON` is the configured default when no state exists. The orchestrator owns goals,
-decomposition, worker missions, worktree allocation, report intake, audit
-transactions, cancellation, reordering, and completion.
+The canonical default is `SWARM + STANDARD`. `SWARM` permits a deterministic
+stage, one worker, parallel workers, or an independent auditor according to the
+resolved stage plan. `AUTO` selects the smallest compatible mode. `SOLO` keeps
+durable worktree isolation with one active agent. `GUARDED` works on the current
+checkout with durable scope and evidence. `DIRECT` has no goal or worktree but
+retains Git, architecture, and security protections.
 
-`SWARM_OFF` means the primary agent executes directly. It does not require a
-goal, ticket, worktree, MCP call, or orchestration transaction. It does not
-change skill discovery, tool access, or validation requirements.
+Persistent mode changes affect new goals only. Each active goal freezes its
+requested/resolved mode, workflow, strategies, reinforcements, and
+`policy_digest`. A safe `goal.policy.rebase` transaction is required to change
+that policy. Historical `SWARM_ON` and `SWARM_OFF` values are read as `SWARM`
+and `DIRECT`; `CTXROUTE_SWARM_MODE`, `defaultMode`, and `mode.set` remain
+deprecated read/API aliases.
 
-The effective mode is resolved in this order: a valid
-`CTXROUTE_SWARM_MODE`, the persisted mode, then the configured default. Every
-decision reports `mode_source` as `environment`, `state`, or `default`.
-Persistent mode changes use a `mode.set` orchestrator transaction.
+Workflows are `STANDARD`, `RESEARCH`, `AUDIT`, `SECURITY`, `MIGRATION`,
+`INCIDENT`, `EXPERIMENT`, and `RECOVERY`. Research and audit are read-only.
+Experiments stop at `READY_FOR_PROMOTION`; recovery never interprets age as
+permission to delete.
 
 Mission requests declare `execution: auto | direct | coordinated`. `direct`
 never allocates a worktree, `coordinated` always uses a mission, and `auto` may
@@ -32,6 +38,11 @@ same service and is the emergency path when MCP is unavailable:
 ```sh
 npm run orchestrator:read
 npm run orchestrator:doctor
+npm run orchestrator:cli -- modes
+npm run orchestrator:cli -- explain-execution request.json
+npm run orchestrator:cli -- pending-decisions
+npm run orchestrator:cli -- resolve-decision receipt.json
+npm run orchestrator:cli -- promote-experiment receipt.json
 npm run orchestrator:cli -- mutate transaction.json
 npm run orchestrator:cli -- prepare-mission transaction.json
 npm run orchestrator:cli -- submit-report transaction.json
@@ -55,7 +66,9 @@ that registration themselves.
 
 ## Mission and evidence contracts
 
-JSON Schema 2020-12 is canonical. `MissionRequest` is the accepted request,
+JSON Schema 2020-12 is canonical. Operating/workflow descriptors, stage plans,
+resolved policies, checkpoints, decision receipts, experiment receipts, and
+outcome receipts are public closed contracts. `MissionRequest` is the accepted request,
 `MissionRecord` is orchestrator-owned state, and `MissionView` is the
 positive worker projection. A worker view contains only mission identity,
 relative file scope, skill/version, acceptance criteria, structured
@@ -85,12 +98,13 @@ orchestrator state directly.
 
 ## Recovery and safety
 
-State is stored under ignored `.ctxroute/orchestrator/` using a
-tokenized global mutation lock, file and supported directory fsync, and atomic
+State is stored under ignored `.ctxroute/orchestrator/` using the portable
+`repositoryMutationLock`, file and supported directory fsync, and atomic
 rename. Bootstrap runs before MCP startup and every mutating CLI operation; it
 resumes `PENDING` actions before accepting ordinary work. There is one current
 state contract and no migration or reset path. Symlinks, corrupt JSON, and
-unknown fields are refused without deletion. Worktrees, reports, and recovery
+unknown fields are refused without deletion. Legacy mode values are accepted
+without destructive rewriting. Worktrees, reports, and recovery
 evidence are never mutated by state loading.
 
 Reconciliation inventories desired missions, Git registrations, directories,

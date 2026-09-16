@@ -22,6 +22,16 @@ export const ORCHESTRATOR_SCHEMA_IDS = Object.freeze({
   worktreeOperation: 'https://ctxroute.dev/schemas/orchestrator/worktree-operation.schema.json',
   decisionEvent: 'https://ctxroute.dev/schemas/orchestrator/decision-event.schema.json',
   bootstrapReport: 'https://ctxroute.dev/schemas/orchestrator/bootstrap-report.schema.json',
+  operatingModeDescriptor: 'https://ctxroute.dev/schemas/orchestrator/operating-mode-descriptor.schema.json',
+  workflowDescriptor: 'https://ctxroute.dev/schemas/orchestrator/workflow-descriptor.schema.json',
+  stagePlan: 'https://ctxroute.dev/schemas/orchestrator/stage-plan.schema.json',
+  resolvedExecutionPolicy: 'https://ctxroute.dev/schemas/orchestrator/resolved-execution-policy.schema.json',
+  stageCheckpoint: 'https://ctxroute.dev/schemas/orchestrator/stage-checkpoint.schema.json',
+  decisionRequest: 'https://ctxroute.dev/schemas/orchestrator/decision-request.schema.json',
+  decisionReceipt: 'https://ctxroute.dev/schemas/orchestrator/decision-receipt.schema.json',
+  experimentReceipt: 'https://ctxroute.dev/schemas/orchestrator/experiment-receipt.schema.json',
+  outcomeReceipt: 'https://ctxroute.dev/schemas/orchestrator/outcome-receipt.schema.json',
+  goalRunRequest: 'https://ctxroute.dev/schemas/orchestrator/goal-run-request.schema.json',
 });
 
 const aliases = new Map(Object.entries(ORCHESTRATOR_SCHEMA_IDS).flatMap(([key, id]) => [

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://ctxroute.dev/schemas/orchestrator/stage-plan.schema.json",
+  "type": "object", "required": ["stage", "strategy"], "properties": {
+    "stage": { "enum": ["inventory", "research", "decision", "planning", "work", "validation", "audit", "integration", "recovery", "promotion"] },
+    "strategy": { "enum": ["deterministic", "primary", "single-worker", "parallel-workers", "independent-auditor", "human-decision"] },
+    "access": { "enum": ["read-only", "write"] }
+  }, "unevaluatedProperties": false
+}
