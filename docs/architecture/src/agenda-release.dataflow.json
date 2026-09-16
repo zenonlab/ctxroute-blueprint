@@ -10,7 +10,7 @@
         "id": "shared-calendar",
         "label": "Calendrier partagé",
         "focus": ["scheduledTrigger", "queue", "collector", "transportPort", "providerApis", "releaseD1", "releaseApi"],
-        "note": "Le cron dépose un signal; le consumer collecte via un port sélectionnable puis promeut D1."
+        "note": "Le cron hebdomadaire dépose un signal; AniList et MangaUpdates avancent avec des baux et checkpoints indépendants avant la fusion."
       },
       {
         "id": "offline-cache",
@@ -34,12 +34,12 @@
     { "label": "Projection locale" }
   ],
   "nodes": [
-    { "id": "scheduledTrigger", "type": "cloud", "label": "Cron Worker", "sublabel": "toutes les 10 minutes", "stage": 0, "row": 0, "width": 145, "tag": "signal seulement" },
+    { "id": "scheduledTrigger", "type": "cloud", "label": "Cron Worker", "sublabel": "dimanche 03:23 UTC", "stage": 0, "row": 0, "width": 145, "tag": "une session / semaine" },
     { "id": "providerApis", "type": "external", "label": "APIs fournisseurs", "sublabel": "AniList · MangaUpdates", "stage": 0, "row": 1, "width": 145, "tag": "données publiques" },
     { "id": "queue", "type": "messagebus", "label": "Cloudflare Queue", "sublabel": "agenda-refresh · DLQ après 8 retries", "stage": 1, "row": 0, "width": 175, "tag": "logs JSON bornés" },
     { "id": "transportPort", "type": "security", "label": "ProviderTransportPort", "sublabel": "AniList + MU via Deno · env normalisé", "stage": 1, "row": 1, "width": 175, "tag": "HMAC ×2 · valeurs expurgées" },
-    { "id": "collector", "type": "backend", "label": "Consumer Worker", "sublabel": "code lane · tentative · disposition", "stage": 2, "row": 0, "width": 165, "tag": "ack · retry · DLQ" },
-    { "id": "releaseD1", "type": "database", "label": "D1 Agenda", "sublabel": "générations · événements DATE/INSTANT", "stage": 2, "row": 1, "width": 175, "tag": "pointeur actif atomique" },
+    { "id": "collector", "type": "backend", "label": "Consumer Worker", "sublabel": "lanes AniList · MangaUpdates", "stage": 2, "row": 0, "width": 165, "tag": "reprise page suivante" },
+    { "id": "releaseD1", "type": "database", "label": "D1 Agenda", "sublabel": "baux · pages staging · snapshots", "stage": 2, "row": 1, "width": 175, "tag": "digest puis promotion" },
     { "id": "releaseApi", "type": "backend", "label": "GET /v3/releases", "sublabel": "fenêtre source · fraîcheur · ETag", "stage": 2, "row": 2, "width": 175, "tag": "pages de 100" },
     { "id": "releaseGeneration", "type": "database", "label": "Génération IndexedDB", "sublabel": "toutes pages validées puis commit", "stage": 3, "row": 4, "yOffset": -200, "width": 175, "tag": "dernier succès" },
     { "id": "localAgenda", "type": "frontend", "label": "Agenda local", "sublabel": "DATE · INSTANT · prochaine estimation", "stage": 4, "row": 4, "yOffset": -200, "width": 175, "tag": "jointure provider + ID" },
@@ -47,11 +47,11 @@
   ],
   "flows": [
     { "from": "scheduledTrigger", "to": "queue", "label": "signal versionné", "classification": "aucun titre ni événement", "variant": "security", "route": "straight", "labelAt": [208, 110] },
-    { "from": "queue", "to": "collector", "label": "message disponible", "classification": "retry borné · lane observable", "variant": "emphasis", "route": "straight", "labelAt": [423, 100] },
+    { "from": "queue", "to": "collector", "label": "session hebdomadaire", "classification": "retry borné · lanes isolées", "variant": "emphasis", "route": "straight", "labelAt": [423, 100] },
     { "from": "collector", "to": "transportPort", "label": "AniList + MU via HMAC", "classification": "fenêtre J−1/J+15", "variant": "security", "route": "auto", "labelAt": [430, 314] },
     { "from": "providerApis", "to": "transportPort", "label": "pages publiques", "classification": "cibles et réponses bornées", "variant": "emphasis", "route": "straight", "labelAt": [208, 314] },
-    { "from": "collector", "to": "releaseD1", "label": "promotion + rétention", "classification": "active + deux sauvegardes", "variant": "security", "route": "auto", "labelAt": [530, 200] },
-    { "from": "releaseD1", "to": "releaseApi", "label": "fenêtre ordonnée", "classification": "source couvrante · 40 jours max", "variant": "default", "route": "auto", "labelAt": [640, 314] },
+    { "from": "collector", "to": "releaseD1", "label": "pages + checkpoints", "classification": "un bail actif par lane", "variant": "security", "route": "auto", "labelAt": [530, 200] },
+    { "from": "releaseD1", "to": "releaseApi", "label": "génération inchangée ou promue", "classification": "ancien actif servi jusqu’au commit", "variant": "default", "route": "auto", "labelAt": [640, 314] },
     { "from": "releaseApi", "to": "releaseGeneration", "label": "pages + fenêtre + ETag", "classification": "moins de huit jours · fail-closed", "variant": "emphasis", "route": "auto", "labelAt": [835, 350] },
     { "from": "releaseGeneration", "to": "localAgenda", "label": "événements validés", "classification": "jointure locale par ID", "variant": "emphasis", "route": "auto", "labelAt": [858, 656] },
     { "from": "localAgenda", "to": "localSurfaces", "label": "projection paginée", "classification": "site sans accès D1", "variant": "security", "route": "auto", "labelAt": [960, 456] }

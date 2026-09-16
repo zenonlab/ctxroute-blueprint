@@ -118,6 +118,14 @@ browser or `workerd` test when platform behavior is the risk.
   invalid signals, successful acknowledgement, bounded retry and the final
   retry that Cloudflare transfers to the configured DLQ. Agenda failures retain
   only the bounded `anilist`, `mangaupdates` or combined lane code.
+- Agenda D1 tests execute every migration and prove one atomic lease per lane,
+  four durable page checkpoints followed by a page-five resume, independent
+  last-valid snapshots, `Retry-After` propagation, and semantic digests that
+  ignore observation timestamps. An unchanged weekly collection must update
+  `checked_at` without increasing the generation-event row count.
+- Collector timing tests enforce at most twenty AniList and ten MangaUpdates
+  HTTP requests per minute with one concurrent collection per provider. The
+  configured cron is exactly one UTC session per week.
 - The Deno gateway health contract is HTTP 200 with
   `{ "status": "healthy" }`; error responses retain `{ "error": code }`.
 - Deno startup tests require `/healthz` to resolve without waiting for KV and
@@ -189,7 +197,8 @@ browser or `workerd` test when platform behavior is the risk.
 - `npm run test:agenda` combines the existing reminder tests with public
   snapshot adapter and Worker tests. It proves strict public fields, stable
   ordering, duplicate rejection, caller-independent output, bounded R2 reads,
-  conditional caching and fallback to the last validated local snapshot.
+  conditional caching, D1 page resume, change-aware publication and fallback
+  to the last validated local snapshot.
 
 ## Favorite correction acceptance
 

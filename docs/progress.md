@@ -119,3 +119,7 @@
 ## Éviter le blocage de warm-up de la gateway Deno — DONE
 
 - [x] **Démarrer HTTP avant Deno KV puis republier la gateway** — DONE _(evidence: Gateway Deno 10/10, npm run verify, npm ls --all et npm audit passent; audit à 0 vulnérabilité; Archify public-pipeline.architecture passe 9/9 sans diagnostic., origin/main pointe sur 68105f231fafd7ecc30f2c5a9336e59cc45b1dcf; .codex/config.toml reste exclu., Plan Deno fa6209d6c2f3167a011d36e725d53343714b6b457fe41ab025de9ae0e5a84b0b limité à la gateway; révision 6sfwa9m7qpx0 routed sans mutation de secret ni KV.)_
+
+## Implémenter le rafraîchissement public adaptatif — DONE
+
+- [x] **Rendre Agenda hebdomadaire, reprenable et sensible aux changements** — DONE _(evidence: D1 21/21; public-discovery 51/51; worker 85/85., npm run verify réussi; npm ls --all exit 0; npm audit: 0 vulnérabilité; git diff --check réussi., Archify agenda-release showcase 9/9, 0 erreur et 0 avertissement; wrangler deploy --dry-run réussi.)_

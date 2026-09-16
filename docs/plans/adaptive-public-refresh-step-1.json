@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-adaptive-public-refresh",
+  "stepId": "step-1",
+  "title": "Rendre Agenda hebdomadaire, reprenable et sensible aux changements",
+  "status": "DONE",
+  "approvedMode": "autonomous",
+  "objective": "Collecter AniList et MangaUpdates une fois par semaine avec baux, checkpoints paginés, snapshots indépendants et publication D1 uniquement sur changement sémantique.",
+  "rollback": "Revert du commit et restauration du cron précédent lors d'un déploiement ultérieur; la migration 0017 reste additive.",
+  "acceptance": [
+    "Une seule collecte active par lane.",
+    "Reprise à la page suivant la dernière page réussie.",
+    "Le dernier snapshot valide de chaque lane reste disponible en cas d'échec.",
+    "Un contenu inchangé ne recopie aucun événement et actualise seulement checked_at.",
+    "Archify showcase et toutes les validations du plan passent."
+  ]
+}

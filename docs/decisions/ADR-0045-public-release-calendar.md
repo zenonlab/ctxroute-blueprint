@@ -38,21 +38,31 @@ utiles, mais sa formule de terminaison MangaUpdates ne constitue pas un oracle.
 
 ## Décision
 
-La collecte partagée s’exécute dans le consumer Queue du Worker. Un cron toutes
-les dix minutes dépose uniquement un signal `agenda-refresh`; le consumer lit
+La collecte partagée s’exécute dans le consumer Queue du Worker. Le cron
+`23 3 * * 0` dépose uniquement un signal `agenda-refresh` le dimanche à
+03:23 UTC; le consumer lit
 deux lanes indépendantes, AniList pour les sorties anime officielles et
-MangaUpdates pour les sorties manga, manhwa et manhua confirmées. Il promeut
-directement une génération complète, bornée, versionnée et sans donnée
-personnelle dans D1. Aucun runtime GitHub ni route d’ingestion externe n’est
+MangaUpdates pour les sorties manga, manhwa et manhua confirmées. Aucun runtime
+GitHub ni route d’ingestion externe n’est
 nécessaire; l’ancienne route `POST /v2/releases/generations` répond 410.
 
 La collecte déclenchée par `GET /v2/releases` reste supprimée : une lecture
-publique ne provoque jamais une requête fournisseur. Le candidat local ajoute
-un cron Worker toutes les dix minutes qui dépose un signal sans événement dans la même
-Cloudflare Queue que Discovery. Le consumer collecte les deux lanes, refuse
-tout lot incomplet et promeut directement la génération D1. Tout `403`, `429`,
-timeout ou échec conserve la dernière génération valide et reprogramme le
-message selon une temporisation bornée.
+publique ne provoque jamais une requête fournisseur. Le cron hebdomadaire
+dépose un signal sans événement dans la même Cloudflare Queue que Discovery.
+Chaque lane acquiert son propre bail D1, écrit chaque page validée dans un
+staging JSON borné, puis avance `next_page` et `not_before`. Une nouvelle
+livraison reprend après la dernière page enregistrée. Tout `403`, `429`, timeout
+ou échec conserve le dernier snapshot valide de la lane; `Retry-After` prime
+sur le backoff Queue dans la limite de vingt-quatre heures.
+
+Une lane terminée calcule un digest sémantique ordonné qui exclut
+`generatedAt`, `fetchedAt`, `expiresAt` et les autres données d’observation.
+Si ce digest est inchangé, seuls les champs `checked_at` sont avancés et aucun
+événement de génération n’est recopié. Si une lane change, ses pages deviennent
+son snapshot actif. La fusion utilise les derniers snapshots valides des deux
+lanes : AniList peut donc être publié avec le précédent snapshot MangaUpdates,
+et inversement. La génération active précédente reste servie jusqu’au commit
+complet de la nouvelle génération.
 
 AniList et MangaUpdates sont joints uniquement via la gateway sortante signée de
 l’ADR-0051; l’adresse de sortie n’appartient donc pas à Cloudflare. La signature,
@@ -81,9 +91,11 @@ batchées et idempotentes. Un `403`, `429`, timeout ou résultat incomplet est u
 de favoris, favoris, progressions, dossiers, owners,
 installations, secrets et payloads fournisseurs restent exclus.
 
-AniList suit `pageInfo.hasNextPage`, au plus 50 éléments par page et une cadence
-minimale de 2,2 secondes. MangaUpdates utilise `page`, `per_page` et
-`total_hits` retournés, avec une cadence minimale de 3 secondes. Son
+AniList suit `pageInfo.hasNextPage`, au plus 50 éléments par page, une seule
+collecte concurrente et une cadence minimale de 3 secondes, soit vingt requêtes
+HTTP par minute au maximum. MangaUpdates utilise `page`, `per_page` et
+`total_hits` retournés, avec une seule collecte concurrente et une cadence
+minimale de 6 secondes, soit dix requêtes HTTP par minute au maximum. Son
 `release_date` devient `DATE/CONFIRMED`; `time_added` reste une date
 d'observation et ne devient jamais un horaire de sortie. Les valeurs comme
 `58.5`, `2a` et `29-29.5 (end)` restent des numéros textuels bornés.
@@ -136,3 +148,7 @@ fournisseur ne réinitialisent pas le calendrier validé. Après bascule certifi
 seul le consumer Worker via proxy appellera les fournisseurs Agenda. La Queue,
 le proxy, leurs secrets et le Worker restent derrière leurs gates
 opérationnelles; cette décision locale ne crée aucun secret ni ressource.
+
+Avec les volumes observés, une session représente environ cinq requêtes AniList
+et treize requêtes MangaUpdates. Les quotas et métriques comptent des requêtes
+HTTP réelles, jamais des œuvres ni des utilisateurs.

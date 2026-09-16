@@ -17,7 +17,8 @@ describe('public Agenda collectors', () => {
       return Response.json({ data: { Page: { airingSchedules: [{ airingAt: 1_800_000_000 + request.variables.page, episode: request.variables.page, media: { id: 700 } }], pageInfo: { hasNextPage: request.variables.page === 1 } } } });
     });
     const result = await new AniListAgendaCollector(fetcher, async (milliseconds) => { pauses.push(milliseconds); }, async (checkpoint) => { checkpoints.push(checkpoint); }, () => 10_000).collect({ from: '2026-09-12', to: '2026-09-28' });
-    expect(result.events.map((item) => item.sequence)).toEqual(['1', '2']); expect(result).toMatchObject({ received: 2, skippedUnidentified: 0 }); expect(pauses).toEqual([2_200]); expect(checkpoints).toHaveLength(2);
+    expect(result.events.map((item) => item.sequence)).toEqual(['1', '2']); expect(result).toMatchObject({ received: 2, skippedUnidentified: 0 }); expect(pauses).toEqual([3_000]); expect(checkpoints).toHaveLength(2);
+    expect(checkpoints.map(({ page, received }) => ({ page, received }))).toEqual([{ page: 1, received: 1 }, { page: 2, received: 2 }]);
   });
 
   it('uses MangaUpdates response pagination and preserves textual chapters', async () => {
@@ -29,7 +30,7 @@ describe('public Agenda collectors', () => {
       return Response.json({ page: request.page, per_page: 1, results, total_hits: 2 });
     });
     const result = await new MangaUpdatesAgendaCollector(fetcher, async (milliseconds) => { pauses.push(milliseconds); }).collect({ from: '2026-09-12', to: '2026-09-28' });
-    expect(result.events.map((item) => item.sequence)).toEqual(['58.5', '29-29.5 (end)']); expect(result).toMatchObject({ received: 2, skippedUnidentified: 0 }); expect(pages).toEqual([1, 2]); expect(pauses).toEqual([3_000]);
+    expect(result.events.map((item) => item.sequence)).toEqual(['58.5', '29-29.5 (end)']); expect(result).toMatchObject({ received: 2, skippedUnidentified: 0 }); expect(pages).toEqual([1, 2]); expect(pauses).toEqual([6_000]);
   });
 
   it('rejects an interrupted lane instead of publishing a partial generation', async () => {
@@ -39,6 +40,27 @@ describe('public Agenda collectors', () => {
       return request.page === 1 ? Response.json({ page: 1, per_page: 1, results: [{ record: { chapter: 1, release_date: '2026-09-13' }, series_id: 42 }], total_hits: 2 }) : new Response('rate limited', { status: 429 });
     });
     await expect(new MangaUpdatesAgendaCollector(fetcher, async () => undefined).collect({ from: '2026-09-12', to: '2026-09-28' })).rejects.toThrow('mangaupdates-429');
+  });
+
+  it('resumes on the requested page and carries forward provider counters', async () => {
+    const pages: number[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
+      // SAFETY: the collector creates this request body and the test reads only its numeric page.
+      const request = JSON.parse(String(init?.body)) as { page: number }; pages.push(request.page);
+      return Response.json({ page: request.page, per_page: 40, results: [{ metadata: { series: { series_id: 42 } }, record: { chapter: '2', id: 'b', release_date: '2026-09-14', volume: null } }], total_hits: 41 });
+    });
+    const result = await new MangaUpdatesAgendaCollector(fetcher, async () => undefined).collect(
+      { from: '2026-09-12', to: '2026-09-28' },
+      { nextPage: 2, received: 40, skippedUnidentified: 1 },
+    );
+    expect(pages).toEqual([2]);
+    expect(result).toMatchObject({ received: 41, skippedUnidentified: 1 });
+  });
+
+  it('exposes Retry-After as an absolute retry time', async () => {
+    const fetcher = vi.fn(async () => new Response('busy', { headers: { 'Retry-After': '120' }, status: 429 }));
+    const collector = new MangaUpdatesAgendaCollector(fetcher, async () => undefined, async () => undefined, () => 10_000);
+    await expect(collector.collect({ from: '2026-09-12', to: '2026-09-28' })).rejects.toMatchObject({ message: 'mangaupdates-429', retryAt: 130_000 });
   });
 
   it('skips a MangaUpdates release that has no series identity', async () => {

@@ -1714,6 +1714,63 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-adaptive-public-refresh",
+      "title": "Implémenter le rafraîchissement public adaptatif",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-1",
+          "title": "Rendre Agenda hebdomadaire, reprenable et sensible aux changements",
+          "status": "DONE",
+          "acceptance": [
+            "Deux exécutions concurrentes ne collectent chaque lane qu'une fois grâce à un bail D1 atomique.",
+            "Une panne après une page reprend à la page suivante réussie et respecte Retry-After.",
+            "AniList et MangaUpdates conservent indépendamment leur dernier snapshot valide.",
+            "Le digest sémantique ignore les champs d'observation et un Agenda inchangé actualise seulement checked_at sans recopier les événements.",
+            "Un changement sémantique produit exactement une génération complète tandis que l'ancienne reste servie pendant la collecte.",
+            "Le cron est 23 3 * * 0 et aucun appel Agenda n'a lieu entre deux collectes.",
+            "Les tests ciblés et globaux, les validations documentaires et Archify showcase 9/9 passent.",
+            "Un commit vérifié unique existe sans .codex/config.toml, push ni déploiement dans cette étape."
+          ],
+          "files": [
+            "apps/worker/migrations/0017_agenda_collection_state.sql",
+            "apps/worker/wrangler.jsonc",
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/native-collectors.test.ts",
+            "apps/worker/src/releases/public-release-collectors.ts",
+            "apps/worker/src/releases/public-release-collectors.test.ts",
+            "apps/worker/src/releases/public-release-contract-migration.test.ts",
+            "apps/worker/src/releases/public-release-calendar.ts",
+            "packages/public-discovery/src/agenda/collectors.ts",
+            "packages/public-discovery/src/agenda/collectors.test.ts",
+            "docs/decisions/ADR-0045-public-release-calendar.md",
+            "docs/02-quality-strategy.md",
+            "docs/operations/cloudflare.md",
+            "docs/architecture/src/agenda-release.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/adaptive-public-refresh-step-1.json"
+          ],
+          "commands": [
+            "Créer la branche perf/adaptive-public-refresh depuis le tip certifié.",
+            "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress prévues.",
+            "Exécuter npm run test:d1, npm test --workspace @tobirink/public-discovery, npm run test:worker et npm run typecheck.",
+            "Exécuter npm run validate:decisions, npm run validate:docs -- --all, npm run archify:validate -- agenda-release.dataflow et npm run verify.",
+            "Exécuter npm ls --all, npm audit --audit-level=high et git diff --check.",
+            "Créer le commit perf(agenda): make collection weekly and change aware sans inclure .codex/config.toml."
+          ],
+          "evidence": [
+            "D1 21/21; public-discovery 51/51; worker 85/85.",
+            "npm run verify réussi; npm ls --all exit 0; npm audit: 0 vulnérabilité; git diff --check réussi.",
+            "Archify agenda-release showcase 9/9, 0 erreur et 0 avertissement; wrangler deploy --dry-run réussi."
+          ]
+        }
+      ]
     }
   ]
 }

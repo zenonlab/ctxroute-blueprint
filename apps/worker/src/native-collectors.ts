@@ -2,16 +2,15 @@ import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import {
   AniListAgendaCollector,
   MangaUpdatesAgendaCollector,
+  PublicAgendaProviderError,
   bindProviderTransport,
-  collectPublicAgendaLanes,
   createPublicDiscoveryProviders,
   createPublicDiscoveryResolver,
-  publicAgendaIngestionSchema,
   runPublicDiscoveryBatch,
   type PublicDiscoveryBatchReport,
   type PublicDiscoveryResultBatch,
 } from '@tobirink/public-discovery';
-import { commitPublicReleaseGeneration } from './releases/public-release-collectors';
+import { D1AgendaCollectionAdapter, type AgendaLaneClaim } from './releases/public-release-collectors';
 import { createProviderTransportAdapter, type ProviderTransportBindings } from './provider-transport-adapter';
 import { z } from 'zod';
 
@@ -38,8 +37,13 @@ interface CalendarWindow {
 }
 
 interface AgendaProcessingReceipt {
+  readonly changed: boolean;
   readonly count: number;
   readonly revision: string;
+}
+
+export class AgendaCollectionRetryError extends Error {
+  constructor(message: string, readonly retryDelaySeconds: number) { super(message); this.name = 'AgendaCollectionRetryError'; }
 }
 
 type NativeCollectorDisposition = 'ack-invalid' | 'ack-success' | 'retry' | 'retry-to-dlq';
@@ -147,12 +151,47 @@ function calendarWindow(scheduledFor: string): CalendarWindow {
 
 export async function processAgendaQueue(bindings: NativeCollectorBindings, scheduledFor: string): Promise<AgendaProcessingReceipt> {
   const transport = providerFetch(bindings); const window = calendarWindow(scheduledFor);
-  const collection = await collectPublicAgendaLanes([new AniListAgendaCollector(transport), new MangaUpdatesAgendaCollector(transport)], window);
-  if (collection.failures.length > 0) throw new Error(agendaCollectionFailureCode(collection.failures));
-  const ingestion = publicAgendaIngestionSchema.parse({ events: collection.events, generatedAt: scheduledFor, nonce: crypto.randomUUID(), schemaVersion: 1, window });
-  const revision = `calendar-${(await digest(JSON.stringify({ events: ingestion.events, generatedAt: ingestion.generatedAt, window: ingestion.window }))).slice(0, 48)}`;
-  await commitPublicReleaseGeneration(bindings.PUBLIC_DB, ingestion.events, ingestion.window, revision, ingestion.generatedAt);
-  return { count: ingestion.events.length, revision };
+  const state = new D1AgendaCollectionAdapter(bindings.PUBLIC_DB);
+  const attempts = await Promise.allSettled((['anilist', 'mangaupdates'] as const).map(async (provider) => {
+    const startedAt = new Date();
+    const tokenDigest = await digest(randomToken());
+    const admission = await state.claimLane({
+      collectionId: crypto.randomUUID(), leaseUntil: new Date(startedAt.valueOf() + 15 * 60_000).toISOString(),
+      now: startedAt.toISOString(), provider, scheduledFor, tokenDigest, window,
+    });
+    if (admission.status === 'complete' || admission.status === 'leased') return { changed: false, collected: false, provider };
+    if (admission.status === 'deferred') {
+      const delay = Math.max(1, Math.ceil((Date.parse(admission.retryAt) - startedAt.valueOf()) / 1_000));
+      throw new AgendaCollectionRetryError(`agenda-${provider}-unavailable`, Math.min(delay, 86_400));
+    }
+    const claim: AgendaLaneClaim = admission.claim;
+    const checkpoint = async (page: Parameters<D1AgendaCollectionAdapter['savePage']>[1]) => state.savePage(claim, page, new Date().toISOString());
+    const collector = provider === 'anilist'
+      ? new AniListAgendaCollector(transport, undefined, checkpoint)
+      : new MangaUpdatesAgendaCollector(transport, undefined, checkpoint);
+    try {
+      await collector.collect(window, { nextPage: claim.nextPage, received: claim.received, skippedUnidentified: claim.skippedUnidentified });
+      const completed = await state.completeLane({ checkedAt: new Date().toISOString(), claim, provider, scheduledFor });
+      return { changed: completed.changed, collected: true, provider };
+    } catch (error) {
+      const now = Date.now();
+      const retryAt = error instanceof PublicAgendaProviderError && error.retryAt !== undefined ? error.retryAt : now + 60_000;
+      await state.failLane({ claim, errorCode: `agenda-${provider}-unavailable`, provider, retryAt: new Date(retryAt).toISOString() });
+      const delay = Math.max(1, Math.ceil((retryAt - now) / 1_000));
+      throw new AgendaCollectionRetryError(`agenda-${provider}-unavailable`, Math.min(delay, 86_400));
+    }
+  }));
+  const failures = attempts.filter((attempt): attempt is PromiseRejectedResult => attempt.status === 'rejected');
+  const completed = attempts.filter((attempt): attempt is PromiseFulfilledResult<{ changed: boolean; collected: boolean; provider: 'anilist' | 'mangaupdates' }> => attempt.status === 'fulfilled');
+  const shouldPublish = completed.some((attempt) => attempt.value.collected)
+    && (failures.length === 0 || completed.some((attempt) => attempt.value.changed));
+  const generation = shouldPublish ? await state.publishMergedGeneration(new Date().toISOString()) : null;
+  if (failures.length > 0) {
+    const failureNames = failures.map((failure) => failure.reason instanceof Error ? failure.reason.message : 'agenda-provider-unavailable');
+    const delay = Math.max(...failures.map((failure) => failure.reason instanceof AgendaCollectionRetryError ? failure.reason.retryDelaySeconds : 60));
+    throw new AgendaCollectionRetryError(agendaCollectionFailureCode(failureNames), delay);
+  }
+  return generation ?? { changed: false, count: 0, revision: 'd1-empty' };
 }
 
 export async function handleNativeCollectorQueue(
@@ -187,7 +226,9 @@ export async function handleNativeCollectorQueue(
       emitNativeCollectorDiagnostic({ attempt: Math.max(1, message.attempts), disposition: 'ack-success', messageType: signal.type });
       message.ack();
     } catch (error) {
-      const retryDelaySeconds = Math.min(60 * (2 ** Math.max(0, message.attempts - 1)), 60 * 60);
+      const retryDelaySeconds = error instanceof AgendaCollectionRetryError
+        ? error.retryDelaySeconds
+        : Math.min(60 * (2 ** Math.max(0, message.attempts - 1)), 60 * 60);
       emitNativeCollectorDiagnostic({
         attempt: Math.max(1, message.attempts),
         code: collectorFailureCode(error instanceof Error ? error : undefined),

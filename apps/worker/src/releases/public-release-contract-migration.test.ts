@@ -1,7 +1,15 @@
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { commitPublicReleaseGeneration, upsertPublicReleaseEvents } from './public-release-collectors';
+import { commitPublicReleaseGeneration, D1AgendaCollectionAdapter, upsertPublicReleaseEvents } from './public-release-collectors';
 import { D1PublicReleaseCalendarAdapter } from './public-release-calendar';
+
+function eventFixture(id: string, value: string) {
+  return {
+    expiresAt: '2026-11-12T00:00:00.000Z', id, occurrence: { kind: 'INSTANT' as const, value },
+    provenance: { fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' },
+    provider: 'anilist' as const, providerWorkId: id, releaseKind: 'episode' as const, state: 'SCHEDULED' as const,
+  };
+}
 
 describe('public release contract migration', () => {
   it('backfills canonical providers and textual release numbers without removing v1 columns', async () => {
@@ -18,6 +26,31 @@ describe('public release contract migration', () => {
       .bind('legacy-release')
       .first<{ provider: string; provider_key: string; sequence_number: number; sequence_label: string }>();
     expect(row).toEqual({ provider: 'mangaUpdates', provider_key: 'mangaupdates', sequence_label: '58', sequence_number: 58 });
+  });
+
+  it('claims one lane once and resumes at page five after four stored pages', async () => {
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS);
+    const state = new D1AgendaCollectionAdapter(env.PUBLIC_DB);
+    const input = {
+      collectionId: 'collection-a', leaseUntil: '2026-09-16T04:00:00.000Z', now: '2026-09-16T03:00:00.000Z',
+      provider: 'anilist' as const, scheduledFor: '2026-09-16T03:23:00.000Z', tokenDigest: 'a'.repeat(64),
+      window: { from: '2026-09-15', to: '2026-10-01' },
+    };
+    const first = await state.claimLane(input);
+    expect(first.status).toBe('claimed');
+    await expect(state.claimLane({ ...input, collectionId: 'collection-b', tokenDigest: 'b'.repeat(64) })).resolves.toEqual({ status: 'leased' });
+    if (first.status !== 'claimed') throw new Error('Expected claimed Agenda lane.');
+    for (let page = 1; page <= 4; page += 1) {
+      await state.savePage(first.claim, {
+        complete: false, events: [], nextPage: page + 1, notBefore: Date.parse(`2026-09-16T03:00:0${page + 1}.000Z`), page,
+        provider: 'anilist', received: 0, skippedUnidentified: 0,
+      }, `2026-09-16T03:00:0${page}.000Z`);
+    }
+    await state.failLane({ claim: first.claim, errorCode: 'agenda-anilist-unavailable', provider: 'anilist', retryAt: '2026-09-16T03:02:00.000Z' });
+    const resumed = await state.claimLane({ ...input, collectionId: 'collection-c', leaseUntil: '2026-09-16T04:03:00.000Z', now: '2026-09-16T03:03:00.000Z', tokenDigest: 'c'.repeat(64) });
+    expect(resumed).toMatchObject({ status: 'claimed', claim: { collectionId: 'collection-a', nextPage: 5 } });
+    if (resumed.status !== 'claimed') throw new Error('Expected resumed Agenda lane.');
+    await state.failLane({ claim: resumed.claim, errorCode: 'agenda-anilist-unavailable', provider: 'anilist', retryAt: '2026-09-16T03:04:00.000Z' });
   });
 
   it('writes canonical textual events through the additive columns', async () => {
@@ -103,5 +136,54 @@ describe('public release contract migration', () => {
     ]);
     const removedEvents = await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM public_release_generation_event WHERE generation_revision = 'calendar-retention-1'").first<{ count: number }>();
     expect(removedEvents?.count).toBe(0);
+  });
+
+  it('keeps event rows unchanged when a weekly snapshot is semantically identical', async () => {
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS);
+    const state = new D1AgendaCollectionAdapter(env.PUBLIC_DB);
+    const weeklyEvent = {
+      ...eventFixture('weekly-release', '2026-09-20T12:00:00.000Z'),
+      expiresAt: '2026-11-20T12:00:00.000Z',
+    };
+    const run = async (collectionId: string, scheduledFor: string, checkedAt: string, fetchedAt: string, events = [weeklyEvent]) => {
+      const tokenDigest = collectionId.padEnd(64, '0');
+      const admission = await state.claimLane({ collectionId, leaseUntil: new Date(Date.parse(checkedAt) + 60 * 60_000).toISOString(), now: checkedAt, provider: 'anilist', scheduledFor, tokenDigest, window: { from: '2026-09-15', to: '2026-10-01' } });
+      if (admission.status !== 'claimed') throw new Error('Expected claimed Agenda lane.');
+      await state.savePage(admission.claim, { complete: true, events: events.map((event) => ({ ...event, provenance: { ...event.provenance, fetchedAt } })), page: 1, provider: 'anilist', received: events.length, skippedUnidentified: 0 }, checkedAt);
+      return state.completeLane({ checkedAt, claim: admission.claim, provider: 'anilist', scheduledFor });
+    };
+    const base = Date.parse((await env.PUBLIC_DB.prepare("SELECT generated_at AS generatedAt FROM public_release_generation WHERE status = 'active'").first<{ generatedAt: string }>())?.generatedAt ?? '2026-09-16T00:00:00.000Z');
+    const firstCheck = new Date(base + 86_400_000).toISOString();
+    const secondCheck = new Date(base + 8 * 86_400_000).toISOString();
+    const first = await run('weekly-a', firstCheck, firstCheck, firstCheck);
+    expect(first.changed).toBe(true);
+    const published = await state.publishMergedGeneration(firstCheck);
+    expect(published?.changed).toBe(true);
+    expect(published?.count).toBeGreaterThan(0);
+    const before = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_generation_event').first<{ count: number }>();
+    const failedCheck = new Date(base + 2 * 86_400_000).toISOString();
+    const failedAdmission = await state.claimLane({ collectionId: 'weekly-failed', leaseUntil: new Date(Date.parse(failedCheck) + 60 * 60_000).toISOString(), now: failedCheck, provider: 'anilist', scheduledFor: failedCheck, tokenDigest: 'f'.repeat(64), window: { from: '2026-09-15', to: '2026-10-01' } });
+    if (failedAdmission.status !== 'claimed') throw new Error('Expected claimed failed Agenda lane.');
+    await state.failLane({ claim: failedAdmission.claim, errorCode: 'agenda-anilist-unavailable', provider: 'anilist', retryAt: new Date(Date.parse(failedCheck) + 60_000).toISOString() });
+    const retained = await env.PUBLIC_DB.prepare("SELECT active_snapshot_id AS activeSnapshotId FROM public_release_agenda_lane_state WHERE provider = 'anilist'").first<{ activeSnapshotId: string }>();
+    expect(retained?.activeSnapshotId).toBe('weekly-a');
+    const second = await run('weekly-b', secondCheck, secondCheck, secondCheck);
+    expect(second.changed).toBe(false);
+    await expect(state.publishMergedGeneration(secondCheck)).resolves.toMatchObject({ changed: false, count: published?.count, revision: published?.revision });
+    const after = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_generation_event').first<{ count: number }>();
+    expect(after).toEqual(before);
+    const freshness = await env.PUBLIC_DB.prepare('SELECT checked_at AS checkedAt FROM public_release_generation WHERE revision = ?1').bind(published?.revision).first<{ checkedAt: string }>();
+    expect(freshness?.checkedAt).toBe(secondCheck);
+    const thirdCheck = new Date(base + 15 * 86_400_000).toISOString();
+    const third = await run('weekly-c', thirdCheck, thirdCheck, thirdCheck, [
+      weeklyEvent,
+      eventFixture('weekly-release-2', '2026-09-27T12:00:00.000Z'),
+    ]);
+    expect(third.changed).toBe(true);
+    const changedPublication = await state.publishMergedGeneration(thirdCheck);
+    expect(changedPublication).toMatchObject({ changed: true });
+    expect(changedPublication?.revision).not.toBe(published?.revision);
+    const newGeneration = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_generation WHERE revision = ?1').bind(changedPublication?.revision).first<{ count: number }>();
+    expect(newGeneration?.count).toBe(1);
   });
 });

@@ -105,6 +105,26 @@ ETag, and content-type metadata.
 
 ## Native collector observability
 
+Agenda is scheduled by Wrangler at `23 3 * * 0` (UTC). Cloudflare cron changes
+can take up to fifteen minutes to propagate. Between weekly triggers, no Agenda
+provider request is expected. The single Queue message opens two independent
+D1 lanes; each lane owns one fifteen-minute lease, a page checkpoint,
+`not_before`, and its last valid snapshot.
+
+AniList is paced at one HTTP request every three seconds and MangaUpdates at
+one every six seconds. Count quota consumption in HTTP requests, including
+every pagination request. A `Retry-After` response becomes the per-message
+Queue retry delay, capped at twenty-four hours. A partial provider failure must
+leave its active snapshot and the currently served generation untouched while
+allowing a changed successful lane to merge with that snapshot.
+
+The semantic generation digest excludes collection timestamps and expirations.
+For an unchanged merge, `public_release_generation.checked_at` advances without
+new `public_release_generation_event` rows. Before deploying the cron change,
+apply migration `0017_agenda_collection_state.sql`; after deployment, verify the
+two lane rows, the active generation pointer, and the absence of provider calls
+outside the controlled collection.
+
 The Queue consumer emits one bounded JSON record with
 `type=native-collector.queue`, `messageType`, `attempt` and `disposition`.
 Failures add only a classified code and the bounded retry delay; raw provider

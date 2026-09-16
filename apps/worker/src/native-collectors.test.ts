@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { agendaCollectionFailureCode, handleNativeCollectorQueue, type NativeCollectorSignal } from './native-collectors';
+import { AgendaCollectionRetryError, agendaCollectionFailureCode, handleNativeCollectorQueue, type NativeCollectorSignal } from './native-collectors';
 
 function message(body: NativeCollectorSignal | null, attempts = 1) {
   return { ack: vi.fn(), attempts, body, retry: vi.fn() };
@@ -39,6 +39,14 @@ describe('native collector queue', () => {
     await handleNativeCollectorQueue([item], { agenda: async () => { throw new Error('upstream'); }, discovery: vi.fn() });
     expect(item.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 240 }); expect(item.ack).not.toHaveBeenCalled();
     expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toMatchObject({ code: 'collector-internal', disposition: 'retry', messageType: 'agenda-refresh' });
+  });
+
+  it('uses an Agenda provider Retry-After delay instead of generic backoff', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const item = message({ scheduledFor: '2026-09-15T14:00:00.000Z', type: 'agenda-refresh', version: 1 }, 3);
+    await handleNativeCollectorQueue([item], { agenda: async () => { throw new AgendaCollectionRetryError('agenda-mangaupdates-unavailable', 1_200); }, discovery: vi.fn() });
+    expect(item.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 1_200 });
+    expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toMatchObject({ code: 'agenda-mangaupdates-unavailable', retryDelaySeconds: 1_200 });
   });
 
   it('marks the configured final attempt as destined for the DLQ', async () => {

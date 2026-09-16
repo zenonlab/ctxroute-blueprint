@@ -10,7 +10,7 @@ export interface PublicReleaseCalendarPort {
 }
 interface CalendarPage { entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; window: { from: string; to: string }; nextCursor?: string }
 interface ReleaseRow { id: string; provider: string; provider_work_id: string; release_kind: string; sequence_label: string | null; occurrence_kind: string; occurrence_value: string; state: string; source: string; fetched_at: string; parser_version: string; rules_version: string; expires_at: string }
-interface ReleaseGenerationRow { revision: string; generated_at: string; window_from: string; window_to: string }
+interface ReleaseGenerationRow { revision: string; checked_at: string | null; generated_at: string; window_from: string; window_to: string }
 interface ReleaseCursor { id: string | null; occurrence: string | null }
 function decodeCursor(cursor: string | undefined): ReleaseCursor {
   if (cursor === undefined) return { id: null, occurrence: null };
@@ -35,7 +35,7 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
     const cursor = decodeCursor(input.cursor);
     const lowerBound = input.from ?? '0000-01-01';
     const upperBound = input.to ? `${input.to}T23:59:59.999Z` : '9999-12-31T23:59:59.999Z';
-    const generation = await this.db.prepare("SELECT generation.revision, generation.generated_at, generation.window_from, generation.window_to FROM public_release_generation AS generation JOIN public_release_active_generation AS active ON active.revision = generation.revision AND active.id = 'active' LIMIT 1").first<ReleaseGenerationRow>();
+    const generation = await this.db.prepare("SELECT generation.revision, generation.checked_at, generation.generated_at, generation.window_from, generation.window_to FROM public_release_generation AS generation JOIN public_release_active_generation AS active ON active.revision = generation.revision AND active.id = 'active' LIMIT 1").first<ReleaseGenerationRow>();
     const emptyRows: ReleaseRow[] = [];
     const rows = generation === null
       ? { results: emptyRows }
@@ -44,7 +44,7 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
     const entries = parsed.slice(0, input.limit);
     const last = entries.at(-1);
     const nextCursor = parsed.length > input.limit && last ? `${last.occurrence.value}|${last.id}` : undefined;
-    const page: CalendarPage = { entries: Object.freeze(entries), revision: generation?.revision ?? 'd1-empty', generatedAt: generation?.generated_at ?? '1970-01-01T00:00:00.000Z', window: { from: generation?.window_from ?? '1970-01-01', to: generation?.window_to ?? '1970-01-01' } };
+    const page: CalendarPage = { entries: Object.freeze(entries), revision: generation?.revision ?? 'd1-empty', generatedAt: generation?.checked_at ?? generation?.generated_at ?? '1970-01-01T00:00:00.000Z', window: { from: generation?.window_from ?? '1970-01-01', to: generation?.window_to ?? '1970-01-01' } };
     if (nextCursor) page.nextCursor = nextCursor;
     return page;
   }

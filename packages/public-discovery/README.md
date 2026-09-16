@@ -27,5 +27,6 @@ npm run verify
 
 The package remains independently testable, but no longer carries a CLI,
 GitHub workflow or external D1 writer. Discovery is signaled immediately and
-Agenda is refreshed every ten minutes by the Worker. Provider traffic crosses
-the isolated signed gateway; no title, favorite, URL or account enters it.
+Agenda runs one weekly, checkpointed Worker collection. Provider traffic
+crosses the isolated signed gateway; no title, favorite, URL or account enters
+it.
