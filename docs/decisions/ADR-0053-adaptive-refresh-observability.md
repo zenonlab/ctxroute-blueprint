@@ -11,6 +11,7 @@ scope:
   - docs/operations/cloudflare.md
   - docs/architecture/src/agenda-release.dataflow.json
   - docs/architecture/src/public-discovery.dataflow.json
+  - docs/architecture/src/adaptive-public-refresh.dataflow.json
   - docs/architecture/src/public-pipeline.architecture.json
 review: on-change
 revised: true

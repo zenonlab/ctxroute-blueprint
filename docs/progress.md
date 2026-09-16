@@ -143,3 +143,8 @@
 ## Mesurer et documenter le rafraîchissement public adaptatif — DONE
 
 - [x] **Ajouter les compteurs expurgés et consolider l’architecture** — DONE _(evidence: Worker 96/96, D1 28/28 et Public Discovery 59/59 passent; tous les typechecks et les tests dédiés aux métriques expurgées sont verts., npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent; les builds Chrome et Firefox passent., Archify showcase passe 9/9 sans erreur ni avertissement: Agenda 29549fac4208f7b875d3c2f29049369792d299648524bb0bb75311ce9dbb78ef, Discovery 13a4049fc65d737e18cbd67c06056c04cb46ccc7a0dd6a3803bf1f5f11868239.)_
+
+## Déployer progressivement le rafraîchissement public adaptatif — ACTIVE
+
+- [ ] **Sauvegarder D1, migrer, pousser et déployer le Worker** — IN_PROGRESS _(evidence: Backup D1 ignoré et restaurable: 1000960 octets, 30 tables, integrity_check ok, SHA-256 c5b94e9566be330a8db0a9a7b54be54c73a603166432bcb48d088a87639b33ed., origin/main pointe sur e83777d après passage des hooks pré-push; .codex/config.toml est resté local et non indexé., external: Cloudflare D1 code 7500 bloque les écritures jusqu’au prochain reset quotidien à minuit UTC; 0017 à 0020 restent toutes en attente et le Worker 2267a691 reste servi à 100 %.)_
+- [ ] **Observer une collecte hebdomadaire complète** — PENDING

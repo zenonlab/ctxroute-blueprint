@@ -2072,6 +2072,80 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-adaptive-public-refresh-step-7",
+      "title": "Déployer progressivement le rafraîchissement public adaptatif",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "deploy-and-certify",
+          "title": "Sauvegarder D1, migrer, pousser et déployer le Worker",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Un export D1 distant ignoré par Git est créé, non vide et vérifié par SHA-256 avant toute mutation distante.",
+            "origin/main pointe sur les six commits validés du rafraîchissement adaptatif et .codex/config.toml reste exclu.",
+            "La gate Cloudflare applique uniquement d1:tobirink-public puis worker:tobirink-public-api à partir d’un plan frais et hashé.",
+            "Les migrations additives 0017 à 0020 sont appliquées, le Worker est sain et le cron 23 3 * * 0 est déployé.",
+            "Les lectures D1 et HTTP post-déploiement confirment les nouveaux états sans exposer de données privées.",
+            "Les builds Chrome et Firefox réussissent localement sans publication d’extension."
+          ],
+          "files": [
+            "build/backups/tobirink-public-adaptive-refresh-20260916.sql",
+            "build/plans/adaptive-public-refresh-cloudflare.json",
+            ".project/project-config.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/adaptive-public-refresh-step-7.json",
+            "docs/plans/adaptive-public-refresh-step-7-deploy-update.json",
+            "docs/operations/cloudflare.md",
+            "docs/decisions/ADR-0053-adaptive-refresh-observability.md",
+            "docs/architecture/src/adaptive-public-refresh.dataflow.json"
+          ],
+          "commands": [
+            "npm exec -- wrangler d1 export PUBLIC_DB --remote --output ../../build/backups/tobirink-public-adaptive-refresh-20260916.sql",
+            "git push origin HEAD:main",
+            "npm run infra:plan -- --provider cloudflare --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation d1-migrate:PUBLIC_DB --operation worker-deploy",
+            "npm run infra:apply -- --provider cloudflare --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow d1:tobirink-public --allow worker:tobirink-public-api",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "npm run archify:validate -- adaptive-public-refresh.dataflow",
+            "Production D1 and HTTP verification"
+          ],
+          "evidence": [
+            "Backup D1 ignoré et restaurable: 1000960 octets, 30 tables, integrity_check ok, SHA-256 c5b94e9566be330a8db0a9a7b54be54c73a603166432bcb48d088a87639b33ed.",
+            "origin/main pointe sur e83777d après passage des hooks pré-push; .codex/config.toml est resté local et non indexé.",
+            "external: Cloudflare D1 code 7500 bloque les écritures jusqu’au prochain reset quotidien à minuit UTC; 0017 à 0020 restent toutes en attente et le Worker 2267a691 reste servi à 100 %.",
+            "Les builds locaux Chrome MV3 et Firefox MV3 version 1.0.31 réussissent; aucune extension n’a été publiée.",
+            "Le dataflow adaptatif passe Archify showcase 9/9 sans erreur ni avertissement; artefact SHA-256 db696e4b7bf06c17833686dda4cef643ecfe2de23ace3e960ad0a5b2db8865de.",
+            "npm run verify, npm ls --all, npm audit avec 0 vulnérabilité et git diff --check réussissent."
+          ]
+        },
+        {
+          "id": "observe-weekly-run",
+          "title": "Observer une collecte hebdomadaire complète",
+          "status": "TODO",
+          "acceptance": [
+            "Une collecte Agenda contrôlée ou le premier cron hebdomadaire termine les deux lanes ou conserve le dernier snapshot valide de la lane en échec.",
+            "Les compteurs expurgés confirment l’absence d’appel Agenda entre les collectes et une publication uniquement sur changement.",
+            "L’observation couvre sept jours calendaires après le déploiement sans publication Chrome ou Firefox."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/adaptive-public-refresh-step-7.json",
+            "docs/operations/cloudflare.md"
+          ],
+          "commands": [
+            "Read-only Cloudflare deployment, D1 and Worker log inspection",
+            "Production HTTP verification after the weekly trigger"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

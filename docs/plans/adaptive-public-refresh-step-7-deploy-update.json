@@ -1,0 +1,35 @@
+{
+  "goalId": "goal-adaptive-public-refresh-step-7",
+  "stepId": "deploy-and-certify",
+  "status": "IN_PROGRESS",
+  "files": [
+    "build/backups/tobirink-public-adaptive-refresh-20260916.sql",
+    "build/plans/adaptive-public-refresh-cloudflare.json",
+    ".project/project-config.json",
+    ".project/progress.json",
+    "docs/progress.md",
+    "docs/plans/adaptive-public-refresh-step-7.json",
+    "docs/plans/adaptive-public-refresh-step-7-deploy-update.json",
+    "docs/operations/cloudflare.md",
+    "docs/decisions/ADR-0053-adaptive-refresh-observability.md",
+    "docs/architecture/src/adaptive-public-refresh.dataflow.json"
+  ],
+  "commands": [
+    "npm exec -- wrangler d1 export PUBLIC_DB --remote --output ../../build/backups/tobirink-public-adaptive-refresh-20260916.sql",
+    "git push origin HEAD:main",
+    "npm run infra:plan -- --provider cloudflare --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation d1-migrate:PUBLIC_DB --operation worker-deploy",
+    "npm run infra:apply -- --provider cloudflare --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow d1:tobirink-public --allow worker:tobirink-public-api",
+    "npm run build:extension",
+    "npm run build:extension:firefox",
+    "npm run archify:validate -- adaptive-public-refresh.dataflow",
+    "Production D1 and HTTP verification"
+  ],
+  "evidence": [
+    "Backup D1 ignoré et restaurable: 1000960 octets, 30 tables, integrity_check ok, SHA-256 c5b94e9566be330a8db0a9a7b54be54c73a603166432bcb48d088a87639b33ed.",
+    "origin/main pointe sur e83777d après passage des hooks pré-push; .codex/config.toml est resté local et non indexé.",
+    "external: Cloudflare D1 code 7500 bloque les écritures jusqu’au prochain reset quotidien à minuit UTC; 0017 à 0020 restent toutes en attente et le Worker 2267a691 reste servi à 100 %.",
+    "Les builds locaux Chrome MV3 et Firefox MV3 version 1.0.31 réussissent; aucune extension n’a été publiée.",
+    "Le dataflow adaptatif passe Archify showcase 9/9 sans erreur ni avertissement; artefact SHA-256 db696e4b7bf06c17833686dda4cef643ecfe2de23ace3e960ad0a5b2db8865de.",
+    "npm run verify, npm ls --all, npm audit avec 0 vulnérabilité et git diff --check réussissent."
+  ]
+}
