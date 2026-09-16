@@ -25,6 +25,20 @@ describe('native collector queue', () => {
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({ disposition: 'ack-success', messageType: 'public-discovery-ready' });
   });
 
+  it('coalesces a Queue batch into one discovery claim and acknowledges duplicate signals', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const items = Array.from({ length: 20 }, () => message({ type: 'public-discovery-ready', version: 1 }));
+    const discovery = vi.fn(async () => ({ claimed: 20, failed: 0, published: 20, replayed: 0 }));
+
+    await handleNativeCollectorQueue(items, { agenda: vi.fn(), discovery });
+
+    expect(discovery).toHaveBeenCalledOnce();
+    for (const item of items) {
+      expect(item.ack).toHaveBeenCalledOnce();
+      expect(item.retry).not.toHaveBeenCalled();
+    }
+  });
+
   it('retries a failed leased discovery after lease expiry', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const item = message({ type: 'public-discovery-ready', version: 1 });

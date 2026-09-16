@@ -9,9 +9,10 @@ export interface FavoriteProviderJson<TValue> { readonly digest: string; readonl
 export class FavoriteProviderHttpError extends Error {
   constructor(readonly status: number) { super(`Favorite provider request failed with HTTP ${status}.`); }
 }
-export interface FavoriteProviderRateCheckpointPort {
-  read(provider: FavoriteProvider): Promise<number | undefined>;
-  write(provider: FavoriteProvider, nextAllowedAt: number): Promise<void>;
+export interface FavoriteProviderRuntimeControlPort {
+  recordFailure(provider: FavoriteProvider, now: number, retryAt?: number): Promise<void>;
+  recordSuccess(provider: FavoriteProvider, now: number): Promise<void>;
+  reserve(provider: FavoriteProvider, now: number, minimumIntervalMs: number): Promise<number>;
 }
 
 export class FavoriteProviderRateGate {
@@ -20,7 +21,7 @@ export class FavoriteProviderRateGate {
 
   constructor(
     private readonly provider: FavoriteProvider,
-    private readonly checkpoints?: FavoriteProviderRateCheckpointPort,
+    private readonly controls?: FavoriteProviderRuntimeControlPort,
     private readonly clock: () => number = Date.now,
     private readonly wait: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => { setTimeout(resolve, milliseconds); }),
   ) {}
@@ -30,19 +31,23 @@ export class FavoriteProviderRateGate {
     let release: () => void = () => {};
     this.active = new Promise<void>((resolve) => { release = resolve; });
     await previous;
+    let operationStarted = false;
     try {
-      const persisted = await this.checkpoints?.read(this.provider) ?? 0;
-      const waitMs = Math.max(0, Math.max(this.nextAllowedAt, persisted) - this.clock());
+      const now = this.clock();
+      const reservedAt = await this.controls?.reserve(this.provider, now, minimumIntervalMs)
+        ?? Math.max(this.nextAllowedAt, now);
+      const waitMs = Math.max(0, reservedAt - now);
       if (waitMs > favoriteProviderPolicy.requestTimeoutMs) throw new FavoriteProviderRetryError('Provider cadence requires a later wake.', this.clock() + waitMs);
       if (waitMs > 0) await this.wait(waitMs);
       this.nextAllowedAt = this.clock() + minimumIntervalMs;
-      await this.checkpoints?.write(this.provider, this.nextAllowedAt);
-      return await operation();
+      operationStarted = true;
+      const value = await operation();
+      await this.controls?.recordSuccess(this.provider, this.clock());
+      return value;
     } catch (error) {
-      if (error instanceof FavoriteProviderRetryError) {
-        this.nextAllowedAt = Math.max(this.nextAllowedAt, error.retryAt);
-        await this.checkpoints?.write(this.provider, this.nextAllowedAt);
-      }
+      const retryAt = error instanceof FavoriteProviderRetryError ? error.retryAt : undefined;
+      if (retryAt !== undefined) this.nextAllowedAt = Math.max(this.nextAllowedAt, retryAt);
+      if (operationStarted) await this.controls?.recordFailure(this.provider, this.clock(), retryAt);
       throw error;
     } finally { release(); }
   }

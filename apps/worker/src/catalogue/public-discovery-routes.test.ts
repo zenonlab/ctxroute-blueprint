@@ -1,5 +1,5 @@
 import { applyD1Migrations, env, SELF } from 'cloudflare:test';
-import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
+import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
 
@@ -115,6 +115,54 @@ describe('verified public discovery cache', () => {
       expect.objectContaining({ state: 'PENDING' }), expect.objectContaining({ state: 'PENDING' }),
     ]);
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ count: 1 });
+  });
+
+  it('returns explicit admission outcomes and claims exact references before precise and ambiguous searches', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const now = '2026-09-16T12:00:00.000Z';
+    const rankedKey = (suffix: string) => ({ ...discoveryKey('d'), fingerprint: `${'d'.repeat(63)}${suffix}` });
+    const ambiguous = { key: rankedKey('1'), query: { discoveryTitles: ['Unknown'], mediaKind: 'UNKNOWN' as const, sourceTitles: ['Unknown'] }, requestDigest: '1'.repeat(64), schemaVersion: 3 as const };
+    const precise = { key: rankedKey('2'), query: { discoveryTitles: ['Anime'], mediaKind: 'ANIME' as const, sourceTitles: ['Anime'] }, requestDigest: '2'.repeat(64), schemaVersion: 3 as const };
+    const exact = { key: rankedKey('3'), query: { discoveryTitles: ['Exact'], explicitProviderReference: { externalId: '154587', provider: 'anilist' as const }, mediaKind: 'ANIME' as const, sourceTitles: ['Exact'] }, requestDigest: '3'.repeat(64), schemaVersion: 3 as const };
+
+    await expect(adapter.request(ambiguous, now)).resolves.toMatchObject({ outcome: 'created', state: { state: 'PENDING' } });
+    await expect(adapter.request(precise, now)).resolves.toMatchObject({ outcome: 'created' });
+    await expect(adapter.request(exact, now)).resolves.toMatchObject({ outcome: 'created' });
+    await expect(adapter.request(exact, now)).resolves.toMatchObject({ outcome: 'existing' });
+    const claim = await adapter.claimBatch({ claimToken: 'c'.repeat(48), leaseUntil: '2026-09-16T12:15:00.000Z', limit: 50, now, tokenDigest: 'c'.repeat(64) });
+    const ranked = new Set([exact.key.fingerprint, precise.key.fingerprint, ambiguous.key.fingerprint]);
+    expect(claim.requests.map(({ key }) => key.fingerprint).filter((fingerprint) => ranked.has(fingerprint))).toEqual([
+      exact.key.fingerprint, precise.key.fingerprint, ambiguous.key.fingerprint,
+    ]);
+  });
+
+  it('serves a fresh negative cache and admits one new collection only after its explicit expiry', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const request = { key: { ...discoveryKey('d'), fingerprint: `${'d'.repeat(63)}4` }, query: { discoveryTitles: ['Missing'], mediaKind: 'ANIME' as const, sourceTitles: ['Missing'] }, requestDigest: '4'.repeat(64), schemaVersion: 3 as const };
+    const verifiedAt = '2026-09-16T12:00:00.000Z';
+    await adapter.request(request, verifiedAt);
+    const claim = await adapter.claimBatch({ claimToken: 'n'.repeat(48), leaseUntil: '2026-09-16T12:15:00.000Z', limit: 50, now: verifiedAt, tokenDigest: 'n'.repeat(64) });
+    expect(claim.requests.some(({ key }) => key.fingerprint === request.key.fingerprint)).toBe(true);
+    await adapter.publishBatch({
+      claimToken: claim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440001',
+      results: [{ key: request.key, requestDigest: request.requestDigest, resolution: { reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' } }],
+      schemaVersion: 3, verifiedAt,
+    }, 'n'.repeat(64), 'd'.repeat(64), verifiedAt);
+
+    await expect(adapter.read(request.key, '2026-09-23T11:59:59.000Z')).resolves.toMatchObject({ state: 'NOT_FOUND' });
+    await expect(adapter.read(request.key, '2026-09-23T12:00:00.001Z')).resolves.toEqual({ state: 'MISS' });
+    await expect(adapter.request(request, '2026-09-23T12:00:00.001Z')).resolves.toMatchObject({ outcome: 'created', state: { state: 'PENDING' } });
+  });
+
+  it('serializes provider reservations and opens the configurable D1 circuit', async () => {
+    const controls = new D1ProviderRuntimeControl(env.PUBLIC_DB, 2, 10_000, 8_000);
+    await expect(controls.reserve('anilist', 10_000, 3_000)).resolves.toBe(10_000);
+    await expect(controls.reserve('anilist', 10_000, 3_000)).resolves.toBe(18_000);
+    await controls.recordSuccess('anilist', 11_000);
+    await expect(controls.reserve('anilist', 11_000, 3_000)).resolves.toBe(21_000);
+    await controls.recordFailure('mangaupdates', 10_000);
+    await controls.recordFailure('mangaupdates', 10_000);
+    await expect(controls.reserve('mangaupdates', 10_000, 6_000)).resolves.toBe(20_000);
   });
 
   it('returns 503 for a new key after the global active-request ceiling while preserving replays', async () => {

@@ -47,8 +47,9 @@
     "consumers": [
       {
         "queue": "tobirink-public-discovery",
-        "max_batch_size": 1,
-        "max_batch_timeout": 0,
+        "max_batch_size": 20,
+        "max_batch_timeout": 5,
+        "max_concurrency": 1,
         "max_retries": 8,
         "dead_letter_queue": "tobirink-public-discovery-dlq"
       }

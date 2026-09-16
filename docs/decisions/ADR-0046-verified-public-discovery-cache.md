@@ -69,11 +69,20 @@ Une lecture renvoie exactement un état :
 - `AMBIGUOUS` : plusieurs identités restent crédibles et sont conservées pour
   une Review locale sans nouvelle recherche fournisseur.
 
-Sur `MISS`, le Worker crée atomiquement la demande v3 ou retourne la ligne
-concurrente déjà créée. L’extension ne reçoit aucun bail, ne propose aucun
+Sur `MISS`, le Worker classe atomiquement l’admission en `created`, `existing`
+ou `saturated`. Seule la transition `created` émet le signal Queue opaque;
+un POST concurrent ou répété classé `existing` n’ajoute aucun message. Un petit
+outbox D1 passe par `UNSENT`, `SENDING` et `SENT` : si l’émission initiale
+échoue, la ligne `PENDING` revient à `UNSENT` et un POST identique peut reprendre
+l’unique envoi non confirmé. L’extension ne reçoit aucun bail, ne propose aucun
 identifiant et n’appelle aucun fournisseur. Une seconde soumission de la même
 clé doit porter le même digest de requête; un contenu différent est refusé au
 lieu d’écraser le travail existant.
+
+Le consumer reçoit jusqu’à vingt signaux à la fois mais exécute un seul
+`claim(20)` par lot; les signaux redondants sont acquittés. Le claim ordonne
+les demandes par référence fournisseur exacte, média précis, puis recherche
+ambiguë, avant l’ancienneté et l’empreinte.
 
 Le composant portable de l’ADR-0047 lit les demandes v3 en attente via une source
 injectée. Il route la recherche vers AniList, MangaUpdates, MangaDex, Kitsu
@@ -88,7 +97,9 @@ La clé D1 possède un index unique. Demande, prise de travail et publication so
 idempotentes. Un seul collecteur peut posséder un bail de traitement actif; les
 lectures voient `PENDING` et n’appellent aucun fournisseur. Un résultat rejoué
 avec le même digest ne change rien. Le collecteur checkpoint son étape avant
-chaque reprise; un résultat terminal ne redevient jamais une demande. Une panne
+chaque reprise. `VERIFIED` ne redevient jamais une demande. `NOT_FOUND` et
+`AMBIGUOUS` restent frais sept jours; après leur échéance explicite, la lecture
+renvoie `MISS` et une nouvelle admission peut recréer exactement un travail. Une panne
 entre un appel fournisseur et son checkpoint peut encore répéter cet appel :
 aucun protocole distribué ne peut garantir exactement-une-fois face à ce crash,
 mais la répétition concurrente et toute répétition après résultat terminal sont
@@ -123,6 +134,15 @@ et les révisions orphelines
 deviennent éligibles après trente jours. Ces échéances n’autorisent aucune
 suppression automatique : toute purge D1 exige sauvegarde, plan borné et
 approbation destructive séparée.
+
+Avant chaque requête HTTP réelle, le Worker réserve dans D1 la cadence et
+l’exclusivité du fournisseur. AniList est limité à une requête toutes les trois
+secondes, MangaUpdates à une toutes les six secondes; MangaDex et Kitsu restent
+à une par seconde. Un `Retry-After` avance la prochaine autorisation. Trois
+échecs consécutifs ouvrent par défaut le circuit quinze minutes; seuil et durée
+sont des paramètres bornés de l’adaptateur. Un succès ferme le circuit. Ces
+contrôles sont partagés entre isolates et ne comptent jamais une lecture D1 ou
+un réveil différé comme appel fournisseur.
 
 L’extension consulte d’abord IndexedDB, puis D1. Un
 `VERIFIED` fournit directement le candidat hydraté complet utilisé pour écrire

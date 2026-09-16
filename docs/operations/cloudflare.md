@@ -125,6 +125,24 @@ apply migration `0017_agenda_collection_state.sql`; after deployment, verify the
 two lane rows, the active generation pointer, and the absence of provider calls
 outside the controlled collection.
 
+Public Discovery uses migration `0018_discovery_admission_state.sql`. Only an
+admission `created` sends the opaque Queue signal; `existing` returns the
+cached or pending state without sending and `saturated` returns 503. The
+consumer accepts twenty signals, waits at most five seconds to form a batch and
+permits one concurrent consumer. It invokes one `claim(20)` and acknowledges
+redundant signals. The D1 outbox moves through `UNSENT`, `SENDING`, then `SENT`. If an
+initial Queue send fails, keep the PENDING row and return it to `UNSENT`; an
+identical POST can reclaim that unconfirmed send without creating another row.
+
+The same migration creates `public_discovery_provider_runtime`. Inspect only
+provider, timestamps and counters; it contains no title or request payload.
+AniList reservations are three seconds apart and MangaUpdates reservations six
+seconds apart. Three consecutive failures open the default circuit for fifteen
+minutes; `Retry-After` may extend it. A successful real request clears the
+failure count. `NOT_FOUND` and `AMBIGUOUS` remain cache hits for seven days,
+then read as MISS and become admissible once more. Apply migration 0018 before
+deploying the batched consumer or its Worker code.
+
 The Queue consumer emits one bounded JSON record with
 `type=native-collector.queue`, `messageType`, `attempt` and `disposition`.
 Failures add only a classified code and the bounded retry delay; raw provider
@@ -194,6 +212,8 @@ D1 records deletion eligibility without deleting data automatically:
 
 - result nonces: seven days after ingestion;
 - `FAILED` requests: thirty days after terminal failure;
+- `NOT_FOUND` and `AMBIGUOUS`: fresh for seven days, then retained but read as
+  expired until a new bounded admission replaces their result;
 - terminal request payloads: replaced immediately by `{}` while their bounded
   result cache remains retained;
 - catalogue revisions no longer referenced by a work: eligible after thirty

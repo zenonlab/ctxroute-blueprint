@@ -16,7 +16,9 @@ import { favoriteTitlePreparationVersion, normalizeFavoriteTitle } from '@tobiri
 
 export const publicDiscoveryPendingLimit = 5_000;
 const failedRetentionMilliseconds = 30 * 86_400_000;
+const negativeResultFreshnessMilliseconds = 7 * 86_400_000;
 const nonceRetentionMilliseconds = 7 * 86_400_000;
+const queueSignalLeaseMilliseconds = 60_000;
 
 type SqlValue = null | number | string;
 interface Statement {
@@ -39,11 +41,15 @@ interface DiscoveryRow {
   leaseUntil: string | null;
   requestDigest: string;
   requestJson: string;
+  resultExpiresAt: string | null;
   resultJson: string | null;
   retryAt: string;
   state: 'PENDING' | 'PROCESSING' | 'FAILED' | 'VERIFIED' | 'NOT_FOUND' | 'AMBIGUOUS';
   verifiedAt: string | null;
 }
+export type PublicDiscoveryAdmission =
+  | { outcome: 'created' | 'existing'; state: PublicDiscoveryReadState }
+  | { outcome: 'saturated' };
 interface CanonicalFacts {
   mediaKind: 'anime' | 'manga';
   normalizedTitles: readonly string[];
@@ -51,9 +57,11 @@ interface CanonicalFacts {
 }
 export interface PublicDiscoveryV3Port {
   claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
+  confirmQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
   publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ published: number; replayed: number }>;
   read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState>;
-  request(request: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryReadState>;
+  releaseQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
+  request(request: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryAdmission>;
 }
 
 function keyValues(key: PublicDiscoveryKeyV3): [string, string, string, string] {
@@ -66,6 +74,9 @@ function futureIso(now: string, milliseconds: number): string {
 }
 function stateFromRow(row: DiscoveryRow | null, now: string): PublicDiscoveryReadState {
   if (!row) return { state: 'MISS' };
+  if ((row.state === 'NOT_FOUND' || row.state === 'AMBIGUOUS') && row.resultExpiresAt !== null && row.resultExpiresAt <= now) {
+    return { state: 'MISS' };
+  }
   if (row.state === 'FAILED') {
     if (row.failureReason !== 'ATTEMPT_LIMIT') throw new Error('invalid-failed-public-discovery');
     return { reason: row.failureReason, state: 'UNAVAILABLE' };
@@ -91,7 +102,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   private row(key: PublicDiscoveryKeyV3): Promise<DiscoveryRow | null> {
     return this.database.prepare(`SELECT attempt_count AS attemptCount, claim_token_hash AS claimTokenHash,
       failure_reason AS failureReason, lease_until AS leaseUntil, request_digest AS requestDigest,
-      request_json AS requestJson, result_json AS resultJson,
+      request_json AS requestJson, result_expires_at AS resultExpiresAt, result_json AS resultJson,
       retry_at AS retryAt, state, verified_at AS verifiedAt FROM public_discovery_requests_v3
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4 LIMIT 1`)
       .bind(...keyValues(key)).first<DiscoveryRow>();
@@ -123,13 +134,16 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     return stateFromRow(await this.row(key), now);
   }
 
-  async request(input: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryReadState> {
+  async request(input: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryAdmission> {
     const request = publicDiscoveryRequestSchema.parse(input);
     await this.failExhaustedKey(request.key, now);
-    await this.database.prepare(`INSERT INTO public_discovery_requests_v3(
+    const priority = request.query.explicitProviderReference !== undefined ? 1 : request.query.mediaKind === 'UNKNOWN' ? 3 : 2;
+    const signalLeaseUntil = futureIso(now, queueSignalLeaseMilliseconds);
+    const created = await this.database.prepare(`INSERT INTO public_discovery_requests_v3(
       fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
-      state, retry_at, created_at, updated_at
-    ) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7
+      state, retry_at, created_at, updated_at, admission_priority,
+      queue_signal_state, queue_signal_lease_until
+    ) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7, ?9, 'SENDING', ?10
     WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4)
       OR (SELECT COUNT(*) FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_pending
@@ -137,14 +151,48 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     ON CONFLICT(fingerprint, media_kind, parser_version, rules_version) DO UPDATE SET
       state = 'PENDING', claim_token_hash = NULL, lease_until = NULL, attempt_count = 0,
       failure_reason = NULL, failed_at = NULL, result_json = NULL, verified_at = NULL,
+      result_expires_at = NULL, request_digest = excluded.request_digest,
+      request_json = excluded.request_json, admission_priority = excluded.admission_priority,
+      queue_signal_state = 'SENDING', queue_signal_lease_until = excluded.queue_signal_lease_until,
       retry_at = excluded.retry_at, updated_at = excluded.updated_at, purge_after = NULL
-    WHERE public_discovery_requests_v3.state = 'FAILED'
-      AND public_discovery_requests_v3.request_digest = excluded.request_digest`)
-      .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now, this.pendingLimit).first();
+    WHERE (public_discovery_requests_v3.state = 'FAILED'
+        AND public_discovery_requests_v3.request_digest = excluded.request_digest)
+      OR (public_discovery_requests_v3.state IN ('NOT_FOUND', 'AMBIGUOUS')
+        AND public_discovery_requests_v3.result_expires_at <= excluded.updated_at)
+    RETURNING state`)
+      .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now, this.pendingLimit, priority, signalLeaseUntil)
+      .first<{ state: string }>();
     const row = await this.row(request.key);
-    if (!row) throw new Error('public-discovery-capacity-unavailable');
+    if (!row) return { outcome: 'saturated' };
     if (row.requestDigest !== request.requestDigest) throw new Error('public-discovery-request-conflict');
-    return stateFromRow(row, now);
+    const resumedSignal = created === null
+      ? await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+          queue_signal_state = 'SENDING', queue_signal_lease_until = ?7, updated_at = ?6
+          WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+            AND request_digest = ?5 AND state = 'PENDING'
+            AND (queue_signal_state = 'UNSENT'
+              OR (queue_signal_state = 'SENDING' AND queue_signal_lease_until <= ?6))
+          RETURNING state`)
+        .bind(...keyValues(request.key), request.requestDigest, now, signalLeaseUntil).first()
+      : null;
+    return { outcome: created !== null || resumedSignal !== null ? 'created' : 'existing', state: stateFromRow(row, now) };
+  }
+
+  async confirmQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void> {
+    const confirmed = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+      queue_signal_state = 'SENT', queue_signal_lease_until = NULL, updated_at = ?6
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+        AND request_digest = ?5 AND queue_signal_state = 'SENDING'
+      RETURNING state`).bind(...keyValues(key), requestDigest, now).first();
+    if (!confirmed) throw new Error('public-discovery-signal-claim-lost');
+  }
+
+  async releaseQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void> {
+    await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+      queue_signal_state = 'UNSENT', queue_signal_lease_until = NULL, updated_at = ?6
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+        AND request_digest = ?5 AND queue_signal_state = 'SENDING'
+      RETURNING state`).bind(...keyValues(key), requestDigest, now).first();
   }
 
   async claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch> {
@@ -154,11 +202,14 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       attempt_count = attempt_count + 1, retry_at = ?2, updated_at = ?3
       WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3
         WHERE ((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
-          AND attempt_count < 8 ORDER BY updated_at, fingerprint LIMIT ?4)
-      RETURNING request_json AS requestJson, attempt_count AS attemptCount`)
+          AND attempt_count < 8 ORDER BY admission_priority, updated_at, fingerprint LIMIT ?4)
+      RETURNING request_json AS requestJson, attempt_count AS attemptCount,
+        admission_priority AS admissionPriority, updated_at AS updatedAt, fingerprint`)
       .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit)
-      .all<{ attemptCount: number; requestJson: string }>();
-    const requests = rows.results.map((row) => {
+      .all<{ admissionPriority: number; attemptCount: number; fingerprint: string; requestJson: string; updatedAt: string }>();
+    const ordered = rows.results.sort((left, right) => left.admissionPriority - right.admissionPriority
+      || left.updatedAt.localeCompare(right.updatedAt) || left.fingerprint.localeCompare(right.fingerprint));
+    const requests = ordered.map((row) => {
       const request = publicDiscoveryRequestSchema.parse(JSON.parse(row.requestJson));
       return publicDiscoveryClaimedRequestSchema.parse({ ...request, attempt: row.attemptCount });
     });
@@ -305,9 +356,13 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       : undefined;
     const guardValues = this.publicationGuardValues(result, profile, tokenDigest, now);
     const statements = profile ? this.catalogueStatements(profile, verifiedAt, guardValues) : [];
+    const resultExpiresAt = result.resolution.state === 'VERIFIED'
+      ? null
+      : futureIso(verifiedAt, negativeResultFreshnessMilliseconds);
     statements.push(this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = ?, result_json = ?, verified_at = ?, retry_at = ?,
-      claim_token_hash = NULL, lease_until = NULL, updated_at = ?, request_json = '{}', purge_after = NULL
+      result_expires_at = ?, claim_token_hash = NULL, lease_until = NULL,
+      updated_at = ?, request_json = '{}', purge_after = NULL
       WHERE fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
         AND state = 'PROCESSING' AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?
         AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
@@ -318,7 +373,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
           JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
           WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`)
-      .bind(result.resolution.state, resultJson, verifiedAt, verifiedAt, verifiedAt, ...guardValues));
+      .bind(result.resolution.state, resultJson, verifiedAt, verifiedAt, resultExpiresAt, verifiedAt, ...guardValues));
     const outcomes = await this.database.batch(statements);
     const terminal = outcomes.at(-1);
     if (!terminal?.success || outcomes.some((outcome) => !outcome.success)) throw new Error('public-discovery-batch-failed');

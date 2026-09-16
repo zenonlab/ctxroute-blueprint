@@ -35,11 +35,11 @@ export interface FavoriteProviderHydrationPort {
 export type FavoriteProviderPort = FavoriteProviderCandidatePort & FavoriteProviderHydrationPort;
 export const favoriteProviderInspectionLimit = 25;
 export const favoriteProviderPolicy = Object.freeze({
-  anilist: Object.freeze({ minimumIntervalMs: 2_200 }),
+  anilist: Object.freeze({ minimumIntervalMs: 3_000 }),
   'kitsu-anime': Object.freeze({ minimumIntervalMs: 1_000 }),
   'kitsu-manga': Object.freeze({ minimumIntervalMs: 1_000 }),
   mangadex: Object.freeze({ minimumIntervalMs: 1_000 }),
-  mangaupdates: Object.freeze({ minimumIntervalMs: 3_000 }),
+  mangaupdates: Object.freeze({ minimumIntervalMs: 6_000 }),
   requestTimeoutMs: 8_000,
 });
 

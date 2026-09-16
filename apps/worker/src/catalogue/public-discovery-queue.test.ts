@@ -37,5 +37,35 @@ describe('public discovery queue trigger', () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: 'discovery-queue-unavailable' });
     await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'PENDING' });
+    const retry = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+      body: JSON.stringify(submission('5', 'Queue retry')),
+      headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(retry.status).toBe(503);
+  });
+
+  it('emits one Queue signal for ten thousand identical admissions', async () => {
+    const queue = { send: vi.fn(async () => undefined) };
+    let requests = 0;
+    const port = {
+      claimBatch: vi.fn(), confirmQueueSignal: vi.fn(async () => undefined), publishBatch: vi.fn(), read: vi.fn(),
+      releaseQueueSignal: vi.fn(async () => undefined),
+      request: vi.fn(async () => ({
+        outcome: requests++ === 0 ? 'created' as const : 'existing' as const,
+        state: { retryAt: '2026-09-16T12:01:00.000Z', state: 'PENDING' as const },
+      })),
+    };
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: port, queue });
+    const body = JSON.stringify(submission('6', 'Coalesced work'));
+
+    for (let index = 0; index < 10_000; index += 1) {
+      expect((await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+        body, headers: { 'Content-Type': 'application/json' }, method: 'POST',
+      })).status).toBe(202);
+    }
+
+    expect(port.request).toHaveBeenCalledTimes(10_000);
+    expect(queue.send).toHaveBeenCalledOnce();
+    expect(port.confirmQueueSignal).toHaveBeenCalledOnce();
   });
 });

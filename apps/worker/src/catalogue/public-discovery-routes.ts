@@ -67,17 +67,22 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     const parsed = publicDiscoverySubmissionSchema.safeParse(await context.req.json().catch(() => undefined));
     if (!parsed.success) return noStore({ error: 'invalid-request' }, 400);
     const requestDigest = await digest(JSON.stringify(parsed.data));
+    const port = v3Port(services);
+    const now = new Date().toISOString();
     try {
-      const state = await v3Port(services).request({ ...parsed.data, requestDigest }, new Date().toISOString());
-      if (state.state === 'PENDING' && services.queue) {
-        try { await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' }); }
-        catch { return noStore({ error: 'discovery-queue-unavailable' }, 503); }
+      const admission = await port.request({ ...parsed.data, requestDigest }, now);
+      if (admission.outcome === 'saturated') return noStore({ error: 'discovery-capacity-unavailable' }, 503);
+      if (admission.outcome === 'created' && services.queue) {
+        try {
+          await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
+          await port.confirmQueueSignal(parsed.data.key, requestDigest, new Date().toISOString());
+        } catch {
+          await port.releaseQueueSignal(parsed.data.key, requestDigest, new Date().toISOString()).catch(() => undefined);
+          return noStore({ error: 'discovery-queue-unavailable' }, 503);
+        }
       }
-      return noStore(state, 202);
-    } catch (error) {
-      if (error instanceof Error && error.message === 'public-discovery-capacity-unavailable') {
-        return noStore({ error: 'discovery-capacity-unavailable' }, 503);
-      }
+      return noStore(admission.state, 202);
+    } catch {
       return noStore({ error: 'request-conflict' }, 409);
     }
   });

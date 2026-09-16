@@ -123,3 +123,7 @@
 ## Implémenter le rafraîchissement public adaptatif — DONE
 
 - [x] **Rendre Agenda hebdomadaire, reprenable et sensible aux changements** — DONE _(evidence: D1 21/21; public-discovery 51/51; worker 85/85., npm run verify réussi; npm ls --all exit 0; npm audit: 0 vulnérabilité; git diff --check réussi., Archify agenda-release showcase 9/9, 0 erreur et 0 avertissement; wrangler deploy --dry-run réussi.)_
+
+## Dédupliquer et borner l’admission Discovery — DONE
+
+- [x] **Coalescer la demande publique Discovery** — DONE _(evidence: Public Discovery 55/55, D1 25/25, Worker 90/90 et tous les typechecks passent., Rafale de 10 000 POST: un signal; lot de 20: un seul claim; outbox reprend un envoi Queue non confirmé., npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent.)_

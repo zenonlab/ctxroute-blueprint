@@ -1,4 +1,4 @@
-import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
+import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import {
   AniListAgendaCollector,
   MangaUpdatesAgendaCollector,
@@ -118,7 +118,10 @@ export function agendaCollectionFailureCode(failures: readonly string[]): string
 export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings): Promise<PublicDiscoveryBatchReport> {
   const port = new D1PublicDiscoveryV3Adapter(bindings.PUBLIC_DB);
   let activeToken = '';
-  const resolver = createPublicDiscoveryResolver(createPublicDiscoveryProviders(providerFetch(bindings)));
+  const resolver = createPublicDiscoveryResolver(createPublicDiscoveryProviders(
+    providerFetch(bindings),
+    new D1ProviderRuntimeControl(bindings.PUBLIC_DB),
+  ));
   return runPublicDiscoveryBatch({
     gateway: {
       claim: async (limit) => {
@@ -198,6 +201,7 @@ export async function handleNativeCollectorQueue(
   messages: readonly QueueMessagePort[],
   processors: { readonly agenda: (scheduledFor: string) => Promise<AgendaProcessingReceipt>; readonly discovery: () => Promise<PublicDiscoveryBatchReport> },
 ): Promise<void> {
+  const discoveryMessages: QueueMessagePort[] = [];
   for (const message of messages) {
     const parsedSignal = nativeCollectorSignalSchema.safeParse(message.body);
     if (!parsedSignal.success) {
@@ -206,23 +210,12 @@ export async function handleNativeCollectorQueue(
       continue;
     }
     const signal = parsedSignal.data;
+    if (signal.type === 'public-discovery-ready') {
+      discoveryMessages.push(message);
+      continue;
+    }
     try {
-      if (signal.type === 'agenda-refresh') await processors.agenda(signal.scheduledFor);
-      else {
-        const report = await processors.discovery();
-        if (report.failed > 0) {
-          const retryDelaySeconds = 15 * 60;
-          emitNativeCollectorDiagnostic({
-            attempt: Math.max(1, message.attempts),
-            code: 'public-discovery-partial',
-            disposition: message.attempts > nativeCollectorMaxRetryRequests ? 'retry-to-dlq' : 'retry',
-            messageType: signal.type,
-            retryDelaySeconds,
-          });
-          message.retry({ delaySeconds: retryDelaySeconds });
-          continue;
-        }
-      }
+      await processors.agenda(signal.scheduledFor);
       emitNativeCollectorDiagnostic({ attempt: Math.max(1, message.attempts), disposition: 'ack-success', messageType: signal.type });
       message.ack();
     } catch (error) {
@@ -238,6 +231,34 @@ export async function handleNativeCollectorQueue(
       });
       message.retry({ delaySeconds: retryDelaySeconds });
     }
+  }
+  if (discoveryMessages.length === 0) return;
+  const [leader, ...duplicates] = discoveryMessages;
+  if (!leader) return;
+  try {
+    const report = await processors.discovery();
+    if (report.failed > 0) {
+      const retryDelaySeconds = 15 * 60;
+      emitNativeCollectorDiagnostic({
+        attempt: Math.max(1, leader.attempts), code: 'public-discovery-partial',
+        disposition: leader.attempts > nativeCollectorMaxRetryRequests ? 'retry-to-dlq' : 'retry',
+        messageType: 'public-discovery-ready', retryDelaySeconds,
+      });
+      leader.retry({ delaySeconds: retryDelaySeconds });
+    } else {
+      emitNativeCollectorDiagnostic({ attempt: Math.max(1, leader.attempts), disposition: 'ack-success', messageType: 'public-discovery-ready' });
+      leader.ack();
+    }
+    for (const duplicate of duplicates) duplicate.ack();
+  } catch (error) {
+    const retryDelaySeconds = Math.min(60 * (2 ** Math.max(0, leader.attempts - 1)), 60 * 60);
+    emitNativeCollectorDiagnostic({
+      attempt: Math.max(1, leader.attempts), code: collectorFailureCode(error instanceof Error ? error : undefined),
+      disposition: leader.attempts > nativeCollectorMaxRetryRequests ? 'retry-to-dlq' : 'retry',
+      messageType: 'public-discovery-ready', retryDelaySeconds,
+    });
+    leader.retry({ delaySeconds: retryDelaySeconds });
+    for (const duplicate of duplicates) duplicate.ack();
   }
 }
 

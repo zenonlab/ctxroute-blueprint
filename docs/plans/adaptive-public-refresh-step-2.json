@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-adaptive-public-refresh-step-2",
+  "stepId": "step-2",
+  "title": "Coalescer la demande publique Discovery",
+  "status": "DONE",
+  "approvedMode": "autonomous",
+  "objective": "Faire de D1 l'autorité d'admission, dédupliquer les signaux Queue et borner les appels fournisseurs par cadence et coupe-circuit partagés.",
+  "rollback": "Revert du commit; la migration 0018 reste additive et les états antérieurs restent lisibles.",
+  "acceptance": [
+    "Seule une admission created émet un signal Queue.",
+    "Un lot Queue exécute un seul claim de vingt demandes.",
+    "Les claims sont ordonnés par exactitude et le plafond global reste atomique.",
+    "Les caches négatifs expirent explicitement après sept jours.",
+    "Les quotas et le coupe-circuit fournisseur sont persistés dans D1.",
+    "Archify showcase et toutes les validations du plan passent."
+  ]
+}

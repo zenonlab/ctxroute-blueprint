@@ -1771,6 +1771,69 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-adaptive-public-refresh-step-2",
+      "title": "Dédupliquer et borner l’admission Discovery",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "step-2",
+          "title": "Coalescer la demande publique Discovery",
+          "status": "DONE",
+          "acceptance": [
+            "L’adaptateur D1 retourne created, existing ou saturated et seule une transition créée émet un signal Queue.",
+            "Une rafale de demandes identiques conserve une ligne D1, un signal Queue et un seul claim fournisseur actif.",
+            "Le consumer traite les signaux Discovery d’un lot avec un seul claim borné à 20.",
+            "Les claims priorisent une référence fournisseur exacte, puis un média précis, puis une recherche ambiguë.",
+            "Le plafond global de 5000 actifs reste atomique et les résultats négatifs frais empêchent tout appel fournisseur jusqu’à leur échéance explicite.",
+            "Les portes fournisseur persistent les quotas conservateurs et un coupe-circuit configurable, respectent Retry-After et huit tentatives.",
+            "Les validations D1, Worker, package, documentation, Archify showcase 9/9 et npm run verify passent.",
+            "Un commit vérifié unique existe sans .codex/config.toml, push ni déploiement dans cette étape."
+          ],
+          "files": [
+            "apps/worker/migrations/0018_discovery_admission_state.sql",
+            "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-provider-runtime-control.ts",
+            "packages/adapters-cloudflare/src/catalogue/index.ts",
+            "packages/public-discovery/src/provider-http.ts",
+            "packages/public-discovery/src/provider-http.test.ts",
+            "packages/public-discovery/src/provider-kit.ts",
+            "packages/public-discovery/src/resolver.ts",
+            "packages/public-discovery/src/resolver.test.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/native-collectors.test.ts",
+            "apps/worker/wrangler.jsonc",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/02-quality-strategy.md",
+            "docs/operations/cloudflare.md",
+            "docs/architecture/src/public-discovery.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/plans/adaptive-public-refresh-step-2.json"
+          ],
+          "commands": [
+            "Modifier uniquement les fichiers listés avec apply_patch et les commandes Progress prévues.",
+            "Exécuter npm test --workspace @tobirink/public-discovery, npm run test:d1, npm run test:worker et npm run typecheck.",
+            "Exécuter npm run validate:decisions, npm run validate:docs -- --all et npm run archify:validate -- public-discovery.dataflow.",
+            "Exécuter npx wrangler deploy --dry-run depuis apps/worker puis npm run verify.",
+            "Exécuter npm ls --all, npm audit --audit-level=high et git diff --check.",
+            "Créer le commit perf(discovery): coalesce public discovery demand sans .codex/config.toml."
+          ],
+          "evidence": [
+            "Public Discovery 55/55, D1 25/25, Worker 90/90 et tous les typechecks passent.",
+            "Rafale de 10 000 POST: un signal; lot de 20: un seul claim; outbox reprend un envoi Queue non confirmé.",
+            "npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent.",
+            "Archify public-discovery showcase 9/9, 0 erreur et 0 avertissement; artefact SHA-256 cb59733b4f084a47af7eeb25c6c7a6ae6346d9d930d5c64cee9a5e3e5a43437a."
+          ]
+        }
+      ]
     }
   ]
 }

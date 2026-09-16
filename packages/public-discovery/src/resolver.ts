@@ -6,17 +6,21 @@ import { AniListFavoriteProviderAdapter } from './providers/anilist.js';
 import { KitsuFavoriteProviderAdapter } from './providers/kitsu.js';
 import { MangaDexFavoriteProviderAdapter } from './providers/mangadex.js';
 import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates.js';
-import type { FavoriteProviderFetch } from './provider-http.js';
+import { FavoriteProviderRateGate } from './provider-http.js';
+import type { FavoriteProviderFetch, FavoriteProviderRuntimeControlPort } from './provider-http.js';
 
 export type PublicDiscoveryProviderPorts = Readonly<Record<ResolutionProvider, FavoriteProviderPort>>;
 
-export function createPublicDiscoveryProviders(fetcher: FavoriteProviderFetch = fetch.bind(globalThis)): PublicDiscoveryProviderPorts {
+export function createPublicDiscoveryProviders(
+  fetcher: FavoriteProviderFetch = fetch.bind(globalThis),
+  controls?: FavoriteProviderRuntimeControlPort,
+): PublicDiscoveryProviderPorts {
   return Object.freeze({
-    anilist: new AniListFavoriteProviderAdapter(fetcher),
-    mangaupdates: new MangaUpdatesFavoriteProviderAdapter(fetcher),
-    mangadex: new MangaDexFavoriteProviderAdapter(fetcher),
-    'kitsu-anime': new KitsuFavoriteProviderAdapter('kitsu-anime', fetcher),
-    'kitsu-manga': new KitsuFavoriteProviderAdapter('kitsu-manga', fetcher),
+    anilist: new AniListFavoriteProviderAdapter(fetcher, new FavoriteProviderRateGate('anilist', controls)),
+    mangaupdates: new MangaUpdatesFavoriteProviderAdapter(fetcher, new FavoriteProviderRateGate('mangaupdates', controls)),
+    mangadex: new MangaDexFavoriteProviderAdapter(fetcher, new FavoriteProviderRateGate('mangadex', controls)),
+    'kitsu-anime': new KitsuFavoriteProviderAdapter('kitsu-anime', fetcher, new FavoriteProviderRateGate('kitsu-anime', controls)),
+    'kitsu-manga': new KitsuFavoriteProviderAdapter('kitsu-manga', fetcher, new FavoriteProviderRateGate('kitsu-manga', controls)),
   });
 }
 

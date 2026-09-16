@@ -79,15 +79,20 @@ browser or `workerd` test when platform behavior is the risk.
 - WebBridge release packages must contain the current candidate version `1.0.31`, the exact
   `https://tobirink.com/*` content-script match and the same
   `externally_connectable` match before their SHA-256 is recorded.
-- Public Discovery tests prouvent la création D1 atomique et dédupliquée,
-  l’attente sans consommation de tentative MV3, le claim natif via Queue,
+- Public Discovery tests prouvent les admissions D1 `created`, `existing` et
+  `saturated`, une seule émission Queue pour 10 000 POST identiques,
+  l’attente sans consommation de tentative MV3 et un seul `claim(20)` par lot Queue,
   la publication terminale d’un profil complet et son rejeu idempotent.
   Les contrats refusent une cinquième entrée dans chacune des deux listes de
   titres. Les tests D1 réels vérifient le plafond global actif et sa réponse
   `503`, l’expurgation terminale et le backfill historique de `request_json`
   sans altérer les demandes reprenables, les échéances des nonces et
-  des échecs, l’index canonique versionné, son plan de requête et le rejet sans
-  écriture partielle d’une collision de titre normalisé.
+  des échecs, l’expiration explicite à sept jours de `NOT_FOUND` et
+  `AMBIGUOUS`, l’ordre référence exacte puis média précis puis ambigu, l’index
+  canonique versionné, son plan de requête et le rejet sans écriture partielle
+  d’une collision de titre normalisé. Les tests de contrôle fournisseur
+  vérifient les réservations D1 exclusives, les cadences de trois et six
+  secondes, `Retry-After` et l’ouverture configurable du circuit.
   Les tests du runner prouvent qu’un MISS, un PENDING et un VERIFIED ne lancent
   aucune recherche ou hydratation fournisseur dans la découverte automatique
   de l’extension.
