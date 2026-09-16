@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readOrchestratorState } from '../../scripts/orchestrator-core.mjs';
-import { codeContextPolicy } from '../../scripts/code-context-policy.mjs';
+import { CODE_CONTEXT_POLICY } from '../../scripts/code-context-policy.mjs';
 import { loadProjectConfig } from '../../.githooks/project-policy.mjs';
 import { loadAdrs } from './decision-memory.mjs';
 
@@ -64,7 +64,7 @@ export function routingContext(projectRoot = root, event = 'SessionStart') {
     `- contracts: ${list(config.contracts?.patterns, 4)}`,
     `- decisions: ${activeDecisions.length} active scoped ADR(s), resolved against exact targets at PreToolUse${invalidDecisions.length ? `; ${invalidDecisions.length} invalid` : ''}`,
     'Declare intended files before mutation; in SWARM_ON route mutating work through orchestrator_run_goal unless execution is explicitly direct. PreToolUse handles prerequisites, PostToolUse audits the completed cumulative diff, and Stop/Git validate the whole change.',
-    codeContextPolicy(),
+    CODE_CONTEXT_POLICY,
   ];
   return { hookSpecificOutput: { hookEventName: event, additionalContext: lines.join('\n') } };
 }

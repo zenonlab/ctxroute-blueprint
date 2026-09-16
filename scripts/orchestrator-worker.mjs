@@ -5,7 +5,7 @@ import { delimiter, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertNoSecrets, loadOrchestratorConfig, safeRelativePath } from './orchestrator-core.mjs';
 import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
-import { codeContextPolicy } from './code-context-policy.mjs';
+import { CODE_CONTEXT_POLICY } from './code-context-policy.mjs';
 
 const RUNTIMES = new Set(['auto', 'codex', 'claude', 'gemini', 'fixture']);
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
@@ -126,7 +126,7 @@ export function workerPrompt(dispatch) {
   return [
     `Read ${dispatch.skill_path} completely before acting.`,
     'Use only the bounded mission below; no conversation history is available.',
-    codeContextPolicy(),
+    CODE_CONTEXT_POLICY,
     'Do not commit, change worktree HEAD, or mutate orchestrator state.',
     `Return only JSON matching ${dispatch.output_contract}.`,
     JSON.stringify(dispatch.mission),
