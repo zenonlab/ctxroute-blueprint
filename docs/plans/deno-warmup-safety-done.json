@@ -1,0 +1,12 @@
+{
+  "goalId": "goal-deno-warmup-safety",
+  "stepId": "defer-kv-and-republish",
+  "status": "DONE",
+  "evidence": [
+    "Gateway Deno 10/10, npm run verify, npm ls --all et npm audit passent; aucune vulnérabilité n’est signalée.",
+    "public-pipeline.architecture passe Archify showcase 9/9 avec zéro erreur et zéro avertissement; artefact SHA-256 c80701eb0635b87a2da602e787b5f486c4c6dd136f86f32a84e3ab6084e09799.",
+    "Les commits 6192727 et 68105f2 sont poussés; origin/main pointe sur 68105f231fafd7ecc30f2c5a9336e59cc45b1dcf sans .codex/config.toml.",
+    "La gate Deno a appliqué le plan fa6209d6c2f3167a011d36e725d53343714b6b457fe41ab025de9ae0e5a84b0b uniquement à deno-app:tobirink-provider-gateway/production; la révision 6sfwa9m7qpx0 est routed.",
+    "La production répond 200 status healthy; de nouvelles demandes AniList 1 et MangaUpdates 22195008066 atteignent VERIFIED; Agenda v3 répond 200 avec calendar-e1fafb53705d14ac448ccb390bdf018ab7d58a9f5cb93b91; v2 et les deux routes collecteur retirées répondent 410."
+  ]
+}

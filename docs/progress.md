@@ -112,10 +112,10 @@
 
 - [x] **Charger les clés par fichier temporaire privé et borné** — DONE _(evidence: Le driver Deno transmet chaque clé via env load avec exactement une variable autorisée; 11 tests ciblés prouvent l'absence de valeur dans argv et le rejet des environnements inconnus ou multi-clés., Le runner crée un fichier temporaire exclusif en mode 0600, nettoie son répertoire après succès et échec, et remplace toute erreur CLI brute par deno-provider-command-failed., Les 36 tests infra passent sans appel fournisseur; la suppression de la clé précédente reste une opération séparée et sans valeur.)_
 
-## Publier le durcissement du pipeline fournisseur — ACTIVE
+## Publier le durcissement du pipeline fournisseur — DONE
 
-- [ ] **Pousser, déployer les deux runtimes et certifier le trafic** — IN_PROGRESS
+- [x] **Pousser, déployer les deux runtimes et certifier le trafic** — DONE _(evidence: Worker 2267a691-68cf-4612-9ec8-e36e3c839ef3 sert 100 %; origin/main inclut le durcissement, la compatibilité Deno et la correction de warm-up jusqu’à 68105f2., La gate Deno accepte les deux formes d’inventaire sans valeur et a déployé uniquement la gateway via le plan fa6209d6c2f3167a011d36e725d53343714b6b457fe41ab025de9ae0e5a84b0b; révision 6sfwa9m7qpx0 routed., AniList et MangaUpdates atteignent VERIFIED; Agenda v3 répond 200; v2 et les routes collecteur retirées répondent 410.)_
 
-## Éviter le blocage de warm-up de la gateway Deno — ACTIVE
+## Éviter le blocage de warm-up de la gateway Deno — DONE
 
-- [ ] **Démarrer HTTP avant Deno KV puis republier la gateway** — IN_PROGRESS _(evidence: Correction materialisée après autorisation explicite; révision précédente 5kdjjznp5w03 timed_out en warming.)_
+- [x] **Démarrer HTTP avant Deno KV puis republier la gateway** — DONE _(evidence: Gateway Deno 10/10, npm run verify, npm ls --all et npm audit passent; audit à 0 vulnérabilité; Archify public-pipeline.architecture passe 9/9 sans diagnostic., origin/main pointe sur 68105f231fafd7ecc30f2c5a9336e59cc45b1dcf; .codex/config.toml reste exclu., Plan Deno fa6209d6c2f3167a011d36e725d53343714b6b457fe41ab025de9ae0e5a84b0b limité à la gateway; révision 6sfwa9m7qpx0 routed sans mutation de secret ni KV.)_

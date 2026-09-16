@@ -1617,14 +1617,14 @@
       "schemaVersion": 1,
       "id": "goal-publish-pipeline-hardening",
       "title": "Publier le durcissement du pipeline fournisseur",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
         {
           "id": "push-deploy-and-certify",
           "title": "Pousser, déployer les deux runtimes et certifier le trafic",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "origin/main pointe exactement sur 589f52c et le Worker sert la version 2267a691 à 100 %.",
             "La gate Deno normalise les inventaires historiques name/secret et actuels key/isSecret sans conserver de valeur.",
@@ -1655,7 +1655,12 @@
             "Appliquer gateway-deploy via une authentification Deno éphémère en mémoire et une allowlist exacte.",
             "Certifier Deno health, Discovery v3, Agenda v3 et les routes retirées en production."
           ],
-          "evidence": []
+          "evidence": [
+            "Worker 2267a691-68cf-4612-9ec8-e36e3c839ef3 sert 100 %; origin/main inclut le durcissement, la compatibilité Deno et la correction de warm-up jusqu’à 68105f2.",
+            "La gate Deno accepte les deux formes d’inventaire sans valeur et a déployé uniquement la gateway via le plan fa6209d6c2f3167a011d36e725d53343714b6b457fe41ab025de9ae0e5a84b0b; révision 6sfwa9m7qpx0 routed.",
+            "AniList et MangaUpdates atteignent VERIFIED; Agenda v3 répond 200; v2 et les routes collecteur retirées répondent 410.",
+            "npm run verify, npm ls --all, npm audit et Archify passent; .codex/config.toml reste exclu."
+          ]
         }
       ]
     },
@@ -1663,14 +1668,14 @@
       "schemaVersion": 1,
       "id": "goal-deno-warmup-safety",
       "title": "Éviter le blocage de warm-up de la gateway Deno",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
         {
           "id": "defer-kv-and-republish",
           "title": "Démarrer HTTP avant Deno KV puis republier la gateway",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "La gateway démarre son serveur HTTP avant d’attendre Deno KV et répond 503 de façon bornée si l’initialisation KV échoue.",
             "La gateway Deno passe ses tests ciblés, npm run verify, npm ls --all, npm audit et public-pipeline.architecture passe Archify showcase.",
@@ -1702,7 +1707,10 @@
             "Certifier la révision Deno, /healthz, Discovery AniList et MangaUpdates, Agenda v3 et les routes retirées."
           ],
           "evidence": [
-            "Correction materialisée après autorisation explicite; révision précédente 5kdjjznp5w03 timed_out en warming."
+            "Gateway Deno 10/10, npm run verify, npm ls --all et npm audit passent; audit à 0 vulnérabilité; Archify public-pipeline.architecture passe 9/9 sans diagnostic.",
+            "origin/main pointe sur 68105f231fafd7ecc30f2c5a9336e59cc45b1dcf; .codex/config.toml reste exclu.",
+            "Plan Deno fa6209d6c2f3167a011d36e725d53343714b6b457fe41ab025de9ae0e5a84b0b limité à la gateway; révision 6sfwa9m7qpx0 routed sans mutation de secret ni KV.",
+            "Production: health 200; AniList 1 et MangaUpdates 22195008066 VERIFIED; Agenda v3 200 calendar-e1fafb53705d14ac448ccb390bdf018ab7d58a9f5cb93b91; routes retirées 410."
           ]
         }
       ]

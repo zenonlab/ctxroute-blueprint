@@ -1,0 +1,12 @@
+{
+  "goalId": "goal-publish-pipeline-hardening",
+  "stepId": "push-deploy-and-certify",
+  "status": "DONE",
+  "evidence": [
+    "Le Worker Cloudflare sert la version 2267a691-68cf-4612-9ec8-e36e3c839ef3 à 100 %; les commits de durcissement et de compatibilité ont été poussés puis complétés par la correction de warm-up 68105f2.",
+    "La gate Deno accepte les inventaires name/secret et key/isSecret sans valeur; ses tests ciblés et les validations complètes passent.",
+    "Le plan Deno fa6209d6c2f3167a011d36e725d53343714b6b457fe41ab025de9ae0e5a84b0b a déployé uniquement deno-app:tobirink-provider-gateway/production; la révision 6sfwa9m7qpx0 est routed sans mutation de secret ni KV.",
+    "En trafic réel, AniList 1 et MangaUpdates 22195008066 atteignent VERIFIED; Agenda v3 répond 200 avec calendar-e1fafb53705d14ac448ccb390bdf018ab7d58a9f5cb93b91; Catalogue v2 et les routes collecteur retirées répondent 410.",
+    "npm run verify, npm ls --all et npm audit passent; Archify public-pipeline.architecture passe showcase 9/9 sans diagnostic."
+  ]
+}
