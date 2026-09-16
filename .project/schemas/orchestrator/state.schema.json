@@ -20,7 +20,13 @@
       "properties": {
         "goal_id": { "$ref": "common.schema.json#/$defs/identifier" },
         "title": { "$ref": "common.schema.json#/$defs/text" },
-        "status": { "enum": ["ACTIVE", "COMPLETED", "CANCELLED"] },
+        "objective": { "$ref": "common.schema.json#/$defs/text" },
+        "acceptance_criteria": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/text" } },
+        "base_revision": { "$ref": "common.schema.json#/$defs/gitOid" },
+        "acceptance_report": { "$ref": "goal-acceptance-report.schema.json" },
+        "blocked_cause": { "$ref": "common.schema.json#/$defs/nullableCause" },
+        "resume_action": { "type": ["string", "null"], "maxLength": 1024, "pattern": "^[^\\u0000]*$" },
+        "status": { "enum": ["ACTIVE", "BLOCKED", "COMPLETED", "CANCELLED"] },
         "missions": { "type": "array", "maxItems": 1024, "items": { "$ref": "mission-record.schema.json" } }
       },
       "unevaluatedProperties": false

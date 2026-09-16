@@ -13,7 +13,7 @@ const repository = fileURLToPath(new URL('..', import.meta.url));
 
 test('blueprint skill companions are strict, structured, and non-recursive', () => {
   assert.deepEqual(validateBlueprintSkills(repository), []);
-  for (const name of ['blueprint-audit', 'session-auditor', 'skill-creator']) {
+  for (const name of ['blueprint-audit', 'goal-auditor', 'goal-planner', 'session-auditor', 'skill-creator']) {
     const companion = JSON.parse(readFileSync(join(repository, '.agents', 'skills', name, 'blueprint.json'), 'utf8'));
     assert.equal(companion.schemaVersion, 2);
     assert.ok(companion.validations.every(validation => validation.executable && Array.isArray(validation.args)));
@@ -46,7 +46,7 @@ test('skills verifier runs exact structured commands and redacts bounded failure
   const calls = [];
   const success = await verifyBlueprintSkills({ root: repository, execute: async validation => { calls.push(structuredClone(validation)); return { exit_code: 0 }; } });
   assert.equal(success.ok, true);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 5);
   assert.ok(calls.every(call => Object.keys(call).sort().join(',') === 'args,cwd,executable,id,timeout_ms'));
   const failure = await verifyBlueprintSkills({ root: repository, execute: async () => { throw new Error(`token=must-not-leak ${'x'.repeat(2000)}`); } });
   assert.equal(failure.ok, false);
@@ -56,7 +56,7 @@ test('skills verifier runs exact structured commands and redacts bounded failure
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'blueprint-skills-'));
-  for (const name of ['blueprint-audit', 'session-auditor', 'skill-creator']) {
+  for (const name of ['blueprint-audit', 'goal-auditor', 'goal-planner', 'session-auditor', 'skill-creator']) {
     const target = join(root, '.agents', 'skills', name);
     cpSync(join(repository, '.agents', 'skills', name), target, { recursive: true });
     assert.equal(dirname(target).endsWith(join('.agents', 'skills')), true);

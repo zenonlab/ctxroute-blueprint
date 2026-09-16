@@ -17,7 +17,9 @@ not inject that corpus for each tool call.
 flowchart TD
     Session[SessionStart] --> Routing[Canonical file routing from project config]
     Routing --> Mission[Targeted worker mission when present]
-    Request[Requested action] --> PreTool[PreToolUse dispatcher]
+    Request[Requested action] --> Goal[orchestrator_run_goal in SWARM_ON]
+    Goal --> Planner[Read-only goal planner]
+    Planner --> PreTool[Mission-scoped PreToolUse dispatcher]
     PreTool --> Governance[Prerequisite ADR and architecture routing]
     Governance -->|allow| Edit[Authorized action]
     Governance -->|block| Refusal[Immediate refusal with reason]
@@ -34,7 +36,8 @@ flowchart TD
     Quality --> PrePush
     PrePush --> Commands[Complete project commands]
     Commands --> Stop[Fail-open Stop review]
-    Prompt[UserPromptSubmit] --> Observe[Passive problem observation]
+    Prompt[UserPromptSubmit] --> GoalRoute[Bounded goal routing]
+    GoalRoute --> Observe[Passive problem observation]
     Compact[PreCompact] --> Reset[CTXRoute reset]
     Reset --> Routing
     Query[Explicit context request] --> Route[Bounded CTXRoute lookup]

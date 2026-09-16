@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/worker-dispatch.schema.json",
+  "type": "object",
+  "required": ["dispatch_id", "runtime", "phase", "mission", "skill_path", "output_contract"],
+  "properties": {
+    "dispatch_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "runtime": { "enum": ["codex", "claude", "fixture"] },
+    "phase": { "enum": ["plan", "work", "audit", "goal-audit"] },
+    "mission": { "type": "object" },
+    "skill_path": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "output_contract": { "enum": ["goal-plan", "worker-report", "audit-report", "goal-acceptance-report"] }
+  },
+  "unevaluatedProperties": false
+}

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { bootstrapOrchestrator } from './orchestrator-bootstrap.mjs';
 import { contextQuery, mutateCoordination, prepareMission, purgeWorktree, readCoordination, reconcileWorktrees, rollbackMission, submitWorkerReport } from './orchestrator-service.mjs';
+import { runGoal } from './orchestrator-goal.mjs';
 
 const [command, argument] = process.argv.slice(2);
 try {
@@ -14,13 +15,14 @@ try {
     if (!argument) throw new Error(`${command ?? 'command'} requires a JSON input file`);
     const input = JSON.parse(await readFile(argument, 'utf8'));
     if (command === 'mutate') result = await mutateCoordination(input);
+    else if (command === 'run-goal' || command === 'orchestrator_run_goal') result = await runGoal(input);
     else if (command === 'prepare-mission') result = await prepareMission(input);
     else if (command === 'submit-report') result = await submitWorkerReport(input);
     else if (command === 'reconcile-worktrees') result = await reconcileWorktrees(input);
     else if (command === 'rollback-mission') result = await rollbackMission(input);
     else if (command === 'purge-worktree') result = await purgeWorktree(input);
     else if (command === 'context') result = await contextQuery(input);
-    else throw new Error('usage: doctor | read | mutate | prepare-mission | submit-report | reconcile-worktrees | rollback-mission | purge-worktree | context <input.json>');
+    else throw new Error('usage: doctor | read | mutate | run-goal | orchestrator_run_goal | prepare-mission | submit-report | reconcile-worktrees | rollback-mission | purge-worktree | context <input.json>');
   }
   process.stdout.write(`${JSON.stringify({ ok: true, result }, null, 2)}\n`);
 } catch (error) {

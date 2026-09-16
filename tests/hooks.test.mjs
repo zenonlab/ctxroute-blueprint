@@ -83,9 +83,9 @@ test('architecture evidence rejects unrelated documentation', () => {
 test('the lifecycle dispatcher declares every event and the required sequence', () => {
   const expected = {
     SessionStart: ['worktree-reconcile.mjs', 'mission-context.mjs'],
-    PreToolUse: ['pre-tool-architecture.mjs'],
+    PreToolUse: ['pre-tool-goal.mjs', 'pre-tool-architecture.mjs'],
     PostToolUse: ['post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs'],
-    UserPromptSubmit: ['problem-memory.mjs'],
+    UserPromptSubmit: ['goal-routing.mjs', 'problem-memory.mjs'],
     PreCompact: ['ctxroute-reset.js', 'mission-context.mjs'],
     Stop: ['worker-restitution.mjs', 'ctxroute-reset.js', 'stop-review.mjs'],
   };
@@ -101,7 +101,7 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
     });
     assert.deepEqual(called, expected[event], `${event} simulation`);
   }
-  assert.equal(handlerPlan('claude', 'PreToolUse', root).length, 1);
+  assert.equal(handlerPlan('claude', 'PreToolUse', root).length, 2);
   assert.equal(handlerPlan('codex', 'PostToolUse', root).some(handler => /doc-inject|session-inject/u.test(handler.name)), false);
 });
 
@@ -117,8 +117,8 @@ test('the lifecycle dispatcher executes sequentially and merges non-blocking con
       return { outputs: [{ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: handler.name } }] };
     },
   });
-  assert.deepEqual(called, ['pre-tool-architecture.mjs']);
-  assert.equal(result.hookSpecificOutput.additionalContext, 'pre-tool-architecture.mjs');
+  assert.deepEqual(called, ['pre-tool-goal.mjs', 'pre-tool-architecture.mjs']);
+  assert.equal(result.hookSpecificOutput.additionalContext, 'pre-tool-goal.mjs\n\npre-tool-architecture.mjs');
 });
 
 test('SessionStart retains the canonical file routing and hook timing', () => {
@@ -175,7 +175,7 @@ test('the lifecycle dispatcher keeps architecture feedback local and targeted', 
       return { outputs: handler.name === 'pre-tool-architecture.mjs' ? [{ hookSpecificOutput: { additionalContext: 'Architecture gate' } }] : [] };
     },
   });
-  assert.deepEqual(called, ['pre-tool-architecture.mjs']);
+  assert.deepEqual(called, ['pre-tool-goal.mjs', 'pre-tool-architecture.mjs']);
   assert.match(result.hookSpecificOutput.additionalContext, /Architecture gate/u);
   assert.doesNotMatch(result.hookSpecificOutput.additionalContext, /Applicable architectural decisions/u);
 });
@@ -210,7 +210,7 @@ test('the lifecycle dispatcher keeps failures fail-open and visible', () => {
       return { outputs: [] };
     },
   });
-  assert.equal(calls, 1);
+  assert.equal(calls, 2);
   assert.match(result.systemMessage, /problem-memory\.mjs failed open: simulated failure/u);
 });
 
@@ -283,7 +283,7 @@ test('postinstall detects legacy global CTXRoute hooks without changing them', (
   ]);
 });
 
-test('both lifecycle dialects enforce local governance without automatic CTXRoute injection', () => {
+test('both lifecycle dialects route unowned SWARM_ON mutations to the goal runner', () => {
   for (const harness of ['codex', 'claude']) {
     const session = `dispatcher-${harness}-${process.pid}-${Date.now()}`;
     const pseudoPatch = ['***', 'Update File: .project/project-config.json'].join(' ');
@@ -293,7 +293,7 @@ test('both lifecycle dialects enforce local governance without automatic CTXRout
       encoding: 'utf8',
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout.trim(), '', `${harness} nominal PreToolUse should stay silent`);
+    assert.match(result.stdout.trim(), /orchestrator_run_goal/u, `${harness} must route the mutation`);
     assert.equal(result.stderr.trim(), '', `${harness} nominal PreToolUse should not emit diagnostics`);
   }
 });

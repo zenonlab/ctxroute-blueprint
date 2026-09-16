@@ -61,7 +61,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Avoid speculative abstractions and refactors.
 - Verify each coherent change in proportion to its risk; use targeted checks while iterating and the release gate only before push or handoff.
 - Review the accumulated diff at coherent boundaries, not after every small write.
-- Complete one coherent delegated work package before taking another; ordinary work need not be mirrored in orchestrator state.
+- In `SWARM_ON`, every mutating request must enter through `orchestrator_run_goal` and remain owned by a goal or active mission. `SWARM_OFF` and an explicit `execution: direct` are the only bypasses. Read-only diagnosis needs no orchestrator state.
 
 ## Audit
 

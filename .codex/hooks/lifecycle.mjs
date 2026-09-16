@@ -26,9 +26,9 @@ export function handlerPlan(harness, event, root = projectRoot) {
 
   return {
     SessionStart: [local('worktree-reconcile.mjs'), local('mission-context.mjs')],
-    PreToolUse: [local('pre-tool-architecture.mjs')],
+    PreToolUse: [local('pre-tool-goal.mjs'), local('pre-tool-architecture.mjs')],
     PostToolUse: [local('post-tool-sensor.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs')],
-    UserPromptSubmit: [problemMemory('UserPromptSubmit')],
+    UserPromptSubmit: [local('goal-routing.mjs'), problemMemory('UserPromptSubmit')],
     PreCompact: [direct('ctxroute-reset.js'), { ...local('mission-context.mjs'), args: ['PreCompact'] }],
     Stop: [local('worker-restitution.mjs'), direct('ctxroute-reset.js'), local('stop-review.mjs')],
   }[event] ?? [];
@@ -108,7 +108,7 @@ export function applicableHandlers(plan, event, input) {
   try { toolName = JSON.parse(input || '{}')?.tool_name; }
   catch { return plan; }
   if (!toolName || /^(?:apply_patch|apply_refactor_tool|Edit|Write|exec_command|Bash|Shell)$/iu.test(String(toolName))) return plan;
-  return plan.filter(handler => handler.name !== 'pre-tool-architecture.mjs');
+  return plan.filter(handler => !['pre-tool-goal.mjs', 'pre-tool-architecture.mjs'].includes(handler.name));
 }
 
 export function executeHandler(handler, input, root) {

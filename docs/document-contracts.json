@@ -86,7 +86,7 @@
       "format": "json",
       "source": ".project/orchestrator-config.json",
       "narrative": "docs/orchestration.md",
-      "requiredKeys": ["defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "limits"],
+      "requiredKeys": ["defaultMode", "statePath", "worktreeRoot", "recoveryRoot", "telemetryPath", "workerRuntime", "limits"],
       "validator": "npm run orchestrator:contracts"
     },
     {
@@ -178,6 +178,34 @@
       "kind": "json-schema",
       "format": "json-schema-2020-12",
       "source": ".project/schemas/orchestrator/bootstrap-report.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-goal-run-request-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/goal-run-request.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-goal-plan-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/goal-plan.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-worker-dispatch-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/worker-dispatch.schema.json",
+      "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
+    },
+    {
+      "id": "orchestrator-goal-acceptance-report-schema",
+      "kind": "json-schema",
+      "format": "json-schema-2020-12",
+      "source": ".project/schemas/orchestrator/goal-acceptance-report.schema.json",
       "requiredKeys": ["$schema", "$id", "unevaluatedProperties"]
     },
     {

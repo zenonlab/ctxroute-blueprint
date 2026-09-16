@@ -55,6 +55,7 @@
     "orchestrator:read": "node scripts/orchestrator-cli.mjs read",
     "orchestrator:doctor": "node scripts/orchestrator-cli.mjs doctor",
     "orchestrator:cli": "node scripts/orchestrator-cli.mjs",
+    "orchestrator:run-goal": "node scripts/orchestrator-cli.mjs run-goal",
     "orchestrator:mcp": "node scripts/orchestrator-mcp.mjs",
     "orchestrator:contracts": "node scripts/validate-orchestrator-contracts.mjs",
     "ctxroute:query": "node scripts/orchestrator-cli.mjs context",

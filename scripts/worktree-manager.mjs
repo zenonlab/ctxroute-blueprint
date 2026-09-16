@@ -65,6 +65,54 @@ export async function inspectMissionChanges(worktreePath, fileScope, root = proc
   return { files, outsideScope, ok: outsideScope.length === 0, head: (await git(worktree, ['rev-parse', 'HEAD'], config, deps)).stdout.trim() };
 }
 
+export async function integrateMissionChanges(mission, root = process.cwd(), dependencies = {}) {
+  const deps = createWorktreeDependencies(dependencies);
+  const config = await loadOrchestratorConfig(root);
+  const allocation = mission.worktree_allocation;
+  if (!allocation?.path || !allocation.base_revision) throw categorized('INTEGRATION_UNPROVABLE', 'mission has no active base revision');
+  const worktree = await resolveManagedPath(root, config.worktreeRoot, allocation.path, true);
+  const before = await inspectMissionChanges(allocation.path, mission.file_scope, root, allocation.base_revision, deps);
+  if (before.head !== allocation.base_revision) throw categorized('WORKER_COMMITTED', 'worker changed worktree HEAD');
+  if (!before.ok) throw categorized('OUTSIDE_SCOPE', `worktree changed files outside mission scope: ${before.outsideScope.join(', ')}`);
+  if (!before.files.length) throw categorized('EMPTY_WORKER_DIFF', 'worker produced no repository change');
+  await git(worktree, ['add', '-A', '--', '.'], config, deps);
+  const staged = parseNull((await git(worktree, ['diff', '--cached', '--name-only', '-z'], config, deps)).stdout).map(normalizePath).sort();
+  if (stableJson(staged) !== stableJson(before.files)) throw categorized('STAGED_SCOPE_MISMATCH', 'staged files differ from inspected mission files');
+  const commitEnvironment = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'CTXRoute Orchestrator',
+    GIT_AUTHOR_EMAIL: 'orchestrator@ctxroute.invalid',
+    GIT_COMMITTER_NAME: 'CTXRoute Orchestrator',
+    GIT_COMMITTER_EMAIL: 'orchestrator@ctxroute.invalid',
+  };
+  await git(worktree, ['commit', '--no-gpg-sign', '-m', `feat(orchestrator): integrate ${mission.mission_id}`], config, { ...deps, gitEnvironment: commitEnvironment });
+  const workerCommit = (await git(worktree, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
+  const mainBefore = (await git(root, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
+  if (mainBefore !== allocation.base_revision) {
+    const mainChanged = parseNull((await git(root, ['diff', '--name-only', '-z', `${allocation.base_revision}..${mainBefore}`], config, deps)).stdout).map(normalizePath);
+    const ignoreCase = (await git(root, ['config', '--bool', 'core.ignoreCase'], config, deps, true)).stdout.trim() === 'true';
+    const conflicts = mainChanged.filter(file => mission.file_scope.some(scope => scopeContains(scope, file, ignoreCase)));
+    if (conflicts.length) {
+      const proof = await writeIntegrationProof(root, mission.mission_id, workerCommit, mainBefore, conflicts, deps);
+      const error = categorized('MAIN_SCOPE_CONFLICT', 'main checkout changed mission-scoped paths since the mission base');
+      error.recoveryProof = proof;
+      error.workerCommit = workerCommit;
+      throw error;
+    }
+  }
+  const picked = await git(root, ['cherry-pick', '--no-edit', workerCommit], config, deps, true);
+  if (picked.code !== 0) {
+    await git(root, ['cherry-pick', '--abort'], config, deps, true);
+    const proof = await writeIntegrationProof(root, mission.mission_id, workerCommit, mainBefore, staged, deps);
+    const error = categorized('CHERRY_PICK_CONFLICT', 'orchestrator cherry-pick conflicted and was aborted');
+    error.recoveryProof = proof;
+    error.workerCommit = workerCommit;
+    throw error;
+  }
+  const integratedCommit = (await git(root, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
+  return { files: staged, worker_commit: workerCommit, integrated_commit: integratedCommit };
+}
+
 export async function reconcileManagedWorktrees(root = process.cwd(), dependencies = {}, suppliedState = null) {
   const deps = createWorktreeDependencies(dependencies);
   const repair = dependencies.repair !== false;
@@ -96,7 +144,8 @@ export async function reconcileManagedWorktrees(root = process.cwd(), dependenci
     if (status.indexLock) { results.push(result(worktreePath, 'INDEX_LOCK', 'NEEDS_ATTENTION', base, status)); continue; }
     if (!TERMINAL.has(mission.status)) { results.push(result(worktreePath, status.dirty ? 'ACTIVE_DIRTY' : 'ACTIVE_COHERENT', 'PRESERVED', base, status)); continue; }
     if (status.dirty) { results.push(result(worktreePath, 'TERMINAL_DIRTY', 'NEEDS_ATTENTION', base, status)); continue; }
-    if (status.head !== base) { results.push(result(worktreePath, 'REVISION_DIVERGED', 'NEEDS_ATTENTION', base, status)); continue; }
+    const expectedHead = mission.integration_status === 'INTEGRATED' && mission.worker_commit ? mission.worker_commit : base;
+    if (status.head !== expectedHead) { results.push(result(worktreePath, 'REVISION_DIVERGED', 'NEEDS_ATTENTION', base, status)); continue; }
     if (repair) {
       await git(root, ['worktree', 'remove', registration.absolute], config, deps);
       await deps.fault?.('afterWorktreeRemove', worktreePath);
@@ -254,7 +303,7 @@ async function ensureManagedRoot(root, worktreeRoot) {
 }
 async function git(cwd, args, config, deps, acceptFailure = false) {
   try {
-    const value = await deps.execFile('git', args, { cwd, encoding: 'utf8', timeout: config.subprocessTimeoutMs, maxBuffer: config.reportBytes, windowsHide: true });
+    const value = await deps.execFile('git', args, { cwd, encoding: 'utf8', timeout: config.subprocessTimeoutMs, maxBuffer: config.reportBytes, windowsHide: true, env: deps.gitEnvironment ?? process.env });
     return { ...value, code: 0 };
   } catch (error) {
     const code = Number.isInteger(error.code) ? error.code : error.killed ? 124 : 1;
@@ -262,6 +311,21 @@ async function git(cwd, args, config, deps, acceptFailure = false) {
     throw categorized(error.killed ? 'GIT_TIMEOUT' : 'GIT_FAILED', `git ${args[0]} failed (${code})`);
   }
 }
+async function writeIntegrationProof(root, missionId, workerCommit, mainHead, files, deps) {
+  const config = await loadOrchestratorConfig(root);
+  const directory = resolve(root, config.recoveryRoot);
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const relativePath = `${config.recoveryRoot.replace(/\/$/u, '')}/${missionId}-integration-${deps.now().toISOString().replace(/[:.]/gu, '-')}.json`;
+  const target = resolve(root, relativePath);
+  const temporary = `${target}.${process.pid}.tmp`;
+  const source = `${JSON.stringify({ mission_id: missionId, worker_commit: workerCommit, main_head: mainHead, files }, null, 2)}\n`;
+  if (Buffer.byteLength(source) > config.reportBytes) throw categorized('RECOVERY_PROOF_TOO_LARGE', 'integration recovery proof exceeds its byte budget');
+  const handle = await open(temporary, 'wx', 0o600);
+  try { await handle.writeFile(source, 'utf8'); await handle.sync(); } finally { await handle.close(); }
+  await rename(temporary, target);
+  return relativePath;
+}
+function stableJson(value) { return JSON.stringify(value); }
 function scopeContains(scope, file, ignoreCase) { const normalize = value => ignoreCase ? normalizePath(value).toLocaleLowerCase('en-US') : normalizePath(value); const left = normalize(scope).replace(/\/$/u, ''); const right = normalize(file); return right === left || right.startsWith(`${left}/`); }
 function result(path, classification, action, baseRevision = null, status = {}) { return { path, classification, action, head: status.head ?? null, base_revision: baseRevision, dirty: status.dirty ?? null, index_lock: status.indexLock ?? false }; }
 function parseNull(source) { return source.split('\0').filter(Boolean); }

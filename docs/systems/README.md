@@ -30,3 +30,11 @@ loop continues without a conversational permission gate. ASK is reserved for
 external effects, new connections, and user-owned memory; NEVER actions are
 refused. Existing CTXRoute, Archify, and Sensor infrastructure remains the
 source of context, architecture evidence, and static safety diagnostics.
+
+## Local autonomous goal runtime
+
+The short-lived goal runtime has no HTTP client or daemon. `goal-planner` and
+`goal-auditor` are read-only processes; mission workers use closed Codex,
+Claude, or fixture adapters with bounded output and deadlines. The orchestrator
+alone owns state, validation, commits, cherry-picks, recovery proofs, and skill
+registration.

@@ -7,9 +7,11 @@ global conversation into a worker mission.
 
 ## Modes
 
-`SWARM_ON` is the configured default when no state exists. The orchestrator owns goals,
-decomposition, worker missions, worktree allocation, report intake, audit
-transactions, cancellation, reordering, and completion.
+`SWARM_ON` is the configured default when no state exists. Every mutating
+request is synthesized into a closed `GoalRunRequest` and enters through
+`orchestrator_run_goal`. The orchestrator owns planning, worker missions,
+worktree allocation, process launch, report intake, Git integration, audit,
+repair, and completion. Raw prompts and conversation history are never stored.
 
 `SWARM_OFF` means the primary agent executes directly. It does not require a
 goal, ticket, worktree, MCP call, or orchestration transaction. It does not
@@ -35,6 +37,7 @@ same service and is the emergency path when MCP is unavailable:
 npm run orchestrator:read
 npm run orchestrator:doctor
 npm run orchestrator:cli -- mutate transaction.json
+npm run orchestrator:run-goal -- goal.json
 npm run orchestrator:cli -- prepare-mission transaction.json
 npm run orchestrator:cli -- submit-report transaction.json
 npm run orchestrator:cli -- reconcile-worktrees transaction.json
@@ -50,10 +53,18 @@ old. Reusing an operation identifier with any payload or action difference is
 rejected before physical effects. Transactions persist `PENDING` intent before
 Git mutation, then converge to `COMPLETED` or `BLOCKED`.
 
-If a selected local skill is missing, mission preparation automatically routes
-one bounded mission to `skill-creator`. After its blueprint audit passes, the
-orchestrator records the result with `skill.register`; workers cannot perform
-that registration themselves.
+The goal runner launches `goal-planner` as a short read-only process and
+validates the returned `GoalPlan` before creating durable state. Dependency-
+ready missions run with bounded local `codex`, `claude`, or test-only `fixture`
+adapters. Selection uses `CTXROUTE_WORKER_RUNTIME`, project configuration, host
+detection, then local availability. Arbitrary executable paths are refused.
+
+If a selected local skill is missing, the original mission remains unchanged
+in `WAITING_FOR_SKILL`. A separate `skill-creator` mission runs in its own
+worktree, then a separate read-only `blueprint-audit` process reviews it.
+Repair reruns the creator in that worktree. Acceptance triggers integration,
+main-checkout digest recomputation, `skill.register`, and resumption of the
+original mission. Workers cannot register skills themselves.
 
 ## Mission and evidence contracts
 
@@ -68,18 +79,25 @@ prompts, reasoning, history, and raw environment are rejected. Active missions
 with overlapping scopes are rejected before work;
 distinct concurrent missions receive distinct worktrees.
 
-Mission status transitions are closed: `PREPARING` may become `ASSIGNED`,
-`BLOCKED`, or `CANCELLED`; `ASSIGNED` may become `RUNNING` or `CANCELLED`;
-`RUNNING` may become `BLOCKED`, `COMPLETED`, or `CANCELLED`; and `BLOCKED` may
-be resumed to `RUNNING` or cancelled. `COMPLETED` and `CANCELLED` are terminal.
+Mission status transitions include `WAITING_FOR_SKILL`, `PREPARING`,
+`ASSIGNED`, `RUNNING`, `VALIDATING`, `INTEGRATING`, and terminal or recovery
+states. `COMPLETED` is reserved for a validated change whose integrated commit
+is present on the main checkout.
 
 A worker report declares `mission_id`, skill identity, touched files,
 validation claims, a short summary, bounded evidence references, and blockers.
 Report intake compares it with the actual worktree diff and rejects out-of-
 scope or mismatched changes. The orchestrator then reruns every declared
 validation with executable/argument arrays and no shell. It stores only bounded,
-redacted result metadata. Only a successful orchestrator validation receipt may
-move a mission to `COMPLETED`.
+redacted result metadata. It then stages only the verified scope, creates one
+deterministically attributed commit, checks mainline path conflicts, and
+cherry-picks non-interactively. A conflict is aborted and the worktree plus
+recovery evidence are preserved as `NEEDS_ATTENTION`.
+
+After all missions integrate, a read-only `goal-auditor` produces the criterion
+→ evidence → mission matrix. `accept` completes the goal, `repair` adds bounded
+corrective missions within the original deadline, and `reject`, timeout, or
+insufficient evidence blocks the goal with a deterministic resume action.
 
 An audit report contains a typed subject, categorical signals, bounded evidence
 references, decision (`accept | repair | reject | defer`), distinct proposed and
@@ -119,5 +137,6 @@ environment dumps, raw output, file contents, and credentials are forbidden.
 Transactional state remains authoritative if telemetry fails.
 
 Stop is fail-open, honors `stop_hook_active`, reports bounded diagnostics, and
-never requests automatic continuation. Run `npm run blueprint:review` after
+never requests automatic continuation; the goal runner owns continuation until
+a terminal goal state. Run `npm run blueprint:review` after
 changes made by any skill or audit path, then `npm run verify` before delivery.

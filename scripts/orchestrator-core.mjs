@@ -6,10 +6,10 @@ import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
 import { emitDecisionEvent } from './orchestrator-telemetry.mjs';
 
 export const MODES = Object.freeze(['SWARM_ON', 'SWARM_OFF']);
-export const GOAL_STATUSES = Object.freeze(['ACTIVE', 'COMPLETED', 'CANCELLED']);
-export const MISSION_STATUSES = Object.freeze(['PREPARING', 'ASSIGNED', 'RUNNING', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
-const GOAL_TRANSITIONS = Object.freeze({ ACTIVE: ['COMPLETED', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
-const MISSION_TRANSITIONS = Object.freeze({ PREPARING: ['ASSIGNED', 'BLOCKED', 'CANCELLED'], ASSIGNED: ['RUNNING', 'CANCELLED'], RUNNING: ['BLOCKED', 'COMPLETED', 'CANCELLED'], BLOCKED: ['RUNNING', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
+export const GOAL_STATUSES = Object.freeze(['ACTIVE', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
+export const MISSION_STATUSES = Object.freeze(['WAITING_FOR_SKILL', 'PREPARING', 'ASSIGNED', 'RUNNING', 'VALIDATING', 'INTEGRATING', 'NEEDS_ATTENTION', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
+const GOAL_TRANSITIONS = Object.freeze({ ACTIVE: ['BLOCKED', 'COMPLETED', 'CANCELLED'], BLOCKED: ['ACTIVE', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
+const MISSION_TRANSITIONS = Object.freeze({ WAITING_FOR_SKILL: ['PREPARING', 'BLOCKED', 'CANCELLED'], PREPARING: ['ASSIGNED', 'WAITING_FOR_SKILL', 'BLOCKED', 'CANCELLED'], ASSIGNED: ['RUNNING', 'BLOCKED', 'CANCELLED'], RUNNING: ['VALIDATING', 'BLOCKED', 'CANCELLED'], VALIDATING: ['INTEGRATING', 'BLOCKED', 'CANCELLED'], INTEGRATING: ['COMPLETED', 'NEEDS_ATTENTION', 'BLOCKED'], NEEDS_ATTENTION: ['INTEGRATING', 'CANCELLED'], BLOCKED: ['PREPARING', 'RUNNING', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
 const SECRET_KEY = /(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)/iu;
 const SECRET_VALUE = /(?:bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)\s*[:=]\s*\S+)/iu;
 const DEFAULTS = Object.freeze({
@@ -23,7 +23,12 @@ const DEFAULTS = Object.freeze({
   contextBytes: 16 * 1024,
   lockTimeoutMs: 2000,
   subprocessTimeoutMs: 30_000,
+  goalTimeoutMs: 15 * 60_000,
+  workerTimeoutMs: 5 * 60_000,
   parallelWorktrees: 8,
+  workerStdoutBytes: 64 * 1024,
+  workerStderrBytes: 16 * 1024,
+  workerRuntime: 'auto',
   minFreeBytes: 256 * 1024 * 1024,
   telemetryBytes: 1024 * 1024,
   rollbackBytes: 16 * 1024 * 1024,
@@ -202,22 +207,30 @@ function applyOperation(state, command) {
   if (command.action === 'mode.set') return { ...state, mode: payload.mode };
   if (command.action === 'goal.create') {
     if (state.goals.some(goal => goal.goal_id === payload.goal_id)) throw new Error(`goal already exists: ${payload.goal_id}`);
-    return { ...state, goals: [...state.goals, { goal_id: payload.goal_id, title: payload.title.trim(), status: 'ACTIVE', missions: [] }] };
+    const goal = { goal_id: payload.goal_id, title: payload.title.trim(), status: 'ACTIVE', missions: [] };
+    if (payload.objective) goal.objective = payload.objective;
+    if (payload.acceptance_criteria) goal.acceptance_criteria = payload.acceptance_criteria;
+    if (payload.base_revision) goal.base_revision = payload.base_revision;
+    return { ...state, goals: [...state.goals, goal] };
   }
   if (command.action === 'goal.transition') return updateGoal(state, payload.goal_id, goal => {
     assertTransition(GOAL_TRANSITIONS, goal.status, payload.status, 'goal');
-    return { ...goal, status: payload.status };
+    const updated = { ...goal, status: payload.status };
+    if (payload.acceptance_report) updated.acceptance_report = payload.acceptance_report;
+    if (payload.blocked_cause !== undefined) updated.blocked_cause = payload.blocked_cause;
+    if (payload.resume_action !== undefined) updated.resume_action = payload.resume_action;
+    return updated;
   });
   if (command.action === 'mission.prepare') {
     const request = payload.mission;
     if (state.goals.some(goal => goal.missions.some(mission => mission.mission_id === request.mission_id))) throw new Error(`mission already exists: ${request.mission_id}`);
-    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : 'AUTO_COORDINATED', status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null };
+    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : 'AUTO_COORDINATED', status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null, blocking_cause: null, integration_status: 'NOT_STARTED', worker_commit: null, integrated_commit: null };
     assertOrchestratorContract('mission-record', record);
     return addMission(state, payload.goal_id, record);
   }
   if (command.action === 'mission.transition') return updateMission(state, payload.goal_id, payload.mission_id, mission => {
     assertTransition(MISSION_TRANSITIONS, mission.status, payload.status, 'mission');
-    if (payload.status === 'COMPLETED' && mission.validation_receipt?.status !== 'PASSED') throw new Error('mission completion requires an orchestrator PASSED receipt');
+    if (payload.status === 'COMPLETED' && (mission.validation_receipt?.status !== 'PASSED' || mission.integration_status !== 'INTEGRATED')) throw new Error('mission completion requires validation and main-branch integration');
     return { ...mission, status: payload.status };
   });
   if (command.action === 'report.submit') return updateMission(state, payload.goal_id, payload.report.mission_id, mission => ({ ...mission, report: payload.report, status: 'BLOCKED' }));

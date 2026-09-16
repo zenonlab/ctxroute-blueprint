@@ -2,7 +2,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const LOCAL_SKILLS = Object.freeze(['blueprint-audit', 'session-auditor', 'skill-creator']);
+export const LOCAL_SKILLS = Object.freeze(['blueprint-audit', 'goal-auditor', 'goal-planner', 'session-auditor', 'skill-creator']);
 export const SKILL_MODES = Object.freeze(['SWARM_ON', 'SWARM_OFF']);
 export const RESEARCH_LABELS = Object.freeze(['official-documentation', 'implementation', 'recommendation', 'hypothesis']);
 const COMPANION_FIELDS = new Set(['schemaVersion', 'skillId', 'version', 'modes', 'mutationAuthority', 'researchLabels', 'validations']);

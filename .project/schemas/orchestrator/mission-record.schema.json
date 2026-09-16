@@ -14,10 +14,18 @@
     "response_format": { "const": "worker-report" },
     "execution": { "enum": ["auto", "direct", "coordinated"] },
     "execution_reason": { "enum": ["ENVIRONMENT_SWARM_OFF", "EXPLICIT_DIRECT", "EXPLICIT_COORDINATED", "AUTO_SINGLE_SCOPE", "AUTO_COORDINATED", "PERSISTED_MODE", "DEFAULT_MODE"] },
-    "status": { "enum": ["PREPARING", "ASSIGNED", "RUNNING", "BLOCKED", "COMPLETED", "CANCELLED"] },
+    "status": { "enum": ["WAITING_FOR_SKILL", "PREPARING", "ASSIGNED", "RUNNING", "VALIDATING", "INTEGRATING", "NEEDS_ATTENTION", "BLOCKED", "COMPLETED", "CANCELLED"] },
     "worktree_allocation": { "oneOf": [{ "$ref": "common.schema.json#/$defs/worktreeAllocation" }, { "type": "null" }] },
     "report": { "oneOf": [{ "$ref": "worker-report.schema.json" }, { "type": "null" }] },
-    "validation_receipt": { "oneOf": [{ "$ref": "validation-receipt.schema.json" }, { "type": "null" }] }
+    "validation_receipt": { "oneOf": [{ "$ref": "validation-receipt.schema.json" }, { "type": "null" }] },
+    "objective": { "$ref": "common.schema.json#/$defs/text" },
+    "dependencies": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/identifier" } },
+    "acceptance_criteria": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/identifier" } },
+    "skill_path": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "blocking_cause": { "$ref": "common.schema.json#/$defs/nullableCause" },
+    "integration_status": { "enum": ["NOT_STARTED", "COMMITTED", "INTEGRATED", "NEEDS_ATTENTION"] },
+    "worker_commit": { "oneOf": [{ "$ref": "common.schema.json#/$defs/gitOid" }, { "type": "null" }] },
+    "integrated_commit": { "oneOf": [{ "$ref": "common.schema.json#/$defs/gitOid" }, { "type": "null" }] }
   },
   "unevaluatedProperties": false
 }

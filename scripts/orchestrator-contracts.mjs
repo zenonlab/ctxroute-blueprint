@@ -22,6 +22,10 @@ export const ORCHESTRATOR_SCHEMA_IDS = Object.freeze({
   worktreeOperation: 'https://ctxroute.dev/schemas/orchestrator/worktree-operation.schema.json',
   decisionEvent: 'https://ctxroute.dev/schemas/orchestrator/decision-event.schema.json',
   bootstrapReport: 'https://ctxroute.dev/schemas/orchestrator/bootstrap-report.schema.json',
+  goalRunRequest: 'https://ctxroute.dev/schemas/orchestrator/goal-run-request.schema.json',
+  goalPlan: 'https://ctxroute.dev/schemas/orchestrator/goal-plan.schema.json',
+  workerDispatch: 'https://ctxroute.dev/schemas/orchestrator/worker-dispatch.schema.json',
+  goalAcceptanceReport: 'https://ctxroute.dev/schemas/orchestrator/goal-acceptance-report.schema.json',
 });
 
 const aliases = new Map(Object.entries(ORCHESTRATOR_SCHEMA_IDS).flatMap(([key, id]) => [

@@ -19,11 +19,16 @@ const missionRequest = { mission_id: 'mission-one', skill_id: 'blueprint-audit',
 const missionRecord = { ...missionRequest, response_format: 'worker-report', execution_reason: 'EXPLICIT_COORDINATED', status: 'COMPLETED', worktree_allocation: { path: '.ctxroute/worktrees/mission-one', base_revision: oid, status: 'ACTIVE', recovery_proof: null }, report, validation_receipt: receipt };
 const missionView = { goal_id: 'goal-one', goal_title: 'Implement contracts', mission_id: 'mission-one', skill_id: 'blueprint-audit', skill_version: '2.0.0', file_scope: ['src/'], acceptance: ['Syntax is valid.'], validations: [validation], response_format: 'worker-report', worktree: '.ctxroute/worktrees/mission-one' };
 const worktreeOperation = { operation_id: 'operation-one', mission_id: 'mission-one', kind: 'RECONCILE', status: 'COMPLETED', classification: 'ACTIVE_COHERENT', path: '.ctxroute/worktrees/mission-one', base_revision: oid, dirty: false, proof_ref: null, cause: null };
-const config = { defaultMode: 'SWARM_ON', statePath: '.ctxroute/orchestrator/state.json', worktreeRoot: '.ctxroute/worktrees', recoveryRoot: '.ctxroute/recovery', telemetryPath: '.ctxroute/orchestrator/events.jsonl', limits: { stateBytes: 524288, reportBytes: 65536, contextBytes: 16384, lockTimeoutMs: 2000, subprocessTimeoutMs: 30000, parallelWorktrees: 8, minimumFreeBytes: 268435456, telemetryBytes: 1048576, recoveryBytes: 16777216, auditTraceBytes: 2097152, auditTraceFiles: 32 } };
+const config = { defaultMode: 'SWARM_ON', statePath: '.ctxroute/orchestrator/state.json', worktreeRoot: '.ctxroute/worktrees', recoveryRoot: '.ctxroute/recovery', telemetryPath: '.ctxroute/orchestrator/events.jsonl', workerRuntime: 'auto', limits: { stateBytes: 524288, reportBytes: 65536, contextBytes: 16384, lockTimeoutMs: 2000, subprocessTimeoutMs: 30000, goalTimeoutMs: 900000, workerTimeoutMs: 300000, parallelWorktrees: 8, workerStdoutBytes: 65536, workerStderrBytes: 16384, minimumFreeBytes: 268435456, telemetryBytes: 1048576, recoveryBytes: 16777216, auditTraceBytes: 2097152, auditTraceFiles: 32 } };
 const transaction = { operation_id: 'operation-one', expected_revision: 0, action: 'mission.prepare', payload: { goal_id: 'goal-one', mission: missionRequest } };
 const state = { revision: 1, mode: 'SWARM_ON', telemetry_sequence: 0, goals: [{ goal_id: 'goal-one', title: 'Implement contracts', status: 'ACTIVE', missions: [missionRecord] }], skills: [{ skill_id: 'blueprint-audit', version: '2.0.0', path: '.agents/skills/blueprint-audit', artifact_digest: digest, validation_receipt: receipt, audit_id: 'audit-one', registered_revision: 1 }], audits: [audit], transactions: [{ operation_id: 'operation-one', digest, action: 'mission.prepare', intent: transaction.payload, status: 'COMPLETED', start_revision: 0, end_revision: 1, result: 'CREATED', cause: null }], worktree_operations: [worktreeOperation] };
 const event = { sequence: 1, event_id: 'event-one', event_type: 'TRANSACTION', operation_id: 'operation-one', revision_before: 0, revision_after: 1, entity_type: 'mission', entity_id: 'mission-one', transition: 'PREPARING->ASSIGNED', mode: 'SWARM_ON', mode_source: 'default', skill_id: 'blueprint-audit', skill_version: '2.0.0', validation_id: null, duration_ms: 12, exit_code: 0, git_oid_before: oid, git_oid_after: oid, result: 'SUCCESS', cause: null, policy_id: 'orchestrator', schema_id: 'state', schema_path: '/goals/0/status', keyword: 'enum', evidence_digest: digest, timestamp: '2026-09-06T12:00:00Z' };
 const bootstrap = { status: 'READY', inventory_digest: digest, classifications: [], causes: [], recovery_actions: [], changed: false };
+const goalRunRequest = { goal_id: 'goal-one', title: 'Implement contracts', objective: 'Implement bounded contracts.', acceptance_criteria: ['Contracts validate.'], suggested_paths: ['src/'], expected_revision: 0 };
+const plannedMission = { ...missionRequest, objective: 'Implement bounded contracts.', dependencies: [], acceptance_criteria: ['criterion-1'], skill_path: '.agents/skills/blueprint-audit/SKILL.md' };
+const goalPlan = { goal_id: 'goal-one', missions: [plannedMission], criterion_coverage: [{ criterion_id: 'criterion-1', mission_ids: ['mission-one'] }] };
+const workerDispatch = { dispatch_id: 'dispatch-one', runtime: 'fixture', phase: 'work', mission: missionView, skill_path: '.agents/skills/blueprint-audit/SKILL.md', output_contract: 'worker-report' };
+const goalAcceptanceReport = { goal_id: 'goal-one', decision: 'accept', criteria: [{ criterion_id: 'criterion-1', status: 'PROVED', evidence_refs: ['src/change.mjs'], mission_ids: ['mission-one'] }], repair_missions: [], summary: 'All criteria are proved.' };
 
 const examples = {
   config,
@@ -38,10 +43,14 @@ const examples = {
   worktreeOperation,
   decisionEvent: event,
   bootstrapReport: bootstrap,
+  goalRunRequest,
+  goalPlan,
+  workerDispatch,
+  goalAcceptanceReport,
 };
 
 test('all public orchestrator schemas compile once and accept their canonical examples', () => {
-  assert.equal(listOrchestratorContracts().length, 12);
+  assert.equal(listOrchestratorContracts().length, 16);
   for (const [name, value] of Object.entries(examples)) {
     assert.equal(validateOrchestratorContract(name, value).valid, true, name);
     assert.equal(getOrchestratorValidator(name), getOrchestratorValidator(ORCHESTRATOR_SCHEMA_IDS[name]));

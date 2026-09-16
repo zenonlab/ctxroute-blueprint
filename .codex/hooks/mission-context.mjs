@@ -25,6 +25,10 @@ export async function missionContext(missionId = process.env.CTXROUTE_MISSION_ID
     acceptance: mission.acceptance,
     validations: mission.validations,
     response_format: mission.response_format,
+    objective: mission.objective,
+    dependencies: mission.dependencies,
+    acceptance_criteria: mission.acceptance_criteria,
+    skill_path: mission.skill_path,
   };
   const routingText = routing.hookSpecificOutput?.additionalContext ?? 'Canonical change routing is unavailable; inspect .project/project-config.json before mutation.';
   const output = {
@@ -58,7 +62,7 @@ export function routingContext(projectRoot = root, event = 'SessionStart') {
     `- architecture: ${list([...(config.architecture?.documents ?? []), ...(config.architecture?.internalDocuments ?? [])])}`,
     `- contracts: ${list(config.contracts?.patterns, 4)}`,
     `- decisions: ${activeDecisions.length} active scoped ADR(s), resolved against exact targets at PreToolUse${invalidDecisions.length ? `; ${invalidDecisions.length} invalid` : ''}`,
-    'Declare intended files before mutation; PreToolUse handles prerequisites, PostToolUse audits the completed cumulative diff, and Stop/Git validate the whole change.',
+    'Declare intended files before mutation; in SWARM_ON route mutating work through orchestrator_run_goal unless execution is explicitly direct. PreToolUse handles prerequisites, PostToolUse audits the completed cumulative diff, and Stop/Git validate the whole change.',
   ];
   return { hookSpecificOutput: { hookEventName: event, additionalContext: lines.join('\n') } };
 }

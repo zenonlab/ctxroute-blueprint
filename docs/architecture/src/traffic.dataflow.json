@@ -36,7 +36,7 @@
     { "from": "request", "to": "agent", "label": "intent", "classification": "user input", "variant": "emphasis", "route": "straight", "labelAt": [100, 210] },
     { "from": "agent", "to": "ctxroute", "label": "explicit query", "classification": "on demand", "variant": "emphasis", "route": "vertical-channel" },
     { "from": "ctxroute", "to": "orchestrator", "label": "bounded references", "classification": "local context", "variant": "default", "route": "straight", "labelDy": 35 },
-    { "from": "orchestrator", "to": "worker", "label": "MissionView", "classification": "no global history", "variant": "emphasis", "route": "vertical-channel" },
+    { "from": "orchestrator", "to": "worker", "label": "GoalPlan → MissionView", "classification": "no prompt or global history", "variant": "emphasis", "route": "vertical-channel" },
     { "from": "worker", "to": "archify", "label": "validation receipt", "classification": "orchestrator result", "variant": "emphasis", "route": "straight", "labelDy": 53 },
     { "from": "archify", "to": "artifacts", "label": "HTML receipt", "classification": "rendered evidence", "variant": "default", "route": "straight" },
     { "from": "agent", "to": "stop", "label": "stop", "classification": "completion attempt", "variant": "security", "route": "bottom-channel" },
@@ -44,7 +44,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "Routing contract", "items": ["Environment, persisted state, then default determine mode", "Workers receive a positive MissionView without conversation", "CTXRoute context is queried explicitly and remains byte-bounded"] },
-    { "dot": "emerald", "title": "Transactional verification", "items": ["Bootstrap holds one global lock through every Git effect", "Pending intents resume from desired and physical state", "Worker declarations never replace orchestrator validation replay"] },
+    { "dot": "emerald", "title": "Transactional verification", "items": ["Planner output is validated before durable effects", "Workers leave HEAD at base and never mutate global state", "Orchestrator validation, commit, and cherry-pick precede completion", "Goal audit maps each criterion to integrated evidence"] },
     { "dot": "rose", "title": "Recovery boundary", "items": ["Dirty or ambiguous worktrees require attention", "Rollback captures bounded restorable proof before removal", "Telemetry is redacted, rotated, and secondary to state"] }
   ]
 }
