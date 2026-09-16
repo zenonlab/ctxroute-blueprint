@@ -19,13 +19,15 @@ boundaries while CTXRoute, Archify, and Sensor remain existing infrastructure.
 
 ## Decision
 
-Classify actions as follows: ASK requires user approval for routing or
-middleware behavior changes, external side effects, memory persistence, and
-new MCP/A2A connections; NEVER permits secret exfiltration, bypassing safety
-checks, changing global agent settings, or persistent unapproved daemons;
-ALWAYS requires scoped context injection, audit diagnostics, bounded execution,
-and clean shutdown. The control loop may plan and validate, but only approved
-adapters may mutate state.
+Classify actions as follows: in-scope repository routing and middleware changes,
+scoped context injection, audit diagnostics, bounded execution, local state, and
+clean shutdown are ALWAYS and proceed without a conversational permission gate.
+ASK is reserved for user-owned or personal memory persistence, external side
+effects, and new MCP/A2A connections (including routing or middleware changes
+outside the governed repository). NEVER refuses secret exfiltration, safety
+bypasses, global agent settings, persistent daemons, and other unapproved
+mutations. The control loop may plan, mutate through governed local adapters,
+and validate autonomously.
 
 ## Alternatives
 
@@ -35,10 +37,10 @@ ownership of multilingual post-hook analysis.
 
 ## Consequences
 
-Governance is explicit and testable. Some actions require an extra approval
-step, while existing infrastructure remains reusable and unchanged. The
-policy is versioned as JSON and evaluated by a short-lived Node.js CLI; it does
-not grant access to memory or MCP/A2A providers by itself.
+Governance is explicit and testable. Routine local work is autonomous; only
+explicitly classified external or user-owned effects require an extra approval
+step. The policy is versioned as JSON and evaluated by a short-lived Node.js
+CLI; it does not grant access to memory or MCP/A2A providers by itself.
 
 Successful hook validations are silent. Lifecycle context is bounded; Sensor
 diagnostics remain visible while full reports belong in CI or local

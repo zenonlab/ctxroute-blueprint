@@ -2,12 +2,12 @@
   "version": 1,
   "decisions": {
     "ASK": [
-      "routing.change",
-      "middleware.change",
       "memory.persist",
       "mcp.connect",
       "a2a.send",
-      "external.side_effect"
+      "external.side_effect",
+      "routing.external_change",
+      "middleware.external_change"
     ],
     "NEVER": [
       "secret.exfiltration",
@@ -18,6 +18,8 @@
     ],
     "ALWAYS": [
       "context.scope",
+      "routing.change",
+      "middleware.change",
       "audit.emit",
       "resource.bound",
       "shutdown.clean",
@@ -25,9 +27,9 @@
     ]
   },
   "boundaries": {
-    "memory": "Agents may read scoped context; persistence requires ASK and explicit user approval.",
+    "memory": "Agents may read scoped context and persist bounded local audit/state autonomously; user-authored or personal memory requires ASK and explicit approval.",
     "mcpA2a": "Connections and outbound messages require ASK; secrets and safety bypasses are NEVER.",
-    "controlLoop": "The loop may plan and validate; only approved adapters may mutate state.",
+    "controlLoop": "The loop may plan, mutate through local governed adapters, and validate autonomously; ASK is reserved for external effects or user-owned memory, and NEVER actions are refused.",
     "infrastructure": "CTXRoute routes context, Archify provides architecture evidence, and Sensor provides static safety diagnostics."
   }
 }

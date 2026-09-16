@@ -24,6 +24,9 @@ validation.
 ## Agent governance
 
 The governance contract classifies routing, middleware, memory, MCP/A2A, and
-control-loop actions as ASK, NEVER, or ALWAYS. Existing CTXRoute, Archify, and
-Sensor infrastructure remains the source of context, architecture evidence,
-and static safety diagnostics.
+control-loop actions as ASK, NEVER, or ALWAYS. In-scope repository routing,
+middleware, validation, audit, and bounded local state are ALWAYS: the control
+loop continues without a conversational permission gate. ASK is reserved for
+external effects, new connections, and user-owned memory; NEVER actions are
+refused. Existing CTXRoute, Archify, and Sensor infrastructure remains the
+source of context, architecture evidence, and static safety diagnostics.

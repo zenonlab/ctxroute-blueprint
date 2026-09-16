@@ -11,7 +11,8 @@ While `.project/project-config.json` has `"status": "template"`, before writing 
 5. Choose the test strategy in `docs/02-quality-strategy.md`.
 6. Add required ADRs under `docs/decisions/`.
 7. Remove guide comments and placeholders, record only real decisions and commands, then change `.project/project-config.json` to `initialized`.
-8. Validate the complete structure, request confirmation before any deletion, and commit verified work automatically.
+8. Validate the complete structure, commit verified work automatically, and
+   reserve confirmation for an explicitly requested irreversible deletion.
 
 If the request already provides this information, use it directly and report only important missing decisions.
 
@@ -39,6 +40,9 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Skip milestone bookkeeping for small, reversible, or single-agent changes. For substantial work, prefer 2–6 coherent milestones; do not turn files, commands, commits, or routine edits into separate steps.
 - Preserve milestone order. Delegate only genuinely independent work packages with non-overlapping ownership, and require one bounded result with verification evidence from each worker.
 - A plan records intent and order; it never creates a conversational permission gate or requires repeated approval.
+- In-scope edits, commits, validation, reconciliation, and recovery continue
+  autonomously. Do not pause for permission unless the action is an explicitly
+  requested irreversible deletion or an external/user-owned side effect.
 - Report `DONE` or `BLOCKED` with short evidence after the work. An unavailable coordination interface does not block safe in-scope work.
 - Reserve manual pauses for visual review or an important undecided product, change, or design choice. Routine verification never requires a conversational checkpoint.
 - Session and post-compaction hooks may inject only bounded current-goal or mission context. Continue from that context directly and query the orchestrator only when the task needs authoritative state or mutation.
@@ -83,6 +87,7 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Branches: `feat/`, `fix/`, `refactor/`, `test/`, `docs/`, `chore/`, `perf/`.
 - Commits: `type(scope): short description`.
 - Allowed types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`.
-- Request confirmation before deletion.
+- Request confirmation only before an explicitly requested irreversible deletion;
+  never use deletion confirmation as a gate for ordinary work.
 - Commit verified functional steps automatically without requesting confirmation.
 - Never delete automatically.
