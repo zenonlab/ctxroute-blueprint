@@ -2,7 +2,11 @@
   "schemaVersion": 2,
   "skillId": "game-theme-author",
   "version": "1.3.0",
-  "modes": ["SWARM_ON", "SWARM_OFF"],
+  "phases": ["research", "work", "validation"],
+  "capabilities": ["theme-authoring"],
+  "access": "write",
+  "tools": ["read", "search", "edit"],
+  "independent": false,
   "mutationAuthority": "orchestrator",
   "validations": [
     {

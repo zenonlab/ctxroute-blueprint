@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ctxroute.dev/schemas/orchestrator/mission-view.schema.json",
   "type": "object",
-  "required": ["mission_id", "skill_id", "skill_version", "file_scope", "acceptance", "validations", "response_format", "worktree"],
+  "required": ["mission_id", "skill_id", "skill_version", "file_scope", "acceptance", "validations", "response_format", "worktree", "requested_mode", "resolved_mode", "workflow", "strategy", "policy_digest", "reinforcements"],
   "properties": {
     "mission_id": { "$ref": "common.schema.json#/$defs/identifier" },
     "skill_id": { "$ref": "common.schema.json#/$defs/identifier" },
@@ -11,7 +11,13 @@
     "acceptance": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/text" } },
     "validations": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/validation" } },
     "response_format": { "const": "worker-report" },
-    "worktree": { "$ref": "common.schema.json#/$defs/relativePath" }
+    "worktree": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "requested_mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] },
+    "resolved_mode": { "enum": ["SWARM", "SOLO", "GUARDED", "DIRECT"] },
+    "workflow": { "enum": ["STANDARD", "RESEARCH", "AUDIT", "SECURITY", "MIGRATION", "INCIDENT", "EXPERIMENT", "RECOVERY"] },
+    "strategy": { "enum": ["deterministic", "primary", "single-worker", "parallel-workers", "independent-auditor", "human-decision"] },
+    "policy_digest": { "$ref": "common.schema.json#/$defs/digest" },
+    "reinforcements": { "type": "array", "items": { "type": "string" } }
   },
   "unevaluatedProperties": false
 }

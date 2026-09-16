@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/operating-mode-descriptor.schema.json",
+  "type": "object",
+  "required": ["mode", "durable", "parallel", "parallel_limit", "isolation", "write_allowed", "permissions", "requirements"],
+  "properties": {
+    "mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] },
+    "durable": { "type": "boolean" }, "parallel": { "type": "boolean" },
+    "parallel_limit": { "type": "integer", "minimum": 1, "maximum": 64 },
+    "isolation": { "enum": ["worktree", "checkout", "adaptive"] }, "write_allowed": { "type": "boolean" },
+    "permissions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "requirements": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+  }, "unevaluatedProperties": false
+}

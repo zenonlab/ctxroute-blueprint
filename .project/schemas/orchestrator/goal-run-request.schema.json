@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://ctxroute.dev/schemas/orchestrator/goal-run-request.schema.json",
+  "type": "object", "required": ["goal_id", "title"], "properties": {
+    "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "title": { "$ref": "common.schema.json#/$defs/text" },
+    "requested_mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] },
+    "workflow": { "enum": ["STANDARD", "RESEARCH", "AUDIT", "SECURITY", "MIGRATION", "INCIDENT", "EXPERIMENT", "RECOVERY"] },
+    "capabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+  }, "unevaluatedProperties": false
+}

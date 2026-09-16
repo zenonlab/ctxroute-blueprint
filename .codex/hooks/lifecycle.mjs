@@ -3,6 +3,8 @@ import process from 'node:process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hookContract } from './lifecycle-contract.mjs';
+import { classifyGitCommand } from '../../scripts/git-command-policy.mjs';
+import { adaptHostDecision } from './host-policy-adapter.mjs';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -79,7 +81,9 @@ export function isBlocking(output) {
     || output?.continue === false;
 }
 
-export function dispatch({ harness, event, input, root = projectRoot, execute = executeHandler }) {
+export function dispatch({ harness, event, input, root = projectRoot, execute = executeHandler, environment = process.env }) {
+  const workerPolicy = workerGitPolicyDecision(harness, event, input, environment);
+  if (workerPolicy) return workerPolicy;
   const plan = applicableHandlers(handlerPlan(harness, event, root), event, input);
   if (!lifecycleEvents.includes(event) || !plan.length) {
     return { systemMessage: `Lifecycle ${event || '(missing)'} failed open: unsupported ${harness || '(missing)'} configuration.` };
@@ -100,6 +104,23 @@ export function dispatch({ harness, event, input, root = projectRoot, execute = 
     }
   }
   return mergeOutputs(event, outputs, notices, hookContract(harness, event, 'synchronous', root).contextLimit);
+}
+
+export function workerGitPolicyDecision(harness, event, input, environment = process.env) {
+  if (event !== 'PreToolUse' || environment.CTXROUTE_AGENT_ROLE !== 'worker') return null;
+  let parsed;
+  try { parsed = JSON.parse(input || '{}'); } catch { return null; }
+  if (!/^(?:exec_command|Bash|Shell)$/u.test(String(parsed.tool_name ?? ''))) return null;
+  const command = parsed.tool_input?.cmd ?? parsed.tool_input?.command;
+  const classification = classifyGitCommand(command);
+  if (classification.allowed_for_worker) return null;
+  const adapted = adaptHostDecision(harness, event, {
+    kind: 'block', mode: environment.CTXROUTE_MODE ?? 'SWARM', workflow: environment.CTXROUTE_WORKFLOW ?? 'STANDARD',
+    stage: environment.CTXROUTE_STAGE ?? 'work', policy_digest: environment.CTXROUTE_POLICY_DIGEST ?? 'NO_DIGEST',
+    cause: 'WORKER_GIT_MUTATION_FORBIDDEN', invariant: 'workers may execute only read-only Git commands',
+    recovery: 'use orchestrator_submit_worker_report or the orchestrator CLI',
+  });
+  return adapted.stdout ? JSON.parse(adapted.stdout) : { decision: 'block', reason: adapted.stderr };
 }
 
 export function applicableHandlers(plan, event, input) {

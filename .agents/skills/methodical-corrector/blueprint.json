@@ -2,7 +2,11 @@
   "schemaVersion": 2,
   "skillId": "methodical-corrector",
   "version": "1.1.0",
-  "modes": ["SWARM_ON", "SWARM_OFF"],
+  "phases": ["inventory", "research", "work", "validation"],
+  "capabilities": ["diagnosis", "correction"],
+  "access": "write",
+  "tools": ["read", "search", "edit", "test"],
+  "independent": false,
   "mutationAuthority": "orchestrator",
   "validations": [
     {

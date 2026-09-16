@@ -31,8 +31,8 @@ test('a real stdio client reads and mutates the orchestrator idempotently', asyn
     assert.ok(!listed.tools.some(tool => tool.name.includes('purge')));
     assert.ok(JSON.stringify(listed.tools).length < 8000);
     const initial = await client.callTool({ name: 'orchestrator_read', arguments: {} });
-    assert.match(initial.content[0].text, /"mode": "SWARM_ON"/u);
-    const transaction = { operation_id: 'set-off', expected_revision: 0, action: 'mode.set', payload: { mode: 'SWARM_OFF' } };
+    assert.match(initial.content[0].text, /"mode": "SWARM"/u);
+    const transaction = { operation_id: 'set-off', expected_revision: 0, action: 'mode.set', payload: { mode: 'DIRECT' } };
     const first = await client.callTool({ name: 'orchestrator_mutate', arguments: transaction });
     const replay = await client.callTool({ name: 'orchestrator_mutate', arguments: transaction });
     assert.notEqual(first.isError, true);
