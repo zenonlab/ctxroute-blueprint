@@ -17,6 +17,7 @@ test('blueprint sync includes transitive local dependencies of control files', (
 const source = fileURLToPath(new URL('..', import.meta.url));
 
 test('blueprint sync previews, backs up, applies, and refuses dirty targets', async () => {
+  const sourceVersion = JSON.parse(readFileSync(join(source, '.project/blueprint-version.json'), 'utf8')).version;
   const target = mkdtempSync(join(tmpdir(), 'blueprint-sync-'));
   git(target, ['init']);
   git(target, ['config', 'user.email', 'test@example.test']);
@@ -27,7 +28,7 @@ test('blueprint sync previews, backs up, applies, and refuses dirty targets', as
   const preview = await synchronizeBlueprint({ source, target, timestamp: 'fixture' });
   assert.equal(preview.applied, false);
   assert.equal(preview.current, false);
-  assert.equal(preview.sourceVersion, '2026.09.06.6');
+  assert.equal(preview.sourceVersion, sourceVersion);
   assert.equal(preview.targetVersion, null);
   assert.ok(preview.changes.some(change => change.file === 'AGENTS.md' && change.action === 'update'));
   assert.equal(readFileSync(join(target, 'AGENTS.md'), 'utf8'), 'old doctrine\n');
@@ -36,11 +37,11 @@ test('blueprint sync previews, backs up, applies, and refuses dirty targets', as
   assert.equal(JSON.parse(check.stdout).current, false);
   const applied = await synchronizeBlueprint({ source, target, apply: true, timestamp: 'fixture' });
   assert.equal(applied.applied, true);
-  assert.equal(applied.targetVersion, '2026.09.06.6');
+  assert.equal(applied.targetVersion, sourceVersion);
   assert.equal(readFileSync(join(target, 'AGENTS.md'), 'utf8'), readFileSync(join(source, 'AGENTS.md'), 'utf8'));
   assert.equal(readFileSync(join(target, '.ctxroute/blueprint-backups/fixture/AGENTS.md'), 'utf8'), 'old doctrine\n');
   assert.ok(existsSync(join(target, 'scripts/orchestrator-core.mjs')));
-  assert.equal(JSON.parse(readFileSync(join(target, '.project/blueprint-version.json'), 'utf8')).version, '2026.09.06.6');
+  assert.equal(JSON.parse(readFileSync(join(target, '.project/blueprint-version.json'), 'utf8')).version, sourceVersion);
   await assert.rejects(() => synchronizeBlueprint({ source, target, apply: true }), /dirty/u);
 });
 

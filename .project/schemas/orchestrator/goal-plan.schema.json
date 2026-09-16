@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/goal-plan.schema.json",
+  "type": "object",
+  "required": ["goal_id", "missions", "criterion_coverage"],
+  "properties": {
+    "goal_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "missions": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/mission" } },
+    "criterion_coverage": { "type": "array", "minItems": 1, "maxItems": 64, "items": { "$ref": "#/$defs/coverage" } },
+    "assessment": { "$ref": "task-assessment.schema.json" },
+    "documentation_requirements": { "type": "array", "maxItems": 64, "items": { "$ref": "documentation-requirement.schema.json" } },
+    "importance": { "enum": ["low", "normal", "high", "critical"] },
+    "change_kind": { "enum": ["routine", "feature", "bugfix", "security", "migration", "incident", "audit"] }
+  },
+  "$defs": {
+    "mission": {
+      "allOf": [
+        { "$ref": "mission-request.schema.json" },
+        { "type": "object", "required": ["objective", "dependencies", "acceptance_criteria", "skill_path"], "properties": { "objective": { "$ref": "common.schema.json#/$defs/text" }, "dependencies": { "type": "array" }, "acceptance_criteria": { "type": "array" }, "skill_path": { "$ref": "common.schema.json#/$defs/relativePath" }, "minimum_level": { "enum": ["L0", "L1", "L2", "L3", "L4"] }, "phase_profile": { "enum": ["work", "skillCreation", "repair"] }, "context_class": { "enum": ["small", "medium", "large", "xlarge"] } } }
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["criterion_id", "mission_ids"],
+      "properties": {
+        "criterion_id": { "$ref": "common.schema.json#/$defs/identifier" },
+        "mission_ids": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/identifier" } }
+      },
+      "unevaluatedProperties": false
+    }
+  },
+  "unevaluatedProperties": false
+}

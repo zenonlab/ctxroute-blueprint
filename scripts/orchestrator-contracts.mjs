@@ -22,6 +22,22 @@ export const ORCHESTRATOR_SCHEMA_IDS = Object.freeze({
   worktreeOperation: 'https://ctxroute.dev/schemas/orchestrator/worktree-operation.schema.json',
   decisionEvent: 'https://ctxroute.dev/schemas/orchestrator/decision-event.schema.json',
   bootstrapReport: 'https://ctxroute.dev/schemas/orchestrator/bootstrap-report.schema.json',
+  goalRunRequest: 'https://ctxroute.dev/schemas/orchestrator/goal-run-request.schema.json',
+  goalPlan: 'https://ctxroute.dev/schemas/orchestrator/goal-plan.schema.json',
+  workerDispatch: 'https://ctxroute.dev/schemas/orchestrator/worker-dispatch.schema.json',
+  goalAcceptanceReport: 'https://ctxroute.dev/schemas/orchestrator/goal-acceptance-report.schema.json',
+  providerCapabilities: 'https://ctxroute.dev/schemas/orchestrator/provider-capabilities.schema.json',
+  modelDescriptor: 'https://ctxroute.dev/schemas/orchestrator/model-descriptor.schema.json',
+  consumptionPolicy: 'https://ctxroute.dev/schemas/orchestrator/consumption-policy.schema.json',
+  taskAssessment: 'https://ctxroute.dev/schemas/orchestrator/task-assessment.schema.json',
+  routingDecision: 'https://ctxroute.dev/schemas/orchestrator/routing-decision.schema.json',
+  executionReceipt: 'https://ctxroute.dev/schemas/orchestrator/execution-receipt.schema.json',
+  escalationEvent: 'https://ctxroute.dev/schemas/orchestrator/escalation-event.schema.json',
+  modelEvaluation: 'https://ctxroute.dev/schemas/orchestrator/model-evaluation.schema.json',
+  documentationRequirement: 'https://ctxroute.dev/schemas/orchestrator/documentation-requirement.schema.json',
+  documentationSource: 'https://ctxroute.dev/schemas/orchestrator/documentation-source.schema.json',
+  documentationEvidenceReport: 'https://ctxroute.dev/schemas/orchestrator/documentation-evidence-report.schema.json',
+  documentationFreshnessReceipt: 'https://ctxroute.dev/schemas/orchestrator/documentation-freshness-receipt.schema.json',
 });
 
 const aliases = new Map(Object.entries(ORCHESTRATOR_SCHEMA_IDS).flatMap(([key, id]) => [

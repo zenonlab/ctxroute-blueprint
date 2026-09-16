@@ -4,16 +4,17 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   beginOrchestratorTransaction, blockOrchestratorTransaction, completeOrchestratorTransaction,
-  currentSwarmMode, findMission, loadOrchestratorConfig, readOrchestratorState, transactOrchestrator, updateMission, withGlobalMutationLock,
+  currentSwarmMode, findMission, loadOrchestratorConfig, readOrchestratorState, transactOrchestrator, updateGoal, updateMission, withGlobalMutationLock,
 } from './orchestrator-core.mjs';
 import { assertBootstrapAllows, bootstrapOrchestrator } from './orchestrator-bootstrap.mjs';
 import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
 import { runMissionValidations } from './orchestrator-validation.mjs';
 import {
-  inspectMissionChanges, prepareMissionWorktree, purgeMissionWorktree, reconcileManagedWorktrees,
+  inspectMissionChanges, integrateMissionChanges, prepareMissionWorktree, purgeMissionWorktree, reconcileManagedWorktrees,
   recoverMissionWorktree, rollbackMissionWorktree,
 } from './worktree-manager.mjs';
 import { queryCtxroute } from './ctxroute-query.mjs';
+import { assertDocumentCitations } from './orchestrator-documentation.mjs';
 
 export async function readCoordination(root = process.cwd(), environment = process.env) {
   const state = await readOrchestratorState(root);
@@ -21,7 +22,12 @@ export async function readCoordination(root = process.cwd(), environment = proce
   const found = findMission(state, environment.CTXROUTE_MISSION_ID);
   if (!found?.mission.worktree_allocation?.path) throw new Error('worker role requires an assigned CTXROUTE_MISSION_ID');
   const mission = found.mission;
-  const view = { mission_id: mission.mission_id, file_scope: mission.file_scope, skill_id: mission.skill_id, skill_version: mission.skill_version, acceptance: mission.acceptance, validations: mission.validations, response_format: mission.response_format, worktree: mission.worktree_allocation.path };
+  const view = { goal_id: found.goal.goal_id, goal_title: found.goal.title, mission_id: mission.mission_id, file_scope: mission.file_scope, skill_id: mission.skill_id, skill_version: mission.skill_version, acceptance: mission.acceptance, validations: mission.validations, response_format: mission.response_format, worktree: mission.worktree_allocation.path };
+  if (mission.objective) view.objective = mission.objective;
+  if (mission.dependencies) view.dependencies = mission.dependencies;
+  if (mission.acceptance_criteria) view.acceptance_criteria = mission.acceptance_criteria;
+  if (mission.skill_path) view.skill_path = mission.skill_path;
+  for (const field of ['assessment', 'phase_profile', 'documentation_evidence', 'documentation_freshness', 'consumption_policy', 'routing_decision', 'escalation_criteria']) if (mission[field] !== undefined) view[field] = mission[field];
   assertOrchestratorContract('mission-view', view);
   return view;
 }
@@ -43,6 +49,7 @@ export async function prepareMission(command, root = process.cwd(), environment 
   if (command.action !== 'mission.prepare') throw new Error('prepare-mission requires action mission.prepare');
   const effective = await currentSwarmMode(root, environment);
   const request = routeMissingSkill(command.payload.mission, root);
+  const missingSkill = !existsSync(resolve(root, request.skill_path ?? `.agents/skills/${request.skill_id}/SKILL.md`));
   const decision = executionDecision(effective, request);
   const normalized = { ...command, payload: { ...command.payload, mission: request } };
   if (!decision.coordinated) {
@@ -52,6 +59,12 @@ export async function prepareMission(command, root = process.cwd(), environment 
     return { ...completed, bypassed: true, mode: effective.mode, mode_source: effective.mode_source, reason: decision.reason };
   }
   const record = missionRecord(request, decision.reason);
+  if (missingSkill) {
+    const begun = await beginOrchestratorTransaction(normalized, root, dependencies, state => addPreparingMission(state, command.payload.goal_id, { ...record, status: 'WAITING_FOR_SKILL', blocking_cause: 'SKILL_MISSING' }, null));
+    if (begun.replayed && !begun.pending) return { ...begun, waiting_for_skill: true, mode: effective.mode, mode_source: effective.mode_source };
+    const completed = await completeOrchestratorTransaction(normalized, state => state, 'CREATED', root, dependencies);
+    return { ...completed, waiting_for_skill: true, mode: effective.mode, mode_source: effective.mode_source };
+  }
   const config = await loadOrchestratorConfig(root);
   const pendingWorktree = { operation_id: command.operation_id, mission_id: request.mission_id, kind: 'ALLOCATE', status: 'PENDING', classification: 'NEEDS_ATTENTION', path: `${config.worktreeRoot}/${request.mission_id}`, base_revision: null, dirty: null, proof_ref: null, cause: null };
   const begun = await beginOrchestratorTransaction(normalized, root, dependencies, state => addPreparingMission(state, command.payload.goal_id, record, pendingWorktree));
@@ -91,6 +104,8 @@ export async function submitWorkerReport(command, root = process.cwd(), environm
   if (!found || found.goal.goal_id !== command.payload.goal_id) throw new Error(`unknown mission: ${report.mission_id}`);
   const mission = found.mission;
   if (!['RUNNING', 'BLOCKED'].includes(mission.status)) throw new Error(`mission cannot report from ${mission.status}`);
+  if (mission.documentation_evidence?.status === 'SATISFIED' && !report.documentation_sources_used?.length) throw categorized('DOCUMENTATION_CITATION_REQUIRED', 'worker must cite at least one applicable documentation source');
+  if (mission.documentation_evidence && report.documentation_sources_used) assertDocumentCitations(mission.documentation_evidence, report.documentation_sources_used);
   const begun = await beginOrchestratorTransaction(command, root, dependencies);
   if (begun.replayed && !begun.pending) return begun;
   try {
@@ -103,9 +118,51 @@ export async function submitWorkerReport(command, root = process.cwd(), environm
     const worktree = resolve(root, mission.worktree_allocation.path);
     const receipt = await runMissionValidations(mission, worktree, root, dependencies);
     if (receipt.status !== 'PASSED') return blockOrchestratorTransaction(command, receipt.status === 'TIMED_OUT' ? 'VALIDATION_TIMEOUT' : 'VALIDATION_FAILED', root, dependencies, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'BLOCKED', report, validation_receipt: receipt })));
-    return completeOrchestratorTransaction(command, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt })), 'UPDATED', root, dependencies);
+    const reinspection = await inspectMissionChanges(mission.worktree_allocation.path, mission.file_scope, root, mission.worktree_allocation.base_revision, dependencies);
+    if (!reinspection.ok || JSON.stringify(reinspection.files) !== JSON.stringify(inspection.files)) throw categorized('VALIDATION_MUTATED_DIFF', 'validation changed the worker diff');
+    const integration = await integrateMissionChanges(mission, root, dependencies);
+    return completeOrchestratorTransaction(command, current => {
+      const updated = updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt, integration_status: 'INTEGRATED', worker_commit: integration.worker_commit, integrated_commit: integration.integrated_commit, blocking_cause: null, execution_receipts: appendReceipt(item.execution_receipts, report.consumption) }));
+      return report.consumption ? updateGoal(updated, command.payload.goal_id, goal => ({ ...goal, execution_receipts: appendReceipt(goal.execution_receipts, report.consumption) })) : updated;
+    }, 'UPDATED', root, dependencies);
   } catch (error) {
-    await blockOrchestratorTransaction(command, error.causeCode ?? 'REPORT_REJECTED', root, dependencies).catch(() => {});
+    const cause = error.causeCode ?? 'REPORT_REJECTED';
+    await blockOrchestratorTransaction(command, cause, root, dependencies, current => {
+      if (!['MAIN_SCOPE_CONFLICT', 'CHERRY_PICK_CONFLICT'].includes(cause)) return current;
+      return updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'NEEDS_ATTENTION', integration_status: 'NEEDS_ATTENTION', worker_commit: error.workerCommit ?? item.worker_commit, blocking_cause: cause }));
+    }).catch(() => {});
+    throw error;
+  }
+}
+
+function appendReceipt(receipts, receipt) {
+  if (!receipt || receipts?.some(item => item.receipt_id === receipt.receipt_id)) return receipts ?? [];
+  return [...(receipts ?? []), receipt];
+}
+
+export async function resumeWaitingMission(command, root = process.cwd(), environment = process.env, dependencies = {}) {
+  if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => resumeWaitingMission(command, root, environment, locked));
+  const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
+  assertOrchestratorRole(environment); assertAction(command, 'mission.transition');
+  if (command.payload.status !== 'PREPARING') throw new Error('resume waiting mission requires PREPARING');
+  const state = await readOrchestratorState(root);
+  const found = findMission(state, command.payload.mission_id);
+  if (!found || found.goal.goal_id !== command.payload.goal_id || found.mission.status !== 'WAITING_FOR_SKILL') throw new Error('mission is not waiting for a skill');
+  const config = await loadOrchestratorConfig(root);
+  const pendingWorktree = { operation_id: command.operation_id, mission_id: found.mission.mission_id, kind: 'ALLOCATE', status: 'PENDING', classification: 'NEEDS_ATTENTION', path: `${config.worktreeRoot}/${found.mission.mission_id}`, base_revision: null, dirty: null, proof_ref: null, cause: null };
+  const begun = await beginOrchestratorTransaction(command, root, dependencies, current => {
+    const updated = updateMission(current, found.goal.goal_id, found.mission.mission_id, mission => ({ ...mission, status: 'PREPARING', blocking_cause: null }));
+    return { ...updated, worktree_operations: [...updated.worktree_operations, pendingWorktree] };
+  });
+  if (begun.replayed && !begun.pending) return begun;
+  try {
+    const allocation = await prepareMissionWorktree(found.mission.mission_id, root, dependencies);
+    return completeOrchestratorTransaction(command, current => {
+      const updated = updateMission(current, found.goal.goal_id, found.mission.mission_id, mission => ({ ...mission, status: 'ASSIGNED', worktree_allocation: { path: allocation.path, base_revision: allocation.base, status: 'ACTIVE', recovery_proof: null } }));
+      return { ...updated, worktree_operations: updated.worktree_operations.map(item => item.operation_id === command.operation_id ? { ...item, status: 'COMPLETED', classification: 'ACTIVE_COHERENT', base_revision: allocation.base, dirty: false } : item) };
+    }, 'UPDATED', root, dependencies);
+  } catch (error) {
+    await blockOrchestratorTransaction(command, error.causeCode ?? 'WORKTREE_ALLOCATION_FAILED', root, dependencies, current => updateMission(current, found.goal.goal_id, found.mission.mission_id, mission => ({ ...mission, status: 'BLOCKED', blocking_cause: error.causeCode ?? 'WORKTREE_ALLOCATION_FAILED' })));
     throw error;
   }
 }
@@ -169,26 +226,27 @@ export async function purgeWorktree(command, root = process.cwd(), environment =
 
 export async function contextQuery(input, root = process.cwd()) { return queryCtxroute(input, root); }
 
-function missionRecord(request, reason) { const record = { ...request, response_format: 'worker-report', execution_reason: reason, status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null }; assertOrchestratorContract('mission-record', record); return record; }
+function missionRecord(request, reason) { const record = { ...request, response_format: 'worker-report', execution_reason: reason, status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null, blocking_cause: null, integration_status: 'NOT_STARTED', worker_commit: null, integrated_commit: null }; if (request.routing_decision) { record.escalations = []; record.execution_receipts = []; } assertOrchestratorContract('mission-record', record); return record; }
 function addPreparingMission(state, goalId, record, worktreeOperation) {
   const goalIndex = state.goals.findIndex(goal => goal.goal_id === goalId);
   if (goalIndex < 0 || state.goals[goalIndex].status !== 'ACTIVE') throw new Error(`unknown or terminal goal: ${goalId}`);
   if (findMission(state, record.mission_id)) throw new Error(`mission already exists: ${record.mission_id}`);
   const active = state.goals.flatMap(goal => goal.missions).filter(mission => !['COMPLETED', 'CANCELLED'].includes(mission.status));
   if (active.some(mission => mission.file_scope.some(left => record.file_scope.some(right => scopesOverlap(left, right))))) throw new Error('mission file_scope overlaps an active worker');
-  const goals = [...state.goals]; goals[goalIndex] = { ...goals[goalIndex], missions: [...goals[goalIndex].missions, record] }; return { ...state, goals, worktree_operations: [...state.worktree_operations, worktreeOperation] };
+  const goals = [...state.goals]; goals[goalIndex] = { ...goals[goalIndex], missions: [...goals[goalIndex].missions, record] }; return { ...state, goals, worktree_operations: worktreeOperation ? [...state.worktree_operations, worktreeOperation] : state.worktree_operations };
 }
 function executionDecision(effective, request) {
   if (effective.mode === 'SWARM_OFF') return { coordinated: false, reason: effective.mode_source === 'environment' ? 'ENVIRONMENT_SWARM_OFF' : effective.mode_source === 'state' ? 'PERSISTED_MODE' : 'DEFAULT_MODE' };
   if (request.execution === 'direct') return { coordinated: false, reason: 'EXPLICIT_DIRECT' };
   if (request.execution === 'coordinated') return { coordinated: true, reason: 'EXPLICIT_COORDINATED' };
-  return request.file_scope.length === 1 ? { coordinated: false, reason: 'AUTO_SINGLE_SCOPE' } : { coordinated: true, reason: 'AUTO_COORDINATED' };
+  return { coordinated: true, reason: 'AUTO_COORDINATED' };
 }
 function routeMissingSkill(mission, root) {
   assertOrchestratorContract('mission-request', mission);
-  if (existsSync(resolve(root, `.agents/skills/${mission.skill_id}/SKILL.md`))) return mission;
+  const skillPath = mission.skill_path ?? `.agents/skills/${mission.skill_id}/SKILL.md`;
+  if (existsSync(resolve(root, skillPath))) return { ...mission, skill_path: skillPath };
   if (!existsSync(resolve(root, '.agents/skills/skill-creator/SKILL.md'))) throw new Error(`selected skill is missing and skill-creator is unavailable: ${mission.skill_id}`);
-  return { ...mission, requested_skill_id: mission.skill_id, skill_id: 'skill-creator', skill_version: '1.0.0', file_scope: [`.agents/skills/${mission.skill_id}/`], acceptance: [`Create and validate the missing ${mission.skill_id} skill`, 'Obtain blueprint-audit review'], validations: [{ id: 'skills-validate', executable: 'node', args: ['scripts/validate-blueprint-skills.mjs'], cwd: '.', timeout_ms: 30_000 }, { id: 'blueprint-review', executable: 'node', args: ['scripts/blueprint-review.mjs'], cwd: '.', timeout_ms: 30_000 }], execution: 'coordinated' };
+  return { ...mission, requested_skill_id: mission.skill_id, skill_path: skillPath };
 }
 async function assertSkillRegistration(payload, root) {
   const skillRoot = resolve(root, `.agents/skills/${payload.skill_id}`);

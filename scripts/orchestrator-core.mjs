@@ -6,11 +6,12 @@ import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
 import { emitDecisionEvent } from './orchestrator-telemetry.mjs';
 
 export const MODES = Object.freeze(['SWARM_ON', 'SWARM_OFF']);
-export const GOAL_STATUSES = Object.freeze(['ACTIVE', 'COMPLETED', 'CANCELLED']);
-export const MISSION_STATUSES = Object.freeze(['PREPARING', 'ASSIGNED', 'RUNNING', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
-const GOAL_TRANSITIONS = Object.freeze({ ACTIVE: ['COMPLETED', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
-const MISSION_TRANSITIONS = Object.freeze({ PREPARING: ['ASSIGNED', 'BLOCKED', 'CANCELLED'], ASSIGNED: ['RUNNING', 'CANCELLED'], RUNNING: ['BLOCKED', 'COMPLETED', 'CANCELLED'], BLOCKED: ['RUNNING', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
+export const GOAL_STATUSES = Object.freeze(['RESEARCHING', 'WAITING_FOR_RESEARCH', 'ROUTING', 'ACTIVE', 'ESCALATING', 'WAITING_FOR_CAPABILITY', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
+export const MISSION_STATUSES = Object.freeze(['WAITING_FOR_SKILL', 'PREPARING', 'ASSIGNED', 'RUNNING', 'VALIDATING', 'INTEGRATING', 'NEEDS_ATTENTION', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
+const GOAL_TRANSITIONS = Object.freeze({ RESEARCHING: ['WAITING_FOR_RESEARCH', 'ROUTING', 'BLOCKED'], WAITING_FOR_RESEARCH: ['RESEARCHING', 'BLOCKED'], ROUTING: ['ACTIVE', 'WAITING_FOR_CAPABILITY', 'BLOCKED'], ACTIVE: ['ESCALATING', 'WAITING_FOR_CAPABILITY', 'BLOCKED', 'COMPLETED', 'CANCELLED'], ESCALATING: ['ACTIVE', 'WAITING_FOR_CAPABILITY', 'BLOCKED'], WAITING_FOR_CAPABILITY: ['ROUTING', 'ACTIVE', 'BLOCKED', 'CANCELLED'], BLOCKED: ['ACTIVE', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
+const MISSION_TRANSITIONS = Object.freeze({ WAITING_FOR_SKILL: ['PREPARING', 'BLOCKED', 'CANCELLED'], PREPARING: ['ASSIGNED', 'WAITING_FOR_SKILL', 'BLOCKED', 'CANCELLED'], ASSIGNED: ['RUNNING', 'BLOCKED', 'CANCELLED'], RUNNING: ['VALIDATING', 'BLOCKED', 'CANCELLED'], VALIDATING: ['INTEGRATING', 'BLOCKED', 'CANCELLED'], INTEGRATING: ['COMPLETED', 'NEEDS_ATTENTION', 'BLOCKED'], NEEDS_ATTENTION: ['INTEGRATING', 'CANCELLED'], BLOCKED: ['PREPARING', 'RUNNING', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
 const SECRET_KEY = /(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)/iu;
+const SAFE_USAGE_KEY = /^(?:input|output|total|cached|reasoning)_tokens$/u;
 const SECRET_VALUE = /(?:bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)\s*[:=]\s*\S+)/iu;
 const DEFAULTS = Object.freeze({
   defaultMode: 'SWARM_ON',
@@ -23,7 +24,12 @@ const DEFAULTS = Object.freeze({
   contextBytes: 16 * 1024,
   lockTimeoutMs: 2000,
   subprocessTimeoutMs: 30_000,
+  goalTimeoutMs: 15 * 60_000,
+  workerTimeoutMs: 5 * 60_000,
   parallelWorktrees: 8,
+  workerStdoutBytes: 64 * 1024,
+  workerStderrBytes: 16 * 1024,
+  workerRuntime: 'auto',
   minFreeBytes: 256 * 1024 * 1024,
   telemetryBytes: 1024 * 1024,
   rollbackBytes: 16 * 1024 * 1024,
@@ -202,24 +208,51 @@ function applyOperation(state, command) {
   if (command.action === 'mode.set') return { ...state, mode: payload.mode };
   if (command.action === 'goal.create') {
     if (state.goals.some(goal => goal.goal_id === payload.goal_id)) throw new Error(`goal already exists: ${payload.goal_id}`);
-    return { ...state, goals: [...state.goals, { goal_id: payload.goal_id, title: payload.title.trim(), status: 'ACTIVE', missions: [] }] };
+    const goal = { goal_id: payload.goal_id, title: payload.title.trim(), status: 'ACTIVE', missions: [] };
+    if (payload.objective) goal.objective = payload.objective;
+    if (payload.acceptance_criteria) goal.acceptance_criteria = payload.acceptance_criteria;
+    if (payload.base_revision) goal.base_revision = payload.base_revision;
+    for (const field of ['importance', 'change_kind', 'assessment', 'consumption_policy', 'documentation_evidence', 'documentation_freshness', 'routing_decisions']) if (payload[field] !== undefined) goal[field] = payload[field];
+    if (goal.assessment) { goal.execution_receipts = payload.execution_receipts ?? []; goal.escalations = []; }
+    return { ...state, goals: [...state.goals, goal] };
   }
   if (command.action === 'goal.transition') return updateGoal(state, payload.goal_id, goal => {
     assertTransition(GOAL_TRANSITIONS, goal.status, payload.status, 'goal');
-    return { ...goal, status: payload.status };
+    const updated = { ...goal, status: payload.status };
+    if (payload.acceptance_report) updated.acceptance_report = payload.acceptance_report;
+    if (payload.blocked_cause !== undefined) updated.blocked_cause = payload.blocked_cause;
+    if (payload.resume_action !== undefined) updated.resume_action = payload.resume_action;
+    return updated;
   });
   if (command.action === 'mission.prepare') {
     const request = payload.mission;
     if (state.goals.some(goal => goal.missions.some(mission => mission.mission_id === request.mission_id))) throw new Error(`mission already exists: ${request.mission_id}`);
-    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : request.file_scope.length === 1 ? 'AUTO_SINGLE_SCOPE' : 'AUTO_COORDINATED', status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null };
+    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : 'AUTO_COORDINATED', status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null, blocking_cause: null, integration_status: 'NOT_STARTED', worker_commit: null, integrated_commit: null };
+    if (request.routing_decision) { record.escalations = []; record.execution_receipts = []; }
     assertOrchestratorContract('mission-record', record);
     return addMission(state, payload.goal_id, record);
   }
   if (command.action === 'mission.transition') return updateMission(state, payload.goal_id, payload.mission_id, mission => {
     assertTransition(MISSION_TRANSITIONS, mission.status, payload.status, 'mission');
-    if (payload.status === 'COMPLETED' && mission.validation_receipt?.status !== 'PASSED') throw new Error('mission completion requires an orchestrator PASSED receipt');
-    return { ...mission, status: payload.status };
+    if (payload.status === 'COMPLETED' && (mission.validation_receipt?.status !== 'PASSED' || mission.integration_status !== 'INTEGRATED')) throw new Error('mission completion requires validation and main-branch integration');
+    const updated = { ...mission, status: payload.status };
+    if (payload.routing_decision) updated.routing_decision = payload.routing_decision;
+    if (payload.escalation_event) updated.escalations = [...(mission.escalations ?? []), payload.escalation_event];
+    if (payload.documentation_evidence) updated.documentation_evidence = payload.documentation_evidence;
+    if (payload.documentation_freshness) updated.documentation_freshness = payload.documentation_freshness;
+    return updated;
   });
+  if (command.action === 'receipt.record') {
+    const withGoalReceipt = updateGoal(state, payload.goal_id, goal => {
+      if ((goal.execution_receipts ?? []).some(receipt => receipt.receipt_id === payload.receipt.receipt_id)) return goal;
+      return { ...goal, execution_receipts: [...(goal.execution_receipts ?? []), payload.receipt] };
+    });
+    if (!payload.mission_id) return withGoalReceipt;
+    return updateMission(withGoalReceipt, payload.goal_id, payload.mission_id, mission => {
+      if ((mission.execution_receipts ?? []).some(receipt => receipt.receipt_id === payload.receipt.receipt_id)) return mission;
+      return { ...mission, execution_receipts: [...(mission.execution_receipts ?? []), payload.receipt] };
+    });
+  }
   if (command.action === 'report.submit') return updateMission(state, payload.goal_id, payload.report.mission_id, mission => ({ ...mission, report: payload.report, status: 'BLOCKED' }));
   if (command.action === 'audit.apply') {
     if (state.audits.some(audit => audit.audit_id === payload.report.audit_id)) throw new Error(`audit already exists: ${payload.report.audit_id}`);
@@ -335,7 +368,7 @@ async function recoverStaleLock(path, deps) {
 }
 
 function validateContract(name, value, maximumBytes, label) { try { const source = JSON.stringify(value); if (Buffer.byteLength(source) > maximumBytes) throw new Error(`${label} exceeds ${maximumBytes} bytes`); assertNoSecrets(value); assertOrchestratorContract(name, value); return []; } catch (error) { return [error.message]; } }
-export function assertNoSecrets(value, key = '', depth = 0) { if (depth > 16) throw new Error('object exceeds safe inspection depth'); if (SECRET_KEY.test(key)) throw new Error('secret-like key is forbidden'); if (value === String(value) && SECRET_VALUE.test(value)) throw new Error('secret-like material is forbidden'); if (Array.isArray(value)) value.forEach(item => assertNoSecrets(item, key, depth + 1)); else if (value && value === Object(value)) Object.entries(value).forEach(([name, item]) => assertNoSecrets(item, name, depth + 1)); }
+export function assertNoSecrets(value, key = '', depth = 0) { if (depth > 16) throw new Error('object exceeds safe inspection depth'); if (SECRET_KEY.test(key) && !SAFE_USAGE_KEY.test(key)) throw new Error('secret-like key is forbidden'); if (value === String(value) && SECRET_VALUE.test(value)) throw new Error('secret-like material is forbidden'); if (Array.isArray(value)) value.forEach(item => assertNoSecrets(item, key, depth + 1)); else if (value && value === Object(value)) Object.entries(value).forEach(([name, item]) => assertNoSecrets(item, name, depth + 1)); }
 export function safeRelativePath(value) { if (value !== String(value) || value.length === 0 || value.length > 1024 || isAbsolute(value) || value.startsWith('~') || [...value].some(character => character.codePointAt(0) < 32)) return false; const normalized = value.replaceAll('\\', '/').replace(/\/$/u, ''); if (normalized === '.') return true; return Boolean(normalized) && !normalized.split('/').includes('..') && relative('.', normalized).replaceAll('\\', '/') === normalized; }
 function assertTransition(graph, before, after, label) { if (before === after) return; if (!graph[before]?.includes(after)) throw new Error(`illegal ${label} transition: ${before} -> ${after}`); }
 function stableJson(value) { if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`; if (value && value === Object(value)) return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`; return JSON.stringify(value); }

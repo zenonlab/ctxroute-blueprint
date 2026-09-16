@@ -57,7 +57,7 @@ test('privileged CRG disposition is exact-SHA, report-bound, admin-only, and nev
   assert.match(workflow, /name: 'CRG disposition'/u);
   assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/u);
   assert.doesNotMatch(workflow, /ref:.*head\.sha/u);
-  for (const proof of ['report sha256:', 'getCollaboratorPermissionLevel', 'persist-credentials: false', 'MAX_ARCHIVE_BYTES']) assert.ok(workflow.includes(proof), proof);
+  for (const proof of ['SUMMARY_PATH', 'getCollaboratorPermissionLevel', 'persist-credentials: false', 'MAX_ARCHIVE_BYTES', 'fs.readFileSync(process.env.SUMMARY_PATH']) assert.ok(workflow.includes(proof), proof);
   const policy = read('scripts/crg-disposition.mjs');
   for (const proof of ["!== 'admin'", 'CRG-report-sha256:', 'review.commit_id !== context.sha', 'login === context.author']) assert.ok(policy.includes(proof), proof);
 });

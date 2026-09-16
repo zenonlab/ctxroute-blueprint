@@ -6,7 +6,7 @@ import {
 import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
 import { runMissionValidations } from './orchestrator-validation.mjs';
 import {
-  inspectMissionChanges, prepareMissionWorktree, purgeMissionWorktree, reconcileManagedWorktrees,
+  inspectMissionChanges, integrateMissionChanges, prepareMissionWorktree, purgeMissionWorktree, reconcileManagedWorktrees,
   recoverMissionWorktree, recoverRollbackProof, rollbackMissionWorktree,
 } from './worktree-manager.mjs';
 import { resolve } from 'node:path';
@@ -116,7 +116,8 @@ async function resumeReport(command, root, dependencies) {
   if (report.status === 'BLOCKED') return blockOrchestratorTransaction(command, 'WORKER_BLOCKED', root, dependencies, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'BLOCKED', report })));
   const receipt = await runMissionValidations(mission, resolve(root, mission.worktree_allocation.path), root, dependencies);
   if (receipt.status !== 'PASSED') return blockOrchestratorTransaction(command, receipt.status === 'TIMED_OUT' ? 'VALIDATION_TIMEOUT' : 'VALIDATION_FAILED', root, dependencies, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'BLOCKED', report, validation_receipt: receipt })));
-  return completeOrchestratorTransaction(command, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt })), 'UPDATED', root, dependencies);
+  const integration = await integrateMissionChanges(mission, root, dependencies);
+  return completeOrchestratorTransaction(command, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt, integration_status: 'INTEGRATED', worker_commit: integration.worker_commit, integrated_commit: integration.integrated_commit, blocking_cause: null })), 'UPDATED', root, dependencies);
 }
 
 async function resumeRollback(command, root, dependencies) {

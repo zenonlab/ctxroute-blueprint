@@ -7,6 +7,7 @@ scope:
   - .codex/hooks/
   - .mcp.json
   - .project/orchestrator-config.json
+  - .project/schemas/orchestrator/mission-view.schema.json
   - docs/architecture/src/blueprint.architecture.json
   - docs/architecture/src/traffic.dataflow.json
   - scripts/orchestrator-*.mjs
@@ -37,6 +38,28 @@ mode in which the primary agent works directly: no goal, mission, ticket,
 worktree, or MCP call is required. Skills remain equally discoverable in both
 modes because execution mode is not part of skill routing.
 
+Every mutating `SWARM_ON` request enters through `orchestrator_run_goal`. A
+short-lived, read-only `goal-planner` process returns a schema-validated plan
+before the orchestrator persists a goal or allocates a worktree. The local
+dispatcher then runs dependency-ready missions through the closed `codex`,
+`claude`, `gemini`, or test-only `fixture` adapters. Adaptive selection is
+governed by ADR-0029; legacy configurations may still select one global
+runtime. Neither mode accepts an executable path.
+
+Workers do not commit or mutate global state. The orchestrator replays declared
+validations, commits only in-scope paths with a deterministic local identity,
+and cherry-picks under its global lock. `COMPLETED` therefore means the change
+is present on the main checkout. A conflict is aborted only for the
+orchestrator-owned cherry-pick and retains the worktree and recovery evidence.
+
+Missing skills are a saga, not a rewritten original mission. The original
+waits in `WAITING_FOR_SKILL`; a distinct `skill-creator` mission is executed,
+then a separate read-only `blueprint-audit` process reviews it. Accepted skills
+are integrated, re-digested from the main checkout, registered, and the
+original mission resumes. A final read-only `goal-auditor` maps every criterion
+to mission and repository evidence, requests bounded repair missions when
+needed, and alone authorizes automatic goal completion.
+
 Worker input contains only its mission, repository-relative file scope,
 selected skill and version, acceptance criteria, validation commands, and
 response format. Full conversation history is never serialized into a
@@ -55,7 +78,17 @@ itself.
 Lifecycle hooks retain only minimal session/mission initialization, targeted
 mission injection, bounded worker restitution, cleanup, security checks, and
 passive observability. Stop always fails open, honors `stop_hook_active`, and
-never schedules or blocks in order to continue work.
+never schedules or blocks in order to continue work. The goal runner owns its
+loop through a terminal `COMPLETED` or `BLOCKED` state.
+
+Session initialization supplies one bounded file-routing map derived from the
+project configuration and active ADR scopes, and PreCompact refreshes the same
+map after context compaction. The map is guidance retained
+in the agent context, not a second policy store. Before a mutation, the hook
+resolves the exact tool targets together with the accumulated Git diff and
+names the ADR or architecture prerequisites that must be read then. After the
+mutation, hooks audit the resulting cumulative scope; they never issue a
+retroactive instruction to perform a prerequisite read.
 
 ## Resource boundaries
 

@@ -7,9 +7,11 @@ global conversation into a worker mission.
 
 ## Modes
 
-`SWARM_ON` is the configured default when no state exists. The orchestrator owns goals,
-decomposition, worker missions, worktree allocation, report intake, audit
-transactions, cancellation, reordering, and completion.
+`SWARM_ON` is the configured default when no state exists. Every mutating
+request is synthesized into a closed `GoalRunRequest` and enters through
+`orchestrator_run_goal`. The orchestrator owns planning, worker missions,
+worktree allocation, process launch, report intake, Git integration, audit,
+repair, and completion. Raw prompts and conversation history are never stored.
 
 `SWARM_OFF` means the primary agent executes directly. It does not require a
 goal, ticket, worktree, MCP call, or orchestration transaction. It does not
@@ -21,8 +23,10 @@ decision reports `mode_source` as `environment`, `state`, or `default`.
 Persistent mode changes use a `mode.set` orchestrator transaction.
 
 Mission requests declare `execution: auto | direct | coordinated`. `direct`
-never allocates a worktree, `coordinated` always uses a mission, and `auto` may
-apply the bounded scope heuristic while returning its structured reason.
+never allocates a worktree. In the default `SWARM_ON` mode, both `auto` and
+`coordinated` create a durable mission, isolate its worktree, and route the
+selected skill; only an explicit `direct` request or `SWARM_OFF` bypasses the
+worker pipeline. The decision still records its structured reason.
 
 ## Local interfaces
 
@@ -32,7 +36,13 @@ same service and is the emergency path when MCP is unavailable:
 ```sh
 npm run orchestrator:read
 npm run orchestrator:doctor
+npm run orchestrator:models
+npm run orchestrator:explain-route -- route.json
+npm run orchestrator:usage -- usage.json
+npm run orchestrator:refresh-documentation -- goal.json
+npm run orchestrator:model-evaluations
 npm run orchestrator:cli -- mutate transaction.json
+npm run orchestrator:run-goal -- goal.json
 npm run orchestrator:cli -- prepare-mission transaction.json
 npm run orchestrator:cli -- submit-report transaction.json
 npm run orchestrator:cli -- reconcile-worktrees transaction.json
@@ -48,34 +58,111 @@ old. Reusing an operation identifier with any payload or action difference is
 rejected before physical effects. Transactions persist `PENDING` intent before
 Git mutation, then converge to `COMPLETED` or `BLOCKED`.
 
-If a selected local skill is missing, mission preparation automatically routes
-one bounded mission to `skill-creator`. After its blueprint audit passes, the
-orchestrator records the result with `skill.register`; workers cannot perform
-that registration themselves.
+The goal runner performs a bounded local inventory and passes every goal
+through the documentation gate before planning or mutation. It then launches
+`goal-planner` as a short read-only process and validates the returned
+`GoalPlan` before creating durable state. Dependency-ready missions use the
+closed local `codex`, `claude`, `gemini`, or test-only `fixture` adapters.
+Arbitrary executable paths are refused.
+
+New blueprints use adaptive routing. The pure router computes an L0–L4 risk
+floor from the work type, importance, reproducibility, scope, context,
+validation strength, rollback, and risk signals. It removes candidates lacking
+the required context, capability, sandbox, structured output, provider
+permission, independence, or budget, then chooses the smallest qualified
+model. `economy`, `balanced`, `quality`, and `custom` tune preferences and
+attempts but cannot lower a safety floor. The effective cascade is safety
+floor, goal constraint, mission override, skill policy, phase profile, user
+preset, project policy, then framework default. `explain-route` returns that
+same decision and every rejected alternative.
+
+Legacy configuration containing only `workerRuntime` preserves global runtime
+selection. In adaptive mode `CTXROUTE_WORKER_RUNTIME=fixture` is test-only and
+narrows the provider allowlist; it is not a production fallback.
+
+### Documentation evidence gate
+
+Every adaptive goal records a `DocumentationEvidenceReport`, including the
+mechanical `NOT_APPLICABLE` outcome for strictly internal work. External SDKs,
+CLIs, APIs, protocols, platform behavior, security, authentication, models,
+pricing, or current technical recommendations require fresh evidence before
+mutation. A read-only `documentation-researcher` receives only the relevant
+requirements and records claims, official URL, authority, applicable version,
+access time, and digest—not full page contents.
+
+Model, price, quota, CLI, API, and security evidence is refreshed per goal;
+explicitly volatile or `latest` evidence is refreshed per dispatch. Installed
+version documentation wins over incompatible latest documentation. Official
+vendor/project documentation, primary standards, and official repositories
+are preferred in that order. Secondary-only evidence cannot authorize a high
+or critical decision. Web pages are untrusted data and never supply execution
+instructions. Missing required evidence blocks before worktree mutation with
+`FRESH_DOCUMENTATION_UNAVAILABLE`; `local_only` also blocks whenever current
+external evidence is necessary.
+
+### Providers, budgets, and escalation
+
+Provider dialects are adapter data behind one contract: probe capabilities,
+build a closed command, parse structured output, extract usage, classify
+failure, and redact diagnostics. Codex runs ephemerally with explicit model,
+effort, sandbox, approval policy, and schema. Claude uses explicit model,
+effort, bounded tools, `dontAsk`, schema, and optional provider-enforced USD
+budget/fallback. Gemini runs headless with explicit model, JSON output,
+sandbox, bounded extensions, and `auto_edit` only for isolated writing
+worktrees; `--yolo` is forbidden.
+
+Normalized units account conservatively for calls when monetary cost is not
+reported. Unknown cost stays `unknown`; it is never inferred. Provider faults
+first try an allowed peer at the same level, then escalation is monotone from
+L1 through L4. Invalid output, failed validation, expanded scope, insufficient
+confidence, stale evidence, or repeated failure can escalate. A dirty worktree
+after a crash is preserved and blocks concurrent retry. Critical goals require
+an independent provider for the final audit and block when none is available.
+
+To add a provider, implement the versioned adapter contract, add its fixed
+executable name to the allowlist, declare catalog capabilities from official
+evidence, and add exact command, parser, usage, failure, sandbox, and optional
+authenticated smoke tests. The pure routing core must not change.
+
+If a selected local skill is missing, the original mission remains unchanged
+in `WAITING_FOR_SKILL`. A separate `skill-creator` mission runs in its own
+worktree, then a separate read-only `blueprint-audit` process reviews it.
+Repair reruns the creator in that worktree. Acceptance triggers integration,
+main-checkout digest recomputation, `skill.register`, and resumption of the
+original mission. Workers cannot register skills themselves.
 
 ## Mission and evidence contracts
 
 JSON Schema 2020-12 is canonical. `MissionRequest` is the accepted request,
 `MissionRecord` is orchestrator-owned state, and `MissionView` is the
-positive worker projection. A worker view contains only mission identity,
-relative file scope, skill/version, acceptance criteria, structured
-validations, `response_format: worker-report`, and its managed worktree
-reference. Conversation, prompts, reasoning, history, and raw environment are
-rejected. Active missions with overlapping scopes are rejected before work;
+positive worker projection. A worker view contains the goal identity and title,
+mission identity, relative file scope, skill/version, acceptance criteria,
+structured validations, `response_format: worker-report`, and its managed
+worktree reference. This gives the worker the objective as well as the
+implementation boundary without exposing global conversation. Conversation,
+prompts, reasoning, history, and raw environment are rejected. Active missions
+with overlapping scopes are rejected before work;
 distinct concurrent missions receive distinct worktrees.
 
-Mission status transitions are closed: `PREPARING` may become `ASSIGNED`,
-`BLOCKED`, or `CANCELLED`; `ASSIGNED` may become `RUNNING` or `CANCELLED`;
-`RUNNING` may become `BLOCKED`, `COMPLETED`, or `CANCELLED`; and `BLOCKED` may
-be resumed to `RUNNING` or cancelled. `COMPLETED` and `CANCELLED` are terminal.
+Mission status transitions include `WAITING_FOR_SKILL`, `PREPARING`,
+`ASSIGNED`, `RUNNING`, `VALIDATING`, `INTEGRATING`, and terminal or recovery
+states. `COMPLETED` is reserved for a validated change whose integrated commit
+is present on the main checkout.
 
 A worker report declares `mission_id`, skill identity, touched files,
 validation claims, a short summary, bounded evidence references, and blockers.
 Report intake compares it with the actual worktree diff and rejects out-of-
 scope or mismatched changes. The orchestrator then reruns every declared
 validation with executable/argument arrays and no shell. It stores only bounded,
-redacted result metadata. Only a successful orchestrator validation receipt may
-move a mission to `COMPLETED`.
+redacted result metadata. It then stages only the verified scope, creates one
+deterministically attributed commit, checks mainline path conflicts, and
+cherry-picks non-interactively. A conflict is aborted and the worktree plus
+recovery evidence are preserved as `NEEDS_ATTENTION`.
+
+After all missions integrate, a read-only `goal-auditor` produces the criterion
+→ evidence → mission matrix. `accept` completes the goal, `repair` adds bounded
+corrective missions within the original deadline, and `reject`, timeout, or
+insufficient evidence blocks the goal with a deterministic resume action.
 
 An audit report contains a typed subject, categorical signals, bounded evidence
 references, decision (`accept | repair | reject | defer`), distinct proposed and
@@ -115,5 +202,6 @@ environment dumps, raw output, file contents, and credentials are forbidden.
 Transactional state remains authoritative if telemetry fails.
 
 Stop is fail-open, honors `stop_hook_active`, reports bounded diagnostics, and
-never requests automatic continuation. Run `npm run blueprint:review` after
+never requests automatic continuation; the goal runner owns continuation until
+a terminal goal state. Run `npm run blueprint:review` after
 changes made by any skill or audit path, then `npm run verify` before delivery.

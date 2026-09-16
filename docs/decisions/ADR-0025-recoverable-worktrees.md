@@ -34,6 +34,14 @@ An unprovable intent or any `NEEDS_ATTENTION` inventory item blocks ordinary
 mutation while leaving read, doctor, reconciliation, rollback, and confirmed
 CLI purge available.
 
+Worker execution must leave the detached worktree at its recorded base HEAD.
+After report validation the orchestrator stages only declared-scope paths,
+creates one commit, rechecks the main checkout revision and changed-path
+conflicts, and performs a non-interactive cherry-pick. Conflict recovery runs
+`cherry-pick --abort`, records the worker commit as recovery evidence, and
+preserves the worktree. Cleanup is permitted only after integration is proven
+and the worktree is clean.
+
 There is one state contract and no migration path. A symlink, corrupt JSON, or
 state outside that contract fails closed without deletion. Bootstrap may remove
 only recognized dead temporary files created by atomic state writes. Worktrees,

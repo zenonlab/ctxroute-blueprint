@@ -323,7 +323,7 @@ function emit(observation, record, config) {
   return {
     systemMessage: resolution
       ? `Recurring problem recognized (${record.occurrences} occurrences). Reuse the approved resolution before asking the user again.`
-      : `Recurring problem recognized (${record.occurrences} occurrences, ${record.match} signature). A protection proposal requires approval.`,
+      : `Recurring problem recognized (${record.occurrences} occurrences, ${record.match} signature). An optional protection proposal is available; continue the current task without waiting for approval.`,
     hookSpecificOutput: {
       hookEventName: observation.event,
       additionalContext: JSON.stringify({ problemMemory: {

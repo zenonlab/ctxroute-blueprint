@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/documentation-evidence-report.schema.json",
+  "type": "object",
+  "required": ["report_id", "goal_id", "status", "requirements", "sources", "justification", "created_at", "digest", "blocked_cause"],
+  "properties": {
+    "report_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "goal_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "status": { "enum": ["SATISFIED", "NOT_APPLICABLE", "BLOCKED"] },
+    "requirements": { "type": "array", "maxItems": 64, "items": { "$ref": "documentation-requirement.schema.json" } },
+    "sources": { "type": "array", "maxItems": 128, "items": { "$ref": "documentation-source.schema.json" } },
+    "justification": { "$ref": "common.schema.json#/$defs/text" },
+    "created_at": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "digest": { "$ref": "common.schema.json#/$defs/digest" },
+    "blocked_cause": { "$ref": "common.schema.json#/$defs/nullableCause" }
+  },
+  "allOf": [
+    { "if": { "properties": { "status": { "const": "SATISFIED" } } }, "then": { "properties": { "requirements": { "type": "array", "minItems": 1 }, "sources": { "type": "array", "minItems": 1 }, "blocked_cause": { "type": "null" } } } },
+    { "if": { "properties": { "status": { "const": "NOT_APPLICABLE" } } }, "then": { "properties": { "requirements": { "type": "array", "maxItems": 0 }, "sources": { "type": "array", "maxItems": 0 }, "blocked_cause": { "type": "null" } } } },
+    { "if": { "properties": { "status": { "const": "BLOCKED" } } }, "then": { "properties": { "blocked_cause": { "type": "string" } } } }
+  ],
+  "unevaluatedProperties": false
+}

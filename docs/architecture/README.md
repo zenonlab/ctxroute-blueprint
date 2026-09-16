@@ -25,3 +25,10 @@ containment at 1440×900, 1600×1000, 1920×1080, and 2048×1320 and generates
 light/dark captures, a contact sheet, and a JSON receipt when product diagrams
 exist. Automated evidence
 keeps `visualReview: pending` until a human inspects the artifact.
+
+The internal blueprint architecture includes the pure routing core, model
+catalog, documentation gate, closed provider adapters, and bounded usage
+telemetry. The traffic dataflow records inventory → documentation research →
+assessment → routing → execution/escalation → deterministic validation →
+independent audit → Git integration. These remain maintainer-only sources and
+cannot leak into a generated product diagram.

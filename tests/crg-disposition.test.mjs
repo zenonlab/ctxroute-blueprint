@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { evaluateCrgDisposition } from '../scripts/crg-disposition.mjs';
+import { evaluateCrgDisposition, formatCrgDispositionSummary } from '../scripts/crg-disposition.mjs';
 
 const sha = 'a'.repeat(40);
 const submitted = '2026-09-06T12:00:00.000Z';
@@ -45,8 +45,19 @@ test('CRG artifact rejects forged PR, stale SHA, and changed report content', as
   assert.equal((await evaluateCrgDisposition({ artifactDirectory, context: context({ reviews: [review({ body })], permissions: { admin: 'admin' } }) })).conclusion, 'failure');
 });
 
+test('blocking disposition explains concrete findings and the exact acceptance path', async () => {
+  const artifactDirectory = artifact('0.85', 'CRITICAL', { detailed: true });
+  const result = await evaluateCrgDisposition({ artifactDirectory, context: context() });
+  const summary = formatCrgDispositionSummary(result);
+  assert.match(summary, /242 changed symbols, 58 affected flows, 159 direct-test gaps/u);
+  assert.match(summary, /scripts\/orchestrator-core\.mjs::assertNoSecrets/u);
+  assert.match(summary, /direct test: no/u);
+  assert.match(summary, /Treat the score as review evidence, not as proof of a defect/u);
+  assert.match(summary, new RegExp(`CRG-report-sha256:${result.report.digest}`, 'u'));
+});
+
 function context(overrides = {}) { return { pr: 52, sha, author: 'author', reviews: [], permissions: {}, ...overrides }; }
 function review(overrides = {}) { return { id: 1, state: 'APPROVED', commit_id: sha, submitted_at: submitted, body: '', user: { login: 'admin' }, ...overrides }; }
-function report(score, risk) { return `<!-- code-review-graph-report -->\n\n## code-review-graph review\n\n**Overall risk: ${score} (${risk})** — bounded result\n\n*Powered by [code-review-graph](https://github.com/tirth8205/code-review-graph)*\n`; }
+function report(score, risk, detailed = false) { return `<!-- code-review-graph-report -->\n\n## code-review-graph review\n\n**Overall risk: ${score} (${risk})** — ${detailed ? '242 changed function(s)/class(es), 58 affected flow(s), 159 test gap(s)' : 'bounded result'}\n${detailed ? '\n| Risk | Level | Symbol | Location | Tested |\n| ---: | :--- | :--- | :--- | :---: |\n| 0.85 | critical | scripts/orchestrator-core.mjs::assertNoSecrets | scripts/orchestrator-core.mjs:371 | no |\n' : ''}\n*Powered by [code-review-graph](https://github.com/tirth8205/code-review-graph)*\n`; }
 function reportDigest(score, risk) { return createHash('sha256').update(report(score, risk)).digest('hex'); }
-function artifact(score, risk, overrides = {}) { const root = mkdtempSync(join(tmpdir(), 'crg-disposition-')); mkdirSync(root, { recursive: true }); writeFileSync(join(root, 'crg-comment.md'), report(score, risk)); writeFileSync(join(root, 'pr-number.txt'), `${overrides.pr ?? 52}\n`); writeFileSync(join(root, 'head-sha.txt'), `${overrides.sha ?? sha}\n`); return root; }
+function artifact(score, risk, overrides = {}) { const root = mkdtempSync(join(tmpdir(), 'crg-disposition-')); mkdirSync(root, { recursive: true }); writeFileSync(join(root, 'crg-comment.md'), report(score, risk, overrides.detailed)); writeFileSync(join(root, 'pr-number.txt'), `${overrides.pr ?? 52}\n`); writeFileSync(join(root, 'head-sha.txt'), `${overrides.sha ?? sha}\n`); return root; }

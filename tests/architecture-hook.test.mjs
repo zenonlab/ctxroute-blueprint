@@ -83,6 +83,33 @@ test('allows a routine package script change without demanding an ADR', () => {
   assert.doesNotMatch(result.stdout, /decision":"block/u);
 });
 
+test('routes applicable ADR reading before the product mutation', () => {
+  const cwd = initializedWorkspace();
+  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+  writeFileSync(join(cwd, 'src/existing.rb'), 'puts :initial\n');
+  writeFileSync(join(cwd, 'docs/decisions/ADR-0001-runtime.md'), [
+    '---',
+    'scope:',
+    '  - src/**',
+    'review: on-change',
+    '---',
+    '# Runtime decision',
+  ].join('\n'));
+  const result = executeArchitectureHook({ file_path: 'src/existing.rb' }, { cwd });
+  const context = JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
+  assert.match(context, /Before mutating product code/u);
+  assert.match(context, /Read applicable ADRs now: ADR-0001-runtime\.md/u);
+});
+
+test('routes architecture candidates before a structural mutation', () => {
+  const cwd = initializedWorkspace();
+  const result = executeArchitectureHook({ patch: '*** Add File: src/service.rb\n+export class Service {}' }, { cwd });
+  const context = JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
+  assert.match(context, /Before mutating src\/service\.rb/u);
+  assert.match(context, /Relevant architecture candidates: docs\/architecture\/src\/blueprint\.architecture\.json/u);
+  assert.match(context, /before product code/u);
+});
+
 test('reads patches supplied through a patch property', () => {
   const result = run({ patch: '*** Add File: application.rb' });
   assert.match(result.stdout, /template mode/u);

@@ -87,6 +87,19 @@ test('environment SWARM_OFF and explicit direct execution create no mission or w
   assert.equal(directResult.state.goals[0].missions.length, 0);
 });
 
+test('automatic execution uses the worker pipeline even for a single scope', async () => {
+  const root = fixture(true);
+  const goal = await transactOrchestrator(goalCommand(), root);
+  const command = missionCommand(goal.state.revision);
+  command.payload.mission.file_scope = ['src/'];
+  command.payload.mission.execution = 'auto';
+  const result = await prepareMission(command, root);
+  assert.equal(result.bypassed, undefined);
+  assert.equal(result.reason, 'AUTO_COORDINATED');
+  assert.equal(result.state.goals[0].missions[0].status, 'ASSIGNED');
+  assert.ok(result.state.goals[0].missions[0].worktree_allocation.path);
+});
+
 test('coordinated mission is isolated and completes only after orchestrator validation replay', async () => {
   const root = fixture(true);
   let state = (await transactOrchestrator(goalCommand(), root)).state;

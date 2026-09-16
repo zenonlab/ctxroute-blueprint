@@ -6,11 +6,14 @@ import { extractPaths } from './path-extraction.mjs';
 
 const input = JSON.parse(await stdin());
 const toolInput = input.tool_input ?? {};
-const paths = extractPaths(toolInput).map(normalizePath);
-const codePaths = paths.filter(path => /\.(?:c|cc|cpp|cs|css|gd|go|h|hpp|java|js|jsx|mjs|py|php|rs|sass|scss|shader|sql|swift|ts|tsx|vue)$/iu.test(path));
+const directPaths = extractPaths(toolInput).map(normalizePath);
+const paths = [...new Set([...directPaths, ...gitChangedFiles()])];
 const policyPaths = paths.filter(path => /(?:^|\/)(?:AGENTS\.md|agents\.md|CLAUDE\.md|\.project\/project-config\.json|\.codex\/(?:hooks\.json|architecture-policy\.json|hooks\/[^/]+)|\.githooks\/[^/]+)/iu.test(path));
 const docPaths = paths.filter(path => /\.(?:md|mmd)$/iu.test(path));
 const { config } = loadProjectConfig();
+const codePaths = config
+  ? paths.filter(path => isSourcePath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config))
+  : [];
 const architecturalPaths = config ? paths.filter(path => isSourcePath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config)) : [];
 const contractPaths = config ? paths.filter(path => isContractPath(path, config)) : [];
 const applicable = applicableAdrs(paths);
@@ -23,7 +26,7 @@ for (const path of changedDecisionPaths) {
   if (adr && isTracked(path) && !adr.metadata.revised && !adr.metadata['superseded-by']) findings.push(`${path} was modified without revised: true or superseded-by.`);
 }
 if ((architecturalPaths.length || contractPaths.length) && !applicable.length && !paths.some(path => path.startsWith('docs/decisions/'))) {
-  findings.push(`No applicable ADR for ${[...architecturalPaths, ...contractPaths].join(', ')}. Add one only if this materially changes a boundary, contract, dependency, or cross-component flow.`);
+  findings.push(`No applicable ADR for ${formatPaths([...architecturalPaths, ...contractPaths])}. Add one only if this materially changes a boundary, contract, dependency, or cross-component flow.`);
 }
 if (decisionStatus.conflicts.length && !paths.some(path => path.startsWith('docs/decisions/'))) {
   findings.push('Applicable ADRs explicitly conflict. Revise or replace them before committing the governed change.');
@@ -34,20 +37,19 @@ if (findings.length || process.env.CODEX_POST_TOOL_AUDIT === '1') {
     ? ['PostToolUse findings. The change already exists: inspect and repair the current file; do not replay the patch.', ...findings]
     : ['Audit required before continuing.'];
   if (codePaths.length) {
-    lines.push(`Code : ${codePaths.join(', ')}`);
-    lines.push('Read relevant documentation and diagrams before changing code.');
+    lines.push(`Cumulative code scope: ${formatPaths(codePaths)}`);
     lines.push('Check placement, architecture, structure, reuse, duplication, regressions, deletions, and side effects.');
     lines.push('Update documentation when architecture, contracts, flows, state, or dependencies change.');
   }
   if (docPaths.length) {
-    lines.push(`Documentation : ${docPaths.join(', ')}`);
+    lines.push(`Documentation: ${formatPaths(docPaths)}`);
     lines.push('Check consistency, links, Archify JSON IR, and related documents.');
   }
   if (policyPaths.length) {
-    lines.push(`Instructions/hooks : ${policyPaths.join(', ')}`);
+    lines.push(`Instructions/hooks: ${formatPaths(policyPaths)}`);
     lines.push('Check scope, consistency, format, security, fail-open behavior, and actual behavior.');
   }
-  if (applicable.length) lines.push(`Applicable ADRs: ${applicable.map(adr => adr.file).join(', ')}. Confirm the decision remains valid.`);
+  if (applicable.length) lines.push(`Applicable ADRs: ${formatPaths(applicable.map(adr => adr.file), 8)}. Check that the decisions remain valid; continue with repair if needed.`);
   lines.push('Review the diff and run the relevant validation.');
   process.stdout.write(JSON.stringify({
     hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: lines.join('\n') },
@@ -57,6 +59,27 @@ if (findings.length || process.env.CODEX_POST_TOOL_AUDIT === '1') {
 function isTracked(path) {
   try { execFileSync('git', ['ls-files', '--error-unmatch', '--', path], { stdio: 'ignore' }); return true; }
   catch { return false; }
+}
+
+function gitChangedFiles() {
+  const files = new Set();
+  for (const args of [
+    ['diff', '--name-only', '-z'],
+    ['diff', '--cached', '--name-only', '-z'],
+    ['ls-files', '--others', '--exclude-standard', '-z'],
+  ]) {
+    try {
+      execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+        .split('\0').filter(Boolean).map(normalizePath).forEach(path => files.add(path));
+    } catch {}
+  }
+  return [...files];
+}
+
+function formatPaths(paths, maximum = 12) {
+  const unique = [...new Set(paths)].sort();
+  const shown = unique.slice(0, maximum).join(', ');
+  return unique.length > maximum ? `${shown} (+${unique.length - maximum})` : shown;
 }
 
 

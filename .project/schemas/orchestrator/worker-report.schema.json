@@ -8,7 +8,13 @@
     "status": { "enum": ["READY_FOR_VALIDATION", "BLOCKED"] },
     "files_touched": { "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/relativePath" } },
     "validation_results": { "type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/validationResult" } },
-    "summary": { "$ref": "common.schema.json#/$defs/text" }
+    "summary": { "$ref": "common.schema.json#/$defs/text" },
+    "documentation_sources_used": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/identifier" } },
+    "confidence": { "enum": ["low", "medium", "high"] },
+    "unverified_points": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/text" } },
+    "consumption": { "$ref": "execution-receipt.schema.json" },
+    "observed_model": { "$ref": "common.schema.json#/$defs/identifier" },
+    "observed_runtime": { "enum": ["codex", "claude", "gemini", "fixture"] }
   },
   "unevaluatedProperties": false
 }

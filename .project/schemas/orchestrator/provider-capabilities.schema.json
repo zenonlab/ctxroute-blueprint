@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/provider-capabilities.schema.json",
+  "type": "object",
+  "required": ["adapter", "capabilities", "context_classes", "efforts", "access_modes", "web_access"],
+  "properties": {
+    "adapter": { "enum": ["codex", "claude", "gemini", "fixture"] },
+    "capabilities": { "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": { "enum": ["code", "reasoning", "long-context", "structured-output", "web-research"] } },
+    "context_classes": { "type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": { "enum": ["small", "medium", "large", "xlarge"] } },
+    "efforts": { "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": { "enum": ["none", "low", "medium", "high", "xhigh", "max"] } },
+    "access_modes": { "type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": { "enum": ["read-only", "workspace-write"] } },
+    "web_access": { "type": "boolean" }
+  },
+  "unevaluatedProperties": false
+}

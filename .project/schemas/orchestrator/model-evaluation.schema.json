@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/model-evaluation.schema.json",
+  "type": "object",
+  "required": ["model_id", "phase", "samples", "success_rate", "structured_output_rate", "scope_rate", "median_duration_ms", "confidence", "promotion_eligible", "degraded", "updated_at"],
+  "properties": {
+    "model_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "phase": { "enum": ["research", "planning", "work", "skillCreation", "skillAudit", "repair", "goalAudit", "conflictAnalysis", "synthesis"] },
+    "samples": { "type": "integer", "minimum": 0 },
+    "success_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "structured_output_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "scope_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "median_duration_ms": { "type": "integer", "minimum": 0 },
+    "confidence": { "enum": ["insufficient-samples", "measured"] },
+    "promotion_eligible": { "type": "boolean" },
+    "degraded": { "type": "boolean" },
+    "updated_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+  },
+  "unevaluatedProperties": false
+}

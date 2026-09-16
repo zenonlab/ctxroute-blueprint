@@ -31,6 +31,13 @@ hook orchestrator; CRG is the code-context MCP, while the independent
 Tree-sitter registry remains Sensor-only. Archify v2.16.0 owns executable
 architecture evidence and desktop visual containment checks.
 
+The local orchestrator uses a pure provider-neutral routing core and data-only
+model catalog. Codex, Claude, and Gemini are closed CLI adapters; fixture is
+test-only. Risk floors, capability filtering, budgets, and explanation remain
+independent of provider dialects. Official documentation is researched through
+the same bounded CLI boundary and retained only as claims plus provenance and
+digests. See ADR-0029 and ADR-0030.
+
 ## Base decision matrix for project construction
 
 | Topic | Project choice | Context and trade-off | Recommendation rule | ADR / evidence |
