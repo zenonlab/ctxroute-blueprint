@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Cycle opérationnel des traitements fournisseur",
+    "quality_profile": "showcase",
+    "viewBox": [980, 700],
+    "views": [
+      {
+        "id": "emergency-stop",
+        "label": "Arrêt d’urgence",
+        "focus": ["providerWorkActive", "queuePaused", "ingressRemoved", "shutdownVerified", "intentionallyStopped"],
+        "note": "La Queue est suspendue avant le retrait des routes et crons; aucune donnée n’est supprimée."
+      },
+      {
+        "id": "verification-failure",
+        "label": "Échec de vérification",
+        "focus": ["ingressRemoved", "verificationFailed", "queuePaused"],
+        "note": "Un contrôle incomplet revient à la barrière Queue avant une nouvelle tentative bornée."
+      },
+      {
+        "id": "controlled-restore",
+        "label": "Reprise contrôlée",
+        "focus": ["intentionallyStopped", "restoreApproved", "providerWorkActive"],
+        "note": "La reprise exige une décision explicite, la restauration des triggers puis la reprise de la Queue."
+      }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "Arrêt des traitements" },
+    { "id": "recovery", "label": "Contrôle et reprise" }
+  ],
+  "states": [
+    { "id": "providerWorkActive", "type": "start", "label": "Traitements actifs", "sublabel": "HTTP · Queue · scheduled", "lane": "main", "col": 0, "step": "01", "tag": "risque fournisseur" },
+    { "id": "queuePaused", "type": "active", "label": "Queue suspendue", "sublabel": "messages conservés", "lane": "main", "col": 1, "step": "02", "tag": "barrière immédiate" },
+    { "id": "ingressRemoved", "type": "active", "label": "Entrées retirées", "sublabel": "routes et crons vides", "lane": "main", "col": 2, "step": "03", "tag": "aucun nouveau signal" },
+    { "id": "shutdownVerified", "type": "decision", "label": "Coupure vérifiée", "sublabel": "Cloudflare + HTTP", "lane": "main", "col": 3, "step": "04", "tag": "preuve distante" },
+    { "id": "intentionallyStopped", "type": "success", "label": "Arrêt intentionnel", "sublabel": "D1 et R2 conservés", "lane": "main", "col": 4, "step": "05", "tag": "zéro traitement" },
+    { "id": "verificationFailed", "type": "failure", "label": "Contrôle incomplet", "sublabel": "entrée encore active", "lane": "recovery", "col": 0, "tag": "retester" },
+    { "id": "restoreApproved", "type": "waiting", "label": "Reprise approuvée", "sublabel": "rollback explicite", "lane": "recovery", "col": 2, "tag": "décision humaine" }
+  ],
+  "transitions": [
+    { "id": "verification-fails", "from": "shutdownVerified", "to": "verificationFailed", "label": "route ou livraison active", "variant": "security" },
+    { "id": "retry-shutdown", "from": "verificationFailed", "to": "queuePaused", "label": "reprendre depuis la barrière", "variant": "security", "fromSide": "right", "toSide": "bottom", "via": [[520, 307], [520, 245], [248, 245]], "labelAt": [385, 275] },
+    { "id": "request-restore", "from": "intentionallyStopped", "to": "restoreApproved", "label": "autorisation séparée", "variant": "dashed", "labelAt": [710, 215] },
+    { "id": "restore-service", "from": "restoreApproved", "to": "providerWorkActive", "label": "triggers puis Queue", "variant": "emphasis", "fromSide": "bottom", "toSide": "left", "via": [[710, 440], [75, 440], [75, 157]], "labelAt": [390, 425] }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Coupure complète",
+      "items": [
+        "La pause Queue précède toute autre mutation",
+        "Aucune route publique ni planification ne reste attachée",
+        "La gateway ne reçoit plus de requête signée du Worker"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Données préservées",
+      "items": [
+        "Aucune table D1 ni aucun objet R2 n’est supprimé",
+        "Les messages existants restent soumis à la rétention Queue",
+        "La version Worker demeure disponible pour rollback"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Reprise séparée",
+      "items": [
+        "La reprise n’est jamais automatique",
+        "Les routes et crons sont restaurés avant la Queue",
+        "Une vérification de coût précède le retour en service"
+      ]
+    }
+  ]
+}

@@ -148,3 +148,7 @@
 
 - [ ] **Sauvegarder D1, migrer, pousser et déployer le Worker** — BLOCKED _(evidence: Backup D1 ignoré et restaurable: 1000960 octets, 30 tables, integrity_check ok, SHA-256 c5b94e9566be330a8db0a9a7b54be54c73a603166432bcb48d088a87639b33ed., origin/main pointe sur 9cfd468 après passage des hooks pré-push; .codex/config.toml est resté local et non indexé., external: plan frais d5ae98b2 appliqué le 2026-09-16T11:04:42Z; Cloudflare refuse D1 avec le code 7500 jusqu’au reset de minuit UTC, 0017 à 0020 restent toutes en attente et le Worker 2267a691 reste servi à 100 %.)_
 - [ ] **Observer une collecte hebdomadaire complète** — PENDING
+
+## Arrêter immédiatement tous les traitements fournisseur — DONE
+
+- [x] **Suspendre Queue, routes et crons sans supprimer de données** — DONE _(evidence: API Cloudflare: routes=[], schedules=[], workers.dev enabled=false et previews_enabled=false pour tobirink-public-api., Queue ed005a14ec534110b350b06922100056: delivery_paused=true; producteur, consommateur et messages non purgés restent conservés., La version Worker 2267a691-68cf-4612-9ec8-e36e3c839ef3 reste servie à 100%; aucune migration ni version Worker n’a été déployée.)_

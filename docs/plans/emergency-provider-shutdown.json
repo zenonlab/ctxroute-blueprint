@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-emergency-provider-shutdown",
+  "title": "Arrêter immédiatement tous les traitements fournisseur",
+  "executionMode": "autonomous",
+  "modeOffered": true,
+  "approved": true,
+  "steps": [
+    {
+      "id": "stop-provider-work",
+      "title": "Suspendre Queue, routes et crons sans supprimer de données",
+      "status": "TODO",
+      "acceptance": [
+        "La livraison de tobirink-public-discovery est suspendue sans purge.",
+        "Le Worker tobirink-public-api ne possède plus de route workers.dev, de route tobirink.com ni de Cron Trigger.",
+        "Aucun déclencheur HTTP, Queue ou scheduled ne peut lancer un appel fournisseur.",
+        "D1, R2, les Queues, leurs messages et la version Worker restent conservés.",
+        "Les vérifications HTTP et Cloudflare prouvent la coupure; le rollback est documenté.",
+        "Archify lifecycle passe showcase 9/9 sans erreur ni avertissement.",
+        "Les validations du dépôt passent et le commit est poussé sans .codex/config.toml."
+      ],
+      "files": [
+        "apps/worker/wrangler.jsonc",
+        ".project/project-config.json",
+        ".project/progress.json",
+        "docs/progress.md",
+        "docs/plans/emergency-provider-shutdown.json",
+        "docs/plans/emergency-provider-shutdown-update.json",
+        "docs/operations/cloudflare.md",
+        "docs/decisions/ADR-0054-emergency-provider-shutdown.md",
+        "docs/architecture/src/provider-operations.lifecycle.json"
+      ],
+      "commands": [
+        "npm exec -- wrangler queues pause-delivery tobirink-public-discovery",
+        "npm exec -- wrangler triggers deploy --dry-run",
+        "npm exec -- wrangler triggers deploy",
+        "npm exec -- wrangler queues info tobirink-public-discovery",
+        "Cloudflare and HTTP read-only verification",
+        "npm run archify:validate -- provider-operations.lifecycle",
+        "npm run validate:config",
+        "npm run validate:decisions",
+        "npm run validate:docs -- --all",
+        "npm run verify",
+        "npm ls --all",
+        "npm audit --audit-level=high",
+        "git diff --check",
+        "git commit -m chore(cloudflare): stop provider processing",
+        "git push origin HEAD:main"
+      ],
+      "evidence": []
+    }
+  ],
+  "validationEvidence": [
+    "Queue distante confirmée suspendue sans purge",
+    "Inventaire Cloudflare sans route workers.dev, route personnalisée ni cron",
+    "Vérifications HTTP et logs sans nouveau traitement fournisseur",
+    "Archify lifecycle showcase 9/9 sans diagnostic",
+    "Validations dépôt, commit et push vérifiés"
+  ]
+}

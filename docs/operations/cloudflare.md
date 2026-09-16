@@ -103,13 +103,62 @@ unknown paths keep their explicit JSON/404 behavior. Versioned downloads stream
 from `tobirink-public-releases` with immutable caching, attachment disposition,
 ETag, and content-type metadata.
 
+## Emergency provider shutdown
+
+The fail-closed emergency state is versioned in `apps/worker/wrangler.jsonc`:
+`workers_dev` is false, `routes` is empty and `triggers.crons` is empty. Queue
+delivery is paused separately because messages and bindings must remain intact.
+Apply the barriers in this order from `apps/worker`:
+
+```sh
+npm exec -- wrangler queues pause-delivery tobirink-public-discovery
+npm exec -- wrangler triggers deploy --dry-run
+npm exec -- wrangler triggers deploy
+```
+
+Wrangler 4.129 does not send its route replacement request when `routes` is an
+empty array. If the read-only Workers Scripts Routes inventory is still
+non-empty, replace only this script's routes through the official account API:
+
+```sh
+curl --fail-with-body -X PUT \
+  "https://api.cloudflare.com/client/v4/accounts/<account-id>/workers/scripts/tobirink-public-api/routes" \
+  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data '[]'
+```
+
+Never print or persist the token. The response and a subsequent GET must both
+report an empty result before HTTP verification.
+
+This intentionally removes the Worker-served site, API and downloads. It does
+not deploy Worker code, run D1 migrations, purge Queue messages, or delete D1,
+R2, Queue or Worker resources. Verify the Queue state, unchanged active Worker
+version, absent Cron Trigger and the unavailability of both the custom route and
+the `workers.dev` route before declaring the shutdown complete.
+
+Rollback requires a separate approved provider operation. Restore the reviewed
+route, `workers_dev` setting and cron in the versioned configuration; deploy
+triggers and verify HTTP plus the scheduled inventory; then resume Queue
+delivery last:
+
+```sh
+npm exec -- wrangler triggers deploy --dry-run
+npm exec -- wrangler triggers deploy
+npm exec -- wrangler queues resume-delivery tobirink-public-discovery
+```
+
+Never resume the Queue before routes and scheduling are known and the D1 cost
+incident has been resolved.
+
 ## Native collector observability
 
-Agenda is scheduled by Wrangler at `23 3 * * 0` (UTC). Cloudflare cron changes
-can take up to fifteen minutes to propagate. Between weekly triggers, no Agenda
-provider request is expected. The single Queue message opens two independent
-D1 lanes; each lane owns one fifteen-minute lease, a page checkpoint,
-`not_before`, and its last valid snapshot.
+Outside the emergency shutdown, Agenda is scheduled by Wrangler at
+`23 3 * * 0` (UTC). During the shutdown, `triggers.crons` remains empty.
+Cloudflare cron changes can take up to fifteen minutes to propagate. Between
+weekly triggers, no Agenda provider request is expected. The single Queue
+message opens two independent D1 lanes; each lane owns one fifteen-minute lease,
+a page checkpoint, `not_before`, and its last valid snapshot.
 
 AniList is paced at one HTTP request every three seconds and MangaUpdates at
 one every six seconds. Count quota consumption in HTTP requests, including
