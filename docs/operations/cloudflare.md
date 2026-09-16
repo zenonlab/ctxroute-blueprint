@@ -153,6 +153,15 @@ PROCESSING → IDLE`, emits one Queue signal on the first transition, keeps
 profile must not add a catalogue revision. A provider failure or non-VERIFIED
 result must leave the previous profile readable.
 
+Apply additive migration `0020_catalogue_work_relations.sql` before deploying
+relation-aware collectors. It creates only the relation table and indexes; it
+does not rewrite existing works. Verify that a source publication with an
+unknown exact target creates one relation with `target_work_id IS NULL`, one
+PENDING exact Discovery request and one Queue signal. After the target becomes
+VERIFIED, the same relation must point to its distinct work ID. Never repair a
+collision by editing or merging work IDs manually; route uncertain evidence to
+Review in a separately approved operation.
+
 The Queue consumer emits one bounded JSON record with
 `type=native-collector.queue`, `messageType`, `attempt` and `disposition`.
 Failures add only a classified code and the bounded retry delay; raw provider

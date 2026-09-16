@@ -11,6 +11,7 @@ import {
   type PublicDiscoveryResult,
   type PublicDiscoveryResultBatch,
   type PublicDiscoveryVerifiedProfile,
+  type PublicDiscoveryWorkRelation,
 } from '@tobirink/public-discovery';
 import { favoriteTitlePreparationVersion, normalizeFavoriteTitle } from '@tobirink/application';
 
@@ -59,6 +60,7 @@ export type PublicDiscoveryRefreshAdmission = {
   requestDigest: string;
   state: Extract<PublicDiscoveryReadState, { state: 'VERIFIED' }>;
 };
+export interface PublicDiscoveryFollowUp { key: PublicDiscoveryKeyV3; requestDigest: string }
 interface CanonicalFacts {
   mediaKind: 'anime' | 'manga';
   normalizedTitles: readonly string[];
@@ -67,7 +69,7 @@ interface CanonicalFacts {
 export interface PublicDiscoveryV3Port {
   claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
   confirmQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
-  publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ published: number; replayed: number }>;
+  publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ followUps?: readonly PublicDiscoveryFollowUp[]; published: number; replayed: number }>;
   read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState>;
   requestRefresh(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryRefreshAdmission>;
   releaseQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
@@ -81,6 +83,10 @@ function futureIso(now: string, milliseconds: number): string {
   const timestamp = Date.parse(now);
   if (!Number.isFinite(timestamp)) throw new TypeError('invalid-public-discovery-time');
   return new Date(timestamp + milliseconds).toISOString();
+}
+async function sha256(value: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 function stateFromRow(row: DiscoveryRow | null, now: string): PublicDiscoveryReadState {
   if (!row) return { state: 'MISS' };
@@ -401,7 +407,73 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
             JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
             WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
         ON CONFLICT(provider, external_id) DO NOTHING`).bind(reference.provider, reference.externalId, profile.workId, ...guardValues)),
+      ...(candidate.relations ?? []).map((relation) => this.database.prepare(`INSERT INTO catalogue_work_relations(
+          source_work_id, relation_type, target_provider, target_external_id, target_media_kind, target_work_id, verified_at)
+        SELECT ?, ?, ?, ?, ?,
+          (SELECT work_id FROM catalogue_external_references WHERE provider = ? AND external_id = ? LIMIT 1), ?
+        WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+          fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
+          AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
+          AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
+        ON CONFLICT(source_work_id, relation_type, target_provider, target_external_id) DO UPDATE SET
+          target_media_kind = excluded.target_media_kind,
+          target_work_id = COALESCE(excluded.target_work_id, catalogue_work_relations.target_work_id),
+          verified_at = excluded.verified_at`)
+        .bind(profile.workId, relation.relationType, relation.reference.provider, relation.reference.externalId,
+          relation.mediaKind, relation.reference.provider, relation.reference.externalId, verifiedAt, ...guardValues.slice(0, 7))),
+      this.database.prepare(`UPDATE catalogue_work_relations SET target_work_id = ?
+        WHERE target_work_id IS NULL AND EXISTS (
+          SELECT 1 FROM json_each(?) AS proposed
+          WHERE target_provider = json_extract(proposed.value, '$.provider')
+            AND target_external_id = json_extract(proposed.value, '$.externalId'))
+          AND EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+            fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
+            AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
+            AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)`)
+        .bind(profile.workId, JSON.stringify(profile.references), ...guardValues.slice(0, 7)),
     ];
+  }
+
+  private async relationRequest(relation: PublicDiscoveryWorkRelation, sourceKey: PublicDiscoveryKeyV3): Promise<PublicDiscoveryRequest> {
+    const key = {
+      fingerprint: await sha256(`relation:${relation.reference.provider}:${relation.reference.externalId}:${relation.mediaKind}`),
+      mediaKind: relation.mediaKind,
+      parserVersion: sourceKey.parserVersion,
+      siteRulesVersion: sourceKey.siteRulesVersion,
+    };
+    const submission = {
+      key,
+      query: {
+        discoveryTitles: relation.titles,
+        explicitProviderReference: relation.reference,
+        mediaKind: relation.mediaKind,
+        sourceTitles: relation.titles,
+      },
+      schemaVersion: 3 as const,
+    };
+    return publicDiscoveryRequestSchema.parse({ ...submission, requestDigest: await sha256(JSON.stringify(submission)) });
+  }
+
+  private async admitRelatedWorks(result: PublicDiscoveryResult, now: string): Promise<PublicDiscoveryFollowUp[]> {
+    if (result.resolution.state !== 'VERIFIED') return [];
+    const profile = result.resolution.profile;
+    const followUps: PublicDiscoveryFollowUp[] = [];
+    for (const relation of profile.candidate.relations ?? []) {
+      if (profile.references.some((reference) => reference.provider === relation.reference.provider && reference.externalId === relation.reference.externalId)) {
+        throw new Error('public-discovery-self-relation');
+      }
+      const known = await this.database.prepare(`SELECT work_id AS workId FROM catalogue_external_references
+        WHERE provider = ?1 AND external_id = ?2 LIMIT 1`).bind(relation.reference.provider, relation.reference.externalId).first();
+      if (known) continue;
+      const request = await this.relationRequest(relation, result.key);
+      try {
+        const admission = await this.request(request, now);
+        if (admission.outcome === 'created') followUps.push({ key: request.key, requestDigest: request.requestDigest });
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== 'public-discovery-request-conflict') throw error;
+      }
+    }
+    return followUps;
   }
 
   private async materializeCanonicalReplay(result: PublicDiscoveryResult, profile: PublicDiscoveryVerifiedProfile, resultJson: string, createdAt: string): Promise<void> {
@@ -497,7 +569,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     if (nonce) {
       if (nonce.resultDigest !== resultDigest) throw new Error('public-discovery-nonce-conflict');
       for (const result of batch.results) await this.publishOne(result, tokenDigest, batch.verifiedAt, now);
-      return { published: 0, replayed: batch.results.length };
+      const followUps = (await Promise.all(batch.results.map((result) => this.admitRelatedWorks(result, now)))).flat();
+      return followUps.length > 0 ? { followUps, published: 0, replayed: batch.results.length } : { published: 0, replayed: batch.results.length };
     }
     let published = 0;
     let replayed = 0;
@@ -505,9 +578,10 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       if (await this.publishOne(result, tokenDigest, batch.verifiedAt, now) === 'published') published += 1;
       else replayed += 1;
     }
+    const followUps = (await Promise.all(batch.results.map((result) => this.admitRelatedWorks(result, now)))).flat();
     await this.database.prepare(`INSERT INTO public_discovery_result_nonces_v3(nonce, result_digest, created_at, purge_after)
       VALUES (?1, ?2, ?3, ?4)`)
       .bind(batch.nonce, resultDigest, batch.verifiedAt, futureIso(now, nonceRetentionMilliseconds)).first();
-    return { published, replayed };
+    return followUps.length > 0 ? { followUps, published, replayed } : { published, replayed };
   }
 }

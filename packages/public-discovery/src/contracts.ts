@@ -20,6 +20,13 @@ export const publicDiscoveryReferenceV3Schema = z.strictObject({
   provider: publicDiscoveryProviderSchema,
 });
 
+export const publicDiscoveryWorkRelationSchema = z.strictObject({
+  mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
+  reference: publicDiscoveryReferenceV3Schema,
+  relationType: z.enum(['ADAPTATION', 'RELATED']),
+  titles: z.array(titleSchema).min(1).max(4),
+});
+
 export const publicDiscoveryQuerySchema = z.strictObject({
   discoveryTitles: z.array(titleSchema).min(1).max(4),
   explicitProviderReference: publicDiscoveryReferenceV3Schema.optional(),
@@ -65,6 +72,7 @@ export const publicDiscoveryCandidateSchema = z.strictObject({
   preSerialization: z.boolean(),
   provider: publicDiscoveryProviderSchema,
   season: z.number().int().positive().max(1000).optional(),
+  relations: z.array(publicDiscoveryWorkRelationSchema).max(5).optional(),
   startYear: z.number().int().min(1800).max(3000).optional(),
   titles: z.array(titleSchema).min(1).max(32),
   titleVariants: z.array(titleVariantSchema).max(32).optional(),
@@ -123,6 +131,7 @@ export type PublicDiscoveryResult = z.output<typeof publicDiscoveryResultSchema>
 export type PublicDiscoveryResultBatch = z.output<typeof publicDiscoveryResultBatchSchema>;
 export type PublicDiscoveryTerminalResolution = z.output<typeof publicDiscoveryTerminalResolutionSchema>;
 export type PublicDiscoveryVerifiedProfile = z.output<typeof publicDiscoveryVerifiedProfileSchema>;
+export type PublicDiscoveryWorkRelation = z.output<typeof publicDiscoveryWorkRelationSchema>;
 export type PublicDiscoverySubmission = z.output<typeof publicDiscoverySubmissionSchema>;
 
 export type PublicDiscoveryReadState =

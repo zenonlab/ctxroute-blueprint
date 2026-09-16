@@ -47,6 +47,19 @@ describe('AniListFavoriteProviderAdapter', () => {
     await expect(adapter.hydrate({ externalId: '30013', provider: 'anilist' })).resolves.toMatchObject({ externalId: '30013', mediaKind: 'MANGA' });
   });
 
+  it('keeps an adaptation as a distinct exact work relation', async () => {
+    const related = { ...media, relations: { edges: [{
+      node: { id: 30013, title: { english: 'Frieren', native: '葬送のフリーレン', romaji: 'Sousou no Frieren' }, type: 'MANGA' },
+      relationType: 'SOURCE',
+    }] } };
+    const adapter = new AniListFavoriteProviderAdapter(async () => Response.json({ data: { Media: related } }));
+    await expect(adapter.hydrate({ externalId: '154587', provider: 'anilist' })).resolves.toMatchObject({
+      externalId: '154587', mediaKind: 'ANIME', relations: [{
+        mediaKind: 'MANGA', reference: { externalId: '30013', provider: 'anilist' }, relationType: 'ADAPTATION',
+      }],
+    });
+  });
+
   it('rejects a cover outside the AniList image origin', async () => {
     const adapter = new AniListFavoriteProviderAdapter(async () => Response.json({ data: { Media: { ...media, coverImage: { extraLarge: 'https://images.invalid/cover.jpg', large: null, medium: null } } } }));
     await expect(adapter.hydrate({ externalId: '154587', provider: 'anilist' })).rejects.toThrow(/not allowed/u);

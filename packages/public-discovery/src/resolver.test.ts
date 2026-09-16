@@ -75,4 +75,23 @@ describe('standalone provider resolver', () => {
     expect(ports.mangadex.search).not.toHaveBeenCalled();
     expect(ports.mangadex.hydrate).toHaveBeenCalledOnce();
   });
+
+  it('preserves an exact adaptation relation without merging the homonymous media', async () => {
+    const exact = {
+      ...candidate('anilist', 'ANIME', '154587', 'Shared Title'),
+      relations: [{
+        mediaKind: 'MANGA' as const, reference: { externalId: '30013', provider: 'anilist' as const },
+        relationType: 'ADAPTATION' as const, titles: ['Shared Title'],
+      }],
+    };
+    const ports = providers({ anilist: exact });
+    const base = request('ANIME', 'Shared Title');
+    const resolution = await createPublicDiscoveryResolver(ports).resolve({
+      ...base, query: { ...base.query, explicitProviderReference: { externalId: '154587', provider: 'anilist' } },
+    });
+    expect(resolution).toMatchObject({
+      profile: { candidate: { mediaKind: 'ANIME', relations: [{ mediaKind: 'MANGA', relationType: 'ADAPTATION' }] } },
+      state: 'VERIFIED',
+    });
+  });
 });

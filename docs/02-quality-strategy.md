@@ -98,6 +98,9 @@ browser or `workerd` test when platform behavior is the risk.
   exacte avec `request_json = {}`, l’absence de révision pour un résultat
   identique, le maintien de l’ancien profil après un résultat non vérifié et le
   remplacement seulement après validation d’un profil changé.
+  Les relations vérifiées couvrent en plus l’homonymie manga/anime, les
+  `workId` distincts, l’adaptation tardive, la demande secondaire exacte unique
+  et l’absence de relation partielle en cas de collision.
   Les tests du runner prouvent qu’un MISS, un PENDING et un VERIFIED ne lancent
   aucune recherche ou hydratation fournisseur dans la découverte automatique
   de l’extension.

@@ -15,7 +15,7 @@ async function jsonDigest(value: DiscoverySubmission): Promise<string> {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function verifiedResult(key: ReturnType<typeof discoveryKey>, requestDigest: string, workMarker: string, externalId = workMarker, title = `Work ${workMarker}`) {
+function verifiedResult(key: { fingerprint: string; mediaKind: 'ANIME' | 'MANGA' | 'MANHWA' | 'MANHUA' | 'UNKNOWN'; parserVersion: string; siteRulesVersion: string }, requestDigest: string, workMarker: string, externalId = workMarker, title = `Work ${workMarker}`) {
   return {
     key,
     requestDigest,
@@ -364,6 +364,75 @@ describe('verified public discovery cache', () => {
     expect(await env.PUBLIC_DB.prepare(`SELECT refresh_attempt_count AS attempts, refresh_state AS refreshState
       FROM public_discovery_requests_v3 WHERE fingerprint = ?1`).bind(key.fingerprint).first())
       .toEqual({ attempts: 0, refreshState: 'IDLE' });
+  });
+
+  it('indexes a late manga adaptation as a distinct work and coalesces its exact discovery', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const sourceKey = { ...discoveryKey('a'), fingerprint: 'ab'.repeat(32) };
+    const now = '2026-09-16T09:00:00.000Z';
+    const sourceRequest = {
+      key: sourceKey,
+      query: { discoveryTitles: ['Shared Title'], mediaKind: 'ANIME' as const, sourceTitles: ['Shared Title'] },
+      requestDigest: 'b'.repeat(64), schemaVersion: 3 as const,
+    };
+    await adapter.request(sourceRequest, now);
+    const sourceClaim = await adapter.claimBatch({
+      claimToken: 'u'.repeat(48), leaseUntil: '2026-09-16T09:15:00.000Z', limit: 20,
+      now, tokenDigest: 'u'.repeat(64),
+    });
+    expect(sourceClaim.requests.some(({ key }) => key.fingerprint === sourceKey.fingerprint)).toBe(true);
+    const sourceBase = verifiedResult(sourceKey, sourceRequest.requestDigest, 'anime_source', '9001', 'Shared Title');
+    const sourceResult = { ...sourceBase, resolution: { ...sourceBase.resolution, profile: {
+      ...sourceBase.resolution.profile,
+      candidate: { ...sourceBase.resolution.profile.candidate, relations: [{
+        mediaKind: 'MANGA' as const, reference: { externalId: '9002', provider: 'anilist' as const },
+        relationType: 'ADAPTATION' as const, titles: ['Shared Title'],
+      }] },
+    } } };
+    const sourceReceipt = await adapter.publishBatch({
+      claimToken: sourceClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440080',
+      results: [sourceResult], schemaVersion: 3, verifiedAt: now,
+    }, 'u'.repeat(64), 'b'.repeat(64), now);
+    expect(sourceReceipt).toMatchObject({ published: 1, replayed: 0, followUps: [expect.any(Object)] });
+    expect(sourceReceipt.followUps).toHaveLength(1);
+    const followUp = sourceReceipt.followUps?.[0];
+    if (!followUp) throw new Error('Expected bounded adaptation follow-up.');
+    await adapter.confirmQueueSignal(followUp.key, followUp.requestDigest, now);
+    await expect(adapter.publishBatch({
+      claimToken: sourceClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440080',
+      results: [sourceResult], schemaVersion: 3, verifiedAt: now,
+    }, 'u'.repeat(64), 'b'.repeat(64), now)).resolves.toEqual({ published: 0, replayed: 1 });
+    expect(await env.PUBLIC_DB.prepare(`SELECT relation_type AS relationType, target_media_kind AS mediaKind,
+      target_work_id AS targetWorkId FROM catalogue_work_relations WHERE source_work_id = ?1`)
+      .bind('work_anime_source').first()).toEqual({ relationType: 'ADAPTATION', mediaKind: 'MANGA', targetWorkId: null });
+
+    const targetClaim = await adapter.claimBatch({
+      claimToken: 'v'.repeat(48), leaseUntil: '2026-09-16T09:30:00.000Z', limit: 20,
+      now, tokenDigest: 'v'.repeat(64),
+    });
+    const targetRequest = targetClaim.requests.find(({ key }) => key.fingerprint === followUp.key.fingerprint);
+    expect(targetRequest).toMatchObject({
+      query: { explicitProviderReference: { externalId: '9002', provider: 'anilist' }, mediaKind: 'MANGA' },
+    });
+    if (!targetRequest) throw new Error('Expected adaptation claim.');
+    const targetResult = {
+      ...verifiedResult(followUp.key, targetRequest.requestDigest, 'manga_target', '9002', 'Shared Title'),
+      resolution: { profile: {
+        ...verifiedResult(followUp.key, targetRequest.requestDigest, 'manga_target', '9002', 'Shared Title').resolution.profile,
+        candidate: { ...verifiedResult(followUp.key, targetRequest.requestDigest, 'manga_target', '9002', 'Shared Title').resolution.profile.candidate, mediaKind: 'MANGA' as const },
+      }, state: 'VERIFIED' as const },
+    };
+    await expect(adapter.publishBatch({
+      claimToken: targetClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440081',
+      results: [targetResult], schemaVersion: 3, verifiedAt: now,
+    }, 'v'.repeat(64), 'c'.repeat(64), now)).resolves.toEqual({ published: 1, replayed: 0 });
+    expect((await env.PUBLIC_DB.prepare(`SELECT work_id AS workId, media_kind AS mediaKind FROM catalogue_works
+      WHERE preferred_title = 'Shared Title' ORDER BY media_kind`).all()).results).toEqual([
+        { mediaKind: 'anime', workId: 'work_anime_source' },
+        { mediaKind: 'manga', workId: 'work_manga_target' },
+      ]);
+    expect(await env.PUBLIC_DB.prepare(`SELECT target_work_id AS targetWorkId FROM catalogue_work_relations
+      WHERE source_work_id = ?1`).bind('work_anime_source').first()).toEqual({ targetWorkId: 'work_manga_target' });
   });
 
   it('rejects a normalized-title collision atomically', async () => {

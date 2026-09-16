@@ -130,12 +130,12 @@
       "id": "verifiedD1",
       "type": "database",
       "label": "D1 fiche VERIFIED",
-      "sublabel": "même catalogue · profil complet",
+      "sublabel": "profil + relations exactes",
       "stage": 4,
       "row": 1,
       "yOffset": -20,
       "width": 140,
-      "tag": "requête + hydratation"
+      "tag": "œuvres distinctes"
     },
     {
       "id": "extensionResult",
@@ -179,8 +179,8 @@
     {
       "from": "publicD1",
       "to": "queue",
-      "label": "MISS ou refresh : signal unique",
-      "classification": "uniquement created · au plus un refresh/semaine",
+      "label": "MISS, refresh ou relation : signal unique",
+      "classification": "uniquement created · cible liée exacte",
       "variant": "security",
       "route": "auto",
       "labelAt": [530, 338]
@@ -260,6 +260,7 @@
         "Le résultat VERIFIED répond aux prochaines lectures; request_json devient {}",
         "Le refresh reconstruit 4 titres maximum depuis le profil et une référence exacte",
         "VERIFIED reste lisible pendant PENDING et PROCESSING; un échec conserve le profil",
+        "Une adaptation est une œuvre distincte; sa référence exacte peut amorcer une seule demande secondaire",
         "Le backfill terminal historique conserve PENDING, PROCESSING et FAILED"
       ]
     },

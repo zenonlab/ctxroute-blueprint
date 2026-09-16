@@ -5,7 +5,7 @@ import { FavoriteProviderRateGate, readFavoriteProviderJson } from '../provider-
 import type { FavoriteProviderFetch } from '../provider-http.js';
 
 export const anilistGraphqlEndpoint = 'https://graphql.anilist.co';
-const mediaProjection = 'id type format status siteUrl title { romaji english native } synonyms genres coverImage { extraLarge large medium } startDate { year } endDate { year } episodes chapters volumes popularity';
+const mediaProjection = 'id type format status siteUrl title { romaji english native } synonyms genres coverImage { extraLarge large medium } startDate { year } endDate { year } episodes chapters volumes popularity relations { edges { relationType node { id type title { romaji english native } } } }';
 const searchQuery = `query FavoriteSearch($search: String!, $perPage: Int!, $page: Int!) { Page(page: $page, perPage: $perPage) { pageInfo { hasNextPage } media(search: $search, type: ANIME) { ${mediaProjection} } } }`;
 const hydrateQuery = `query FavoriteById($id: Int!) { Media(id: $id) { ${mediaProjection} } }`;
 const requestHeaders = Object.freeze({
@@ -17,6 +17,11 @@ const requestHeaders = Object.freeze({
 });
 const nonEmptyString = z.string().trim().min(1);
 const identifierSchema = z.union([z.number().int().positive(), nonEmptyString]).transform(String);
+const relationNodeSchema = z.object({
+  id: identifierSchema,
+  title: z.object({ english: nonEmptyString.nullable(), native: nonEmptyString.nullable(), romaji: nonEmptyString.nullable() }).strict(),
+  type: z.enum(['ANIME', 'MANGA']),
+}).strict();
 const anilistMediaSchema = z.object({
   coverImage: z.object({ extraLarge: z.url().nullable(), large: z.url().nullable(), medium: z.url().nullable() }).strict(),
   format: nonEmptyString.nullable(),
@@ -26,6 +31,7 @@ const anilistMediaSchema = z.object({
   endDate: z.object({ year: z.number().int().min(1800).max(3000).nullable() }).strict().optional(),
   episodes: z.number().int().nonnegative().nullable().optional(), chapters: z.number().int().nonnegative().nullable().optional(), volumes: z.number().int().nonnegative().nullable().optional(),
   popularity: z.number().int().nonnegative().nullable().optional(),
+  relations: z.object({ edges: z.array(z.object({ relationType: nonEmptyString, node: relationNodeSchema }).strict()).max(20) }).strict().optional(),
   id: identifierSchema,
   siteUrl: z.url().nullable(),
   synonyms: z.array(nonEmptyString).max(16),
@@ -73,6 +79,17 @@ function candidate(media: AniListMedia): ProviderCandidate {
   if (media.chapters != null) result.chapterCount = media.chapters;
   if (media.volumes != null) result.volumeCount = media.volumes;
   if (media.popularity != null) result.popularity = { kind: 'MEMBERS', value: media.popularity };
+  const relations = (media.relations?.edges ?? []).flatMap(({ node, relationType }) => {
+    const relationTitles = [node.title.english, node.title.romaji, node.title.native].filter((title): title is string => title !== null);
+    if (relationTitles.length === 0 || (node.id === media.id && node.type === media.type)) return [];
+    return [{
+      mediaKind: node.type,
+      reference: { externalId: node.id, provider: 'anilist' as const },
+      relationType: relationType === 'ADAPTATION' || relationType === 'SOURCE' ? 'ADAPTATION' as const : 'RELATED' as const,
+      titles: [...new Set(relationTitles)].slice(0, 4),
+    }];
+  }).slice(0, 5);
+  if (relations.length > 0) result.relations = relations;
   return createProviderCandidate(result, 'anilist');
 }
 

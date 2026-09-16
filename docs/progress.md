@@ -131,3 +131,7 @@
 ## Réhydrater les œuvres actives sans interrompre les lectures — DONE
 
 - [x] **Rafraîchir une fiche VERIFIED sans bloquer sa lecture** — DONE _(evidence: D1 26/26, Worker 91/91, Public Discovery 55/55 et adaptateur navigateur 3/3 passent; tous les typechecks sont verts., Les tests prouvent VERIFIED lisible pendant refresh, admission hebdomadaire unique, reconstruction exacte avec request_json expurgé, résultat identique sans révision, échec conservant le profil, changement validé et huit tentatives bornées., npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent.)_
+
+## Indexer les relations vérifiées entre œuvres — DONE
+
+- [x] **Publier les adaptations comme œuvres liées distinctes** — DONE _(evidence: Public Discovery 58/58, D1 27/27 et Worker 92/92 passent; tous les typechecks sont verts., Les tests prouvent des workId anime/manga distincts, une relation exacte atomique, une hydratation secondaire unique et le rattachement tardif de la cible., npm run verify, npm ls --all, npm audit (0 vulnérabilité), dry-run Wrangler et git diff --check réussissent.)_

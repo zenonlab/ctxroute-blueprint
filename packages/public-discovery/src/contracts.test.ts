@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { publicDiscoveryQuerySchema, publicDiscoveryRefreshSubmissionSchema, publicDiscoverySubmissionSchema } from '.';
+import { publicDiscoveryCandidateSchema, publicDiscoveryQuerySchema, publicDiscoveryRefreshSubmissionSchema, publicDiscoverySubmissionSchema } from '.';
 
 const query = {
   discoveryTitles: ['One'],
@@ -23,5 +23,17 @@ describe('public discovery request minimization', () => {
     expect(publicDiscoverySubmissionSchema.safeParse({ key, query, schemaVersion: 2 }).success).toBe(false);
     expect(publicDiscoveryRefreshSubmissionSchema.safeParse({ key, schemaVersion: 3 }).success).toBe(true);
     expect(publicDiscoveryRefreshSubmissionSchema.safeParse({ key, query, schemaVersion: 3 }).success).toBe(false);
+  });
+
+  it('keeps a linked adaptation distinct from aliases', () => {
+    const candidate = publicDiscoveryCandidateSchema.parse({
+      externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Shared Title'],
+      relations: [{
+        mediaKind: 'MANGA', reference: { externalId: '30013', provider: 'anilist' },
+        relationType: 'ADAPTATION', titles: ['Shared Title'],
+      }],
+    });
+    expect(candidate.titles).toEqual(['Shared Title']);
+    expect(candidate.relations).toEqual([expect.objectContaining({ mediaKind: 'MANGA', relationType: 'ADAPTATION' })]);
   });
 });

@@ -118,18 +118,23 @@ export function agendaCollectionFailureCode(failures: readonly string[]): string
 export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings): Promise<PublicDiscoveryBatchReport> {
   const port = new D1PublicDiscoveryV3Adapter(bindings.PUBLIC_DB);
   let activeToken = '';
+  let followUps: readonly { key: Parameters<typeof port.confirmQueueSignal>[0]; requestDigest: string }[] = [];
   const resolver = createPublicDiscoveryResolver(createPublicDiscoveryProviders(
     providerFetch(bindings),
     new D1ProviderRuntimeControl(bindings.PUBLIC_DB),
   ));
-  return runPublicDiscoveryBatch({
+  const report = await runPublicDiscoveryBatch({
     gateway: {
       claim: async (limit) => {
         activeToken = randomToken();
         const now = new Date();
         return port.claimBatch({ claimToken: activeToken, leaseUntil: new Date(now.valueOf() + 15 * 60_000).toISOString(), limit, now: now.toISOString(), tokenDigest: await digest(activeToken) });
       },
-      publish: async (batch: PublicDiscoveryResultBatch) => port.publishBatch(batch, await digest(activeToken), await digest(JSON.stringify(batch.results)), new Date().toISOString()),
+      publish: async (batch: PublicDiscoveryResultBatch) => {
+        const receipt = await port.publishBatch(batch, await digest(activeToken), await digest(JSON.stringify(batch.results)), new Date().toISOString());
+        followUps = receipt.followUps ?? [];
+        return { published: receipt.published, replayed: receipt.replayed };
+      },
     },
     limit: 20,
     nonce: () => crypto.randomUUID(),
@@ -144,6 +149,18 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       },
     },
   });
+  if (followUps.length > 0) {
+    try {
+      await bindings.PUBLIC_DISCOVERY_QUEUE.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
+      const confirmedAt = new Date().toISOString();
+      await Promise.all(followUps.map((followUp) => port.confirmQueueSignal(followUp.key, followUp.requestDigest, confirmedAt)));
+    } catch (error) {
+      const releasedAt = new Date().toISOString();
+      await Promise.all(followUps.map((followUp) => port.releaseQueueSignal(followUp.key, followUp.requestDigest, releasedAt)));
+      throw error;
+    }
+  }
+  return report;
 }
 
 function calendarWindow(scheduledFor: string): CalendarWindow {

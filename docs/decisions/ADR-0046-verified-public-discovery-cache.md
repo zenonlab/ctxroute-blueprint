@@ -148,6 +148,16 @@ jamais le profil servi. Un profil sémantiquement identique met à jour les date
 sans réécrire les tables catalogue; un profil changé n’est publié qu’après les
 mêmes validations atomiques de références et de titres.
 
+Une relation d’œuvre n’est jamais un alias. Le profil fournisseur peut porter
+jusqu’à cinq relations exactes `ADAPTATION` ou `RELATED`, chacune avec média,
+titres bornés et référence fournisseur. La publication écrit la relation dans
+`catalogue_work_relations` sans réutiliser le `workId` source. Si la référence
+cible est déjà connue, son `workId` distinct est rattaché; sinon une unique
+demande Discovery exacte est admise et un signal Queue reprenable est émis.
+L’œuvre cible ne reçoit ses titres canoniques qu’après sa propre publication
+`VERIFIED`. Une référence vers soi, une collision fournisseur ou une collision
+canonique refuse le batch au lieu de fusionner silencieusement manga et anime.
+
 Avant chaque requête HTTP réelle, le Worker réserve dans D1 la cadence et
 l’exclusivité du fournisseur. AniList est limité à une requête toutes les trois
 secondes, MangaUpdates à une toutes les six secondes; MangaDex et Kitsu restent
