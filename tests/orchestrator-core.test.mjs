@@ -10,7 +10,7 @@ import {
   validateAuditReport, validateWorkerReport,
 } from '../scripts/orchestrator-core.mjs';
 import { bootstrapOrchestrator } from '../scripts/orchestrator-bootstrap.mjs';
-import { prepareMission, reconcileWorktrees, rollbackMission, submitWorkerReport } from '../scripts/orchestrator-service.mjs';
+import { commitMission, integrateMission, mutateCoordination, prepareMission, reconcileWorktrees, rollbackMission, submitWorkerReport } from '../scripts/orchestrator-service.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -74,7 +74,7 @@ test('stale dead locks recover but a live lock times out', async () => {
 
 test('environment SWARM_OFF and explicit direct execution create no mission or worktree', async () => {
   const root = fixture(true);
-  const goal = await transactOrchestrator(goalCommand(), root);
+  const goal = await createGoalAtWork(root);
   const environmentResult = await prepareMission(missionCommand(goal.state.revision), root, { CTXROUTE_SWARM_MODE: 'SWARM_OFF' });
   assert.equal(environmentResult.bypassed, true);
   assert.equal(environmentResult.mode_source, 'environment');
@@ -87,7 +87,7 @@ test('environment SWARM_OFF and explicit direct execution create no mission or w
 
 test('coordinated mission is isolated and completes only after orchestrator validation replay', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   const prepareCommand = missionCommand(state.revision);
   prepareCommand.payload.mission.validations.push({ id: 'syntax-again', executable: 'node', args: ['--check', 'src/change.mjs'], cwd: '.', timeout_ms: 30_000 });
   const prepared = await prepareMission(prepareCommand, root);
@@ -113,7 +113,7 @@ test('coordinated mission is isolated and completes only after orchestrator vali
 
 test('worker claims cannot hide a failing orchestrator validation or an out-of-scope diff', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   const command = missionCommand(state.revision);
   command.payload.mission.validations[0].args = ['--check', 'src/broken.mjs'];
   let prepared = await prepareMission(command, root);
@@ -125,9 +125,56 @@ test('worker claims cannot hide a failing orchestrator validation or an out-of-s
   assert.equal(blocked.state.goals[0].missions[0].validation_receipt.status, 'FAILED');
 });
 
+test('the orchestrator alone commits validated work and integrates the exact commit', async () => {
+  const root = fixture(true);
+  let state = (await createGoalAtWork(root)).state;
+  const prepared = await prepareMission(missionCommand(state.revision), root);
+  state = (await transactOrchestrator({ operation_id: 'start-commit', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'RUNNING' } }, root)).state;
+  const worktree = state.goals[0].missions[0].worktree_allocation.path;
+  writeFileSync(join(root, worktree, 'src/change.mjs'), 'export const integrated = true;\n');
+  state = (await submitWorkerReport({ operation_id: 'report-commit', expected_revision: state.revision, action: 'report.submit', payload: { goal_id: 'goal-one', report: workerReport(['src/change.mjs']) } }, root)).state;
+  const committed = await commitMission({ operation_id: 'commit-one', expected_revision: state.revision, action: 'mission.commit', payload: { goal_id: 'goal-one', mission_id: 'mission-one', message: 'feat: integrate validated mission' } }, root);
+  const sourceCommit = committed.state.goals[0].missions[0].orchestrator_commit;
+  assert.match(sourceCommit, /^[0-9a-f]{40}$/u);
+  state = committed.state;
+  for (const [index, completed_stage, next_stage] of [[3, 'work', 'validation'], [4, 'validation', 'audit'], [5, 'audit', 'integration']]) {
+    const goal = state.goals[0];
+    state = (await transactOrchestrator({ operation_id: `stage-${index}`, expected_revision: state.revision, action: 'goal.stage.advance', payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: `checkpoint-${index}`, goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage, completed_receipt_ids: [], artifact_refs: [], next_stage, created_at: `2026-09-17T12:0${index}:00Z` } } }, root)).state;
+  }
+  const integrated = await integrateMission({ operation_id: 'integrate-one', expected_revision: state.revision, action: 'mission.integrate', payload: { goal_id: 'goal-one', mission_id: 'mission-one', commit_oid: sourceCommit } }, root);
+  const resultCommit = integrated.state.goals[0].missions[0].integrated_commit;
+  assert.equal(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), resultCommit);
+  assert.equal(readFileSync(join(root, 'src/change.mjs'), 'utf8'), 'export const integrated = true;\n');
+  const completed = await mutateCoordination({ operation_id: 'complete-one', expected_revision: integrated.state.revision, action: 'goal.transition', payload: { goal_id: 'goal-one', status: 'COMPLETED', outcome_receipt: { receipt_id: 'outcome-one', goal_id: 'goal-one', effect: 'mutation', policy_digest: integrated.state.goals[0].policy_digest, evidence_refs: ['src/change.mjs'], repository_unchanged: false, integrated_commit: resultCommit, recovery_backup_refs: [], final_repository_digest: null, completed_at: '2026-09-17T12:10:00Z' } } }, root);
+  assert.equal(completed.state.goals[0].status, 'COMPLETED');
+  assert.equal(completed.state.outcome_receipts[0].integrated_commit, resultCommit);
+});
+
+test('read-only completion proves the primary repository snapshot stayed unchanged', async () => {
+  const root = fixture(true);
+  let state = (await mutateCoordination({ ...goalCommand(), payload: { ...goalCommand().payload, workflow: 'AUDIT' } }, root)).state;
+  const goal = state.goals[0];
+  state = (await transactOrchestrator({ operation_id: 'audit-stage', expected_revision: state.revision, action: 'goal.stage.advance', payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: 'audit-checkpoint', goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage: 'inventory', completed_receipt_ids: [], artifact_refs: ['src/base.mjs'], next_stage: 'audit', created_at: '2026-09-17T13:00:00Z' } } }, root)).state;
+  const completed = await mutateCoordination({ operation_id: 'audit-complete', expected_revision: state.revision, action: 'goal.transition', payload: { goal_id: goal.goal_id, status: 'COMPLETED', outcome_receipt: { receipt_id: 'audit-outcome', goal_id: goal.goal_id, effect: 'read-only', policy_digest: goal.policy_digest, evidence_refs: ['src/base.mjs'], repository_unchanged: true, integrated_commit: null, recovery_backup_refs: [], final_repository_digest: null, completed_at: '2026-09-17T13:10:00Z' } } }, root);
+  assert.equal(completed.state.goals[0].status, 'COMPLETED');
+});
+
+test('read-only workflows reject a worker diff mechanically', async () => {
+  const root = fixture(true);
+  let state = (await transactOrchestrator({ ...goalCommand(), payload: { ...goalCommand().payload, workflow: 'RESEARCH' } }, root)).state;
+  const goal = state.goals[0];
+  state = (await transactOrchestrator({ operation_id: 'research-stage', expected_revision: state.revision, action: 'goal.stage.advance', payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: 'research-checkpoint', goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage: 'inventory', completed_receipt_ids: [], artifact_refs: [], next_stage: 'research', created_at: '2026-09-17T13:00:00Z' } } }, root)).state;
+  const command = missionCommand(state.revision);
+  const prepared = await prepareMission(command, root);
+  state = (await transactOrchestrator({ operation_id: 'research-start', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'RUNNING' } }, root)).state;
+  const worktree = state.goals[0].missions[0].worktree_allocation.path;
+  writeFileSync(join(root, worktree, 'src/change.mjs'), 'export const forbidden = true;\n');
+  await assert.rejects(() => submitWorkerReport({ operation_id: 'research-report', expected_revision: state.revision, action: 'report.submit', payload: { goal_id: 'goal-one', report: workerReport(['src/change.mjs']) } }, root), /read-only mission/u);
+});
+
 test('reconciliation preserves dirty terminal worktrees and removes only clean terminal worktrees', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   let prepared = await prepareMission(missionCommand(state.revision), root);
   state = (await transactOrchestrator({ operation_id: 'cancel-one', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'CANCELLED' } }, root)).state;
   const worktree = prepared.state.goals[0].missions[0].worktree_allocation.path;
@@ -140,7 +187,7 @@ test('reconciliation preserves dirty terminal worktrees and removes only clean t
 
 test('reconciliation removes clean terminal worktrees but preserves clean revision divergence', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   let prepared = await prepareMission(missionCommand(state.revision), root);
   const worktree = prepared.state.goals[0].missions[0].worktree_allocation.path;
   state = (await transactOrchestrator({ operation_id: 'cancel-clean', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'CANCELLED' } }, root)).state;
@@ -162,7 +209,7 @@ test('reconciliation removes clean terminal worktrees but preserves clean revisi
 
 test('reconciliation never removes a worktree with an index lock', async () => {
   const root = fixture(true);
-  const goal = await transactOrchestrator(goalCommand(), root);
+  const goal = await createGoalAtWork(root);
   const prepared = await prepareMission(missionCommand(goal.state.revision), root);
   const worktree = prepared.state.goals[0].missions[0].worktree_allocation.path;
   const gitDirectory = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-dir'], { cwd: join(root, worktree), encoding: 'utf8' }).trim();
@@ -174,7 +221,7 @@ test('reconciliation never removes a worktree with an index lock', async () => {
 
 test('rollback captures a bounded recovery proof before force removal', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   const prepared = await prepareMission(missionCommand(state.revision), root);
   const mission = prepared.state.goals[0].missions[0];
   writeFileSync(join(root, mission.worktree_allocation.path, 'src/change.mjs'), 'export const proof = true;\n');
@@ -192,7 +239,7 @@ test('worker authority and symlinked worktrees fail closed', async () => {
   await assert.rejects(() => mutateCoordination(goalCommand(), root, worker), /workers cannot mutate/u);
   mkdirSync(join(root, '.ctxroute/worktrees'), { recursive: true });
   symlinkSync(join(root, 'src'), join(root, '.ctxroute/worktrees/mission-one'));
-  const state = (await transactOrchestrator(goalCommand(), root)).state;
+  const state = (await createGoalAtWork(root)).state;
   await assert.rejects(() => prepareMission(missionCommand(state.revision), root), /symlink|SYMLINK|already exists/u);
 });
 
@@ -205,6 +252,19 @@ test('formal report and audit contracts reject unknown fields and conversational
 });
 
 function goalCommand() { return { operation_id: 'goal-create-one', expected_revision: 0, action: 'goal.create', payload: { goal_id: 'goal-one', title: 'Ship one goal' } }; }
+async function createGoalAtWork(root) {
+  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  for (const [index, completed_stage, next_stage] of [[1, 'inventory', 'planning'], [2, 'planning', 'work']]) {
+    const goal = state.goals[0];
+    state = (await transactOrchestrator({
+      operation_id: `stage-${index}`,
+      expected_revision: state.revision,
+      action: 'goal.stage.advance',
+      payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: `checkpoint-${index}`, goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage, completed_receipt_ids: [], artifact_refs: [], next_stage, created_at: `2026-09-17T12:0${index}:00Z` } },
+    }, root)).state;
+  }
+  return { state };
+}
 function missionCommand(revision, operation_id = 'mission-prepare-one') { return { operation_id, expected_revision: revision, action: 'mission.prepare', payload: { goal_id: 'goal-one', mission: { mission_id: 'mission-one', skill_id: 'blueprint-audit', requested_skill_id: null, skill_version: '1.0.0', file_scope: ['src/', 'lib/'], acceptance: ['Scoped file is valid'], validations: [{ id: 'syntax', executable: 'node', args: ['--check', 'src/change.mjs'], cwd: '.', timeout_ms: 30_000 }], execution: 'coordinated' } } }; }
 function workerReport(files) { return { mission_id: 'mission-one', status: 'READY_FOR_VALIDATION', files_touched: files, validation_results: [{ id: 'syntax', status: 'PASSED', exit_code: 0, duration_ms: 1, timed_out: false, cause: null, diagnostic: null }], summary: 'Worker reports readiness; orchestrator must verify.' }; }
 function fixture(gitRepository = false) {

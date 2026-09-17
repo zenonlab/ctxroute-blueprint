@@ -46,6 +46,8 @@ npm run orchestrator:cli -- promote-experiment receipt.json
 npm run orchestrator:cli -- mutate transaction.json
 npm run orchestrator:cli -- prepare-mission transaction.json
 npm run orchestrator:cli -- submit-report transaction.json
+npm run orchestrator:cli -- commit-mission transaction.json
+npm run orchestrator:cli -- integrate-mission transaction.json
 npm run orchestrator:cli -- reconcile-worktrees transaction.json
 npm run orchestrator:cli -- rollback-mission transaction.json
 npm run orchestrator:cli -- purge-worktree transaction.json
@@ -90,11 +92,33 @@ validation with executable/argument arrays and no shell. It stores only bounded,
 redacted result metadata. Only a successful orchestrator validation receipt may
 move a mission to `COMPLETED`.
 
+Workers have a closed Git read-only allowlist. They cannot stage, commit,
+create or move references, allocate worktrees, integrate, fetch, push, or run
+maintenance. After validation, `commit-mission` creates the commit inside the
+managed worktree and records its exact OID. `integrate-mission` accepts only
+that OID and cherry-picks it on the primary checkout while holding the single
+`repositoryMutationLock`. Both effects persist `PENDING` intent first, so
+bootstrap can converge after interruption without inventing a second commit.
+
 An audit report contains a typed subject, categorical signals, bounded evidence
 references, decision (`accept | repair | reject | defer`), distinct proposed and
 applied actions, structured validations, and a rollback reference.
 Objective adjustments are nested inside `audit.apply`; auditors never write
 orchestrator state directly.
+
+Every accepted stage transition writes a `StageCheckpoint` containing only
+closed identifiers, the frozen digest, completed receipt IDs, bounded artifact
+references, and the exact next stage. A human decision request and its
+checkpoint are one atomic transaction. Resolution validates the digest and
+continues at that next stage without replaying accepted stages. Raw model
+memory, prompts, and conversation history are never checkpointed.
+
+Goal completion is an effect check, not a status shortcut. Read-only outcomes
+must provide an existing report/evidence reference and match the repository
+baseline. Mutating outcomes must name a commit already reachable from primary
+`HEAD`. Recovery outcomes must name existing backup evidence and the verified
+final repository digest. Experiment outcomes require a promotion receipt and
+successful integration first.
 
 ## Recovery and safety
 
@@ -107,14 +131,26 @@ unknown fields are refused without deletion. Legacy mode values are accepted
 without destructive rewriting. Worktrees, reports, and recovery
 evidence are never mutated by state loading.
 
+Hooks consume an atomic, digest-verified policy envelope smaller than 16 KiB.
+They try the current snapshot, then its last-valid copy, then a freshly
+resolved canonical `SWARM + STANDARD` policy. If none is verifiable, only
+mutation tools are denied, with mode, workflow, stage, digest, categorical
+cause, invariant, and a concrete recovery command. Codex and Claude adapt the
+same internal decision separately: policy denials use the host JSON contract;
+a Claude hook infrastructure failure uses stderr plus exit 2 and never mixes
+that exit with JSON.
+
 Reconciliation inventories desired missions, Git registrations, directories,
 cleanliness, base revisions, and locks. It automatically removes only clean
 terminal worktrees. Dirty or ambiguous divergence becomes `NEEDS_ATTENTION`.
 `rollback-mission` captures a bounded restorable binary patch before forced
 removal; capture failure prevents removal. Destructive `purge-worktree` exists
 only in the CLI and requires orchestrator authority, a unique operation ID,
-reason, and exact mission-ID confirmation. It is never exposed through MCP or
-hooks.
+reason, exact mission-ID confirmation, and a matching explicit
+`DecisionReceipt`. It is never exposed through MCP or hooks. Recovery also
+inventories unmanaged or stale worktrees, divergent branches, interrupted Git
+operations, and unreachable commits. Age is evidence for review, never
+authority to delete or rewrite a reference.
 
 Limits apply to bytes, time, parallel worktrees, free disk, telemetry, and
 rollback evidence rather than arbitrary workflow step counts. Worktrees isolate
@@ -127,6 +163,13 @@ Git OID, outcome, and duration metadata only.
 Append and Windows-compatible rotation share a lock. Prompts, conversation, private reasoning,
 environment dumps, raw output, file contents, and credentials are forbidden.
 Transactional state remains authoritative if telemetry fails.
+
+The implementation evidence matrix is maintained in
+[`orchestration-verification.md`](orchestration-verification.md). Architectural
+rationale is split by concern: ADR-0087 defines the three-level model,
+ADR-0088 covers stages and human resumption, ADR-0089 covers repository
+authority and outcome proofs, and ADR-0090 covers atomic snapshots and host
+adapters.
 
 Stop is fail-open, honors `stop_hook_active`, reports bounded diagnostics, and
 never requests automatic continuation. Run `npm run blueprint:review` after

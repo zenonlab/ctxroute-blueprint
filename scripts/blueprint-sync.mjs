@@ -70,10 +70,10 @@ async function blueprintVersion(root) {
 
 export function trackedControlFiles(root = scriptRoot) {
   const repository = resolve(root);
-  const output = execFileSync('git', ['ls-files', '-z', '--', ...CONTROL_FILES, ...CONTROL_DIRECTORIES], {
+  const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', ...CONTROL_FILES, ...CONTROL_DIRECTORIES], {
     cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
   });
-  const allTracked = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean));
+  const allTracked = new Set(execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean));
   const selected = new Set(output.split('\0')
     .filter(Boolean)
     .filter(file => !file.startsWith('.claude/hooks/docs/adr-memory/')));

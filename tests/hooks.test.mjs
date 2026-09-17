@@ -6,7 +6,7 @@ import { get as requestLoopback } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, isBlocking, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
+import { actionableStderr, applicableHandlers, dispatch, dispatchLifecycle, handlerPlan, isBlocking, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
 import { stopReview } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
@@ -85,8 +85,8 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
     PreToolUse: ['pre-tool-architecture.mjs'],
     PostToolUse: ['post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs'],
     UserPromptSubmit: ['problem-memory.mjs'],
-    PreCompact: ['ctxroute-reset.js'],
-    Stop: ['worker-restitution.mjs', 'ctxroute-reset.js', 'stop-review.mjs'],
+    PreCompact: ['ctxroute-reset.mjs'],
+    Stop: ['worker-restitution.mjs', 'ctxroute-reset.mjs', 'stop-review.mjs'],
   };
   for (const event of lifecycleEvents) {
     assert.deepEqual(handlerPlan('codex', event, root).map(handler => handler.name), expected[event]);
@@ -221,23 +221,12 @@ test('the lifecycle dispatcher hides only the Node 22 SQLite stability warning',
   assert.equal(actionableStderr(`${warning}\nreal diagnostic`), 'real diagnostic');
 });
 
-test('the lifecycle handler executor suppresses the SQLite warning but preserves diagnostics', () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'lifecycle-handler-'));
-  const hook = join(cwd, 'fixture.mjs');
-  writeFileSync(hook, [
-    "process.stderr.write('(node:14537) ExperimentalWarning: SQLite is an experimental feature and might change at any time\\n');",
-    "process.stderr.write('(Use `node --trace-warnings ...` to show where the warning was created)\\n');",
-    "process.stderr.write('real diagnostic\\n');",
-    "process.stdout.write(JSON.stringify({ continue: true }));",
-  ].join('\n'));
-  try {
-    assert.deepEqual(executeHandler({ path: hook, args: [] }, '{}', cwd), {
-      stderr: 'real diagnostic',
-      outputs: [{ continue: true }],
-    });
-  } finally {
-    rmSync(cwd, { recursive: true, force: true });
-  }
+test('the production lifecycle imports handlers in-process without nested Node execution', async () => {
+  for (const event of lifecycleEvents) for (const handler of handlerPlan('codex', event, root)) assert.equal(handler.run instanceof Function, true, `${event}:${handler.name}`);
+  const source = readFileSync(join(root, '.codex/hooks/lifecycle.mjs'), 'utf8');
+  assert.doesNotMatch(source, /spawnSync|execFileSync|child_process/u);
+  const result = await dispatchLifecycle({ harness: 'codex', event: 'PreToolUse', input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'README.md' } }), root });
+  assert.equal(result, null);
 });
 
 test('merged lifecycle output preserves messages and context', () => {

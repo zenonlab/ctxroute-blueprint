@@ -6,7 +6,7 @@ import {
 import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
 import { runMissionValidations } from './orchestrator-validation.mjs';
 import {
-  inspectMissionChanges, prepareMissionWorktree, purgeMissionWorktree, reconcileManagedWorktrees,
+  commitMissionWorktree, inspectMissionChanges, integrateMissionCommit, inventoryRepositoryRecovery, prepareMissionWorktree, purgeMissionWorktree, reconcileManagedWorktrees,
   recoverMissionWorktree, recoverRollbackProof, rollbackMissionWorktree,
 } from './worktree-manager.mjs';
 import { resolve } from 'node:path';
@@ -43,7 +43,11 @@ export async function bootstrapOrchestrator(root = process.cwd(), dependencies =
       const hasManagedEntries = managedRoot ? managedRoot.isSymbolicLink() || !managedRoot.isDirectory() || (await readdir(managedPath)).length > 0 : false;
       if (hasAllocations || hasManagedEntries) recoveryCauses.push(error.causeCode ?? 'WORKTREE_INVENTORY_FAILED');
     }
-    const attention = reconciliation.results.filter(item => item.action === 'NEEDS_ATTENTION');
+    let repositoryInventory = [];
+    try { repositoryInventory = await inventoryRepositoryRecovery(root, locked); }
+    catch (error) { recoveryCauses.push(error.causeCode ?? 'GIT_RECOVERY_INVENTORY_FAILED'); }
+    const combinedClassifications = [...reconciliation.results, ...repositoryInventory].sort((left, right) => left.path.localeCompare(right.path));
+    const attention = combinedClassifications.filter(item => item.action === 'NEEDS_ATTENTION');
     const latestOperations = new Map();
     for (const item of state.worktree_operations) latestOperations.set(item.mission_id, item);
     const stateAttention = [...latestOperations.values()].filter(item => item.status !== 'COMPLETED' && item.classification === 'NEEDS_ATTENTION');
@@ -54,8 +58,8 @@ export async function bootstrapOrchestrator(root = process.cwd(), dependencies =
       ...stateAttention.map(item => item.cause ?? 'NEEDS_ATTENTION'),
       ...blockedRecovery.map(item => item.cause),
     ])].sort();
-    const status = causes.length ? 'BLOCKED' : reconciliation.results.some(item => ['TERMINAL_CLEAN', 'REGISTERED_PATH_MISSING', 'ORPHAN_REGISTERED_MISSING'].includes(item.classification)) ? 'DEGRADED' : 'READY';
-    const classifications = reconciliation.results;
+    const status = causes.length ? 'BLOCKED' : combinedClassifications.some(item => ['TERMINAL_CLEAN', 'REGISTERED_PATH_MISSING', 'ORPHAN_REGISTERED_MISSING'].includes(item.classification)) ? 'DEGRADED' : 'READY';
+    const classifications = combinedClassifications;
     const inventory_digest = createHash('sha256').update(stableJson(classifications)).digest('hex');
     const report = { status, inventory_digest, classifications, causes, recovery_actions: status === 'BLOCKED' ? [...RECOVERY_ACTIONS] : [], changed: prepared.initialized || prepared.cleaned || state.revision !== initialRevision };
     assertOrchestratorContract('bootstrap-report', report);
@@ -76,6 +80,8 @@ async function resumePending(receipt, root, dependencies) {
   const command = commandFrom(receipt);
   if (receipt.action === 'mission.prepare') return resumePreparation(command, root, dependencies);
   if (receipt.action === 'report.submit') return resumeReport(command, root, dependencies);
+  if (receipt.action === 'mission.commit') return resumeCommit(command, root, dependencies);
+  if (receipt.action === 'mission.integrate') return resumeIntegration(command, root, dependencies);
   if (receipt.action === 'worktree.reconcile') {
     const before = await readOrchestratorState(root);
     const reconciliation = await reconcileManagedWorktrees(root, { ...dependencies, repair: command.payload.repair });
@@ -117,6 +123,28 @@ async function resumeReport(command, root, dependencies) {
   const receipt = await runMissionValidations(mission, resolve(root, mission.worktree_allocation.path), root, dependencies);
   if (receipt.status !== 'PASSED') return blockOrchestratorTransaction(command, receipt.status === 'TIMED_OUT' ? 'VALIDATION_TIMEOUT' : 'VALIDATION_FAILED', root, dependencies, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'BLOCKED', report, validation_receipt: receipt })));
   return completeOrchestratorTransaction(command, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt })), 'UPDATED', root, dependencies);
+}
+
+async function resumeCommit(command, root, dependencies) {
+  const state = await readOrchestratorState(root);
+  const found = findMission(state, command.payload.mission_id);
+  if (!found || found.goal.goal_id !== command.payload.goal_id) throw categorized('COMMIT_RECOVERY_UNPROVABLE', 'pending commit mission is missing');
+  const committed = await commitMissionWorktree(found.mission, command.payload.message, root, dependencies);
+  return completeOrchestratorTransaction(command, current => {
+    const updated = updateMission(current, command.payload.goal_id, command.payload.mission_id, mission => ({ ...mission, orchestrator_commit: committed.commit }));
+    return { ...updated, worktree_operations: updated.worktree_operations.map(item => item.operation_id === command.operation_id ? { ...item, status: 'COMPLETED', classification: 'COMMITTED', dirty: false } : item) };
+  }, 'UPDATED', root, dependencies);
+}
+
+async function resumeIntegration(command, root, dependencies) {
+  const state = await readOrchestratorState(root);
+  const found = findMission(state, command.payload.mission_id);
+  if (!found || found.goal.goal_id !== command.payload.goal_id || found.mission.orchestrator_commit !== command.payload.commit_oid) throw categorized('INTEGRATION_RECOVERY_UNPROVABLE', 'pending integration mission is missing or changed');
+  const integration = await integrateMissionCommit(command.payload.commit_oid, root, dependencies);
+  return completeOrchestratorTransaction(command, current => {
+    const updated = updateMission(current, command.payload.goal_id, command.payload.mission_id, mission => ({ ...mission, integrated_commit: integration.integrated_commit }));
+    return { ...updated, worktree_operations: updated.worktree_operations.map(item => item.operation_id === command.operation_id ? { ...item, status: 'COMPLETED', classification: 'INTEGRATED', base_revision: integration.integrated_commit } : item) };
+  }, 'UPDATED', root, dependencies);
 }
 
 async function resumeRollback(command, root, dependencies) {

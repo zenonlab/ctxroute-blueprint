@@ -32,6 +32,25 @@
         "workflow": { "enum": ["STANDARD", "RESEARCH", "AUDIT", "SECURITY", "MIGRATION", "INCIDENT", "EXPERIMENT", "RECOVERY"] },
         "policy_digest": { "$ref": "common.schema.json#/$defs/digest" },
         "stage": { "type": "string" },
+        "stage_index": { "type": "integer", "minimum": 0 },
+        "strategy": { "enum": ["deterministic", "primary", "single-worker", "parallel-workers", "independent-auditor", "human-decision"] },
+        "resolved_policy": { "$ref": "resolved-execution-policy.schema.json" },
+        "reinforcements": { "type": "array", "uniqueItems": true, "items": { "type": "string", "maxLength": 512 } },
+        "policy_justification": { "type": "array", "uniqueItems": true, "items": { "type": "string", "maxLength": 512 } },
+        "repository_baseline": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["head", "status_digest"],
+              "properties": {
+                "head": { "$ref": "common.schema.json#/$defs/gitOid" },
+                "status_digest": { "$ref": "common.schema.json#/$defs/digest" }
+              },
+              "unevaluatedProperties": false
+            }
+          ]
+        },
         "outcome_receipt_id": { "oneOf": [{ "$ref": "common.schema.json#/$defs/identifier" }, { "type": "null" }] }
       },
       "unevaluatedProperties": false
@@ -56,7 +75,7 @@
       "properties": {
         "operation_id": { "$ref": "common.schema.json#/$defs/identifier" },
         "digest": { "$ref": "common.schema.json#/$defs/digest" },
-        "action": { "enum": ["operating-mode.set", "mode.set", "goal.create", "goal.transition", "goal.policy.rebase", "decision.request", "decision.resolve", "experiment.promote", "mission.prepare", "mission.transition", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
+        "action": { "enum": ["operating-mode.set", "mode.set", "goal.create", "goal.stage.advance", "goal.transition", "goal.policy.rebase", "decision.request", "decision.resolve", "experiment.promote", "mission.prepare", "mission.commit", "mission.integrate", "mission.transition", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
         "intent": { "type": ["object", "null"] },
         "status": { "enum": ["PENDING", "COMPLETED", "BLOCKED"] },
         "start_revision": { "type": "integer", "minimum": 0 },

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { bootstrapOrchestrator } from './orchestrator-bootstrap.mjs';
-import { contextQuery, explainExecution, listOperatingModes, mutateCoordination, pendingDecisions, prepareMission, promoteExperiment, purgeWorktree, readCoordination, reconcileWorktrees, resolveDecision, rollbackMission, setOperatingMode, submitWorkerReport } from './orchestrator-service.mjs';
+import { commitMission, contextQuery, explainExecution, integrateMission, listOperatingModes, mutateCoordination, pendingDecisions, prepareMission, promoteExperiment, purgeWorktree, readCoordination, reconcileWorktrees, resolveDecision, rollbackMission, setOperatingMode, submitWorkerReport } from './orchestrator-service.mjs';
 
 const [command, argument] = process.argv.slice(2);
 try {
@@ -22,11 +22,13 @@ try {
     else if (command === 'promote-experiment') result = await promoteExperiment(input);
     else if (command === 'prepare-mission') result = await prepareMission(input);
     else if (command === 'submit-report') result = await submitWorkerReport(input);
+    else if (command === 'commit-mission') result = await commitMission(input);
+    else if (command === 'integrate-mission') result = await integrateMission(input);
     else if (command === 'reconcile-worktrees') result = await reconcileWorktrees(input);
     else if (command === 'rollback-mission') result = await rollbackMission(input);
     else if (command === 'purge-worktree') result = await purgeWorktree(input);
     else if (command === 'context') result = await contextQuery(input);
-    else throw new Error('usage: doctor | read | modes | pending-decisions | mutate | set-mode | explain-execution | resolve-decision | promote-experiment | prepare-mission | submit-report | reconcile-worktrees | rollback-mission | purge-worktree | context <input.json>');
+    else throw new Error('usage: doctor | read | modes | pending-decisions | mutate | set-mode | explain-execution | resolve-decision | promote-experiment | prepare-mission | submit-report | commit-mission | integrate-mission | reconcile-worktrees | rollback-mission | purge-worktree | context <input.json>');
   }
   process.stdout.write(`${JSON.stringify({ ok: true, result }, null, 2)}\n`);
 } catch (error) {

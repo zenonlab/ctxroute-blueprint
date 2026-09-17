@@ -12,7 +12,7 @@ const stages = Object.freeze({
   SECURITY: [['inventory', 'deterministic'], ['research', 'parallel-workers'], ['planning', 'primary'], ['work', 'single-worker'], ['validation', 'deterministic'], ['audit', 'independent-auditor'], ['integration', 'deterministic']],
   MIGRATION: [['inventory', 'deterministic'], ['planning', 'primary'], ['work', 'parallel-workers'], ['validation', 'deterministic'], ['integration', 'deterministic'], ['recovery', 'deterministic']],
   INCIDENT: [['inventory', 'deterministic'], ['research', 'parallel-workers'], ['decision', 'primary'], ['work', 'single-worker'], ['validation', 'deterministic'], ['integration', 'deterministic']],
-  EXPERIMENT: [['inventory', 'deterministic'], ['planning', 'primary'], ['work', 'single-worker'], ['validation', 'deterministic'], ['promotion', 'human-decision']],
+  EXPERIMENT: [['inventory', 'deterministic'], ['planning', 'primary'], ['work', 'single-worker'], ['validation', 'deterministic'], ['promotion', 'human-decision'], ['integration', 'deterministic']],
   RECOVERY: [['inventory', 'deterministic'], ['recovery', 'single-worker'], ['decision', 'human-decision'], ['validation', 'deterministic']],
 });
 
@@ -41,6 +41,13 @@ export function policyDigest(value) {
   return createHash('sha256').update(stableJson(value)).digest('hex');
 }
 
+export function hasValidPolicyDigest(policy) {
+  if (!policy || policy !== Object(policy) || policy.policy_digest !== String(policy.policy_digest ?? '')) return false;
+  const unsigned = { ...policy };
+  delete unsigned.policy_digest;
+  return policy.policy_digest === policyDigest(unsigned);
+}
+
 export function resolveExecutionPolicy(input = {}) {
   const requestedMode = canonicalMode(input.requested_mode ?? input.mode ?? 'SWARM');
   const workflow = WORKFLOWS.includes(input.workflow) ? input.workflow : 'STANDARD';
@@ -55,6 +62,8 @@ export function resolveExecutionPolicy(input = {}) {
   const modelFloor = Math.max(0, ...layers.map(item => Number(item.model_floor ?? 0)));
   const parallelLimit = Math.min(...layers.map(item => Number(item.parallel_limit ?? Number.POSITIVE_INFINITY)));
   const writeAllowed = !workflowDescriptor.read_only && layers.every(item => item.write_allowed !== false);
+  const isolationRequired = layers.some(item => item.isolation_required === true) || ['SWARM', 'SOLO'].includes(mode);
+  const criticalAuditRequired = layers.some(item => item.critical_audit_required === true) || ['STANDARD', 'SECURITY'].includes(workflow);
   const capabilities = new Set(input.capabilities ?? []);
   const missing = requirements.filter(item => !capabilities.has(item));
   const stagesResolved = workflowDescriptor.stages.map(item => ({
@@ -76,6 +85,8 @@ export function resolveExecutionPolicy(input = {}) {
     requested_mode: requestedMode, mode, workflow, permissions, requirements, risk_floor: riskFloor,
     model_floor: modelFloor, parallel_limit: Number.isFinite(parallelLimit) ? parallelLimit : 1,
     write_allowed: writeAllowed, repository_mutation_serialized: true, stages: stagesResolved,
+    isolation_required: isolationRequired, critical_audit_required: criticalAuditRequired,
+    parallel_writers_allowed: Number(input.parallel_writers ?? 1) <= 1 || input.disjoint_write_scopes_proven === true,
     reinforcements: explainReinforcements(mode, workflowDescriptor),
   });
 }

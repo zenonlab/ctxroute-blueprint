@@ -1,6 +1,5 @@
-import { spawnSync } from 'node:child_process';
 import process from 'node:process';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hookContract } from './lifecycle-contract.mjs';
 import { classifyGitCommand } from '../../scripts/git-command-policy.mjs';
@@ -21,18 +20,17 @@ const MAX_CONTEXT_LENGTH = 4096;
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
 export function handlerPlan(harness, event, root = projectRoot) {
-  const local = name => ({ name, path: join(root, '.codex', 'hooks', name), args: [] });
-  const problemMemory = event => ({ name: 'problem-memory.mjs', path: join(root, '.codex', 'hooks', 'problem-memory.mjs'), args: [event] });
-  const direct = (name, ...args) => ({ name, path: join(root, 'node_modules', 'ctxroute', 'src', 'hooks', name), args });
+  const local = (name, run) => ({ name, run });
+  const memory = memoryEvent => local('problem-memory.mjs', async (input, _root, environment) => (await import('./problem-memory.mjs')).handle(input, memoryEvent, { stateDirectory: environment.CTXROUTE_STATE_DIR }));
   if (harness !== 'codex' && harness !== 'claude') return [];
 
   return {
-    SessionStart: [local('worktree-reconcile.mjs'), local('mission-context.mjs')],
-    PreToolUse: [local('pre-tool-architecture.mjs')],
-    PostToolUse: [local('post-tool-sensor.mjs'), problemMemory('PostToolUse'), local('post-tool-audit.mjs')],
-    UserPromptSubmit: [problemMemory('UserPromptSubmit')],
-    PreCompact: [direct('ctxroute-reset.js')],
-    Stop: [local('worker-restitution.mjs'), direct('ctxroute-reset.js'), local('stop-review.mjs')],
+    SessionStart: [local('worktree-reconcile.mjs', async (_input, project) => (await import('./worktree-reconcile.mjs')).reconcileHook(project)), local('mission-context.mjs', async (_input, project, environment) => (await import('./mission-context.mjs')).missionContext(environment.CTXROUTE_MISSION_ID, project))],
+    PreToolUse: [local('pre-tool-architecture.mjs', async input => (await import('./pre-tool-architecture.mjs')).preToolArchitecture(input))],
+    PostToolUse: [local('post-tool-sensor.mjs', async (input, _project, environment) => (await import('./post-tool-sensor.mjs')).postToolSensor(input, { stateDirectory: environment.CTXROUTE_STATE_DIR })), memory('PostToolUse'), local('post-tool-audit.mjs', async input => (await import('./post-tool-audit.mjs')).postToolAudit(input))],
+    UserPromptSubmit: [memory('UserPromptSubmit')],
+    PreCompact: [local('ctxroute-reset.mjs', async (input, project, environment) => (await import('./ctxroute-reset.mjs')).resetCtxrouteContext(input, project, environment))],
+    Stop: [local('worker-restitution.mjs', async (_input, project, environment) => (await import('./worker-restitution.mjs')).restituteWorker(environment.CTXROUTE_WORKER_REPORT, project, environment)), local('ctxroute-reset.mjs', async (input, project, environment) => (await import('./ctxroute-reset.mjs')).resetCtxrouteContext(input, project, environment)), local('stop-review.mjs', async input => (await import('./stop-review.mjs')).stopReview(parseInput(input), root))],
   }[event] ?? [];
 }
 
@@ -81,7 +79,7 @@ export function isBlocking(output) {
     || output?.continue === false;
 }
 
-export function dispatch({ harness, event, input, root = projectRoot, execute = executeHandler, environment = process.env }) {
+export function dispatch({ harness, event, input, root = projectRoot, execute, environment = process.env }) {
   const workerPolicy = workerGitPolicyDecision(harness, event, input, environment);
   if (workerPolicy) return workerPolicy;
   const plan = applicableHandlers(handlerPlan(harness, event, root), event, input);
@@ -101,6 +99,34 @@ export function dispatch({ harness, event, input, root = projectRoot, execute = 
     for (const output of result.outputs ?? []) {
       if (isBlocking(output)) return output;
       outputs.push(output);
+    }
+  }
+  return mergeOutputs(event, outputs, notices, hookContract(harness, event, 'synchronous', root).contextLimit);
+}
+
+export async function dispatchLifecycle({ harness, event, input, root = projectRoot, environment = process.env }) {
+  const workerPolicy = workerGitPolicyDecision(harness, event, input, environment);
+  if (workerPolicy) return workerPolicy;
+  const plan = applicableHandlers(handlerPlan(harness, event, root), event, input);
+  if (event === 'PreToolUse' && plan.length === 0) return null;
+  const resolved = await (await import('./resolved-policy.mjs')).resolvedPolicyDecision(input, root, environment);
+  if (resolved.decision) {
+    const adapted = adaptHostDecision(harness, event, resolved.decision);
+    if (adapted.exitCode !== 0) return { __hostExit: adapted };
+    return adapted.stdout ? JSON.parse(adapted.stdout) : null;
+  }
+  if (!lifecycleEvents.includes(event) || !plan.length) {
+    return { systemMessage: `Lifecycle ${event || '(missing)'} failed open: unsupported ${harness || '(missing)'} configuration.` };
+  }
+  const outputs = [];
+  const notices = resolved.source === 'last-valid' && resolved.diagnostic ? [`Lifecycle ${event} policy source ${resolved.source}: ${resolved.diagnostic}`] : [];
+  for (const handler of plan) {
+    try {
+      const output = await handler.run(input, root, environment);
+      if (isBlocking(output)) return output;
+      if (output) outputs.push(output);
+    } catch (error) {
+      notices.push(`Lifecycle ${event} handler ${handler.name} failed open: ${error.message}`);
     }
   }
   return mergeOutputs(event, outputs, notices, hookContract(harness, event, 'synchronous', root).contextLimit);
@@ -132,45 +158,13 @@ export function applicableHandlers(plan, event, input) {
   return plan.filter(handler => handler.name !== 'pre-tool-architecture.mjs');
 }
 
-export function executeHandler(handler, input, root) {
-  const result = spawnSync(process.execPath, [handler.path, ...handler.args], {
-    cwd: root,
-    env: ctxrouteEnvironment(root),
-    input,
-    encoding: 'utf8',
-    timeout: 30_000,
-  });
-  const stderr = actionableStderr(result.stderr);
-  if (result.error || (result.status !== 0 && result.status !== null)) {
-    return { error: result.error?.message ?? `exit ${result.status}`, stderr, outputs: [] };
-  }
-
-  const stdout = String(result.stdout ?? '').trim();
-  if (!stdout) return { stderr, outputs: [] };
-  try {
-    return { stderr, outputs: [JSON.parse(stdout)] };
-  } catch {
-    return { error: `invalid JSON output: ${stdout.slice(0, 160)}`, stderr, outputs: [] };
-  }
-}
-
 export function actionableStderr(value) {
   return String(value ?? '')
     .replace(/^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time\r?\n(?:\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)\r?\n?)?/gmu, '')
     .trim();
 }
 
-function ctxrouteEnvironment(root) {
-  return {
-    ...process.env,
-    CTXROUTE_CONFIG_PATH: join(root, 'ctxroute-config.json'),
-    CTXROUTE_DOCS_DIR: join(root, 'docs', 'mcp'),
-    CTXROUTE_FILEDOCS_DIR: join(root, '.claude', 'hooks', 'docs'),
-    CTXROUTE_FLEET_HOOKS_DIR: join(root, '.claude', 'hooks'),
-    CTXROUTE_SESSIONDOCS_DIR: join(root, 'docs', 'session'),
-    CTXROUTE_STATE_DIR: join(root, '.ctxroute', 'state'),
-  };
-}
+function parseInput(value) { try { return JSON.parse(value || '{}'); } catch { return {}; } }
 
 async function stdin() {
   let value = '';
@@ -180,6 +174,10 @@ async function stdin() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const result = dispatch({ harness: process.argv[2], event: process.argv[3], input: await stdin() });
-  if (result) process.stdout.write(JSON.stringify(result));
+  const result = await dispatchLifecycle({ harness: process.argv[2], event: process.argv[3], input: await stdin() });
+  if (result?.__hostExit) {
+    if (result.__hostExit.stdout) process.stdout.write(result.__hostExit.stdout);
+    if (result.__hostExit.stderr) process.stderr.write(result.__hostExit.stderr);
+    process.exitCode = result.__hostExit.exitCode;
+  } else if (result) process.stdout.write(JSON.stringify(result));
 }

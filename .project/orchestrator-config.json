@@ -4,6 +4,8 @@
   "worktreeRoot": ".ctxroute/worktrees",
   "recoveryRoot": ".ctxroute/recovery",
   "telemetryPath": ".ctxroute/orchestrator/events.jsonl",
+  "policySnapshotPath": ".ctxroute/orchestrator/policy.json",
+  "policySnapshotRoot": ".ctxroute/orchestrator/policies",
   "limits": {
     "stateBytes": 524288,
     "reportBytes": 65536,

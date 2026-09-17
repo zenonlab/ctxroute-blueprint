@@ -14,6 +14,8 @@
     "worktreeRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
     "recoveryRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
     "telemetryPath": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "policySnapshotPath": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "policySnapshotRoot": { "$ref": "common.schema.json#/$defs/relativePath" },
     "limits": {
       "type": "object",
       "required": ["stateBytes", "reportBytes", "contextBytes", "lockTimeoutMs", "subprocessTimeoutMs", "parallelWorktrees", "minimumFreeBytes", "telemetryBytes", "recoveryBytes", "auditTraceBytes", "auditTraceFiles"],

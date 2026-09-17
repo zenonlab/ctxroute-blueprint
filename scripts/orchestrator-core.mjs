@@ -4,7 +4,7 @@ import { lstat, mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/p
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
 import { emitDecisionEvent } from './orchestrator-telemetry.mjs';
-import { canonicalMode, decisionCanResolve, resolveExecutionPolicy } from './orchestration-policy-core.mjs';
+import { canonicalMode, decisionCanResolve, hasValidPolicyDigest, resolveExecutionPolicy } from './orchestration-policy-core.mjs';
 
 export const MODES = Object.freeze(['SWARM', 'AUTO', 'SOLO', 'GUARDED', 'DIRECT']);
 export const LEGACY_MODES = Object.freeze(['SWARM_ON', 'SWARM_OFF']);
@@ -20,6 +20,8 @@ const DEFAULTS = Object.freeze({
   worktreeRoot: '.ctxroute/worktrees',
   recoveryRoot: '.ctxroute/recovery',
   telemetryPath: '.ctxroute/orchestrator/events.jsonl',
+  policySnapshotPath: '.ctxroute/orchestrator/policy.json',
+  policySnapshotRoot: '.ctxroute/orchestrator/policies',
   stateBytes: 512 * 1024,
   reportBytes: 64 * 1024,
   contextBytes: 16 * 1024,
@@ -214,7 +216,38 @@ function applyOperation(state, command) {
     if (state.goals.some(goal => goal.goal_id === payload.goal_id)) throw new Error(`goal already exists: ${payload.goal_id}`);
     const policy = resolveExecutionPolicy({ requested_mode: payload.requested_mode ?? canonicalMode(state.mode), workflow: payload.workflow ?? 'STANDARD', capabilities: payload.capabilities ?? ['git'] });
     if (policy.resolution_status !== 'RESOLVED') throw categorized(policy.resolution_status, `goal policy did not resolve: ${policy.causes?.join(', ') ?? policy.missing_capabilities?.join(', ')}`);
-    return { ...state, goals: [...state.goals, { goal_id: payload.goal_id, title: payload.title.trim(), status: 'ACTIVE', missions: [], requested_mode: policy.requested_mode, resolved_mode: policy.mode, workflow: policy.workflow, policy_digest: policy.policy_digest, stage: policy.stages[0]?.stage ?? 'inventory', outcome_receipt_id: null }] };
+    const firstStage = policy.stages[0] ?? { stage: 'inventory', strategy: 'deterministic' };
+    return { ...state, goals: [...state.goals, {
+      goal_id: payload.goal_id, title: payload.title.trim(), status: 'ACTIVE', missions: [],
+      requested_mode: policy.requested_mode, resolved_mode: policy.mode, workflow: policy.workflow,
+      policy_digest: policy.policy_digest, resolved_policy: policy,
+      stage: firstStage.stage, stage_index: 0, strategy: firstStage.strategy,
+      reinforcements: policy.reinforcements ?? [], policy_justification: policy.reinforcements ?? [],
+      repository_baseline: payload.repository_baseline ?? null, outcome_receipt_id: null,
+    }] };
+  }
+  if (command.action === 'goal.stage.advance') {
+    const checkpoint = payload.checkpoint;
+    const goal = state.goals.find(item => item.goal_id === payload.goal_id);
+    if (!goal || goal.status !== 'ACTIVE') throw new Error('stage advancement requires an active goal');
+    assertFrozenPolicy(goal);
+    if (checkpoint.goal_id !== goal.goal_id || checkpoint.policy_digest !== goal.policy_digest || checkpoint.completed_stage !== goal.stage) throw new Error('stage checkpoint does not match the active stage');
+    if (state.checkpoints.some(item => item.checkpoint_id === checkpoint.checkpoint_id)) throw new Error('stage checkpoint was already consumed');
+    const nextIndex = goal.stage_index + 1;
+    const next = goal.resolved_policy.stages[nextIndex];
+    if (!next || next.stage !== checkpoint.next_stage) throw new Error('checkpoint next stage does not match the frozen workflow');
+    const readyExperiment = goal.workflow === 'EXPERIMENT' && next.stage === 'promotion';
+    if (next.strategy === 'human-decision' && !readyExperiment) throw new Error('human-decision stages require an atomic decision.request checkpoint');
+    if (readyExperiment) {
+      const receipt = payload.experiment_receipt;
+      if (!receipt || receipt.goal_id !== goal.goal_id || receipt.policy_digest !== goal.policy_digest || receipt.status !== 'READY_FOR_PROMOTION') throw new Error('experiment terminal stage requires a matching ExperimentReceipt');
+    }
+    const updated = updateGoal(state, goal.goal_id, item => ({ ...item, stage: next.stage, stage_index: nextIndex, strategy: next.strategy, status: readyExperiment ? 'READY_FOR_PROMOTION' : item.status }));
+    return {
+      ...updated,
+      checkpoints: [...updated.checkpoints, checkpoint],
+      experiment_receipts: readyExperiment ? [...updated.experiment_receipts, payload.experiment_receipt] : updated.experiment_receipts,
+    };
   }
   if (command.action === 'goal.transition') {
     const updated = updateGoal(state, payload.goal_id, goal => {
@@ -227,32 +260,59 @@ function applyOperation(state, command) {
   if (command.action === 'goal.policy.rebase') return updateGoal(state, payload.goal_id, goal => {
     if (!['ACTIVE', 'WAITING_FOR_USER_DECISION', 'READY_FOR_PROMOTION'].includes(goal.status)) throw new Error('policy rebase requires a safe checkpoint');
     if (goal.policy_digest !== payload.expected_policy_digest) throw new Error('policy digest mismatch');
-    if (payload.policy.resolution_status !== 'RESOLVED' || payload.policy.repository_mutation_serialized !== true) throw new Error('policy rebase cannot weaken a mechanical invariant');
-    return { ...goal, requested_mode: payload.policy.requested_mode, resolved_mode: payload.policy.mode, workflow: payload.policy.workflow, policy_digest: payload.policy.policy_digest, stage: payload.policy.stages[0]?.stage ?? goal.stage };
+    assertFrozenPolicy(goal);
+    const checkpoint = state.checkpoints.find(item => item.checkpoint_id === payload.checkpoint_id && item.goal_id === goal.goal_id && item.policy_digest === goal.policy_digest);
+    if (!checkpoint || checkpoint.next_stage !== goal.stage) throw new Error('policy rebase requires the current safe checkpoint');
+    if (goal.missions.some(mission => ['ASSIGNED', 'RUNNING'].includes(mission.status))) throw new Error('policy rebase requires no active mission');
+    assertPolicyRebasePreservesInvariants(goal.resolved_policy, payload.policy);
+    const stageIndex = payload.policy.stages.findIndex(item => item.stage === goal.stage);
+    if (stageIndex < 0) throw new Error('rebased policy must preserve the current stage');
+    return { ...goal, requested_mode: payload.policy.requested_mode, resolved_mode: payload.policy.mode, workflow: payload.policy.workflow, policy_digest: payload.policy.policy_digest, resolved_policy: payload.policy, stage_index: stageIndex, strategy: payload.policy.stages[stageIndex].strategy, reinforcements: payload.policy.reinforcements ?? [], policy_justification: payload.policy.reinforcements ?? [] };
   });
   if (command.action === 'decision.request') {
     if (state.decision_requests?.some(item => item.decision_id === payload.request.decision_id)) throw new Error(`decision already exists: ${payload.request.decision_id}`);
     const goal = state.goals.find(item => item.goal_id === payload.request.goal_id);
-    if (!goal || goal.policy_digest !== payload.request.policy_digest || payload.checkpoint.policy_digest !== goal.policy_digest) throw new Error('decision policy digest mismatch');
-    const updated = updateGoal(state, goal.goal_id, item => ({ ...item, status: 'WAITING_FOR_USER_DECISION', stage: payload.checkpoint.next_stage }));
+    if (!goal || goal.policy_digest !== payload.request.policy_digest || payload.checkpoint.policy_digest !== goal.policy_digest || payload.request.checkpoint_id !== payload.checkpoint.checkpoint_id) throw new Error('decision policy digest or checkpoint mismatch');
+    assertFrozenPolicy(goal);
+    if (payload.checkpoint.goal_id !== goal.goal_id || payload.checkpoint.completed_stage !== goal.stage) throw new Error('decision checkpoint does not match the active stage');
+    const nextIndex = goal.stage_index + 1;
+    const next = goal.resolved_policy.stages[nextIndex];
+    if (!next || next.stage !== payload.checkpoint.next_stage) throw new Error('decision request does not match the frozen next stage');
+    const promotionDecision = goal.workflow === 'EXPERIMENT' && goal.status === 'READY_FOR_PROMOTION' && goal.stage === 'promotion' && payload.request.category === 'promotion';
+    if (payload.request.category === 'promotion' && !promotionDecision) throw new Error('promotion decision requires a ready experiment');
+    const updated = updateGoal(state, goal.goal_id, item => ({ ...item, status: 'WAITING_FOR_USER_DECISION' }));
     return { ...updated, decision_requests: [...(updated.decision_requests ?? []), payload.request], checkpoints: [...(updated.checkpoints ?? []), payload.checkpoint] };
   }
   if (command.action === 'decision.resolve') {
     const request = state.decision_requests?.find(item => item.decision_id === payload.receipt.decision_id && item.status === 'PENDING');
     if (!decisionCanResolve(request, payload.receipt)) throw new Error('decision receipt is incompatible with the pending request');
-    const updated = updateGoal(state, request.goal_id, goal => ({ ...goal, status: 'ACTIVE' }));
+    const checkpoint = state.checkpoints.find(item => item.checkpoint_id === request.checkpoint_id && item.goal_id === request.goal_id && item.policy_digest === request.policy_digest);
+    if (!checkpoint) throw new Error('decision checkpoint is missing');
+    const updated = updateGoal(state, request.goal_id, goal => {
+      assertFrozenPolicy(goal);
+      if (request.category === 'promotion') return { ...goal, status: payload.receipt.selection === 'promote' ? 'READY_FOR_PROMOTION' : 'CANCELLED' };
+      const nextIndex = goal.stage_index + 1;
+      const next = goal.resolved_policy.stages[nextIndex];
+      if (!next || next.stage !== checkpoint.next_stage) throw new Error('decision checkpoint no longer matches the frozen workflow');
+      return { ...goal, status: 'ACTIVE', stage: next.stage, stage_index: nextIndex, strategy: next.strategy };
+    });
     return { ...updated, decision_requests: updated.decision_requests.map(item => item.decision_id === request.decision_id ? { ...item, status: 'RESOLVED' } : item), decision_receipts: [...(updated.decision_receipts ?? []), payload.receipt] };
   }
   if (command.action === 'experiment.promote') return updateGoal(state, payload.goal_id, goal => {
     if (goal.workflow !== 'EXPERIMENT' || goal.status !== 'READY_FOR_PROMOTION') throw new Error('experiment is not ready for promotion');
     const receipt = state.decision_receipts?.find(item => item.receipt_id === payload.decision_receipt_id && item.policy_digest === goal.policy_digest && item.selection === 'promote');
     if (!receipt) throw new Error('experiment promotion requires a matching decision receipt');
-    return { ...goal, stage: 'integration' };
+    const integrationIndex = goal.resolved_policy.stages.findIndex(item => item.stage === 'integration');
+    if (integrationIndex < 0) throw new Error('experiment policy has no integration stage');
+    return { ...goal, status: 'ACTIVE', stage: 'integration', stage_index: integrationIndex, strategy: goal.resolved_policy.stages[integrationIndex].strategy };
   });
   if (command.action === 'mission.prepare') {
     const request = payload.mission;
     if (state.goals.some(goal => goal.missions.some(mission => mission.mission_id === request.mission_id))) throw new Error(`mission already exists: ${request.mission_id}`);
-    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : request.file_scope.length === 1 ? 'AUTO_SINGLE_SCOPE' : 'AUTO_COORDINATED', status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null };
+    const goal = state.goals.find(item => item.goal_id === payload.goal_id);
+    assertFrozenPolicy(goal);
+    const stage = goal.resolved_policy.stages[goal.stage_index];
+    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : request.file_scope.length === 1 ? 'AUTO_SINGLE_SCOPE' : 'AUTO_COORDINATED', stage: stage.stage, strategy: stage.strategy, access: stage.access, policy_digest: goal.policy_digest, reinforcements: goal.reinforcements ?? [], status: 'PREPARING', worktree_allocation: null, orchestrator_commit: null, integrated_commit: null, report: null, validation_receipt: null };
     assertOrchestratorContract('mission-record', record);
     return addMission(state, payload.goal_id, record);
   }
@@ -270,7 +330,7 @@ function applyOperation(state, command) {
     if (state.skills.some(skill => skill.skill_id === payload.skill_id)) throw new Error(`skill already registered: ${payload.skill_id}`);
     return { ...state, skills: [...state.skills, { skill_id: payload.skill_id, version: payload.version, path: payload.path, artifact_digest: payload.artifact_digest, validation_receipt: payload.validation_receipt, audit_id: payload.audit_id, registered_revision: state.revision + 1 }] };
   }
-  if (['worktree.reconcile', 'mission.rollback', 'worktree.purge'].includes(command.action)) throw new Error(`${command.action} requires the orchestrator service effect handler`);
+  if (['mission.commit', 'mission.integrate', 'worktree.reconcile', 'mission.rollback', 'worktree.purge'].includes(command.action)) throw new Error(`${command.action} requires the orchestrator service effect handler`);
   throw new Error(`unsupported orchestrator action: ${command.action}`);
 }
 
@@ -388,7 +448,8 @@ function eventType(action) { if (action === 'report.submit') return 'VALIDATION'
 function entityType(action) { if (action === 'report.submit') return 'validation'; if (action.startsWith('goal.')) return 'goal'; if (action.startsWith('mission.')) return 'mission'; if (action.startsWith('worktree.')) return 'worktree'; if (action.startsWith('audit.')) return 'audit'; if (action.startsWith('skill.')) return 'skill'; if (action.endsWith('mode.set')) return 'mode'; return 'transaction'; }
 function entityId(command) { return command.payload?.mission_id ?? command.payload?.report?.mission_id ?? command.payload?.goal_id ?? command.payload?.audit_id ?? command.payload?.skill_id ?? null; }
 function decisionEvents(command, before, after, result, cause = null) {
-  const common = { operation_id: command.operation_id, revision_before: before.revision, revision_after: after.revision, result, cause };
+  const context = policyEventContext(command, before, after);
+  const common = { operation_id: command.operation_id, revision_before: before.revision, revision_after: after.revision, result, cause, ...context };
   const events = [];
   const beforeEntity = transitionEntity(before, command);
   const afterEntity = transitionEntity(after, command);
@@ -400,6 +461,24 @@ function decisionEvents(command, before, after, result, cause = null) {
   for (const item of validationResults) events.push({ ...common, event_type: 'VALIDATION', entity_type: 'validation', entity_id: item.id, validation_id: item.id, duration_ms: item.duration_ms, exit_code: item.exit_code, policy_id: 'mission-validation', schema_id: 'validation-receipt', git_oid_before: beforeEntity?.worktree_allocation?.base_revision ?? null, git_oid_after: afterEntity?.worktree_allocation?.base_revision ?? null, evidence_digest: evidenceDigest({ id: item.id, status: item.status, exit_code: item.exit_code, cause: item.cause }) });
   if (events.length === 0) events.push({ ...common, event_type: cause ? 'BLOCKED' : eventType(command.action), entity_type: entityType(command.action), entity_id: entityId(command), policy_id: actionPolicy(command.action), schema_id: 'transaction', evidence_digest: evidenceDigest({ action: command.action, result, cause }) });
   return events;
+}
+function policyEventContext(command, before, after) {
+  const goalId = command.payload?.goal_id;
+  const missionId = command.payload?.mission_id ?? command.payload?.report?.mission_id ?? command.payload?.mission?.mission_id;
+  const located = missionId ? findMission(after, missionId) ?? findMission(before, missionId) : null;
+  const goal = located?.goal ?? after.goals.find(item => item.goal_id === goalId) ?? before.goals.find(item => item.goal_id === goalId);
+  if (!goal?.policy_digest) return {};
+  const mission = located?.mission;
+  return {
+    requested_mode: goal.requested_mode ?? null,
+    resolved_mode: goal.resolved_mode ?? null,
+    workflow: goal.workflow ?? null,
+    stage: mission?.stage ?? goal.stage ?? null,
+    strategy: mission?.strategy ?? goal.strategy ?? null,
+    policy_digest: goal.policy_digest,
+    reinforcements: goal.reinforcements ?? [],
+    policy_justification: goal.policy_justification ?? [],
+  };
 }
 function transitionEntity(state, command) {
   if (command.action.startsWith('goal.')) return state.goals.find(goal => goal.goal_id === command.payload.goal_id) ?? null;
@@ -415,5 +494,16 @@ function validateOutcomeForGoal(goal, receipt) {
   if (goal.workflow === 'EXPERIMENT' && receipt.effect !== 'experiment') throw new Error('experiment completion requires an experiment outcome');
   if (['RESEARCH', 'AUDIT'].includes(goal.workflow) && (receipt.effect !== 'read-only' || receipt.repository_unchanged !== true)) throw new Error('read-only completion requires unchanged-repository evidence');
   if (!['RESEARCH', 'AUDIT', 'RECOVERY'].includes(goal.workflow) && !receipt.integrated_commit) throw new Error('mutation completion requires an integrated commit');
+}
+function assertFrozenPolicy(goal) {
+  if (!goal?.resolved_policy || goal.policy_digest !== goal.resolved_policy.policy_digest || !hasValidPolicyDigest(goal.resolved_policy)) throw new Error('goal frozen policy digest is invalid');
+}
+function assertPolicyRebasePreservesInvariants(before, after) {
+  if (after.resolution_status !== 'RESOLVED' || !hasValidPolicyDigest(after)) throw new Error('rebased policy must be a valid resolved policy');
+  if (before.repository_mutation_serialized && !after.repository_mutation_serialized) throw new Error('policy rebase cannot weaken repository mutation serialization');
+  if (before.isolation_required && !after.isolation_required) throw new Error('policy rebase cannot weaken mandatory isolation');
+  if (before.critical_audit_required && !after.critical_audit_required) throw new Error('policy rebase cannot remove critical audit');
+  if (!before.write_allowed && after.write_allowed) throw new Error('policy rebase cannot grant write access denied by the frozen policy');
+  if ((after.risk_floor ?? 0) < (before.risk_floor ?? 0) || (after.model_floor ?? 0) < (before.model_floor ?? 0)) throw new Error('policy rebase cannot lower risk or model floors');
 }
 function escapeRegex(value) { return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'); }

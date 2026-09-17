@@ -1,13 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://ctxroute.dev/schemas/orchestrator/outcome-receipt.schema.json",
-  "type": "object", "required": ["receipt_id", "goal_id", "effect", "policy_digest", "evidence_refs", "repository_unchanged", "integrated_commit", "completed_at"],
+  "type": "object", "required": ["receipt_id", "goal_id", "effect", "policy_digest", "evidence_refs", "repository_unchanged", "integrated_commit", "recovery_backup_refs", "final_repository_digest", "completed_at"],
   "properties": {
     "receipt_id": { "$ref": "common.schema.json#/$defs/identifier" }, "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "effect": { "enum": ["read-only", "mutation", "recovery", "experiment"] },
     "policy_digest": { "$ref": "common.schema.json#/$defs/digest" }, "evidence_refs": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/relativePath" } },
     "repository_unchanged": { "type": ["boolean", "null"] }, "integrated_commit": { "oneOf": [{ "$ref": "common.schema.json#/$defs/gitOid" }, { "type": "null" }] },
+    "recovery_backup_refs": { "type": "array", "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/relativePath" } },
+    "final_repository_digest": { "oneOf": [{ "$ref": "common.schema.json#/$defs/digest" }, { "type": "null" }] },
     "completed_at": { "$ref": "common.schema.json#/$defs/timestamp" }
   }, "allOf": [
-    { "if": { "properties": { "effect": { "const": "read-only" } } }, "then": { "properties": { "repository_unchanged": { "const": true }, "integrated_commit": { "type": "null" } } } },
-    { "if": { "properties": { "effect": { "enum": ["mutation", "experiment"] } } }, "then": { "properties": { "integrated_commit": { "$ref": "common.schema.json#/$defs/gitOid" } } } }
+    { "if": { "properties": { "effect": { "const": "read-only" } } }, "then": { "properties": { "repository_unchanged": { "const": true }, "integrated_commit": { "type": "null" }, "recovery_backup_refs": { "type": "array", "maxItems": 0 }, "final_repository_digest": { "type": "null" } } } },
+    { "if": { "properties": { "effect": { "enum": ["mutation", "experiment"] } } }, "then": { "properties": { "integrated_commit": { "$ref": "common.schema.json#/$defs/gitOid" }, "recovery_backup_refs": { "type": "array", "maxItems": 0 }, "final_repository_digest": { "type": "null" } } } },
+    { "if": { "properties": { "effect": { "const": "recovery" } } }, "then": { "properties": { "integrated_commit": { "type": "null" }, "recovery_backup_refs": { "type": "array", "minItems": 1 }, "final_repository_digest": { "$ref": "common.schema.json#/$defs/digest" } } } }
   ], "unevaluatedProperties": false
 }

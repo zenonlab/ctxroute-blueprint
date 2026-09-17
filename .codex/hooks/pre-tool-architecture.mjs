@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 import {
   isAdr,
   isArchitectureEvidence,
@@ -16,8 +17,14 @@ import {
 } from '../../.githooks/project-policy.mjs';
 import { decisionDiagnostics, loadAdrs, syncAdrRules } from './decision-memory.mjs';
 
+export function preToolArchitecture(rawInput) {
+  try { return evaluateArchitecturePolicy(rawInput); }
+  catch (error) { if (error instanceof HookOutput) return error.output; throw error; }
+}
+
+function evaluateArchitecturePolicy(rawInput) {
 let input;
-try { input = JSON.parse(await stdin()); }
+try { input = rawInput === String(rawInput) ? JSON.parse(rawInput || '{}') : rawInput; }
 catch { block('Write blocked: invalid hook input.'); }
 const toolInput = input.tool_input ?? {};
 const paths = extractPaths(toolInput);
@@ -26,8 +33,7 @@ const { config, failures } = loadProjectConfig();
 if (failures.length) {
   const repairPaths = new Set(['.codex/architecture-policy.json', '.project/project-config.json']);
   if (paths.length && paths.every(path => repairPaths.has(path))) {
-    context(`Configuration repair allowed: ${failures.join(', ')}`);
-    process.exit(0);
+    return context(`Configuration repair allowed: ${failures.join(', ')}`);
   }
   block(['Write blocked: invalid project configuration.', ...failures]);
 }
@@ -37,14 +43,12 @@ const command = commandText(toolInput);
 const mutationTool = /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(toolName);
 if (toolName === 'apply_refactor_tool') {
   if (toolInput.dry_run === true) {
-    context('CRG refactor preview allowed. Apply accepted changes with normal editing tools so architecture and Sensor controls remain active.');
-    process.exit(0);
+    return context('CRG refactor preview allowed. Apply accepted changes with normal editing tools so architecture and Sensor controls remain active.');
   }
   block('Write blocked: apply_refactor_tool is restricted to dry_run: true; use normal editing tools for real changes.');
 }
 if (isShellTool(toolName) && isCrgGraphCommand(command)) {
-  context('CRG graph maintenance allowed: generated writes are confined to .code-review-graph/.');
-  process.exit(0);
+  return context('CRG graph maintenance allowed: generated writes are confined to .code-review-graph/.');
 }
 if (isShellTool(toolName) && config.status === 'template' && !isSafeTemplateCommand(command)) {
   block('Write blocked: only read and validation commands, plus the project bootstrap, are allowed before initialization is complete.');
@@ -57,7 +61,7 @@ if (paths.includes('.project/project-config.json') && /["']status["']\s*:\s*["']
 }
 
 if (!paths.length) {
-  process.exit(0);
+  return null;
 }
 
 // Template-mode decisions depend only on the declared starter boundary. Avoid
@@ -71,7 +75,7 @@ if (config.status === 'template') {
       'Complete the brief, decisions, Archify architecture evidence, and quality strategy, then set the configuration to initialized before writing product code.',
     ]);
   }
-  process.exit(0);
+  return null;
 }
 
 const changePaths = [...new Set([...paths, ...gitChangedFiles()])];
@@ -115,14 +119,15 @@ if (codeOutsideDeclaredRoots.length) {
 const newSourceFiles = paths.filter(path => isSourcePath(path, config) && !existsSync(path) && !isTestPath(path, config));
 const structuralChange = paths.some(path => isSourcePath(path, config)) && hasStructuralSignal(addedContent(toolInput));
 if ((newSourceFiles.length || structuralChange) && !architectureEvidence) {
-  context(`Potential structural change in ${(newSourceFiles.length ? newSourceFiles : paths.filter(path => isSourcePath(path, config))).join(', ')}. Update an ADR and Archify source only if this materially changes a boundary, contract, dependency, or cross-component flow.`);
-  process.exit(0);
+  return context(`Potential structural change in ${(newSourceFiles.length ? newSourceFiles : paths.filter(path => isSourcePath(path, config))).join(', ')}. Update an ADR and Archify source only if this materially changes a boundary, contract, dependency, or cross-component flow.`);
 }
 
 if (paths.some(path => isSourcePath(path, config))) {
-  context(`${mutationTool ? 'Product code changed' : 'Product code inspected'}: verify documentation, side effects, and test strategy.${formatDecisionStatus(decisionStatus)}`);
+  return context(`${mutationTool ? 'Product code changed' : 'Product code inspected'}: verify documentation, side effects, and test strategy.${formatDecisionStatus(decisionStatus)}`);
 } else if (decisionStatus.applicable.length) {
-  context(formatDecisionStatus(decisionStatus));
+  return context(formatDecisionStatus(decisionStatus));
+}
+return null;
 }
 
 function formatDecisionStatus(status) {
@@ -287,12 +292,15 @@ function gitChangedFiles() {
 }
 
 function block(reason) {
-  process.stdout.write(JSON.stringify({ decision: 'block', reason: Array.isArray(reason) ? reason.join('\n') : reason }));
-  process.exit(0);
+  throw new HookOutput({ decision: 'block', reason: Array.isArray(reason) ? reason.join('\n') : reason });
 }
 
 function context(message) {
-  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: message } }));
+  return { hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: message } };
+}
+
+class HookOutput extends Error {
+  constructor(output) { super('hook output'); this.output = output; }
 }
 
 function stdin() {
@@ -302,4 +310,9 @@ function stdin() {
     process.stdin.on('data', chunk => { value += chunk; });
     process.stdin.on('end', () => resolveInput(value || '{}'));
   });
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const output = preToolArchitecture(await stdin());
+  if (output) process.stdout.write(JSON.stringify(output));
 }

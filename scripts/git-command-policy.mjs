@@ -1,4 +1,5 @@
 const MUTATING = new Set(['add', 'am', 'apply', 'branch', 'checkout', 'cherry-pick', 'clean', 'commit', 'fetch', 'gc', 'merge', 'mv', 'pull', 'push', 'rebase', 'repack', 'reset', 'restore', 'rm', 'stash', 'switch', 'tag', 'update-ref', 'worktree']);
+const READ_ONLY = new Set(['annotate', 'blame', 'cat-file', 'check-ignore', 'diff', 'diff-tree', 'for-each-ref', 'grep', 'log', 'ls-files', 'merge-base', 'name-rev', 'rev-list', 'rev-parse', 'show', 'show-ref', 'status', 'symbolic-ref', 'version', 'whatchanged']);
 const GLOBAL_VALUE_OPTIONS = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--super-prefix', '--config-env']);
 
 export function classifyGitCommand(argv) {
@@ -17,8 +18,8 @@ function classifyAt(values, gitIndex) {
     if (GLOBAL_VALUE_OPTIONS.has(option) || [...GLOBAL_VALUE_OPTIONS].some(name => option === name)) index += 1;
   }
   const subcommand = values[index] ?? null;
-  const mutating = !subcommand || MUTATING.has(subcommand) || subcommand.startsWith('remote-');
-  return { git: true, allowed_for_worker: !mutating, classification: mutating ? 'MUTATION_FORBIDDEN' : 'READ_ONLY', subcommand };
+  const allowed = Boolean(subcommand) && READ_ONLY.has(subcommand) && !MUTATING.has(subcommand);
+  return { git: true, allowed_for_worker: allowed, classification: allowed ? 'READ_ONLY' : 'MUTATION_FORBIDDEN', subcommand };
 }
 
 export function assertWorkerGitCommand(argv) {

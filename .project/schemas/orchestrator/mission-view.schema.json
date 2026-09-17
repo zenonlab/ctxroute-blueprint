@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ctxroute.dev/schemas/orchestrator/mission-view.schema.json",
   "type": "object",
-  "required": ["mission_id", "skill_id", "skill_version", "file_scope", "acceptance", "validations", "response_format", "worktree", "requested_mode", "resolved_mode", "workflow", "strategy", "policy_digest", "reinforcements"],
+  "required": ["mission_id", "skill_id", "skill_version", "file_scope", "acceptance", "validations", "response_format", "worktree", "requested_mode", "resolved_mode", "workflow", "stage", "strategy", "access", "policy_digest", "policy_snapshot", "reinforcements"],
   "properties": {
     "mission_id": { "$ref": "common.schema.json#/$defs/identifier" },
     "skill_id": { "$ref": "common.schema.json#/$defs/identifier" },
@@ -15,8 +15,11 @@
     "requested_mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] },
     "resolved_mode": { "enum": ["SWARM", "SOLO", "GUARDED", "DIRECT"] },
     "workflow": { "enum": ["STANDARD", "RESEARCH", "AUDIT", "SECURITY", "MIGRATION", "INCIDENT", "EXPERIMENT", "RECOVERY"] },
+    "stage": { "enum": ["inventory", "research", "decision", "planning", "work", "validation", "audit", "integration", "recovery", "promotion"] },
     "strategy": { "enum": ["deterministic", "primary", "single-worker", "parallel-workers", "independent-auditor", "human-decision"] },
+    "access": { "enum": ["read-only", "write"] },
     "policy_digest": { "$ref": "common.schema.json#/$defs/digest" },
+    "policy_snapshot": { "$ref": "common.schema.json#/$defs/relativePath" },
     "reinforcements": { "type": "array", "items": { "type": "string" } }
   },
   "unevaluatedProperties": false

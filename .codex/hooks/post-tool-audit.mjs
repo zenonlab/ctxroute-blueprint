@@ -3,8 +3,10 @@ import { execFileSync } from 'node:child_process';
 import { isSourcePath, isTestPath, isGeneratedPath, isContractPath, loadProjectConfig } from '../../.githooks/project-policy.mjs';
 import { applicableAdrs, decisionDiagnostics, loadAdrs, normalizePath } from './decision-memory.mjs';
 import { extractPaths } from './path-extraction.mjs';
+import { pathToFileURL } from 'node:url';
 
-const input = JSON.parse(await stdin());
+export function postToolAudit(rawInput) {
+const input = rawInput === String(rawInput) ? JSON.parse(rawInput || '{}') : rawInput;
 const toolInput = input.tool_input ?? {};
 const paths = extractPaths(toolInput).map(normalizePath);
 const codePaths = paths.filter(path => /\.(?:c|cc|cpp|cs|css|gd|go|h|hpp|java|js|jsx|mjs|py|php|rs|sass|scss|shader|sql|swift|ts|tsx|vue)$/iu.test(path));
@@ -49,9 +51,11 @@ if (findings.length || process.env.CODEX_POST_TOOL_AUDIT === '1') {
   }
   if (applicable.length) lines.push(`Applicable ADRs: ${applicable.map(adr => adr.file).join(', ')}. Confirm the decision remains valid.`);
   lines.push('Review the diff and run the relevant validation.');
-  process.stdout.write(JSON.stringify({
+  return {
     hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: lines.join('\n') },
-  }));
+  };
+}
+return null;
 }
 
 function isTracked(path) {
@@ -67,4 +71,13 @@ function stdin() {
     process.stdin.on('data', chunk => { value += chunk; });
     process.stdin.on('end', () => resolve(value || '{}'));
   });
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  try {
+    const output = postToolAudit(await stdin());
+    if (output) process.stdout.write(JSON.stringify(output));
+  } catch (error) {
+    process.stderr.write(`PostToolUse audit failed open: ${error.message}`);
+  }
 }

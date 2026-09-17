@@ -14,11 +14,11 @@
   },
   "components": [
     { "id": "agents", "type": "external", "label": "Coding agents", "sublabel": "Codex / Claude", "pos": [40, 50], "size": [150, 60] },
-    { "id": "lifecycle", "type": "backend", "label": "Lifecycle dispatch", "sublabel": "Minimal local hooks", "pos": [280, 50], "size": [180, 60] },
+    { "id": "lifecycle", "type": "backend", "label": "Lifecycle dispatch", "sublabel": "Atomic policy gate", "pos": [280, 50], "size": [180, 60] },
     { "id": "ctxroute", "type": "external", "label": "CTXRoute", "sublabel": "On-demand context", "pos": [540, 50], "size": [170, 60] },
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
-    { "id": "orchestrator", "type": "backend", "label": "Orchestrator", "sublabel": "Bootstrap + MCP + CLI", "pos": [30, 230], "size": [170, 60] },
+    { "id": "orchestrator", "type": "backend", "label": "Orchestrator", "sublabel": "Stages + repository authority", "pos": [30, 230], "size": [170, 60] },
     { "id": "workers", "type": "external", "label": "Isolated workers", "sublabel": "Minimal mission + worktree", "pos": [30, 410], "size": [190, 60] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Blocking security checks", "pos": [280, 230], "size": [180, 60] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "Sensor-only parsing", "pos": [540, 230], "size": [180, 60] },
@@ -27,7 +27,7 @@
     { "id": "githubActions", "type": "cloud", "label": "GitHub Actions", "sublabel": "Matrix + fork-safe review", "pos": [1060, 410], "size": [190, 60] },
     { "id": "ciArtifacts", "type": "database", "label": "Validation artifacts", "sublabel": "CRG / Sensor / Archify", "pos": [790, 410], "size": [190, 60] }
     ,{ "id": "contracts", "type": "security", "label": "Contract registry", "sublabel": "JSON Schema 2020-12 + Ajv", "pos": [280, 410], "size": [210, 60] }
-    ,{ "id": "state", "type": "database", "label": "Transactional state", "sublabel": "Intent + receipts", "pos": [540, 410], "size": [190, 60] }
+    ,{ "id": "state", "type": "database", "label": "Transactional state", "sublabel": "Checkpoints + outcome receipts", "pos": [540, 410], "size": [190, 60] }
     ,{ "id": "validation", "type": "backend", "label": "Validation runner", "sublabel": "execFile / no shell", "pos": [30, 580], "size": [190, 60] }
     ,{ "id": "worktrees", "type": "database", "label": "Managed worktrees", "sublabel": "reconciled Git state", "pos": [280, 580], "size": [210, 60] }
     ,{ "id": "recovery", "type": "database", "label": "Recovery proofs", "sublabel": "bounded restorable patch", "pos": [540, 580], "size": [190, 60] }

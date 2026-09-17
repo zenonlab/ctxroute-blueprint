@@ -11,6 +11,7 @@ review: on-change
 revised: true
 contracts:
   - docs/orchestration.md
+  - docs/orchestration-verification.md
 ---
 # ADR-0087 — Durable modular orchestration
 
@@ -56,3 +57,9 @@ Policy resolution can be property-tested without disk, network, Git, or
 environment access. Skills declare stages, capabilities, access, tools, and
 independence instead of enumerating operating modes. The control plane gains
 durable inter-session decisions without treating raw model state as authority.
+
+This ADR establishes the three-level model. The mechanical consequences are
+split into focused decisions: ADR-0088 owns stage/checkpoint semantics,
+ADR-0089 owns Git effects and outcome proof, and ADR-0090 owns hook snapshots,
+host adaptation, and latency budgets. Those ADRs are normative rather than
+optional implementation notes.

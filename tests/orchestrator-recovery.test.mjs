@@ -14,7 +14,7 @@ const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
 test('a crash after physical worktree creation leaves PENDING intent and replay converges', async () => {
   const root = fixture();
-  const goal = await transactOrchestrator(goalCommand(), root);
+  const goal = await createGoalAtWork(root);
   let crashed = false;
   const fault = point => {
     if (point === 'afterWorktreeCreate' && !crashed) { crashed = true; const error = new Error('simulated process crash'); error.simulatedCrash = true; throw error; }
@@ -30,7 +30,7 @@ test('a crash after physical worktree creation leaves PENDING intent and replay 
 
 test('low disk blocks allocation after durable intent and before Git effect', async () => {
   const root = fixture();
-  const goal = await transactOrchestrator(goalCommand(), root);
+  const goal = await createGoalAtWork(root);
   await assert.rejects(() => prepareMission(missionCommand(goal.state.revision), root, {}, { statfs: async () => ({ bavail: 1, bsize: 1 }) }), /free space/u);
   const state = await readOrchestratorState(root);
   assert.equal(state.transactions.at(-1).status, 'BLOCKED');
@@ -79,7 +79,7 @@ test('bootstrap is idempotent and resumes a real SIGKILL after durable state int
 
 test('bootstrap resumes a real SIGKILL after physical worktree allocation', { skip: process.platform === 'win32' }, async () => {
   const root = fixture(true);
-  const goal = await transactOrchestrator(goalCommand(), root);
+  const goal = await createGoalAtWork(root);
   const modulePath = join(repositoryRoot, 'scripts/orchestrator-service.mjs');
   const source = `import { prepareMission } from ${JSON.stringify(new URL(`file://${modulePath}`).href)}; const command=JSON.parse(process.argv[1]); await prepareMission(command, process.argv[2], {}, { fault(point) { if (point === 'afterWorktreeCreate') process.kill(process.pid, 'SIGKILL'); } });`;
   const killed = await runNode(['--input-type=module', '-e', source, JSON.stringify(missionCommand(goal.state.revision)), root]);
@@ -93,7 +93,7 @@ test('bootstrap resumes a real SIGKILL after physical worktree allocation', { sk
 
 test('bootstrap resumes a real SIGKILL after a planned clean reconciliation removal', { skip: process.platform === 'win32' }, async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   const prepared = await prepareMission(missionCommand(state.revision), root);
   state = (await transactOrchestrator({ operation_id: 'cancel-before-reconcile', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'CANCELLED' } }, root)).state;
   const command = { operation_id: 'reconcile-after-kill', expected_revision: state.revision, action: 'worktree.reconcile', payload: { repair: true } };
@@ -133,6 +133,19 @@ test('doctor returns exit 2 for intervention and preserves an unknown symlink', 
 });
 
 function goalCommand() { return { operation_id: 'goal-create-one', expected_revision: 0, action: 'goal.create', payload: { goal_id: 'goal-one', title: 'Recovery goal' } }; }
+async function createGoalAtWork(root) {
+  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  for (const [index, completed_stage, next_stage] of [[1, 'inventory', 'planning'], [2, 'planning', 'work']]) {
+    const goal = state.goals[0];
+    state = (await transactOrchestrator({
+      operation_id: `stage-${index}`,
+      expected_revision: state.revision,
+      action: 'goal.stage.advance',
+      payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: `checkpoint-${index}`, goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage, completed_receipt_ids: [], artifact_refs: [], next_stage, created_at: `2026-09-17T12:0${index}:00Z` } },
+    }, root)).state;
+  }
+  return { state };
+}
 function missionCommand(revision) { return { operation_id: 'mission-prepare-one', expected_revision: revision, action: 'mission.prepare', payload: { goal_id: 'goal-one', mission: { mission_id: 'mission-one', skill_id: 'blueprint-audit', requested_skill_id: null, skill_version: '1.0.0', file_scope: ['src/', 'lib/'], acceptance: ['Converges after crash'], validations: [{ id: 'syntax', executable: 'node', args: ['--check', 'src/change.mjs'], cwd: '.', timeout_ms: 30_000 }], execution: 'coordinated' } } }; }
 function fixture(gitRepository = true) {
   const root = mkdtempSync(join(tmpdir(), 'orchestrator-recovery-'));

@@ -9,6 +9,8 @@
     "permissions": { "type": "array", "items": { "type": "string" } }, "requirements": { "type": "array", "items": { "type": "string" } },
     "risk_floor": { "type": "number", "minimum": 0 }, "model_floor": { "type": "number", "minimum": 0 }, "parallel_limit": { "type": "integer", "minimum": 1 },
     "write_allowed": { "type": "boolean" }, "repository_mutation_serialized": { "type": "boolean" },
+    "isolation_required": { "type": "boolean" }, "critical_audit_required": { "type": "boolean" },
+    "parallel_writers_allowed": { "type": "boolean" },
     "reinforcements": { "type": "array", "items": { "type": "string" } }, "causes": { "type": "array", "items": { "type": "string" } },
     "missing_capabilities": { "type": "array", "items": { "type": "string" } }, "alternatives": { "type": "array", "items": { "type": "string" } }
   }, "unevaluatedProperties": false
