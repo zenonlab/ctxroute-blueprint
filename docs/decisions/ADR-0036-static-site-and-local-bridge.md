@@ -80,11 +80,13 @@ This version is newer than the fixed boundary for GHSA-7mvr-c777-76hp; both
 the complete development graph and the shipped dependency graph must pass the
 repository audit without a high-severity finding.
 
-Extension release version `1.0.0` is owned by the extension package manifest.
-WXT and the web download surface read that source, while the deterministic
-packager uses it for both archive names and verifies the exact production
-origin in the generated manifests. The download surface keeps links absent
-until a separately approved upload has been verified.
+The extension package manifest owns the candidate version read by WXT and the
+deterministic packager. The web download surface reads the separate,
+versioned `apps/web/published-extension.json` pointer. That pointer advances
+only after both immutable browser archives have been uploaded and verified;
+building or deploying a newer candidate cannot change public download links.
+The packager continues to verify the exact production origin in generated
+manifests.
 
 ## Consequences
 

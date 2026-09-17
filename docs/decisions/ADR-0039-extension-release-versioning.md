@@ -1,6 +1,8 @@
 ---
 scope:
   - apps/extension/package.json
+  - apps/web/published-extension.json
+  - apps/web/app/download/page.tsx
   - package-lock.json
   - scripts/infra/**
   - docs/release.md
@@ -80,9 +82,11 @@ au workflow GitHub public vérifié.
 règle DNR MangaUpdates et la restauration directe d’identité. Les parcours
 automatiques comme manuels passent désormais exclusivement par Public
 Discovery v3 et le cache Agenda partagé.
-The
-version in `apps/extension/package.json` remains the single WXT and archive
-version source; the lockfile, static download page and release tests follow it.
+The version in `apps/extension/package.json` remains the single WXT and archive
+candidate source. The static download page follows the separately versioned
+`apps/web/published-extension.json` publication pointer, which is advanced only
+after both immutable archives have been uploaded and verified. Release tests
+must prove that an unpublished candidate cannot move public links.
 Existing archives are retained unchanged. A `worker-deploy` preview and apply
 must each rebuild the web workspace before invoking Wrangler, so the reviewed
 bundle and the deployed Worker cannot reuse a stale `apps/web/out` from an

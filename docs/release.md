@@ -80,9 +80,10 @@ Cloudflare et sa propre étape destructive.
 The current production archives remain immutable. The published production
 archives are `1.0.30`; the repository source is the unpublished `1.0.31`
 candidate.
-`apps/extension/package.json` is the only
-version source: WXT reads it for both manifests, the packager reads it for ZIP
-names, and the download page derives its two public links from it.
+`apps/extension/package.json` is the candidate version source: WXT reads it for
+both manifests and the packager reads it for ZIP names. The download page reads
+`apps/web/published-extension.json`, which remains on the last verified upload
+until both candidate ZIPs have been accepted and published.
 
 Run `npm run package:extension` from the repository root. The command rebuilds
 both browser targets and writes these ignored, reproducible artifacts:

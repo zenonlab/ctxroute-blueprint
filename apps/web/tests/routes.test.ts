@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { webLibraryQuerySchema, webRequestSchema } from '@tobirink/contracts/web-bridge';
 import { createLocalAgendaPeriod } from '@tobirink/ui';
 import { publicDownloads } from '../app/download/page';
+import extensionPackage from '../../extension/package.json';
+import publishedExtension from '../published-extension.json';
 
 describe('Workbench web routes', () => {
   it('bounds the home preview to four local works', () => {
@@ -23,6 +25,15 @@ describe('Workbench web routes', () => {
     expect(publicDownloads('1.0.0')).toEqual([
       { browser: 'Chrome', href: '/downloads/tobirink-chrome-mv3-1.0.0.zip' },
       { browser: 'Firefox', href: '/downloads/tobirink-firefox-mv3-1.0.0.zip' },
+    ]);
+  });
+
+  it('keeps an unpublished source candidate out of public download links', () => {
+    expect(extensionPackage.version).toBe('1.0.31');
+    expect(publishedExtension.version).toBe('1.0.30');
+    expect(publicDownloads(publishedExtension.version)).toEqual([
+      { browser: 'Chrome', href: '/downloads/tobirink-chrome-mv3-1.0.30.zip' },
+      { browser: 'Firefox', href: '/downloads/tobirink-firefox-mv3-1.0.30.zip' },
     ]);
   });
 });

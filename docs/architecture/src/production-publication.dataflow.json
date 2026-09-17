@@ -4,7 +4,7 @@
   "meta": {
     "title": "Publication production TobiRink 1.0.30",
     "quality_profile": "showcase",
-    "viewBox": [1068, 760],
+    "viewBox": [1068, 560],
     "views": [
       {
         "id": "publication",
@@ -28,14 +28,14 @@
     { "label": "Vérifier" }
   ],
   "nodes": [
-    { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "build automatique 1.0.30", "stage": 0, "row": 0, "tag": "Next statique" },
-    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.30", "stage": 0, "row": 3, "tag": "SHA-256 vérifiés" },
-    { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 2, "tag": "fail closed" },
-    { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP versionnés", "stage": 2, "row": 3, "tag": "R2" },
+    { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "version publiée explicite", "stage": 0, "row": 0, "tag": "Next statique" },
+    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.30", "stage": 0, "row": 2, "tag": "SHA-256 vérifiés" },
+    { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 1, "tag": "fail closed" },
+    { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP versionnés", "stage": 2, "row": 2, "tag": "R2" },
     { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "7278372d" },
     { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "liens 1.0.30", "stage": 3, "row": 0, "tag": "HTTP 200" },
-    { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 3, "tag": "HTTP 200" },
-    { "id": "productionEvidence", "type": "security", "label": "Preuve production", "sublabel": "statuts + hashes", "stage": 4, "row": 2, "tag": "concordants" }
+    { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 2, "tag": "HTTP 200" },
+    { "id": "productionEvidence", "type": "security", "label": "Preuve production", "sublabel": "statuts + hashes", "stage": 4, "row": 1, "tag": "concordants" }
   ],
   "flows": [
     { "id": "exportToGate", "from": "staticExport", "to": "approvalGate", "label": "build avant Wrangler", "classification": "prévisualisé", "variant": "default" },
@@ -46,27 +46,5 @@
     { "id": "bucketToDownloads", "from": "releaseBucket", "to": "publicDownloads", "label": "via Worker", "classification": "route bornée", "variant": "security" },
     { "id": "pagesToEvidence", "from": "memberPages", "to": "productionEvidence", "label": "5 × HTTP 200", "classification": "vérifié", "variant": "default" },
     { "id": "downloadsToEvidence", "from": "publicDownloads", "to": "productionEvidence", "label": "2 hashes identiques", "classification": "vérifié", "variant": "security" }
-  ],
-  "cards": [
-    {
-      "dot": "emerald",
-      "title": "Résultat",
-      "items": [
-        "Le build Worker dérive toujours la page de la version extension courante",
-        "Les deux archives 1.0.30 publiques reproduisent leurs hashes locaux",
-        "La page publique pointe vers les mêmes objets R2 versionnés",
-        "Les lectures Agenda restent servies depuis D1",
-        "Worker 7278372d-1d2e-4a7c-960a-58b96d6a9b1c actif à 100 %"
-      ]
-    },
-    {
-      "dot": "cyan",
-      "title": "Limites conservées",
-      "items": [
-        "Aucune mutation D1 n’est nécessaire pour publier les assets 1.0.30",
-        "Chaque objet R2 modifié figure dans l’allowlist exacte",
-        "La version Worker précédente reste disponible pour rollback"
-      ]
-    }
   ]
 }
