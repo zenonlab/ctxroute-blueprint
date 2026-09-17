@@ -15,7 +15,7 @@
   "bugs": "https://github.com/zenonlab/ctxroute-blueprint/issues",
   "type": "module",
   "engines": {
-    "node": ">=22.13.0",
+    "node": ">=22.18.0",
     "npm": ">=10"
   },
   "scripts": {

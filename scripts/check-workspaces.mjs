@@ -20,7 +20,7 @@ for (const [relativePath, source] of expected) {
   names.add(manifest.name);
   if (manifest.private !== true) failures.push(`${relativePath}: workspace boundary must remain private`);
   if (manifest.license !== 'Apache-2.0') failures.push(`${relativePath}: license must be Apache-2.0`);
-  if (manifest.engines?.node !== '>=22.13.0') failures.push(`${relativePath}: Node.js 22.13+ compatibility is required`);
+  if (manifest.engines?.node !== '>=22.18.0') failures.push(`${relativePath}: Node.js 22.18+ compatibility is required`);
   if (manifest.blueprintSource !== source) failures.push(`${relativePath}: blueprintSource must be ${source}`);
 }
 

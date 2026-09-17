@@ -2,7 +2,7 @@
 
 [![Validate](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml/badge.svg)](https://github.com/zenonlab/ctxroute-blueprint/actions/workflows/validate.yml)
 [![GitHub Template](https://img.shields.io/badge/GitHub-template-181717?logo=github)](https://github.com/zenonlab/ctxroute-blueprint/generate)
-[![Node.js 22.13+](https://img.shields.io/badge/Node.js-22.13%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Node.js 22.18+](https://img.shields.io/badge/Node.js-22.18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![npm 10+](https://img.shields.io/badge/npm-10%2B-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![uv 0.11.2](https://img.shields.io/badge/uv-0.11.2-DE5FE9)](https://github.com/astral-sh/uv)
@@ -39,11 +39,11 @@ deliberately and verify the result.
 | Code intelligence | `npm run setup` installs the official [Code Review Graph](https://github.com/tirth8205/code-review-graph) Python package at [`code-review-graph==2.3.8`](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8) for bounded MCP context, impact analysis, and fork-safe PR risk review. |
 | Architecture evidence | Archify validates typed JSON IR and generates interactive artifacts without publishing blueprint control-plane diagrams. |
 | Static safety | The tree-sitter Sensor reports deterministic diagnostics across AST, embedded, and lexical adapters. |
-| Portable validation | Node.js 24 CI runs the complete gate on Linux and bounded hook/orchestrator MCP smokes on macOS and Windows while the package contract remains Node.js 22.13+. |
+| Portable validation | Node.js 24 CI runs the complete gate on Linux and bounded hook/orchestrator MCP smokes on macOS and Windows; a dedicated Node.js 22.18 job verifies the package floor. |
 
 ## Quick start
 
-Prerequisites: Git, Node.js 22.13+, npm 10+, Python 3.10+, and uv 0.11.2.
+Prerequisites: Git, Node.js 22.18+, npm 10+, Python 3.10+, and uv 0.11.2.
 Python 3.12 is the reference runtime for official code-review-graph.
 
 1. Select **Use this template** on GitHub, then clone the generated repository.
@@ -240,7 +240,7 @@ The Sensor is independent from CRG and is the only blocking static-safety
 boundary. Its catalogue preserves every recognized extension while reporting
 four honest capability states: `PASS`, `PARTIAL`, `MISSING`, and `N/A`.
 
-- `PASS` requires a parser loaded and exercised on the Node.js 24 reference CI runtime while remaining compatible with the declared Node.js 22.13+ floor.
+- `PASS` requires a parser loaded and exercised on the Node.js 24 reference CI runtime while remaining compatible with the declared Node.js 22.18+ floor.
 - `PARTIAL` identifies an extractor or bounded lexical check.
 - `MISSING` identifies an expected capability without a verified parser.
 - `N/A` means the capability does not apply to that language.
@@ -310,7 +310,9 @@ package behavior, whole-program flows, or runtime enforcement.
 ### CI and repository protection
 
 The tracked workflow runs the complete Node.js 24 gate on Linux and bounded
-hook/orchestrator MCP smokes on macOS and Windows. Linux additionally smoke-tests
+hook/orchestrator MCP smokes on macOS and Windows. A dedicated Linux job installs
+the pinned dependencies and runs the tests and anti-slop rules on Node.js 22.18.
+Linux additionally smoke-tests
 the official CRG transport. Pull requests receive a fork-safe blocking `CRG
 risk gate` at level `high`, while
 unexpected Sensor diagnostics are uploaded as SARIF when permissions allow.

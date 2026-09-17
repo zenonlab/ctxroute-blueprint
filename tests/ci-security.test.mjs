@@ -10,6 +10,12 @@ const read = path => readFileSync(join(root, path), 'utf8');
 test('validation matrix pins Python and uv and captures Archify visual evidence', () => {
   const workflow = read('.github/workflows/validate.yml');
   assert.match(workflow, /name: Node 24 \/ \$\{\{ matrix\.os \}\}/u);
+  assert.match(workflow, /name: Node 22\.18 compatibility/u);
+  assert.match(workflow, /node-version: 22\.18\.0/u);
+  assert.match(workflow, /Verify declared Node\.js floor[\s\S]*?npm run lint:anti-slop[\s\S]*?npm test/u);
+  const floorJob = workflow.match(/  node-floor:[\s\S]*?(?=\n  dependency-audit:)/u)?.[0] ?? '';
+  assert.match(floorJob, /actions\/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97/u);
+  assert.match(floorJob, /astral-sh\/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4/u);
   assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/u);
   assert.match(workflow, /actions\/setup-node@820762786026740c76f36085b0efc47a31fe5020/u);
   assert.match(workflow, /actions\/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97/u);

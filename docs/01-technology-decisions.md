@@ -24,7 +24,7 @@ framework only because it is common in another project.
 
 ## Blueprint tooling decision
 
-The template control plane uses Node.js 22.13+ and npm 10+. Official
+The template control plane uses Node.js 22.18+ and npm 10+. Official
 code-review-graph v2.3.8 runs from a frozen uv 0.11.2 project with Python 3.12
 as the reference and Python 3.10+ as the supported floor. CTXRoute is the sole
 hook orchestrator; CRG is the code-context MCP, while the independent

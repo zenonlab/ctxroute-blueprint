@@ -4,7 +4,7 @@
   "private": true,
   "license": "Apache-2.0",
   "description": "Workspace boundary for the pinned CTXRoute integration.",
-  "engines": { "node": ">=22.13.0" },
+  "engines": { "node": ">=22.18.0" },
   "blueprintSource": "zenonlab/ctxroute",
   "integration": "external-pinned-dependency"
 }

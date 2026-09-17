@@ -7,7 +7,7 @@ export function main() {
   const npmCli = process.env.npm_execpath;
   const initialGitStatus = capture('git', ['status', '--porcelain']);
 
-  requireVersion('Node.js', process.versions.node, [22, 13, 0]);
+  requireVersion('Node.js', process.versions.node, [22, 18, 0]);
   if (!npmCli) fail('Run setup through npm: npm run setup');
 
   const npmVersion = capture(process.execPath, [npmCli, '--version']);
@@ -76,11 +76,14 @@ function capture(command, args) {
 }
 
 function requireVersion(name, version, minimum) {
+  if (!versionAtLeast(version, minimum)) fail(`${name} ${minimum.join('.')}+ is required; found ${version}.`);
+}
+
+export function versionAtLeast(version, minimum) {
   const actual = String(version).split('.').slice(0, 3).map(value => Number.parseInt(value, 10));
   const valid = actual.length === 3 && actual.every(Number.isInteger);
   const firstDifference = actual.findIndex((value, index) => value !== minimum[index]);
-  const supported = valid && (firstDifference === -1 || actual[firstDifference] > minimum[firstDifference]);
-  if (!supported) fail(`${name} ${minimum.join('.')}+ is required; found ${version}.`);
+  return valid && (firstDifference === -1 || actual[firstDifference] > minimum[firstDifference]);
 }
 
 function fail(message) {

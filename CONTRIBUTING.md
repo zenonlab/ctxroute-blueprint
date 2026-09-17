@@ -7,7 +7,7 @@ Read `AGENTS.md` and the relevant documentation before making changes.
 - Archify JSON IR is versioned; generated HTML stays under ignored `dist/`.
 - Commands declared in `.project/project-config.json` must exist.
 - Source directories, code extensions, and contracts come only from that configuration.
-- Git, Node.js 22.13+, npm 10+, Python 3.10+, and uv 0.11.2 are required for template tooling, independently of the product stack.
+- Git, Node.js 22.18+, npm 10+, Python 3.10+, and uv 0.11.2 are required for template tooling, independently of the product stack.
 - Never delete automatically; request confirmation before deletion.
 - Commit verified functional steps automatically.
 
