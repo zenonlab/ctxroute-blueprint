@@ -2529,7 +2529,7 @@
         {
           "id": "remove-relational-crawl",
           "title": "Corriger la propagation et retirer l’exploration relationnelle",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Une relation fournisseur ne crée aucune demande ni signal Queue; les références de même œuvre restent dédupliquées.",
             "contentClassification traverse API, candidat, contrats et caches; Kitsu accepte seulement les valeurs documentées.",
@@ -2557,7 +2557,9 @@
             "npm run archify:validate -- adaptive-public-refresh.dataflow",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "Mesures commitée sous eeb7057; démarrage du retrait des follow-ups relationnels, correction de classification et audit des index."
+          ]
         },
         {
           "id": "canonical-metadata",

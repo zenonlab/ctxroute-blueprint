@@ -174,7 +174,7 @@
 
 - [x] **Aligner documentation, ADR, Progress et architecture cible** — DONE _(evidence: Brief, stratégie qualité, ADR-0045/0055/0056, plan maître et audit de coûts alignés sur D1 courant, R2 opérationnel, Agenda virtuel, unknown visible et absence d’exploration relationnelle., Archify adaptive-public-refresh architecture et dataflow passent showcase 9/9 sans erreur ni avertissement., validate:docs, validate:decisions et git diff --check réussissent; aucun code produit ni mutation distante dans cette étape.)_
 - [x] **Établir les budgets actuels reproductibles et les tailles réelles** — DONE _(evidence: Fixture locale: 2 copies VERIFIED identiques = 678 octets BLOB; après changement de compteur, 2 profils distincts = 696 octets; chaînes catalogue 15/59/6 octets., Le test métrique prouve qu'un payload de 64 000 caractères avec rows_written=1 compte une écriture native, sans coefficient de taille., Worker 105/105, tous les typechecks, validate:docs --all et git diff --check réussissent; aucun appel fournisseur ni mutation distante.)_
-- [ ] **Corriger la propagation et retirer l’exploration relationnelle** — PENDING
+- [ ] **Corriger la propagation et retirer l’exploration relationnelle** — IN_PROGRESS _(evidence: Mesures commitée sous eeb7057; démarrage du retrait des follow-ups relationnels, correction de classification et audit des index.)_
 - [ ] **Introduire la fiche canonique courante par œuvre** — PENDING
 - [ ] **Implémenter Agenda virtuel et stockage opérationnel R2** — PENDING
 - [ ] **Basculer Worker et extension avec compatibilité** — PENDING

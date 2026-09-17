@@ -55,7 +55,7 @@
     { "id": "queue-refresh", "from": "admissionQueue", "to": "refreshJob", "label": "claim refresh", "classification": "VERIFIED reste servi", "variant": "default" },
     { "id": "agenda-observe", "from": "agendaLanes", "to": "operationsR2", "label": "observations bornées", "classification": "écriture conditionnelle", "variant": "default", "route": "straight", "labelAt": [760, 220] },
     { "id": "agenda-publish", "from": "agendaLanes", "to": "catalogueD1", "label": "modèle changé", "classification": "aucune occurrence matérialisée", "variant": "emphasis" },
-    { "id": "discovery-publish", "from": "discoveryJob", "to": "catalogueD1", "label": "fiche VERIFIED", "classification": "publication atomique", "variant": "emphasis", "labelAt": [780, 485] },
+    { "id": "discovery-publish", "from": "discoveryJob", "to": "catalogueD1", "label": "fiche + classification", "classification": "sans exploration relationnelle", "variant": "emphasis", "labelAt": [780, 485] },
     { "id": "refresh-publish", "from": "refreshJob", "to": "catalogueD1", "label": "profil validé", "classification": "compteurs inclus", "variant": "emphasis" },
     { "id": "catalogue-read", "from": "catalogueD1", "to": "privateIndexedDb", "label": "profil + modèle", "classification": "projection locale : 0 écriture distante", "variant": "emphasis", "route": "straight", "labelDy": 53 },
     { "id": "local-filter", "from": "catalogueD1", "to": "localContentPolicy", "label": "classification", "classification": "OFF masque adult explicite", "variant": "emphasis" }

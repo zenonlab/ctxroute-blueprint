@@ -33,7 +33,7 @@ describe('KitsuFavoriteProviderAdapter', () => {
     expect(requested).toContain('episodeCount');
     expect(requested).not.toContain('chapterCount');
     expect(envelope).toMatchObject({ complete: true, provider: 'kitsu-anime', truncated: false });
-    expect(envelope.candidates[0]).toMatchObject({ cover: { attribution: 'Kitsu', url: anime.attributes.posterImage.large }, displayTitle: 'Frieren: Beyond Journey’s End', editorialStatus: 'COMPLETED', endYear: 2024, episodeCount: 28, externalId: '46474', mediaKind: 'ANIME', popularity: { kind: 'MEMBERS', value: 180000 }, provider: 'kitsu-anime', startYear: 2023, titleVariants: expect.arrayContaining([{ title: 'Sousou no Frieren' }, { language: 'en', title: 'Frieren: Beyond Journey’s End' }]) });
+    expect(envelope.candidates[0]).toMatchObject({ contentClassification: 'non-adult', cover: { attribution: 'Kitsu', url: anime.attributes.posterImage.large }, displayTitle: 'Frieren: Beyond Journey’s End', editorialStatus: 'COMPLETED', endYear: 2024, episodeCount: 28, externalId: '46474', mediaKind: 'ANIME', popularity: { kind: 'MEMBERS', value: 180000 }, provider: 'kitsu-anime', startYear: 2023, titleVariants: expect.arrayContaining([{ title: 'Sousou no Frieren' }, { language: 'en', title: 'Frieren: Beyond Journey’s End' }]) });
   });
 
   it('uses manga-only sparse fields and accepts a response without nsfw', async () => {
@@ -43,7 +43,7 @@ describe('KitsuFavoriteProviderAdapter', () => {
       return new Response(JSON.stringify({ data: [manga], links: { next: null }, meta: { count: 1 } }), { headers: { 'content-type': 'application/vnd.api+json' } });
     });
     await expect(adapter.search({ limit: 20, provider: 'kitsu-manga', titles: ['Genius of the Unique Lineage'] })).resolves.toMatchObject({
-      candidates: [{ chapterCount: 130, externalId: '64708', mediaKind: 'MANGA', provider: 'kitsu-manga' }], complete: true,
+      candidates: [{ chapterCount: 130, contentClassification: 'unknown', externalId: '64708', mediaKind: 'MANGA', provider: 'kitsu-manga' }], complete: true,
     });
     expect(requested).toContain('chapterCount');
     expect(requested).not.toContain('episodeCount');
@@ -59,5 +59,15 @@ describe('KitsuFavoriteProviderAdapter', () => {
   it('hydrates the exact numeric identity', async () => {
     const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => new Response(JSON.stringify({ data: anime }), { headers: { 'content-type': 'application/vnd.api+json' } }));
     await expect(adapter.hydrate({ externalId: '46474', provider: 'kitsu-anime' })).resolves.toMatchObject({ externalId: '46474', provider: 'kitsu-anime' });
+  });
+
+  it.each([
+    [{ ageRating: 'R18', nsfw: false }, 'adult'],
+    [{ ageRating: 'R', nsfw: undefined }, 'non-adult'],
+    [{ ageRating: 'TV-MA', nsfw: undefined }, 'unknown'],
+  ] as const)('classifies only documented Kitsu signals %o', async (signals, expected) => {
+    const attributes = { ...anime.attributes, ...signals };
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: { ...anime, attributes } }));
+    await expect(adapter.hydrate({ externalId: '46474', provider: 'kitsu-anime' })).resolves.toMatchObject({ contentClassification: expected });
   });
 });

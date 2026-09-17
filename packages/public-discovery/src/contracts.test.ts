@@ -32,15 +32,12 @@ describe('public discovery request minimization', () => {
     expect(publicDiscoveryLookupSubmissionSchema.safeParse({ keys: [key, key], schemaVersion: 3 }).success).toBe(false);
   });
 
-  it('keeps a linked adaptation distinct from aliases', () => {
-    const candidate = publicDiscoveryCandidateSchema.parse({
-      externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Shared Title'],
-      relations: [{
-        mediaKind: 'MANGA', reference: { externalId: '30013', provider: 'anilist' },
-        relationType: 'ADAPTATION', titles: ['Shared Title'],
-      }],
-    });
-    expect(candidate.titles).toEqual(['Shared Title']);
-    expect(candidate.relations).toEqual([expect.objectContaining({ mediaKind: 'MANGA', relationType: 'ADAPTATION' })]);
+  it('keeps same-work provider references and rejects relation expansion fields', () => {
+    const candidate = {
+      externalId: '154587', linkedReferences: [{ externalId: '46474', provider: 'kitsu-anime' }],
+      mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Shared Title'],
+    };
+    expect(publicDiscoveryCandidateSchema.parse(candidate).linkedReferences).toEqual(candidate.linkedReferences);
+    expect(publicDiscoveryCandidateSchema.safeParse({ ...candidate, relations: [{ relationType: 'ADAPTATION' }] }).success).toBe(false);
   });
 });

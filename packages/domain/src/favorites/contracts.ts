@@ -62,6 +62,7 @@ export interface FavoriteObservation {
 }
 
 export interface ProviderCandidate {
+  contentClassification?: 'adult' | 'non-adult' | 'unknown';
   readonly linkedReferences?: readonly ProviderCandidateReference[];
   readonly canonicalUrl?: string;
   readonly categories?: readonly string[];
@@ -84,6 +85,10 @@ export interface ProviderCandidate {
   readonly provider: FavoriteProvider;
   readonly season?: number;
   readonly titles: readonly string[];
+}
+
+export function isContentVisible(candidate: ProviderCandidate | undefined, showAdultContent: boolean): boolean {
+  return showAdultContent || candidate?.contentClassification !== 'adult';
 }
 
 export interface ProviderCandidateEnvelope {
@@ -187,6 +192,9 @@ export function createFavoriteParseArtifact(input: FavoriteParseArtifact): Favor
 
 export function createProviderCandidate(input: ProviderCandidate, provider: FavoriteProvider): ProviderCandidate {
   contract(input.provider === provider, 'candidate provider must match its envelope.');
+  if (input.contentClassification !== undefined) {
+    contract(['adult', 'non-adult', 'unknown'].includes(input.contentClassification), 'contentClassification is invalid.');
+  }
   contract(input.titles.length <= favoriteAliasLimit, `titles exceeds ${favoriteAliasLimit} entries.`);
   if (input.season !== undefined) contract(Number.isSafeInteger(input.season) && input.season > 0, 'candidate season must be a positive safe integer.');
   for (const [field, value] of Object.entries({ startYear: input.startYear, endYear: input.endYear })) {
@@ -236,6 +244,7 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
     provider: input.provider,
     titles: Object.freeze(input.titles.map((title, index) => boundedText(title, `titles[${index}]`, favoriteTitleByteLimit))),
   };
+  if (input.contentClassification !== undefined) Object.assign(candidate, { contentClassification: input.contentClassification });
   if (input.format !== undefined) Object.assign(candidate, { format: boundedText(input.format, 'format', providerFacetValueByteLimit) });
   if (input.season !== undefined) Object.assign(candidate, { season: input.season });
   if (input.categories !== undefined) Object.assign(candidate, { categories: boundedTexts(input.categories, 'categories', favoriteAliasLimit, providerFacetValueByteLimit) });

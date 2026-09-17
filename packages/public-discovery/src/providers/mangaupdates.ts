@@ -26,6 +26,7 @@ const mangaUpdatesResultSchema = z.object({ record: mangaUpdatesSeriesSchema }).
 const mangaUpdatesSearchSchema = z.object({ results: z.array(mangaUpdatesResultSchema).max(favoriteProviderInspectionLimit), total_hits: z.number().int().nonnegative() }).passthrough();
 type MangaUpdatesSeries = z.infer<typeof mangaUpdatesSeriesSchema>;
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
+const adultLabels = new Set(['adult', 'erotica', 'hentai', 'lolicon', 'pornographic', 'shotacon', 'smut']);
 
 function mediaKind(value: string): Exclude<FavoriteMediaKind, 'ANIME' | 'UNKNOWN'> {
   const normalized = value.toLocaleLowerCase();
@@ -36,6 +37,7 @@ function mediaKind(value: string): Exclude<FavoriteMediaKind, 'ANIME' | 'UNKNOWN
 
 function candidate(series: MangaUpdatesSeries): ProviderCandidate {
   const result: MutableCandidate = {
+    contentClassification: [...series.genres.map(({ genre }) => genre), ...series.categories.map(({ category }) => category)].some((value) => adultLabels.has(value.trim().toLocaleLowerCase('en-US'))) ? 'adult' : 'unknown',
     externalId: series.series_id,
     format: series.type,
     mediaKind: mediaKind(series.type),

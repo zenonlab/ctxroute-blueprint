@@ -32,6 +32,14 @@ const searchSchema = z.object({
 const hydrationSchema = z.object({ data: resourceSchema }).passthrough();
 type KitsuResource = z.infer<typeof resourceSchema>;
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
+const documentedNonAdultAgeRatings = new Set(['G', 'PG', 'R']);
+
+function contentClassification(attributes: KitsuResource['attributes']): 'adult' | 'non-adult' | 'unknown' {
+  const ageRating = attributes.ageRating?.trim().toLocaleUpperCase('en-US');
+  if (attributes.nsfw === true || ageRating === 'R18') return 'adult';
+  if (attributes.nsfw === false || (ageRating !== undefined && documentedNonAdultAgeRatings.has(ageRating))) return 'non-adult';
+  return 'unknown';
+}
 
 function kind(provider: KitsuProvider): 'anime' | 'manga' {
   return provider === 'kitsu-anime' ? 'anime' : 'manga';
@@ -47,6 +55,7 @@ function candidate(resource: KitsuResource, provider: KitsuProvider): ProviderCa
   if (resource.type !== expectedType) throw new Error('Kitsu returned a different media type.');
   const titles = [...new Set([resource.attributes.canonicalTitle, ...Object.values(resource.attributes.titles), ...resource.attributes.abbreviatedTitles])].slice(0, 16);
   const result: MutableCandidate = {
+    contentClassification: contentClassification(resource.attributes),
     canonicalUrl: `https://kitsu.io/${expectedType}/${encodeURIComponent(resource.id)}/${encodeURIComponent(resource.attributes.slug)}`,
     externalId: resource.id,
     mediaKind: expectedType === 'anime' ? 'ANIME' : 'MANGA',

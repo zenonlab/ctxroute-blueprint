@@ -6,6 +6,7 @@ import {
   createResolutionDecision,
   createSourceEvidence,
   favoriteObservationByteLimit,
+  isContentVisible,
   utf8ByteLength,
 } from './contracts';
 
@@ -27,6 +28,16 @@ describe('favorite pipeline contracts', () => {
     const [candidate] = createProviderCandidateEnvelope(input).candidates;
     expect(candidate).not.toHaveProperty('lastChapter');
     expect(candidate).not.toHaveProperty('lastVolume');
+  });
+  it('preserves classification and hides only explicit adult content', () => {
+    const base = { externalId: '1', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Fixture'] };
+    const candidates = (['adult', 'non-adult', 'unknown'] as const).map((contentClassification) => createProviderCandidateEnvelope({
+      candidates: [{ ...base, contentClassification }], complete: true, digest: contentClassification,
+      provider: 'anilist', truncated: false,
+    }).candidates[0]);
+    expect(candidates.map((candidate) => candidate?.contentClassification)).toEqual(['adult', 'non-adult', 'unknown']);
+    expect(candidates.map((candidate) => isContentVisible(candidate, false))).toEqual([false, true, true]);
+    expect(isContentVisible(undefined, false)).toBe(true);
   });
   it('preserves raw strings, freezes nested values and counts UTF-8 bytes', () => {
     const value = observation();

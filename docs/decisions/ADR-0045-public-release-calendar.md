@@ -41,8 +41,8 @@ durable : l'objet est écrit avant l'envoi et un envoi échoué reste récupéra
 La collecte déclenchée par `GET /v2/releases` reste supprimée : une lecture
 publique ne provoque jamais une requête fournisseur. Le cron hebdomadaire
 dépose un signal sans événement dans la même Cloudflare Queue que Discovery.
-Chaque lane acquiert son propre bail D1, écrit chaque page validée dans un
-staging JSON borné, puis avance `next_page` et `not_before`. Une nouvelle
+Chaque lane acquiert son propre objet R2 avec jeton de propriété, écrit chaque
+page validée conditionnellement, puis avance `next_page` et `not_before`. Une nouvelle
 livraison reprend après la dernière page enregistrée. Tout `403`, `429`, timeout
 ou échec conserve le dernier snapshot valide de la lane; `Retry-After` prime
 sur le backoff Queue dans la limite de vingt-quatre heures.
@@ -62,8 +62,8 @@ l’horodatage, l’anti-rejeu, l’allowlist et les limites de corps s’appliq
 gates opérationnelles. La certification du 15 septembre 2026 a produit une
 génération active de 711 événements, dont 225 AniList et 486 MangaUpdates.
 
-L'extension ne possède aucun repli fournisseur Agenda. Elle lit le calendrier
-D1 par `/v3/releases`; une indisponibilité réseau peut réutiliser la dernière
+L'extension ne possède aucun repli fournisseur Agenda. Elle lit les modèles
+projetés par `/v3/releases`; une indisponibilité réseau peut réutiliser la dernière
 génération partagée de même fenêtre tant qu'elle a moins de huit jours. Sans
 génération partagée valide, Agenda expose son état indisponible et attend la
 prochaine collecte planifiée. Ni un démarrage, ni une alarme, ni une lecture Agenda

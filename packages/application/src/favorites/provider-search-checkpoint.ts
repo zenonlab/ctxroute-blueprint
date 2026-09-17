@@ -19,6 +19,7 @@ const count = z.number().int().nonnegative();
 type MutableProviderCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 type MutableProviderSearchQuery = { -readonly [Key in keyof FavoriteProviderSearchQuery]: FavoriteProviderSearchQuery[Key] };
 export const providerCandidateSchema = z.strictObject({
+  contentClassification: z.enum(['adult', 'non-adult', 'unknown']).optional(),
   linkedReferences: z.array(z.strictObject({ provider: z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']), externalId: text })).max(5).optional(),
   canonicalUrl: z.url().max(8192).optional(), categories: z.array(text).max(16).optional(), externalId: text,
   cover: z.strictObject({ attribution: z.string().trim().min(1).max(120), url: z.url().max(32 * 1024) }).optional(),
@@ -32,8 +33,9 @@ export const providerCandidateSchema = z.strictObject({
   season: z.number().int().positive().optional(),
   titleVariants: z.array(z.strictObject({ language: z.string().trim().min(1).max(120).optional(), title: text })).max(16).optional(),
   titles: z.array(text).min(1).max(16),
-}).transform(({ linkedReferences, canonicalUrl, categories, cover, displayTitle, format, genres, season, titleVariants, editorialStatus, startYear, endYear, episodeCount, chapterCount, volumeCount, popularity, metadataVersion, ...candidate }) => {
+}).transform(({ contentClassification, linkedReferences, canonicalUrl, categories, cover, displayTitle, format, genres, season, titleVariants, editorialStatus, startYear, endYear, episodeCount, chapterCount, volumeCount, popularity, metadataVersion, ...candidate }) => {
   const value: MutableProviderCandidate = candidate;
+  if (contentClassification !== undefined) value.contentClassification = contentClassification;
   if (linkedReferences !== undefined) value.linkedReferences = linkedReferences;
   if (canonicalUrl !== undefined) value.canonicalUrl = canonicalUrl;
   if (categories !== undefined) value.categories = categories;

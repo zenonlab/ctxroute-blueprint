@@ -163,7 +163,6 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   try {
   const port = new D1PublicDiscoveryV3Adapter(d1.database);
   let activeToken = '';
-  let followUps: readonly { key: Parameters<typeof port.confirmQueueSignal>[0]; requestDigest: string }[] = [];
   const resolver = createPublicDiscoveryResolver(createPublicDiscoveryProviders(
     providers.fetch,
     new D1ProviderRuntimeControl(d1.database),
@@ -177,7 +176,6 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       },
       publish: async (batch: PublicDiscoveryResultBatch) => {
         const receipt = await port.publishBatch(batch, await digest(activeToken), await digest(JSON.stringify(batch.results)), new Date().toISOString());
-        followUps = receipt.followUps ?? [];
         return { published: receipt.published, replayed: receipt.replayed };
       },
     },
@@ -195,17 +193,6 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     },
   });
   acceptedResults = report.published;
-  if (followUps.length > 0) {
-    try {
-      await bindings.PUBLIC_DISCOVERY_QUEUE.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
-      const confirmedAt = new Date().toISOString();
-      await Promise.all(followUps.map((followUp) => port.confirmQueueSignal(followUp.key, followUp.requestDigest, confirmedAt)));
-    } catch (error) {
-      const releasedAt = new Date().toISOString();
-      await Promise.all(followUps.map((followUp) => port.releaseQueueSignal(followUp.key, followUp.requestDigest, releasedAt)));
-      throw error;
-    }
-  }
   const result = report.replayed > 0 && report.published === 0 ? 'deduplicated' : report.published > 0 ? 'changed' : 'unchanged';
   return { ...report, metrics: collectorCost(d1.snapshot(), providers.snapshot(), report.published, result) };
   } catch (error) {

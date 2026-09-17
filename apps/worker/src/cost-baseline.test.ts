@@ -103,7 +103,7 @@ describe('local D1 cost baseline — no external requests', () => {
       (SELECT TOTAL(length(CAST(result_json AS BLOB))) FROM public_discovery_requests_v3 WHERE state = 'VERIFIED' AND json_extract(result_json, '$.profile.workId') = ?1) AS profileBytes`).bind(profile.workId).first();
     expect(byteStock).toMatchObject({ distinctProfiles: 2, profileCopies: 2 });
     for (const value of Object.values(byteStock ?? {})) expect(value).toEqual(expect.any(Number));
-    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([5, 4, 0, 4, 42, 0, 0, 0, 19, 12, 12]);
+    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([5, 4, 0, 4, 42, 0, 0, 0, 19, 12, 15]);
     console.info('d1-cost-baseline-storage-bytes', JSON.stringify({ afterAlias: aliasStorage, afterCounterChange: byteStock }));
     m.report();
   });
@@ -180,23 +180,20 @@ describe('local D1 cost baseline — no external requests', () => {
     m.report();
   });
 
-  it('measures relation admission and repeated publication without provider calls', async () => {
+  it('measures publication replay without relation admission', async () => {
     const m = meter();
     const adapter = new D1PublicDiscoveryV3Adapter(m.database);
     const now = at(0);
+    const requestsBefore = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first<{ count: number }>();
+    const relationsBefore = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_work_relations').first<{ count: number }>();
     await adapter.request(request('f'), now);
     await adapter.claimBatch({ claimToken: 'f'.repeat(48), tokenDigest: 'f'.repeat(64), now, leaseUntil: at(15), limit: 20 });
-    const related: PublicDiscoveryVerifiedProfile = { workId: 'work_cost_relation', references: [{ provider: 'anilist', externalId: '910003' }], candidate: { ...profile.candidate, externalId: '910003', displayTitle: 'Synthetic Relation', titles: ['Synthetic Relation'], relations: [{
-      mediaKind: 'MANGA', reference: { externalId: '910002', provider: 'anilist' }, relationType: 'ADAPTATION', titles: ['Synthetic Adaptation'],
-    }] } };
-    const batch = { claimToken: 'f'.repeat(48), nonce: crypto.randomUUID(), schemaVersion: 3 as const, verifiedAt: now, results: [{ key: key('f'), requestDigest: 'f'.repeat(64), resolution: { state: 'VERIFIED' as const, profile: related } }] };
-    const receipt = await m.measure('publish-with-one-relation', () => adapter.publishBatch(batch, 'f'.repeat(64), 'f'.repeat(64), now));
-    expect(receipt.followUps).toHaveLength(1);
-    const followUp = receipt.followUps?.[0];
-    if (!followUp) throw new Error('Expected relation admission.');
-    await m.measure('relation-signal-confirm', () => adapter.confirmQueueSignal(followUp.key, followUp.requestDigest, now));
+    const selected: PublicDiscoveryVerifiedProfile = { workId: 'work_cost_replay', references: [{ provider: 'anilist', externalId: '910003' }], candidate: { ...profile.candidate, externalId: '910003', displayTitle: 'Synthetic Replay', titles: ['Synthetic Replay'] } };
+    const batch = { claimToken: 'f'.repeat(48), nonce: crypto.randomUUID(), schemaVersion: 3 as const, verifiedAt: now, results: [{ key: key('f'), requestDigest: 'f'.repeat(64), resolution: { state: 'VERIFIED' as const, profile: selected } }] };
+    await m.measure('publish-without-relation', () => adapter.publishBatch(batch, 'f'.repeat(64), 'f'.repeat(64), now));
     await m.measure('replay-same-publication', async () => expect(await adapter.publishBatch(batch, 'f'.repeat(64), 'f'.repeat(64), now)).toEqual({ published: 0, replayed: 1 }));
-    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_work_relations').first()).toEqual({ count: 1 });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first()).toEqual({ count: (requestsBefore?.count ?? 0) + 1 });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_work_relations').first()).toEqual(relationsBefore);
     m.report();
   });
 

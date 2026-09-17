@@ -2,6 +2,7 @@ import { applyD1Migrations, env, SELF } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import { instrumentD1 } from '../operational-metrics';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
 
 const discoveryKey = (marker: string) => ({ fingerprint: marker.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' });
@@ -133,20 +134,25 @@ describe('verified public discovery cache', () => {
     ]);
   });
 
-  it('stores one server-side request for repeated v3 discovery misses', async () => {
-    const key = discoveryKey('e');
+  it('coalesces fifty concurrent misses into one bounded D1 admission', async () => {
+    const key = { ...discoveryKey('e'), fingerprint: `${'e'.repeat(62)}c0` };
     const body = { key, query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Sousou no Frieren'] }, schemaVersion: 3 };
-    const responses = await Promise.all([1, 2].map(() => SELF.fetch('https://tobirink.test/v3/catalogue/discoveries/requests', {
+    const metrics = instrumentD1(env.PUBLIC_DB);
+    const adapter = new D1PublicDiscoveryV3Adapter(metrics.database);
+    const app = createPublicDiscoveryApp({ d1Metrics: metrics, publicDiscoveryV3: adapter });
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const responses = await Promise.all(Array.from({ length: 50 }, () => app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
       body: JSON.stringify(body), headers: { 'CF-Connecting-IP': '192.0.2.3', 'Content-Type': 'application/json' }, method: 'POST',
     })));
-    expect(responses.map((response) => response.status)).toEqual([202, 202]);
-    expect(await Promise.all(responses.map((response) => response.json()))).toEqual([
-      expect.objectContaining({ state: 'PENDING' }), expect.objectContaining({ state: 'PENDING' }),
-    ]);
+    info.mockRestore();
+    expect(responses.every((response) => response.status === 202)).toBe(true);
+    expect((await Promise.all(responses.map((response) => response.json<{ state: string }>()))).every(({ state }) => state === 'PENDING')).toBe(true);
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ count: 1 });
+    expect(metrics.snapshot().rowsWritten).toBe(5);
   });
 
   it('reads up to fifty discovery states in one public request', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const keys = Array.from({ length: 50 }, (_, index) => ({ ...discoveryKey('8'), fingerprint: `${'8'.repeat(62)}${index.toString(16).padStart(2, '0')}` }));
     const response = await SELF.fetch('https://tobirink.test/v3/catalogue/discoveries/lookup', {
       body: JSON.stringify({ keys, schemaVersion: 3 }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
@@ -159,6 +165,14 @@ describe('verified public discovery cache', () => {
       body: JSON.stringify({ keys: [...keys, { ...discoveryKey('f') }], schemaVersion: 3 }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect(oversized.status).toBe(400);
+    const events = info.mock.calls.flatMap(([value]) => {
+      const parsed = costEventSchema.safeParse(JSON.parse(String(value)));
+      return parsed.success ? [parsed.data] : [];
+    });
+    info.mockRestore();
+    expect(events).toContainEqual(expect.objectContaining({ d1RowsWritten: 0, task: 'discovery-lookup', type: 'worker.cost' }));
+    expect(events.find(({ task }) => task === 'discovery-lookup')?.d1RowsRead).toBe(357);
+    expect(JSON.stringify(events)).not.toContain(keys[0]?.fingerprint);
   });
 
   it('returns explicit admission outcomes and claims exact references before precise and ambiguous searches', async () => {
@@ -386,14 +400,23 @@ describe('verified public discovery cache', () => {
     }, 's'.repeat(64), '9'.repeat(64), changedAt)).rejects.toThrow('public-discovery-refresh-not-verified');
     await expect(adapter.read(key, changedAt)).resolves.toMatchObject({ profile: { candidate: { displayTitle: 'Refresh Work' } }, state: 'VERIFIED' });
 
-    const changed = verifiedResult(key, request.requestDigest, 'refresh', '754321', 'Refresh Work Updated');
+    const revisionBeforeChanged = await env.PUBLIC_DB.prepare('SELECT revision FROM catalogue_works WHERE work_id = ?1')
+      .bind('work_refresh').first<{ revision: number }>();
+    const changedBase = verifiedResult(key, request.requestDigest, 'refresh', '754321', 'Refresh Work');
+    const changed = { ...changedBase, resolution: { ...changedBase.resolution, profile: {
+      ...changedBase.resolution.profile,
+      candidate: { ...changedBase.resolution.profile.candidate, contentClassification: 'adult' as const, episodeCount: 24 },
+    } } };
     await expect(adapter.publishBatch({
       claimToken: changedClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440073',
       results: [changed], schemaVersion: 3, verifiedAt: changedAt,
     }, 's'.repeat(64), 'a'.repeat(64), changedAt)).resolves.toEqual({ published: 1, replayed: 0 });
     await expect(adapter.read(key, changedAt)).resolves.toMatchObject({
-      profile: { candidate: { displayTitle: 'Refresh Work Updated' }, workId: 'work_refresh' }, state: 'VERIFIED',
+      profile: { candidate: { contentClassification: 'adult', displayTitle: 'Refresh Work', episodeCount: 24 }, workId: 'work_refresh' }, state: 'VERIFIED',
     });
+    const revisionAfterChanged = await env.PUBLIC_DB.prepare('SELECT revision FROM catalogue_works WHERE work_id = ?1')
+      .bind('work_refresh').first<{ revision: number }>();
+    expect(revisionAfterChanged?.revision).toBeGreaterThan(revisionBeforeChanged?.revision ?? 0);
     await env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3 SET
       refresh_state = 'PROCESSING', refresh_attempt_count = 8, claim_token_hash = ?1, lease_until = ?2
       WHERE fingerprint = ?3`).bind('e'.repeat(64), '2000-01-01T00:00:00.000Z', key.fingerprint).run();
@@ -403,15 +426,17 @@ describe('verified public discovery cache', () => {
     });
     expect(exhausted.requests.some(({ key: claimedKey }) => claimedKey.fingerprint === key.fingerprint)).toBe(false);
     await expect(adapter.read(key, changedAt)).resolves.toMatchObject({
-      profile: { candidate: { displayTitle: 'Refresh Work Updated' } }, state: 'VERIFIED',
+      profile: { candidate: { contentClassification: 'adult', episodeCount: 24 } }, state: 'VERIFIED',
     });
     expect(await env.PUBLIC_DB.prepare(`SELECT refresh_attempt_count AS attempts, refresh_state AS refreshState
       FROM public_discovery_requests_v3 WHERE fingerprint = ?1`).bind(key.fingerprint).first())
       .toEqual({ attempts: 0, refreshState: 'IDLE' });
   });
 
-  it('indexes a late manga adaptation as a distinct work and coalesces its exact discovery', async () => {
+  it('publishes one work without creating relation requests or relation rows', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const requestsBefore = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first<{ count: number }>();
+    const relationsBefore = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_work_relations').first<{ count: number }>();
     const sourceKey = { ...discoveryKey('a'), fingerprint: 'ab'.repeat(32) };
     const now = '2026-09-16T09:00:00.000Z';
     const sourceRequest = {
@@ -425,58 +450,18 @@ describe('verified public discovery cache', () => {
       now, tokenDigest: 'u'.repeat(64),
     });
     expect(sourceClaim.requests.some(({ key }) => key.fingerprint === sourceKey.fingerprint)).toBe(true);
-    const sourceBase = verifiedResult(sourceKey, sourceRequest.requestDigest, 'anime_source', '9001', 'Shared Title');
-    const sourceResult = { ...sourceBase, resolution: { ...sourceBase.resolution, profile: {
-      ...sourceBase.resolution.profile,
-      candidate: { ...sourceBase.resolution.profile.candidate, relations: [{
-        mediaKind: 'MANGA' as const, reference: { externalId: '9002', provider: 'anilist' as const },
-        relationType: 'ADAPTATION' as const, titles: ['Shared Title'],
-      }] },
-    } } };
+    const sourceResult = verifiedResult(sourceKey, sourceRequest.requestDigest, 'anime_source', '9001', 'Shared Title');
     const sourceReceipt = await adapter.publishBatch({
       claimToken: sourceClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440080',
       results: [sourceResult], schemaVersion: 3, verifiedAt: now,
     }, 'u'.repeat(64), 'b'.repeat(64), now);
-    expect(sourceReceipt).toMatchObject({ published: 1, replayed: 0, followUps: [expect.any(Object)] });
-    expect(sourceReceipt.followUps).toHaveLength(1);
-    const followUp = sourceReceipt.followUps?.[0];
-    if (!followUp) throw new Error('Expected bounded adaptation follow-up.');
-    await adapter.confirmQueueSignal(followUp.key, followUp.requestDigest, now);
+    expect(sourceReceipt).toEqual({ published: 1, replayed: 0 });
     await expect(adapter.publishBatch({
       claimToken: sourceClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440080',
       results: [sourceResult], schemaVersion: 3, verifiedAt: now,
     }, 'u'.repeat(64), 'b'.repeat(64), now)).resolves.toEqual({ published: 0, replayed: 1 });
-    expect(await env.PUBLIC_DB.prepare(`SELECT relation_type AS relationType, target_media_kind AS mediaKind,
-      target_work_id AS targetWorkId FROM catalogue_work_relations WHERE source_work_id = ?1`)
-      .bind('work_anime_source').first()).toEqual({ relationType: 'ADAPTATION', mediaKind: 'MANGA', targetWorkId: null });
-
-    const targetClaim = await adapter.claimBatch({
-      claimToken: 'v'.repeat(48), leaseUntil: '2026-09-16T09:30:00.000Z', limit: 20,
-      now, tokenDigest: 'v'.repeat(64),
-    });
-    const targetRequest = targetClaim.requests.find(({ key }) => key.fingerprint === followUp.key.fingerprint);
-    expect(targetRequest).toMatchObject({
-      query: { explicitProviderReference: { externalId: '9002', provider: 'anilist' }, mediaKind: 'MANGA' },
-    });
-    if (!targetRequest) throw new Error('Expected adaptation claim.');
-    const targetResult = {
-      ...verifiedResult(followUp.key, targetRequest.requestDigest, 'manga_target', '9002', 'Shared Title'),
-      resolution: { profile: {
-        ...verifiedResult(followUp.key, targetRequest.requestDigest, 'manga_target', '9002', 'Shared Title').resolution.profile,
-        candidate: { ...verifiedResult(followUp.key, targetRequest.requestDigest, 'manga_target', '9002', 'Shared Title').resolution.profile.candidate, mediaKind: 'MANGA' as const },
-      }, state: 'VERIFIED' as const },
-    };
-    await expect(adapter.publishBatch({
-      claimToken: targetClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440081',
-      results: [targetResult], schemaVersion: 3, verifiedAt: now,
-    }, 'v'.repeat(64), 'c'.repeat(64), now)).resolves.toEqual({ published: 1, replayed: 0 });
-    expect((await env.PUBLIC_DB.prepare(`SELECT work_id AS workId, media_kind AS mediaKind FROM catalogue_works
-      WHERE preferred_title = 'Shared Title' ORDER BY media_kind`).all()).results).toEqual([
-        { mediaKind: 'anime', workId: 'work_anime_source' },
-        { mediaKind: 'manga', workId: 'work_manga_target' },
-      ]);
-    expect(await env.PUBLIC_DB.prepare(`SELECT target_work_id AS targetWorkId FROM catalogue_work_relations
-      WHERE source_work_id = ?1`).bind('work_anime_source').first()).toEqual({ targetWorkId: 'work_manga_target' });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first()).toEqual({ count: (requestsBefore?.count ?? 0) + 1 });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_work_relations').first()).toEqual(relationsBefore);
   });
 
   it('rejects a normalized-title collision atomically', async () => {

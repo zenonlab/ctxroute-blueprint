@@ -51,7 +51,7 @@ ni l'idempotence, ni la décision de ne pas écrire.
 | Admission Discovery | écriture atomique, puis lecture de l'état; reprise du signal si nécessaire | La lecture confirme saturation, conflit et état final après concurrence | Fusion possible seulement avec une nouvelle forme de retour SQL |
 | Claim Discovery | `UPDATE ... RETURNING`, plus clôture bornée des claims épuisés | Sélection, bail et retour des demandes sont atomiques | Aucune lecture séparée à retirer |
 | Publication Discovery | lecture de garde, comparaison catalogue, batch protégé par lease, relecture seulement après `changes=0` | Protège rejeu, collision, bail et publication partielle | Les gardes répétées sont le prix de l'atomicité; pas de suppression sûre |
-| Relations Discovery | lecture par relation avant admission | Évite une demande et un signal quand la référence existe déjà | Batch de relations possible, mais non nécessaire au plan actuel |
+| Relations Discovery historiques | lecture puis admission secondaire | Retirées du runtime cible; aucune relation ne crée de travail |
 | Claim Agenda | lecture complète de lane puis `UPDATE ... RETURNING` | La lecture distingue complete/deferred/resume; l'UPDATE arbitre le lease | **Candidate** : décision + retour d'état dans une requête atomique |
 | Page Agenda | batch de deux écritures : page et checkpoint lane | Les deux écritures doivent réussir ensemble pour reprendre sans trou | Aucune écriture inutile démontrée |
 | Fin de lane | lecture de toutes les pages, relecture de lane, mise à jour conditionnelle | Pages pour le digest; lane pour le digest actif et le lease | **Candidate** : transporter `activeDigest` depuis le claim pour éviter la relecture |
@@ -131,7 +131,7 @@ aucune relation. Stock final : 1 fiche + 4 titres + 4 clés canoniques + 1 réf�
 | Admission identique déjà VERIFIED | 14 | 0 |
 | Nouvelle clé aboutissant à la même œuvre, cycle complet | 67 | 19 |
 | Refresh identique : admission, confirmation, claim, publication | 36 | 12 |
-| Refresh sans changement des champs catalogue persistés | 61 | 12 |
+| Refresh avec compteur changé | 64 | 15 |
 | Réservation fournisseur + succès | 4 | 2 |
 | Réservation fournisseur + échec | 4 | 2 |
 
@@ -157,7 +157,7 @@ la taille des pages SQLite, ni les octets d'index, ni une facturation distante.
 La future fiche canonique doit ramener le profil courant à une seule copie sans
 effacer les clés de résolution.
 
-### Échecs et relations
+### Échecs et ancienne exploration relationnelle
 
 | Scénario | Lignes lues | Écritures |
 |---|---:|---:|
@@ -165,15 +165,15 @@ effacer les clés de résolution.
 | Huit claims avec expiration du bail | 208 | 32 |
 | Première lecture après épuisement : transition FAILED | 5 | 3 |
 | Lecture UNAVAILABLE suivante | 3 | 0 |
-| Publication d'une nouvelle fiche à un titre et une relation | 88 | 28 |
-| Confirmation du signal de l'œuvre liée | 3 | 4 |
+| Publication historique d'une fiche à un titre et une relation | 88 | 28 |
+| Confirmation historique du signal de l'œuvre liée | 3 | 4 |
 | Rejeu du même résultat et du même nonce | 36 | 0 |
 
 Les huit claims coûtent **40 écritures avec admission et clôture**, hors
 confirmation du signal initial et hors contrôle/appels fournisseur.
 Il s'agit d'expirations de baux synthétiques, pas de huit erreurs HTTP réelles.
-La publication avec relation exclut son admission/claim initial et ne résout pas
-l'œuvre cible : ce n'est pas le coût complet de deux œuvres.
+Ces deux lignes sont une référence 0021 antérieure au retrait de l'exploration.
+Le runtime cible n'écrit plus de relation et n'admet plus l'œuvre cible.
 
 La lecture unitaire n'est pas universellement sans écriture : elle clôt une
 demande PROCESSING épuisée. Ne pas promettre zéro écriture pour tout GET.
@@ -287,12 +287,13 @@ Pour D nouvelles œuvres, A nouvelles clés d'œuvres existantes, H refreshes
 inchangés, M refreshes modifiés et P paires de contrôle fournisseur, le modèle
 local indicatif est :
 
-`writes = 55D + 19A + 12H + 12M + 2P + Agenda + échecs + autres écritures`.
+`writes = 55D + 19A + 12H + 15M + 2P + Agenda + échecs + autres écritures`.
 
 Ces coefficients sont propres aux fixtures. La première publication d'une
-révision commune peut être mutualisée par un batch ; les alias, références,
-relations et index changent aussi le coût. Ne pas additionner deux fois le
-contrôle fournisseur dans un cycle déjà mesuré intégralement.
+révision commune peut être mutualisée par un batch; alias, références et index
+changent aussi le coût. Les relations ne font plus partie du runtime cible. Ne
+pas additionner deux fois le contrôle fournisseur dans un cycle déjà mesuré
+intégralement.
 
 Une moyenne hebdomadaire ne protège pas du pic d'un jour. Par exemple,
 2 000 créations de cette fixture donnent 110 000 écritures avant Agenda.

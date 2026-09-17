@@ -27,6 +27,11 @@ const hydrationSchema = z.object({
 });
 type MangaDexData = z.infer<typeof hydrationSchema>['data'];
 const searchSchema = z.object({ result: z.literal('ok'), data: z.array(z.record(z.string(), z.json())).max(20), limit: z.number().int().min(1).max(20), offset: z.number().int().nonnegative(), total: z.number().int().nonnegative() });
+function contentClassification(value: MangaDexData['attributes']['contentRating']): 'adult' | 'non-adult' | 'unknown' {
+  if (value === 'erotica' || value === 'pornographic') return 'adult';
+  if (value === 'safe') return 'non-adult';
+  return 'unknown';
+}
 
 export class MangaDexFavoriteProviderAdapter implements FavoriteProviderCandidatePort, FavoriteProviderHydrationPort {
   constructor(private readonly fetcher: FavoriteProviderFetch = fetch.bind(globalThis), private readonly gate = new FavoriteProviderRateGate('mangadex')) {}
@@ -57,7 +62,7 @@ export class MangaDexFavoriteProviderAdapter implements FavoriteProviderCandidat
     const id = data.id.toLowerCase(); const attributes = data.attributes;
     const variants = [...Object.entries(attributes.title), ...attributes.altTitles.flatMap((value) => Object.entries(value))].map(([language, title]) => ({ language, title }));
     const titles = [...new Set(variants.map((variant) => variant.title))];
-    const result: MutableCandidate = { canonicalUrl: `https://mangadex.org/title/${id}`, categories: attributes.contentRating === 'erotica' || attributes.contentRating === 'pornographic' ? ['Adult'] : [], externalId: id, mediaKind: attributes.originalLanguage === 'ko' ? 'MANHWA' : attributes.originalLanguage.startsWith('zh') ? 'MANHUA' : 'MANGA', preSerialization: false, provider: 'mangadex', titles: titles.slice(0, 16), metadataVersion: 2, displayTitle: attributes.title.fr ?? attributes.title.en ?? attributes.title['ja-ro'] ?? titles[0], titleVariants: variants.slice(0, 16) };
+    const result: MutableCandidate = { canonicalUrl: `https://mangadex.org/title/${id}`, categories: attributes.contentRating === 'erotica' || attributes.contentRating === 'pornographic' ? ['Adult'] : [], contentClassification: contentClassification(attributes.contentRating), externalId: id, mediaKind: attributes.originalLanguage === 'ko' ? 'MANHWA' : attributes.originalLanguage.startsWith('zh') ? 'MANHUA' : 'MANGA', preSerialization: false, provider: 'mangadex', titles: titles.slice(0, 16), metadataVersion: 2, displayTitle: attributes.title.fr ?? attributes.title.en ?? attributes.title['ja-ro'] ?? titles[0], titleVariants: variants.slice(0, 16) };
     const fileName = data.relationships.find((relationship) => relationship.type === 'cover_art')?.attributes?.fileName;
     if (fileName !== undefined) result.cover = { attribution: 'MangaDex', url: `https://uploads.mangadex.org/covers/${id}/${encodeURIComponent(fileName)}.512.jpg` };
     const linked = this.mangaUpdatesReference(attributes.links?.mu);
