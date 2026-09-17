@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const hook = join(root, '.codex/hooks/post-tool-sensor.mjs');
-const state = mkdtempSync(join(tmpdir(), 'post-tool-sensor-state-'));
+mkdirSync(join(root, '.ctxroute'), { recursive: true });
+const state = mkdtempSync(join(root, '.ctxroute/post-tool-sensor-state-'));
 process.on('exit', () => rmSync(state, { recursive: true, force: true }));
 function run(input) { return spawnSync(process.execPath, [hook], { cwd: root, env: { ...process.env, CTXROUTE_STATE_DIR: state }, input: JSON.stringify(input), encoding: 'utf8' }); }
 

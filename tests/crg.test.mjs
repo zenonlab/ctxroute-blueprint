@@ -61,10 +61,11 @@ test('PostToolUse triggers only one successful normal write', () => {
 });
 
 test('PostToolUse maintenance coalesces an edit burst to its latest request', async () => {
-  const stateDirectory = await mkdtemp(join(tmpdir(), 'crg-maintenance-'));
-  const first = isLatestMaintenanceRequest({ stateDirectory, quietMs: 30, token: 'first' });
+  const projectRoot = await mkdtemp(join(tmpdir(), 'crg-maintenance-'));
+  const stateDirectory = join(projectRoot, '.ctxroute/state');
+  const first = isLatestMaintenanceRequest({ root: projectRoot, stateDirectory, quietMs: 30, token: 'first' });
   await new Promise(resolveWait => { setTimeout(resolveWait, 5); });
-  const second = isLatestMaintenanceRequest({ stateDirectory, quietMs: 30, token: 'second' });
+  const second = isLatestMaintenanceRequest({ root: projectRoot, stateDirectory, quietMs: 30, token: 'second' });
   assert.equal(await first, false);
   assert.equal(await second, true);
 });

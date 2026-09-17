@@ -10,10 +10,11 @@ contracts:
   - "*.lock"
 review: on-change
 revised: true
+superseded-by: ADR-0091-adr-authority-and-governance-effects.md
 ---
 # ADR-0008 — Persistent decision metadata and priority
 
-- Status: accepted
+- Status: superseded
 - Date: 2026-08-30
 
 ## Context

@@ -104,12 +104,12 @@ export async function integrateMissionCommit(commitOid, root = process.cwd(), de
 
 export async function reconcileManagedWorktrees(root = process.cwd(), dependencies = {}, suppliedState = null) {
   const deps = createWorktreeDependencies(dependencies);
-  const repair = dependencies.repair !== false;
+  const repair = dependencies.repair === true;
   const config = await loadOrchestratorConfig(root);
   const state = suppliedState ?? await readOrchestratorState(root);
-  const managedRoot = await ensureManagedRoot(root, config.worktreeRoot);
+  const managedRoot = await managedRootForInventory(root, config.worktreeRoot);
   const missions = new Map(state.goals.flatMap(goal => goal.missions).filter(mission => mission.worktree_allocation?.path && !['REMOVED', 'ROLLED_BACK'].includes(mission.worktree_allocation.status)).map(mission => [normalizePath(mission.worktree_allocation.path), mission]));
-  const registered = await listManagedWorktrees(root, config, deps);
+  const registered = await listManagedWorktrees(root, config, deps, false);
   const remaining = new Map(registered.map(item => [item.relative, item]));
   const results = [];
   let shouldPrune = false;
@@ -150,7 +150,7 @@ export async function reconcileManagedWorktrees(root = process.cwd(), dependenci
     results.push(result(registration.relative, status.indexLock ? 'INDEX_LOCK' : status.dirty ? 'ORPHAN_REGISTERED_DIRTY' : 'ORPHAN_REGISTERED_CLEAN', 'NEEDS_ATTENTION', null, status));
   }
   const registeredPaths = new Set(registered.filter(item => item.present).map(item => item.absolute));
-  for (const entry of await readdir(managedRoot, { withFileTypes: true })) {
+  for (const entry of managedRoot ? await readdir(managedRoot, { withFileTypes: true }) : []) {
     const absolute = resolve(managedRoot, entry.name);
     if (registeredPaths.has(absolute)) continue;
     const path = `${config.worktreeRoot}/${entry.name}`;
@@ -281,8 +281,10 @@ async function worktreeStatus(worktree, config, deps) {
   const lock = await lstat(resolve(gitDirectory, 'index.lock')).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
   return { dirty: source.length > 0, files: parseNull(source).map(record => normalizePath(record.slice(3))).sort(), head, indexLock: Boolean(lock) };
 }
-async function listManagedWorktrees(root, config, deps) {
-  const managedRoot = await ensureManagedRoot(root, config.worktreeRoot);
+async function listManagedWorktrees(root, config, deps, createRoot = true) {
+  const managedRoot = createRoot
+    ? await ensureManagedRoot(root, config.worktreeRoot)
+    : await managedRootForInventory(root, config.worktreeRoot);
   const repository = await realpath(root);
   const records = (await git(root, ['worktree', 'list', '--porcelain'], config, deps)).stdout.split(/\n\n+/u);
   const entries = [];
@@ -290,11 +292,23 @@ async function listManagedWorktrees(root, config, deps) {
     const first = record.split(/\r?\n/u).find(line => line.startsWith('worktree '));
     if (!first) continue;
     const absolute = first.slice(9);
-    if (absolute !== managedRoot && !absolute.startsWith(`${managedRoot}${sep}`)) continue;
+    if (!managedRoot || (absolute !== managedRoot && !absolute.startsWith(`${managedRoot}${sep}`))) continue;
     const details = await lstat(absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
     entries.push({ absolute, relative: normalizePath(relative(repository, absolute)), present: Boolean(details), symlink: details?.isSymbolicLink() ?? false });
   }
   return entries;
+}
+async function managedRootForInventory(root, worktreeRoot) {
+  if (!safeRelativePath(worktreeRoot)) throw new Error('invalid managed worktree root');
+  const repository = await realpath(root);
+  const absolute = resolve(repository, worktreeRoot);
+  assertContained(repository, absolute, 'managed root');
+  const details = await lstat(absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+  if (!details) return null;
+  if (!details.isDirectory() || details.isSymbolicLink()) throw new Error('managed worktree root must be a real directory');
+  const canonical = await realpath(absolute);
+  assertContained(repository, canonical, 'managed root');
+  return canonical;
 }
 async function resolveManagedPath(root, worktreeRoot, candidate, mustExist) {
   if (!safeRelativePath(candidate) || !normalizePath(candidate).startsWith(`${normalizePath(worktreeRoot)}/`)) throw new Error('path is outside the managed worktree root');

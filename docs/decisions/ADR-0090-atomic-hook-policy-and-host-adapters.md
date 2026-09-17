@@ -12,10 +12,11 @@ revised: true
 contracts:
   - docs/orchestration.md
   - docs/orchestration-verification.md
+superseded-by: ADR-0092-execution-bindings-and-hook-lanes.md
 ---
 # ADR-0090 — Atomic hook policy and host-specific adapters
 
-- Status: accepted
+- Status: superseded
 - Date: 2026-09-17
 
 ## Decision

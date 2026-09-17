@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,8 +8,9 @@ import { adaptHostDecision } from '../.codex/hooks/host-policy-adapter.mjs';
 import { assertWorkerGitCommand, classifyGitCommand } from '../scripts/git-command-policy.mjs';
 import { MODE_DESCRIPTORS, OPERATING_MODES, WORKFLOWS, decisionCanResolve, policyDigest, resolveExecutionPolicy } from '../scripts/orchestration-policy-core.mjs';
 import { readOrchestratorState, transactOrchestrator } from '../scripts/orchestrator-core.mjs';
-import { writePolicySnapshot } from '../scripts/orchestrator-policy-snapshot.mjs';
+import { loadPolicySnapshot, POLICY_SNAPSHOT_MAX_BYTES, readPolicySnapshot, writePolicySnapshot } from '../scripts/orchestrator-policy-snapshot.mjs';
 import { resolvedPolicyDecision } from '../.codex/hooks/resolved-policy.mjs';
+import { safeStateDirectory } from '../scripts/safe-state-directory.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -106,6 +107,40 @@ test('hook policy uses last-valid then blocks only mutations when configuration 
   assert.equal(blocked.decision.cause, 'POLICY_CONFIG_INVALID');
   const readOnly = await resolvedPolicyDecision({ tool_name: 'Read' }, root, {});
   assert.equal(readOnly.decision, null);
+});
+
+test('an unvalidated in-process lastValid value is never trusted', async () => {
+  const root = policyFixture();
+  const loaded = await loadPolicySnapshot({
+    path: join(root, '.ctxroute/orchestrator/missing.json'),
+    lastValid: { resolution_status: 'RESOLVED', write_allowed: true, policy_digest: '0'.repeat(64) },
+    config: { default_mode: 'SWARM', capabilities: ['git'] },
+    mutation: true,
+  });
+  assert.notEqual(loaded.source, 'last-valid');
+  assert.equal(loaded.policy.policy_digest.length, 64);
+});
+
+test('mutation policy rejects unknown stages and missing worker bindings', async () => {
+  const root = policyFixture();
+  const policy = resolveExecutionPolicy({ requested_mode: 'SWARM', workflow: 'STANDARD', capabilities: ['git'] });
+  await writePolicySnapshot(policy, join(root, '.ctxroute/orchestrator/policy.json'));
+  const unknown = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, { CTXROUTE_STAGE: 'unknown' });
+  assert.equal(unknown.decision.cause, 'POLICY_STAGE_UNKNOWN');
+  const missing = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, { CTXROUTE_AGENT_ROLE: 'worker' });
+  assert.equal(missing.decision.cause, 'EXECUTION_BINDING_MISSING');
+});
+
+test('policy snapshots and state directories reject oversized or escaping inputs', async () => {
+  const root = policyFixture();
+  const snapshot = join(root, '.ctxroute/orchestrator/policy.json');
+  mkdirSync(join(root, '.ctxroute/orchestrator'), { recursive: true });
+  writeFileSync(snapshot, 'x'.repeat(POLICY_SNAPSHOT_MAX_BYTES));
+  await assert.rejects(() => readPolicySnapshot(snapshot), /exceeds 16 KiB/u);
+  assert.throws(() => safeStateDirectory(join(tmpdir(), 'outside-state'), root), /inside the repository/u);
+  mkdirSync(join(root, '.ctxroute'), { recursive: true });
+  symlinkSync(tmpdir(), join(root, '.ctxroute/linked-state'));
+  assert.throws(() => safeStateDirectory(join(root, '.ctxroute/linked-state/cache'), root), /symlink/u);
 });
 
 test('an experiment remains unintegrable until a durable promotion decision is consumed', async () => {

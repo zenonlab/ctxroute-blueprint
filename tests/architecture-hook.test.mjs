@@ -215,6 +215,22 @@ test('allows a contract with a real ADR', () => {
   assert.equal(result.stdout, '');
 });
 
+test('pre-tool ADR protection applies only to tracked accepted decisions', () => {
+  const cwd = initializedWorkspace();
+  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+  const path = join(cwd, 'docs/decisions/ADR-0001-fixture.md');
+  writeFileSync(path, '---\nscope:\n  - src/**\nreview: on-change\n---\n# ADR\n\n- Status: accepted\n\n## Decision\n\nKeep it.\n\n## Consequences\n\nStable.\n');
+  const untracked = run({ file_path: 'docs/decisions/ADR-0001-fixture.md' }, { cwd });
+  assert.doesNotMatch(untracked.stdout, /accepted ADR cannot be rewritten/u);
+  git(cwd, ['init', '-q']);
+  git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
+  git(cwd, ['config', 'user.name', 'Fixture']);
+  git(cwd, ['add', '.']);
+  git(cwd, ['commit', '-qm', 'chore: fixture']);
+  const tracked = run({ file_path: 'docs/decisions/ADR-0001-fixture.md' }, { cwd });
+  assert.match(tracked.stdout, /accepted ADR cannot be rewritten/u);
+});
+
 test('blocks governed changes while an ADR is invalid or superseded', () => {
   for (const metadata of [
     '# invalid ADR\n',

@@ -5,8 +5,10 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { safeStateDirectory } from '../../scripts/safe-state-directory.mjs';
 
 export function postToolSensor(rawInput, options = {}) {
+  const root = options.root ?? process.cwd();
   let input;
   try { input = rawInput === String(rawInput) ? JSON.parse(rawInput || '{}') : rawInput; }
   catch (error) { return { systemMessage: `PostToolUse Sensor failed open: invalid JSON input (${error.message})` }; }
@@ -15,10 +17,10 @@ export function postToolSensor(rawInput, options = {}) {
   const supported = entries
     .filter(({ path, key }) => isSupportedSourcePath(path) && key !== 'old_path')
     .filter(({ path }) => path !== '.project/sensor-rules.json')
-    .filter(({ path }) => !deletion || existsSync(resolve(process.cwd(), path)))
+    .filter(({ path }) => !deletion || existsSync(resolve(root, path)))
     .map(({ path }) => path);
   if (supported.length) {
-    const result = analyzePaths(supported);
+    const result = analyzePaths(supported, { root });
     if (result.verdict !== 'SAFE') {
       const details = result.diagnostics.slice(0, 5).map(item => `${item.path}:${item.line} ${item.rule}`).join(', ');
       if (result.verdict === 'WARN') {
@@ -39,7 +41,7 @@ export function postToolSensor(rawInput, options = {}) {
 function firstWarning(input, result, options) {
   const identity = JSON.stringify({ session: input.session_id ?? 'session', findings: result.diagnostics.map(item => [item.path, item.rule, item.line]) });
   const key = createHash('sha256').update(identity).digest('hex');
-  const directory = options.stateDirectory ?? process.env.CTXROUTE_STATE_DIR ?? resolve('.ctxroute/state');
+  const directory = safeStateDirectory(options.stateDirectory ?? process.env.CTXROUTE_STATE_DIR ?? resolve(options.root ?? process.cwd(), '.ctxroute/state'), options.root ?? process.cwd());
   const marker = join(directory, `sensor-warn-${key}`);
   try {
     mkdirSync(directory, { recursive: true });

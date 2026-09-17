@@ -1,7 +1,8 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
 import {
   isAdr,
   isArchitectureEvidence,
@@ -15,20 +16,20 @@ import {
   loadProjectConfig,
   normalizePath,
 } from '../../.githooks/project-policy.mjs';
-import { decisionDiagnostics, loadAdrs, syncAdrRules } from './decision-memory.mjs';
+import { decisionDiagnostics, loadAdrs, parseAdr, syncAdrRules } from './decision-memory.mjs';
 
-export function preToolArchitecture(rawInput) {
-  try { return evaluateArchitecturePolicy(rawInput); }
+export function preToolArchitecture(rawInput, root = process.cwd()) {
+  try { return evaluateArchitecturePolicy(rawInput, root); }
   catch (error) { if (error instanceof HookOutput) return error.output; throw error; }
 }
 
-function evaluateArchitecturePolicy(rawInput) {
+function evaluateArchitecturePolicy(rawInput, root) {
 let input;
 try { input = rawInput === String(rawInput) ? JSON.parse(rawInput || '{}') : rawInput; }
 catch { block('Write blocked: invalid hook input.'); }
 const toolInput = input.tool_input ?? {};
 const paths = extractPaths(toolInput);
-const { config, failures } = loadProjectConfig();
+const { config, failures } = loadProjectConfig(root);
 
 if (failures.length) {
   const repairPaths = new Set(['.codex/architecture-policy.json', '.project/project-config.json']);
@@ -41,6 +42,14 @@ if (failures.length) {
 const toolName = String(input.tool_name ?? '');
 const command = commandText(toolInput);
 const mutationTool = /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(toolName);
+const acceptedAdrEdits = paths.filter(path => acceptedTrackedAdr(path, root));
+if (mutationTool && acceptedAdrEdits.length && !/(?:superseded-by|editorial-correction)\s*:/u.test(addedContent(toolInput))) {
+  block([
+    'Write blocked: an accepted ADR cannot be rewritten in place.',
+    `ADRs: ${acceptedAdrEdits.join(', ')}`,
+    'Create a new ADR with supersedes metadata, or declare a non-normative editorial-correction.',
+  ]);
+}
 if (toolName === 'apply_refactor_tool') {
   if (toolInput.dry_run === true) {
     return context('CRG refactor preview allowed. Apply accepted changes with normal editing tools so architecture and Sensor controls remain active.');
@@ -78,10 +87,10 @@ if (config.status === 'template') {
   return null;
 }
 
-const changePaths = [...new Set([...paths, ...gitChangedFiles()])];
-const invalidDecisionPaths = loadAdrs().filter(adr => adr.errors.length).map(adr => adr.file);
-const decisionStatus = decisionDiagnostics(changePaths);
-syncAdrRules(process.cwd());
+const changePaths = [...new Set([...paths, ...gitChangedFiles(root)])];
+const invalidDecisionPaths = loadAdrs(root).filter(adr => adr.errors.length).map(adr => adr.file);
+const decisionStatus = decisionDiagnostics(changePaths, root);
+syncAdrRules(root);
 if (invalidDecisionPaths.length && mutationTool && !paths.some(path => path.startsWith('docs/decisions/'))) {
   block(['Write blocked: invalid ADR metadata must be repaired before changing governed files.', `ADRs: ${invalidDecisionPaths.join(', ')}`]);
 }
@@ -116,7 +125,7 @@ if (codeOutsideDeclaredRoots.length) {
   ]);
 }
 
-const newSourceFiles = paths.filter(path => isSourcePath(path, config) && !existsSync(path) && !isTestPath(path, config));
+const newSourceFiles = paths.filter(path => isSourcePath(path, config) && !existsSync(resolve(root, path)) && !isTestPath(path, config));
 const structuralChange = paths.some(path => isSourcePath(path, config)) && hasStructuralSignal(addedContent(toolInput));
 if ((newSourceFiles.length || structuralChange) && !architectureEvidence) {
   return context(`Potential structural change in ${(newSourceFiles.length ? newSourceFiles : paths.filter(path => isSourcePath(path, config))).join(', ')}. Update an ADR and Archify source only if this materially changes a boundary, contract, dependency, or cross-component flow.`);
@@ -277,7 +286,7 @@ function isDirectMutationCommand(value) {
   return /[>]|\b(?:rm|mv|cp|touch|mkdir|tee|truncate|dd|install)\b|\bsed\s+-i\b|\bfind\b[^\n]*\s-(?:delete|exec)\b|\b(?:node|python|python3|ruby|perl)\s+-e\b/iu.test(command);
 }
 
-function gitChangedFiles() {
+function gitChangedFiles(root) {
   const files = new Set();
   for (const args of [
     ['diff', '--name-only', '-z'],
@@ -285,10 +294,20 @@ function gitChangedFiles() {
     ['ls-files', '--others', '--exclude-standard', '-z'],
   ]) {
     try {
-      execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean).forEach(path => files.add(normalizePath(path)));
+      execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean).forEach(path => files.add(normalizePath(path)));
     } catch {}
   }
   return [...files];
+}
+
+function acceptedTrackedAdr(path, root) {
+  if (!/^docs\/decisions\/ADR-(?!0000-).+\.md$/u.test(path) || !existsSync(resolve(root, path))) return false;
+  try {
+    execFileSync('git', ['ls-files', '--error-unmatch', '--', path], { cwd: root, stdio: 'ignore' });
+    return /^- Status:\s*accepted\s*$/imu.test(parseAdr(readFileSync(resolve(root, path), 'utf8'), path).body);
+  } catch {
+    return false;
+  }
 }
 
 function block(reason) {

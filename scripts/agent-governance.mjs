@@ -4,11 +4,15 @@ import { fileURLToPath } from 'node:url';
 
 const policyPath = join(dirname(fileURLToPath(import.meta.url)), 'agent-governance.json');
 const policy = JSON.parse(await readFile(policyPath, 'utf8'));
-const decisionNames = ['ASK', 'NEVER', 'ALWAYS'];
+const decisionNames = ['ASK', 'NEVER', 'ALWAYS', 'ORCHESTRATOR'];
 
-export function decide(action, { approved = false } = {}) {
+export function decide(action, { approved = false, authority = null, decisionReceipt = null } = {}) {
   const decision = decisionNames.find(name => policy.decisions[name].includes(action)) ?? 'ASK';
-  return { action, decision, allowed: decision === 'ALWAYS' || (decision === 'ASK' && approved), requiresApproval: decision === 'ASK' };
+  const receipted = decisionReceipt && decisionReceipt === Object(decisionReceipt) && decisionReceipt.receipt_id && decisionReceipt.selection;
+  const allowed = decision === 'ALWAYS'
+    || (decision === 'ASK' && approved && Boolean(receipted))
+    || (decision === 'ORCHESTRATOR' && authority === 'orchestrator');
+  return { action, decision, allowed, requiresApproval: decision === 'ASK', requiredAuthority: decision === 'ORCHESTRATOR' ? 'orchestrator' : null };
 }
 
 export function validateGovernancePolicy(value = policy) {

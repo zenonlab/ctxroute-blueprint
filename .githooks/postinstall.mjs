@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -53,6 +53,17 @@ export function inspectGlobalCtxrouteHooks(configPath = join(process.env.CODEX_H
 
 function inspectHarness(root, relativePath, harness, failures) {
   const config = readJson(join(root, relativePath), failures, relativePath);
+  if (config?.hookLanes?.synchronous !== 'host-blocking' || config?.hookLanes?.maintenance !== 'host-async'
+    || !Array.isArray(config?.hookLanes?.manual) || !config.hookLanes.manual.includes('.codex/hooks/archify-preview.mjs')) {
+    failures.push(`${relativePath} must declare synchronous, maintenance, and manual lanes.`);
+  }
+  const declaredModules = Object.values(config?.hookModules ?? {}).flat();
+  const actualModules = existsSync(join(root, '.codex', 'hooks'))
+    ? readdirSync(join(root, '.codex', 'hooks')).filter(name => name.endsWith('.mjs')).sort()
+    : [];
+  if (new Set(declaredModules).size !== declaredModules.length || JSON.stringify([...declaredModules].sort()) !== JSON.stringify(actualModules)) {
+    failures.push(`${relativePath} must classify every hook module exactly once.`);
+  }
   const actualEvents = Object.keys(config?.hooks ?? {});
   if (actualEvents.length !== lifecycleEvents.length || lifecycleEvents.some(event => !actualEvents.includes(event))) {
     failures.push(`${relativePath} must define exactly the six supported lifecycle events.`);
@@ -60,9 +71,12 @@ function inspectHarness(root, relativePath, harness, failures) {
   for (const event of lifecycleEvents) {
     const entries = (config?.hooks?.[event] ?? []).flatMap(block => block.hooks ?? []);
     const expected = `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`;
-    if (entries.length !== 1 || entries[0]?.command !== expected) failures.push(`${relativePath} ${event} must contain exactly one local lifecycle handler.`);
+    const expectedCount = ['PostToolUse', 'UserPromptSubmit'].includes(event) ? 2 : 1;
+    if (entries.length !== expectedCount || entries[0]?.command !== expected) failures.push(`${relativePath} ${event} has an invalid synchronous lifecycle handler.`);
+    if (expectedCount === 2 && (entries[1]?.command !== `${expected} maintenance` || entries[1]?.async !== true)) failures.push(`${relativePath} ${event} has an invalid maintenance lifecycle handler.`);
     if (!Number.isFinite(entries[0]?.timeout) || entries[0].timeout <= 0) failures.push(`${relativePath} ${event} must declare an explicit positive timeout.`);
     if ('statusMessage' in (entries[0] ?? {})) failures.push(`${relativePath} ${event} must not declare a noisy statusMessage.`);
+    if (entries.some(entry => !Number.isFinite(entry.timeout) || entry.timeout <= 0)) failures.push(`${relativePath} ${event} handlers must declare explicit positive timeouts.`);
     if (event === 'PostToolUse' && config?.hooks?.[event]?.[0]?.matcher !== 'apply_patch|Edit|Write|exec_command|Bash|Shell') {
       failures.push(`${relativePath} PostToolUse must target only mutation-capable tools.`);
     }

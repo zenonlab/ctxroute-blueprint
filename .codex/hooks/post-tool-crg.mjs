@@ -3,6 +3,9 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { runCrgUpdate } from '../../scripts/crg-runner.mjs';
+import { decide } from '../../scripts/agent-governance.mjs';
+import { safeStateDirectory } from '../../scripts/safe-state-directory.mjs';
+import { emitGovernanceEvent } from '../../scripts/governance-telemetry.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -11,6 +14,7 @@ export function shouldUpdate(input) {
 }
 
 export async function isLatestMaintenanceRequest({ root: projectRoot = root, stateDirectory = process.env.CTXROUTE_STATE_DIR || join(projectRoot, '.ctxroute', 'state'), quietMs = 600, token = randomUUID() } = {}) {
+  stateDirectory = safeStateDirectory(stateDirectory, projectRoot);
   const marker = join(stateDirectory, 'crg-maintenance-request');
   const temporary = `${marker}.${createHash('sha256').update(token).digest('hex')}.tmp`;
   await mkdir(stateDirectory, { recursive: true });
@@ -18,6 +22,21 @@ export async function isLatestMaintenanceRequest({ root: projectRoot = root, sta
   await rename(temporary, marker);
   await new Promise(resolveWait => { setTimeout(resolveWait, quietMs); });
   return await readFile(marker, 'utf8').catch(() => '') === token;
+}
+
+export async function runCrgMaintenance(rawInput, options = {}) {
+  let input;
+  try { input = rawInput === String(rawInput) ? JSON.parse(rawInput || '{}') : rawInput; }
+  catch { return null; }
+  if (!shouldUpdate(input)) return null;
+  const projectRoot = options.root ?? root;
+  const stateDirectory = safeStateDirectory(options.stateDirectory ?? join(projectRoot, '.ctxroute', 'state'), projectRoot);
+  const governance = decide('maintenance.crg');
+  emitGovernanceEvent(stateDirectory, governance);
+  if (!governance.allowed) return null;
+  if (!await isLatestMaintenanceRequest({ root: projectRoot, stateDirectory })) return null;
+  await runCrgUpdate({ root: projectRoot }).catch(() => null);
+  return null;
 }
 
 function successful(value) {

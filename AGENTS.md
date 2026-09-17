@@ -69,6 +69,14 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Use typed Archify JSON IR for executable, readable architecture diagrams.
 - Record important decisions in `docs/decisions/`.
 
+## ADR authority
+
+- The primary agent is responsible for final coherence across ADRs, contracts, documentation, and diagrams.
+- A worker may modify an ADR only when its mission explicitly includes that ADR or the decisions directory in its file scope.
+- Never rewrite an accepted ADR to change its meaning. Create a new ADR with `supersedes`; update the old ADR only with the reverse `superseded-by` relation and status `superseded`.
+- An editorial correction must declare `editorial-correction: true` and cannot change `scope`, `contracts`, `Decision`, `Consequences`, or status.
+- Operational documentation and diagrams may change with implementation when the underlying decision remains unchanged.
+
 ## Git
 
 - One coherent verified outcome per commit; do not create micro-commits merely to mirror milestones.

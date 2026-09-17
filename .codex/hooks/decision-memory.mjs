@@ -108,10 +108,54 @@ export function validateMetadata(metadata, file = '') {
   if (metadata?.contracts !== undefined && (!Array.isArray(metadata.contracts) || metadata.contracts.some(value => value !== String(value) || !value.trim()))) errors.push(`${file}: contracts must be a string array`);
   if (!['on-change', 'manual', 'never'].includes(metadata?.review)) errors.push(`${file}: review must be on-change, manual, or never`);
   if (metadata?.['superseded-by'] !== undefined && !/^ADR-\d{4}-.+\.md$/u.test(String(metadata['superseded-by']))) errors.push(`${file}: superseded-by must reference an ADR filename`);
+  if (metadata?.supersedes !== undefined
+    && (!Array.isArray(metadata.supersedes) || metadata.supersedes.some(value => !/^ADR-\d{4}-.+\.md$/u.test(String(value))))) {
+    errors.push(`${file}: supersedes must be an array of ADR filenames`);
+  }
   if (metadata?.['conflicts-with'] !== undefined && (!Array.isArray(metadata['conflicts-with']) || metadata['conflicts-with'].some(value => !/^ADR-\d{4}-.+\.md$/u.test(String(value))))) errors.push(`${file}: conflicts-with must be an array of ADR filenames`);
   if (metadata?.revised !== undefined && metadata.revised !== true) errors.push(`${file}: revised must be true when present`);
+  if (metadata?.['editorial-correction'] !== undefined && metadata['editorial-correction'] !== true) errors.push(`${file}: editorial-correction must be true when present`);
   return errors;
 }
+
+export function validateAdrRevision(beforeSource, afterSource, file = '') {
+  const before = parseAdr(beforeSource, file);
+  const after = parseAdr(afterSource, file);
+  if (before.errors.length || after.errors.length) return [...before.errors, ...after.errors];
+  const statusBefore = adrStatus(before.body);
+  if (statusBefore !== 'accepted') return [];
+  const statusAfter = adrStatus(after.body);
+  const afterNormative = normativeRecord(after);
+  const superseded = statusAfter === 'superseded'
+    && after.metadata['superseded-by']
+    && normativeSections(before).every(([name, value]) => name === 'status' || value === afterNormative[name]);
+  if (superseded) return [];
+  if (after.metadata['editorial-correction'] === true) {
+    const changed = normativeSections(before).filter(([name, value]) => value !== afterNormative[name]).map(([name]) => name);
+    return changed.length ? [`${file}: editorial correction changed normative fields: ${changed.join(', ')}`] : [];
+  }
+  return [`${file}: accepted ADR meaning cannot be rewritten; create a new ADR with supersedes metadata`];
+}
+
+function normativeSections(adr) {
+  const metadata = adr.metadata ?? {};
+  const sections = sectionMap(adr.body);
+  return [
+    ['scope', JSON.stringify(metadata.scope ?? [])],
+    ['contracts', JSON.stringify(metadata.contracts ?? [])],
+    ['Decision', sections.get('Decision') ?? ''],
+    ['Consequences', sections.get('Consequences') ?? ''],
+    ['status', adrStatus(adr.body)],
+  ];
+}
+function normativeRecord(adr) { return Object.fromEntries(normativeSections(adr)); }
+function sectionMap(body) {
+  const result = new Map();
+  const matches = [...body.matchAll(/^##\s+(.+)\s*$([\s\S]*?)(?=^##\s+|(?![\s\S]))/gmu)];
+  for (const match of matches) result.set(match[1].trim(), match[2].trim());
+  return result;
+}
+function adrStatus(body) { return /^- Status:\s*(accepted|superseded|proposed|rejected)\s*$/imu.exec(body)?.[1]?.toLowerCase() ?? null; }
 
 export function normalizePath(value) {
   return value === String(value) ? value.trim().replace(/\\/gu, '/').replace(/^\.\//u, '') : '';

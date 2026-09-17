@@ -14,7 +14,7 @@
   },
   "components": [
     { "id": "agents", "type": "external", "label": "Coding agents", "sublabel": "Codex / Claude", "pos": [40, 50], "size": [150, 60] },
-    { "id": "lifecycle", "type": "backend", "label": "Lifecycle dispatch", "sublabel": "Atomic policy gate", "pos": [280, 50], "size": [180, 60] },
+    { "id": "lifecycle", "type": "backend", "label": "Lifecycle dispatch", "sublabel": "sync + maintenance lanes", "pos": [280, 50], "size": [180, 60] },
     { "id": "ctxroute", "type": "external", "label": "CTXRoute", "sublabel": "On-demand context", "pos": [540, 50], "size": [170, 60] },
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
@@ -41,7 +41,7 @@
     { "id": "lifecycle-sensor", "from": "lifecycle", "to": "sensor", "label": "validate successful writes", "variant": "security", "labelAt": [450, 170] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse supported sources", "labelAt": [500, 304] },
     { "id": "agents-orchestrator", "from": "agents", "to": "orchestrator", "label": "MCP or CLI transaction", "fromSide": "bottom", "toSide": "top", "via": [[115, 170]], "labelAt": [110, 170] },
-    { "id": "orchestrator-lifecycle", "from": "orchestrator", "to": "lifecycle", "label": "targeted mission", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [315, 140] },
+    { "id": "orchestrator-lifecycle", "from": "orchestrator", "to": "lifecycle", "label": "bound MissionView", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [305, 122] },
     { "id": "orchestrator-workers", "from": "orchestrator", "to": "workers", "label": "scope + worktree", "fromSide": "bottom", "toSide": "top", "labelAt": [90, 350] },
     { "id": "workers-orchestrator", "from": "workers", "to": "orchestrator", "label": "bounded report", "variant": "emphasis", "fromSide": "right", "toSide": "right", "via": [[250, 440], [250, 260]], "labelAt": [285, 395] },
     { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },

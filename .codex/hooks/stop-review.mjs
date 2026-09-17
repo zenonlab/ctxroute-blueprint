@@ -44,9 +44,6 @@ function runValidations(root) {
   const failures = [];
   for (const [name, args] of [
     ['configuration', ['.githooks/validate-project-config.mjs']],
-    ['CTXRoute', ['.githooks/validate-ctxroute.mjs']],
-    ['documentation', ['.githooks/validate-docs.mjs', '--all']],
-    ['blueprint review', ['scripts/blueprint-review.mjs']],
   ]) {
     try { execFileSync(process.execPath, args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }
     catch (error) { failures.push(`${name}: ${String(error.stderr ?? '').trim().split(/\r?\n/u)[0] || 'failed'}`); }

@@ -16,6 +16,7 @@ export const ORCHESTRATOR_SCHEMA_IDS = Object.freeze({
   missionRequest: 'https://ctxroute.dev/schemas/orchestrator/mission-request.schema.json',
   missionRecord: 'https://ctxroute.dev/schemas/orchestrator/mission-record.schema.json',
   missionView: 'https://ctxroute.dev/schemas/orchestrator/mission-view.schema.json',
+  executionBinding: 'https://ctxroute.dev/schemas/orchestrator/execution-binding.schema.json',
   workerReport: 'https://ctxroute.dev/schemas/orchestrator/worker-report.schema.json',
   auditReport: 'https://ctxroute.dev/schemas/orchestrator/audit-report.schema.json',
   validationReceipt: 'https://ctxroute.dev/schemas/orchestrator/validation-receipt.schema.json',

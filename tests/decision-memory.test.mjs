@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { applicableAdrs, decisionDiagnostics, matchScope, parseAdr, syncAdrRules } from '../.codex/hooks/decision-memory.mjs';
+import { applicableAdrs, decisionDiagnostics, matchScope, parseAdr, syncAdrRules, validateAdrRevision } from '../.codex/hooks/decision-memory.mjs';
 
 test('matches exact paths and single or recursive globs', () => {
   assert.equal(matchScope('package.json', ['package.json']), true);
@@ -95,4 +95,31 @@ test('materializes an inactive ADR index without copying decision bodies', () =>
   assert.doesNotMatch(generated, /Use the approved adapter/u);
   assert.doesNotMatch(generated, /problem-memory|events:|tools:/u);
 
+});
+
+test('revised true cannot rewrite accepted normative sections', () => {
+  const before = '---\nscope:\n  - src/**\nreview: on-change\nrevised: true\n---\n# ADR\n\n- Status: accepted\n\n## Decision\n\nKeep A.\n\n## Consequences\n\nStable.\n';
+  const after = before.replace('Keep A.', 'Choose B.');
+  assert.match(validateAdrRevision(before, after, 'docs/decisions/ADR-0042-choice.md').join('\n'), /cannot be rewritten/u);
+  const editorial = before.replace('revised: true', 'revised: true\neditorial-correction: true').replace('# ADR', '# ADR — clarified title');
+  assert.deepEqual(validateAdrRevision(before, editorial, 'docs/decisions/ADR-0042-choice.md'), []);
+});
+
+test('staged validation compares accepted ADRs against HEAD', () => {
+  const root = mkdtempSync(join(tmpdir(), 'decision-staged-'));
+  mkdirSync(join(root, 'docs/decisions'), { recursive: true });
+  const path = 'docs/decisions/ADR-0042-choice.md';
+  const before = '---\nscope:\n  - src/**\nreview: on-change\nrevised: true\n---\n# ADR-0042\n\n- Status: accepted\n\n## Decision\n\nKeep A.\n\n## Consequences\n\nStable.\n';
+  writeFileSync(join(root, path), before);
+  execFileSync('git', ['init', '-q'], { cwd: root });
+  execFileSync('git', ['config', 'user.email', 'fixture@example.invalid'], { cwd: root });
+  execFileSync('git', ['config', 'user.name', 'Fixture'], { cwd: root });
+  execFileSync('git', ['add', '.'], { cwd: root });
+  execFileSync('git', ['commit', '-qm', 'docs: accepted decision'], { cwd: root });
+  writeFileSync(join(root, path), before.replace('Keep A.', 'Choose B.'));
+  execFileSync('git', ['add', path], { cwd: root });
+  const validator = fileURLToPath(new URL('../.githooks/validate-decisions.mjs', import.meta.url));
+  const result = spawnSync(process.execPath, [validator, '--staged'], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /cannot be rewritten/u);
 });

@@ -17,7 +17,8 @@ const report = { mission_id: 'mission-one', status: 'READY_FOR_VALIDATION', file
 const audit = { audit_id: 'audit-one', audit_type: 'blueprint-audit', subject: { type: 'blueprint', id: 'ctxroute-blueprint' }, signals: ['contracts-closed'], decision: 'accept', evidence_refs: ['tests/orchestrator-contracts.test.mjs'], proposed_action: null, applied_action: null, validations: [validationResult], rollback_ref: null };
 const missionRequest = { mission_id: 'mission-one', skill_id: 'blueprint-audit', requested_skill_id: null, skill_version: '2.0.0', file_scope: ['src/'], acceptance: ['Syntax is valid.'], validations: [validation], execution: 'coordinated' };
 const missionRecord = { ...missionRequest, response_format: 'worker-report', execution_reason: 'EXPLICIT_COORDINATED', stage: 'work', strategy: 'single-worker', access: 'write', policy_digest: digest, reinforcements: [], status: 'COMPLETED', worktree_allocation: { path: '.ctxroute/worktrees/mission-one', base_revision: oid, status: 'ACTIVE', recovery_proof: null }, orchestrator_commit: null, integrated_commit: null, report, validation_receipt: receipt };
-const missionView = { mission_id: 'mission-one', skill_id: 'blueprint-audit', skill_version: '2.0.0', file_scope: ['src/'], acceptance: ['Syntax is valid.'], validations: [validation], response_format: 'worker-report', worktree: '.ctxroute/worktrees/mission-one', requested_mode: 'SWARM', resolved_mode: 'SWARM', workflow: 'STANDARD', stage: 'work', strategy: 'single-worker', access: 'write', policy_digest: digest, policy_snapshot: '.ctxroute/orchestrator/policies/goal-one.json', reinforcements: [] };
+const executionBinding = { goal_id: 'goal-one', mission_id: 'mission-one', session_id: 'session-one', policy_snapshot: '.ctxroute/orchestrator/policies/goal-one.json', policy_digest: digest, workflow: 'STANDARD', stage: 'work', strategy: 'single-worker', access: 'write', revision: 1 };
+const missionView = { goal_id: 'goal-one', mission_id: 'mission-one', skill_id: 'blueprint-audit', skill_version: '2.0.0', file_scope: ['src/'], acceptance: ['Syntax is valid.'], validations: [validation], response_format: 'worker-report', worktree: '.ctxroute/worktrees/mission-one', requested_mode: 'SWARM', resolved_mode: 'SWARM', workflow: 'STANDARD', stage: 'work', strategy: 'single-worker', access: 'write', policy_digest: digest, policy_snapshot: '.ctxroute/orchestrator/policies/goal-one.json', revision: 1, reinforcements: [] };
 const worktreeOperation = { operation_id: 'operation-one', mission_id: 'mission-one', kind: 'RECONCILE', status: 'COMPLETED', classification: 'ACTIVE_COHERENT', path: '.ctxroute/worktrees/mission-one', base_revision: oid, dirty: false, proof_ref: null, cause: null };
 const config = { defaultMode: 'SWARM_ON', statePath: '.ctxroute/orchestrator/state.json', worktreeRoot: '.ctxroute/worktrees', recoveryRoot: '.ctxroute/recovery', telemetryPath: '.ctxroute/orchestrator/events.jsonl', limits: { stateBytes: 524288, reportBytes: 65536, contextBytes: 16384, lockTimeoutMs: 2000, subprocessTimeoutMs: 30000, parallelWorktrees: 8, minimumFreeBytes: 268435456, telemetryBytes: 1048576, recoveryBytes: 16777216, auditTraceBytes: 2097152, auditTraceFiles: 32 } };
 const transaction = { operation_id: 'operation-one', expected_revision: 0, action: 'mission.prepare', payload: { goal_id: 'goal-one', mission: missionRequest } };
@@ -42,6 +43,7 @@ const examples = {
   missionRequest,
   missionRecord,
   missionView,
+  executionBinding,
   workerReport: report,
   auditReport: audit,
   validationReceipt: receipt,

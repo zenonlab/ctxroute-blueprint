@@ -38,7 +38,7 @@ TransactionEnvelope
 
 MissionRequest
   mission_id, skill_id, skill_version, file_scope,
-  acceptance, validation_commands, response_format
+  acceptance, validations, response_format
 
 MissionRecord (orchestrator-owned)
   MissionRequest + status, worktree, base_revision,

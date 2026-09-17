@@ -74,10 +74,15 @@ outcome receipts are public closed contracts. `MissionRequest` is the accepted r
 `MissionRecord` is orchestrator-owned state, and `MissionView` is the
 positive worker projection. A worker view contains only mission identity,
 relative file scope, skill/version, acceptance criteria, structured
-validations, `response_format: worker-report`, and its managed worktree
-reference. Conversation, prompts, reasoning, history, and raw environment are
-rejected. Active missions with overlapping scopes are rejected before work;
-distinct concurrent missions receive distinct worktrees.
+validations, `response_format: worker-report`, its managed worktree reference,
+and the fields of its `ExecutionBinding`. The binding is resolved atomically
+from durable mission/goal state and contains goal/mission identity, policy
+snapshot and digest, workflow, stage, strategy, access, and state revision.
+Environment fields may confirm but never replace it. Missing, stale, unknown,
+or contradictory worker bindings block mutation. Conversation, prompts,
+reasoning, history, and raw environment are rejected. Active missions with
+overlapping scopes are rejected before work; distinct concurrent missions
+receive distinct worktrees.
 
 Mission status transitions are closed: `PREPARING` may become `ASSIGNED`,
 `BLOCKED`, or `CANCELLED`; `ASSIGNED` may become `RUNNING` or `CANCELLED`;
@@ -168,9 +173,19 @@ The implementation evidence matrix is maintained in
 [`orchestration-verification.md`](orchestration-verification.md). Architectural
 rationale is split by concern: ADR-0087 defines the three-level model,
 ADR-0088 covers stages and human resumption, ADR-0089 covers repository
-authority and outcome proofs, and ADR-0090 covers atomic snapshots and host
-adapters.
+authority and outcome proofs, ADR-0091 defines ADR/effect authority, and
+ADR-0092 covers execution bindings, atomic snapshots, and hook lanes.
 
 Stop is fail-open, honors `stop_hook_active`, reports bounded diagnostics, and
 never requests automatic continuation. Run `npm run blueprint:review` after
 changes made by any skill or audit path, then `npm run verify` before delivery.
+
+Hook execution has three honest lanes. Synchronous policy, architecture,
+Sensor, and audit handlers contribute to the host result. Host-async
+maintenance runs bounded problem observation and coalesced CRG updates without
+polluting that result. Archify preview is manual until a lifecycle owns its
+process. Mutation-gate failures block; advisory and maintenance failures are
+visible or fail-open according to their declared class.
+Governed effects append only categorical action/decision/authority flags to a
+bounded local telemetry file; prompts, errors, observations, and environment
+values are excluded.

@@ -14,18 +14,24 @@ import { runStep } from '../.githooks/setup.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-test('Codex and Claude expose exactly one handler for the same six lifecycle events', () => {
+test('Codex and Claude expose the same six events and explicit hook lanes', () => {
   for (const [file, harness] of [['.codex/hooks.json', 'codex'], ['.claude/settings.json', 'claude']]) {
     const config = JSON.parse(readFileSync(join(root, file), 'utf8'));
     assert.deepEqual(Object.keys(config.hooks).sort(), [...lifecycleEvents].sort());
     for (const event of lifecycleEvents) {
       const handlers = config.hooks[event].flatMap(block => block.hooks ?? []);
-      assert.equal(handlers.length, 1, `${file} ${event}`);
+      const expectedCount = ['PostToolUse', 'UserPromptSubmit'].includes(event) ? 2 : 1;
+      assert.equal(handlers.length, expectedCount, `${file} ${event}`);
       assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
       assert.ok(handlers[0].timeout > 0, `${file} ${event} timeout`);
       assert.equal('statusMessage' in handlers[0], false, `${file} ${event} should remain quiet`);
       if (harness === 'codex') assert.equal(handlers[0].additionalContextLimit, 1200, `${file} ${event} context limit`);
+      for (const maintenance of handlers.slice(1)) {
+        assert.equal(maintenance.async, true, `${file} ${event} maintenance async`);
+        assert.equal(maintenance.command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event} maintenance`);
+      }
     }
+    assert.deepEqual(Object.keys(config.hookLanes).sort(), ['maintenance', 'manual', 'synchronous']);
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
   }
 });
@@ -83,8 +89,8 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
   const expected = {
     SessionStart: ['worktree-reconcile.mjs', 'mission-context.mjs'],
     PreToolUse: ['pre-tool-architecture.mjs'],
-    PostToolUse: ['post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs'],
-    UserPromptSubmit: ['problem-memory.mjs'],
+    PostToolUse: ['post-tool-sensor.mjs', 'post-tool-audit.mjs'],
+    UserPromptSubmit: [],
     PreCompact: ['ctxroute-reset.mjs'],
     Stop: ['worker-restitution.mjs', 'ctxroute-reset.mjs', 'stop-review.mjs'],
   };
@@ -101,6 +107,8 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
     assert.deepEqual(called, expected[event], `${event} simulation`);
   }
   assert.equal(handlerPlan('claude', 'PreToolUse', root).length, 1);
+  assert.deepEqual(handlerPlan('codex', 'PostToolUse', root, 'maintenance').map(handler => handler.name), ['problem-memory.mjs', 'post-tool-crg.mjs']);
+  assert.deepEqual(handlerPlan('codex', 'PostToolUse', root, 'manual').map(handler => handler.name), ['archify-preview.mjs']);
   assert.equal(handlerPlan('codex', 'PostToolUse', root).some(handler => /doc-inject|session-inject/u.test(handler.name)), false);
 });
 
@@ -202,17 +210,17 @@ test('the lifecycle dispatcher keeps failures fail-open and visible', () => {
   let calls = 0;
   const result = dispatch({
     harness: 'codex',
-    event: 'UserPromptSubmit',
+    event: 'PostToolUse',
     input: '{}',
     root,
     execute(handler) {
       calls += 1;
-      if (handler.name === 'problem-memory.mjs') return { error: 'simulated failure', outputs: [] };
+      if (handler.name === 'post-tool-sensor.mjs') return { error: 'simulated failure', outputs: [] };
       return { outputs: [] };
     },
   });
-  assert.equal(calls, 1);
-  assert.match(result.systemMessage, /problem-memory\.mjs failed open: simulated failure/u);
+  assert.equal(calls, 2);
+  assert.match(result.systemMessage, /post-tool-sensor\.mjs failed open: simulated failure/u);
 });
 
 test('the lifecycle dispatcher hides only the Node 22 SQLite stability warning', () => {
@@ -229,6 +237,25 @@ test('the production lifecycle imports handlers in-process without nested Node e
   assert.equal(result, null);
 });
 
+test('real SessionStart is silent and cannot mutate repository or worktree state', () => {
+  const before = {
+    status: execFileSync('git', ['status', '--porcelain=v1'], { cwd: root, encoding: 'utf8' }),
+    worktrees: execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: root, encoding: 'utf8' }),
+  };
+  for (const harness of ['codex', 'claude']) {
+    const result = spawnSync(process.execPath, [join(root, '.codex/hooks/lifecycle.mjs'), harness, 'SessionStart'], {
+      cwd: root,
+      input: '{}',
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '', harness);
+    assert.doesNotMatch(result.stdout, /failed open|cleanup/iu, harness);
+  }
+  assert.equal(execFileSync('git', ['status', '--porcelain=v1'], { cwd: root, encoding: 'utf8' }), before.status);
+  assert.equal(execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: root, encoding: 'utf8' }), before.worktrees);
+});
+
 test('merged lifecycle output preserves messages and context', () => {
   const result = mergeOutputs('PostToolUse', [
     { systemMessage: 'first', hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: 'alpha' } },
@@ -236,6 +263,11 @@ test('merged lifecycle output preserves messages and context', () => {
   ]);
   assert.equal(result.systemMessage, 'first · second');
   assert.equal(result.hookSpecificOutput.additionalContext, 'alpha\n\nbeta');
+});
+
+test('merged lifecycle output bounds the total system message', () => {
+  const result = mergeOutputs('PostToolUse', Array.from({ length: 4 }, (_, index) => ({ systemMessage: `${index}:${'x'.repeat(600)}` })));
+  assert.ok(result.systemMessage.length <= 1000);
 });
 
 test('CLAUDE.md is the single effective import of AGENTS.md', () => {

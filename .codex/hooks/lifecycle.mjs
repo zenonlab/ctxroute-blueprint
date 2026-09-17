@@ -19,19 +19,29 @@ export const lifecycleEvents = [
 const MAX_CONTEXT_LENGTH = 4096;
 const MAX_SYSTEM_MESSAGE_LENGTH = 1000;
 
-export function handlerPlan(harness, event, root = projectRoot) {
-  const local = (name, run) => ({ name, run });
-  const memory = memoryEvent => local('problem-memory.mjs', async (input, _root, environment) => (await import('./problem-memory.mjs')).handle(input, memoryEvent, { stateDirectory: environment.CTXROUTE_STATE_DIR }));
+export function handlerPlan(harness, event, root = projectRoot, lane = 'synchronous') {
+  const local = (name, failureClass, run) => ({ name, failureClass, run });
+  const memory = memoryEvent => local('problem-memory.mjs', 'maintenance', async (input, project, environment) => (await import('./problem-memory.mjs')).handle(input, memoryEvent, { stateDirectory: environment.CTXROUTE_STATE_DIR, projectRoot: project }));
   if (harness !== 'codex' && harness !== 'claude') return [];
 
-  return {
-    SessionStart: [local('worktree-reconcile.mjs', async (_input, project) => (await import('./worktree-reconcile.mjs')).reconcileHook(project)), local('mission-context.mjs', async (_input, project, environment) => (await import('./mission-context.mjs')).missionContext(environment.CTXROUTE_MISSION_ID, project))],
-    PreToolUse: [local('pre-tool-architecture.mjs', async input => (await import('./pre-tool-architecture.mjs')).preToolArchitecture(input))],
-    PostToolUse: [local('post-tool-sensor.mjs', async (input, _project, environment) => (await import('./post-tool-sensor.mjs')).postToolSensor(input, { stateDirectory: environment.CTXROUTE_STATE_DIR })), memory('PostToolUse'), local('post-tool-audit.mjs', async input => (await import('./post-tool-audit.mjs')).postToolAudit(input))],
-    UserPromptSubmit: [memory('UserPromptSubmit')],
-    PreCompact: [local('ctxroute-reset.mjs', async (input, project, environment) => (await import('./ctxroute-reset.mjs')).resetCtxrouteContext(input, project, environment))],
-    Stop: [local('worker-restitution.mjs', async (_input, project, environment) => (await import('./worker-restitution.mjs')).restituteWorker(environment.CTXROUTE_WORKER_REPORT, project, environment)), local('ctxroute-reset.mjs', async (input, project, environment) => (await import('./ctxroute-reset.mjs')).resetCtxrouteContext(input, project, environment)), local('stop-review.mjs', async input => (await import('./stop-review.mjs')).stopReview(parseInput(input), root))],
-  }[event] ?? [];
+  const plans = {
+    synchronous: {
+      SessionStart: [local('worktree-reconcile.mjs', 'advisory', async (_input, project) => (await import('./worktree-reconcile.mjs')).reconcileHook(project)), local('mission-context.mjs', 'advisory', async (_input, project, environment) => (await import('./mission-context.mjs')).missionContext(environment.CTXROUTE_MISSION_ID, project))],
+      PreToolUse: [local('pre-tool-architecture.mjs', 'critical-mutation-gate', async (input, project) => (await import('./pre-tool-architecture.mjs')).preToolArchitecture(input, project))],
+      PostToolUse: [local('post-tool-sensor.mjs', 'advisory', async (input, project, environment) => (await import('./post-tool-sensor.mjs')).postToolSensor(input, { stateDirectory: environment.CTXROUTE_STATE_DIR, root: project })), local('post-tool-audit.mjs', 'advisory', async (input, project) => (await import('./post-tool-audit.mjs')).postToolAudit(input, project))],
+      UserPromptSubmit: [],
+      PreCompact: [local('ctxroute-reset.mjs', 'advisory', async (input, project, environment) => (await import('./ctxroute-reset.mjs')).resetCtxrouteContext(input, project, environment))],
+      Stop: [local('worker-restitution.mjs', 'advisory', async (_input, project, environment) => (await import('./worker-restitution.mjs')).restituteWorker(environment.CTXROUTE_WORKER_REPORT, project, environment)), local('ctxroute-reset.mjs', 'advisory', async (input, project, environment) => (await import('./ctxroute-reset.mjs')).resetCtxrouteContext(input, project, environment)), local('stop-review.mjs', 'advisory', async input => (await import('./stop-review.mjs')).stopReview(parseInput(input), root))],
+    },
+    maintenance: {
+      PostToolUse: [memory('PostToolUse'), local('post-tool-crg.mjs', 'maintenance', async (input, project, environment) => (await import('./post-tool-crg.mjs')).runCrgMaintenance(input, { root: project, stateDirectory: environment.CTXROUTE_STATE_DIR }))],
+      UserPromptSubmit: [memory('UserPromptSubmit')],
+    },
+    manual: {
+      PostToolUse: [local('archify-preview.mjs', 'maintenance', async () => null)],
+    },
+  };
+  return plans[lane]?.[event] ?? [];
 }
 
 export function mergeOutputs(event, outputs, notices = [], contextMaximum = MAX_CONTEXT_LENGTH) {
@@ -63,7 +73,7 @@ export function mergeOutputs(event, outputs, notices = [], contextMaximum = MAX_
     hookSpecificOutput.hookEventName ??= event;
     merged.hookSpecificOutput = hookSpecificOutput;
   }
-  if (systemMessages.length) merged.systemMessage = systemMessages.join(' · ');
+  if (systemMessages.length) merged.systemMessage = limit(systemMessages.join(' · '), MAX_SYSTEM_MESSAGE_LENGTH);
   return Object.keys(merged).length ? merged : null;
 }
 
@@ -83,9 +93,10 @@ export function dispatch({ harness, event, input, root = projectRoot, execute, e
   const workerPolicy = workerGitPolicyDecision(harness, event, input, environment);
   if (workerPolicy) return workerPolicy;
   const plan = applicableHandlers(handlerPlan(harness, event, root), event, input);
-  if (!lifecycleEvents.includes(event) || !plan.length) {
+  if (!lifecycleEvents.includes(event)) {
     return { systemMessage: `Lifecycle ${event || '(missing)'} failed open: unsupported ${harness || '(missing)'} configuration.` };
   }
+  if (!plan.length) return null;
 
   const outputs = [];
   const notices = [];
@@ -104,20 +115,24 @@ export function dispatch({ harness, event, input, root = projectRoot, execute, e
   return mergeOutputs(event, outputs, notices, hookContract(harness, event, 'synchronous', root).contextLimit);
 }
 
-export async function dispatchLifecycle({ harness, event, input, root = projectRoot, environment = process.env }) {
+export async function dispatchLifecycle({ harness, event, input, root = projectRoot, environment = process.env, lane = 'synchronous' }) {
   const workerPolicy = workerGitPolicyDecision(harness, event, input, environment);
   if (workerPolicy) return workerPolicy;
-  const plan = applicableHandlers(handlerPlan(harness, event, root), event, input);
+  const plan = applicableHandlers(handlerPlan(harness, event, root, lane), event, input);
   if (event === 'PreToolUse' && plan.length === 0) return null;
-  const resolved = await (await import('./resolved-policy.mjs')).resolvedPolicyDecision(input, root, environment);
+  if (lane === 'manual') return null;
+  const resolved = lane === 'synchronous'
+    ? await (await import('./resolved-policy.mjs')).resolvedPolicyDecision(input, root, environment)
+    : { decision: null, source: 'not-required', diagnostic: null };
   if (resolved.decision) {
     const adapted = adaptHostDecision(harness, event, resolved.decision);
     if (adapted.exitCode !== 0) return { __hostExit: adapted };
     return adapted.stdout ? JSON.parse(adapted.stdout) : null;
   }
-  if (!lifecycleEvents.includes(event) || !plan.length) {
+  if (!lifecycleEvents.includes(event)) {
     return { systemMessage: `Lifecycle ${event || '(missing)'} failed open: unsupported ${harness || '(missing)'} configuration.` };
   }
+  if (!plan.length) return null;
   const outputs = [];
   const notices = resolved.source === 'last-valid' && resolved.diagnostic ? [`Lifecycle ${event} policy source ${resolved.source}: ${resolved.diagnostic}`] : [];
   for (const handler of plan) {
@@ -126,9 +141,14 @@ export async function dispatchLifecycle({ harness, event, input, root = projectR
       if (isBlocking(output)) return output;
       if (output) outputs.push(output);
     } catch (error) {
+      if (handler.failureClass === 'critical-mutation-gate') {
+        const adapted = adaptHostDecision(harness, event, { kind: 'block', cause: 'MUTATION_GATE_FAILURE', invariant: `${handler.name} must succeed before mutation`, recovery: 'repair the local hook and retry' });
+        return adapted.stdout ? JSON.parse(adapted.stdout) : { __hostExit: adapted };
+      }
       notices.push(`Lifecycle ${event} handler ${handler.name} failed open: ${error.message}`);
     }
   }
+  if (lane === 'maintenance') return null;
   return mergeOutputs(event, outputs, notices, hookContract(harness, event, 'synchronous', root).contextLimit);
 }
 
@@ -174,7 +194,7 @@ async function stdin() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const result = await dispatchLifecycle({ harness: process.argv[2], event: process.argv[3], input: await stdin() });
+  const result = await dispatchLifecycle({ harness: process.argv[2], event: process.argv[3], lane: process.argv[4] ?? 'synchronous', input: await stdin() });
   if (result?.__hostExit) {
     if (result.__hostExit.stdout) process.stdout.write(result.__hostExit.stdout);
     if (result.__hostExit.stderr) process.stderr.write(result.__hostExit.stderr);

@@ -1,15 +1,14 @@
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { hookContract } from '../.codex/hooks/lifecycle-contract.mjs';
-import { handlerPlan, lifecycleEvents } from '../.codex/hooks/lifecycle.mjs';
+import { actionableStderr, handlerPlan, lifecycleEvents } from '../.codex/hooks/lifecycle.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const state = mkdtempSync(join(tmpdir(), 'blueprint-hook-performance-state-'));
 const fixture = mkdtempSync(join(root, '.hook-performance-'));
+const state = join(fixture, 'state');
 const hook = join(root, '.codex/hooks/lifecycle.mjs');
 const samplesPerCase = 10;
 const fixturePath = path => relative(root, path).split(sep).join('/');
@@ -29,6 +28,7 @@ const inputs = {
 };
 const latencyLimits = { SessionStart: 1_500, PreToolUse: 250, PostToolUse: 500, UserPromptSubmit: 1_000, PreCompact: 1_000, Stop: 1_000, SubagentStart: 750, SubagentStop: 750, SessionEnd: 1_000 };
 const results = [];
+const maintenanceResults = [];
 let failed = false;
 
 try {
@@ -50,7 +50,8 @@ try {
         let output = {};
         try { output = child.stdout.trim() ? JSON.parse(child.stdout) : {}; } catch { error = 'invalid dispatcher JSON'; }
         contextChars = Math.max(contextChars, String(output?.hookSpecificOutput?.additionalContext ?? '').length);
-        if (child.status !== 0) error = child.error?.message ?? (child.stderr.trim() || `exit ${child.status}`);
+        const stderr = actionableStderr(child.stderr);
+        if (child.status !== 0 || stderr) error = child.error?.message ?? (stderr || `exit ${child.status}`);
       }
       const durationMs = percentile(samples, 0.95);
       const contract = hookContract(harness, event, 'synchronous', root);
@@ -70,22 +71,36 @@ try {
         timeout: hookContract(harness, 'PreToolUse', 'synchronous', root).timeoutMs,
       });
       readOnlySamples.push(Math.round(performance.now() - started));
-      if (child.status !== 0) readOnlyError = child.error?.message ?? (child.stderr.trim() || `exit ${child.status}`);
+      const stderr = actionableStderr(child.stderr);
+      if (child.status !== 0 || stderr) readOnlyError = child.error?.message ?? (stderr || `exit ${child.status}`);
     }
     const readOnlyDuration = percentile(readOnlySamples, 0.95);
     const readOnlyOk = !readOnlyError && readOnlyDuration <= 100;
     failed ||= !readOnlyOk;
     results.push({ harness, event: 'PreToolUse:read-only', durationMs: readOnlyDuration, samples: readOnlySamples, latencyLimit: 100, contextChars: 0, contextLimit: hookContract(harness, 'PreToolUse', 'synchronous', root).contextLimit, handlers: [], ok: readOnlyOk, error: readOnlyError });
-    if (!handlerPlan(harness, 'PostToolUse', root, 'maintenance').length) failed = true;
+    const maintenancePlan = handlerPlan(harness, 'PostToolUse', root, 'maintenance');
+    const maintenanceInput = { tool_name: 'exec_command', tool_input: { cmd: 'false' }, tool_response: { isError: true, error: 'bounded fixture' }, session_id: `maintenance-${harness}` };
+    const maintenanceStarted = performance.now();
+    const maintenance = spawnSync(process.execPath, [hook, harness, 'PostToolUse', 'maintenance'], {
+      cwd: root,
+      env: { ...process.env, CTXROUTE_STATE_DIR: state },
+      input: JSON.stringify(maintenanceInput),
+      encoding: 'utf8',
+      timeout: hookContract(harness, 'PostToolUse', 'maintenance', root).timeoutMs,
+    });
+    const maintenanceStderr = actionableStderr(maintenance.stderr);
+    const maintenanceOk = maintenancePlan.length > 0 && maintenance.status === 0 && !maintenanceStderr && !maintenance.stdout.trim();
+    failed ||= !maintenanceOk;
+    maintenanceResults.push({ harness, event: 'PostToolUse', lane: 'maintenance', durationMs: Math.round(performance.now() - maintenanceStarted), handlers: maintenancePlan.map(item => item.name), ok: maintenanceOk, error: maintenanceStderr || maintenance.error?.message || null });
   }
 } finally {
-  rmSync(state, { recursive: true, force: true });
   rmSync(fixture, { recursive: true, force: true });
 }
 
 const maximumObservedLatencyMs = Math.max(...results.flatMap(result => result.samples));
 const maximumObservedContextChars = Math.max(...results.map(result => result.contextChars));
-process.stdout.write(`${JSON.stringify({ ok: !failed, samplesPerCase, lifecycleEvents, harnesses: ['codex', 'claude'], maintenancePlanCovered: true, maximumObservedLatencyMs, maximumObservedContextChars, results }, null, 2)}\n`);
+const maintenancePlanCovered = maintenanceResults.length === 2 && maintenanceResults.every(result => result.ok && result.handlers.length > 0);
+process.stdout.write(`${JSON.stringify({ ok: !failed && maintenancePlanCovered, samplesPerCase, lifecycleEvents, harnesses: ['codex', 'claude'], maintenancePlanCovered, maximumObservedLatencyMs, maximumObservedContextChars, results, maintenanceResults }, null, 2)}\n`);
 if (failed) process.exitCode = 1;
 
 function percentile(values, ratio) {

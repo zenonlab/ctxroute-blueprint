@@ -150,10 +150,11 @@ and Claude-compatible tooling without automatic per-tool injection.
 
 The lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
 `UserPromptSubmit`, `PreCompact`, and `Stop`. Session start injects only an
-explicit worker mission. `PostToolUse` runs the blocking Sensor, opportunistic
-problem memory, and the local documentation audit. CRG maintenance is explicit
-or asynchronous. `PreCompact` and Stop clean CTXRoute session state; Stop is
-fail-open and never schedules continuation.
+explicit worker `MissionView` and durable execution binding. Synchronous
+`PostToolUse` runs bounded Sensor and documentation audit handlers; problem
+observation and coalesced CRG updates use the declared host-async maintenance
+lane. Archify preview remains manual. `PreCompact` and Stop clean CTXRoute
+session state; Stop is fail-open and never schedules continuation.
 
 Keep only the project-local lifecycle definitions after approval. Legacy global
 CTXRoute hooks would run in addition to them, duplicating context and process

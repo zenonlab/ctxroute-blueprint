@@ -10,7 +10,11 @@ import {
   validateAuditReport, validateWorkerReport,
 } from '../scripts/orchestrator-core.mjs';
 import { bootstrapOrchestrator } from '../scripts/orchestrator-bootstrap.mjs';
-import { commitMission, integrateMission, mutateCoordination, prepareMission, reconcileWorktrees, rollbackMission, submitWorkerReport } from '../scripts/orchestrator-service.mjs';
+import { commitMission, integrateMission, mutateCoordination, prepareMission, readCoordination, reconcileWorktrees, rollbackMission, submitWorkerReport } from '../scripts/orchestrator-service.mjs';
+import { writePolicySnapshot } from '../scripts/orchestrator-policy-snapshot.mjs';
+import { resolvedPolicyDecision } from '../.codex/hooks/resolved-policy.mjs';
+import { resolveExecutionPolicy } from '../scripts/orchestration-policy-core.mjs';
+import { reconcileHook } from '../.codex/hooks/worktree-reconcile.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
@@ -111,6 +115,54 @@ test('coordinated mission is isolated and completes only after orchestrator vali
   assert.deepEqual(validateWorkerReport(report), []);
 });
 
+test('worker mutation policy resolves a durable ExecutionBinding and rejects contradictions', async () => {
+  const root = fixture(true);
+  let state = (await createGoalAtWork(root)).state;
+  const prepared = await prepareMission(missionCommand(state.revision), root);
+  state = prepared.state;
+  const goal = state.goals[0];
+  await writePolicySnapshot(goal.resolved_policy, join(root, '.ctxroute/orchestrator/policies/goal-one.json'));
+  const environment = { CTXROUTE_AGENT_ROLE: 'worker', CTXROUTE_MISSION_ID: 'mission-one' };
+  const view = await readCoordination(root, environment);
+  assert.equal(view.goal_id, 'goal-one');
+  assert.equal(view.stage, 'work');
+  assert.equal(view.access, 'write');
+  assert.equal(view.revision, state.revision);
+  assert.equal((await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, environment)).decision, null);
+  await writePolicySnapshot(resolveExecutionPolicy({ requested_mode: 'DIRECT', workflow: 'STANDARD', capabilities: [] }), join(root, '.ctxroute/orchestrator/policy.json'));
+  assert.equal((await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, environment)).decision, null, 'global policy changes cannot replace a goal binding');
+  const contradictory = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, { ...environment, CTXROUTE_STAGE: 'audit' });
+  assert.equal(contradictory.decision.cause, 'EXECUTION_BINDING_ENVIRONMENT_MISMATCH');
+  const stale = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, { ...environment, CTXROUTE_BINDING_REVISION: String(state.revision - 1) });
+  assert.equal(stale.decision.cause, 'EXECUTION_BINDING_STALE');
+  const adr = await resolvedPolicyDecision({ tool_name: 'apply_patch', tool_input: { patch: '*** Update File: docs/decisions/ADR-0092-execution-bindings-and-hook-lanes.md' } }, root, environment);
+  assert.equal(adr.decision.cause, 'ADR_WORKER_AUTHORITY_REQUIRED');
+  await writePolicySnapshot(resolveExecutionPolicy({ requested_mode: 'SWARM', workflow: 'AUDIT', capabilities: ['git'] }), join(root, '.ctxroute/orchestrator/policies/goal-one.json'));
+  const wrongGoalSnapshot = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, environment);
+  assert.equal(wrongGoalSnapshot.decision.cause, 'POLICY_DIGEST_MISMATCH');
+});
+
+test('a STANDARD read-only worker stage blocks mutation through its binding', async () => {
+  const root = fixture(true);
+  let state = (await createGoalAtWork(root)).state;
+  for (const [index, completedStage, nextStage] of [[3, 'work', 'validation'], [4, 'validation', 'audit']]) {
+    const goal = state.goals[0];
+    state = (await transactOrchestrator({
+      operation_id: `audit-stage-${index}`,
+      expected_revision: state.revision,
+      action: 'goal.stage.advance',
+      payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: `audit-checkpoint-${index}`, goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage: completedStage, completed_receipt_ids: [], artifact_refs: [], next_stage: nextStage, created_at: `2026-09-17T12:0${index}:00Z` } },
+    }, root)).state;
+  }
+  const command = missionCommand(state.revision, 'audit-mission-prepare');
+  command.payload.mission.mission_id = 'audit-mission';
+  const prepared = await prepareMission(command, root);
+  const goal = prepared.state.goals[0];
+  await writePolicySnapshot(goal.resolved_policy, join(root, '.ctxroute/orchestrator/policies/goal-one.json'));
+  const blocked = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, { CTXROUTE_AGENT_ROLE: 'worker', CTXROUTE_MISSION_ID: 'audit-mission' });
+  assert.equal(blocked.decision.cause, 'POLICY_READ_ONLY');
+});
+
 test('worker claims cannot hide a failing orchestrator validation or an out-of-scope diff', async () => {
   const root = fixture(true);
   let state = (await createGoalAtWork(root)).state;
@@ -183,6 +235,25 @@ test('reconciliation preserves dirty terminal worktrees and removes only clean t
   let reconciled = await reconcileWorktrees(command, root);
   assert.equal(existsSync(join(root, worktree)), true);
   assert.ok(reconciled.state.worktree_operations.some(item => item.classification === 'TERMINAL_DIRTY'));
+});
+
+test('SessionStart inventory preserves a clean terminal worktree', async () => {
+  const root = fixture(true);
+  let state = (await createGoalAtWork(root)).state;
+  const prepared = await prepareMission(missionCommand(state.revision), root);
+  state = prepared.state;
+  state = (await transactOrchestrator({ operation_id: 'cancel-for-session', expected_revision: state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'CANCELLED' } }, root)).state;
+  const worktree = state.goals[0].missions[0].worktree_allocation.path;
+  assert.equal(await reconcileHook(root), null);
+  assert.equal(existsSync(join(root, worktree)), true);
+});
+
+test('SessionStart inventory does not create the managed worktree directory', async () => {
+  const root = fixture(true);
+  await bootstrapOrchestrator(root);
+  assert.equal(existsSync(join(root, '.ctxroute/worktrees')), false);
+  assert.equal(await reconcileHook(root), null);
+  assert.equal(existsSync(join(root, '.ctxroute/worktrees')), false);
 });
 
 test('reconciliation removes clean terminal worktrees but preserves clean revision divergence', async () => {

@@ -1,11 +1,12 @@
 import process from 'node:process';
 import { execFileSync } from 'node:child_process';
 import { isSourcePath, isTestPath, isGeneratedPath, isContractPath, loadProjectConfig } from '../../.githooks/project-policy.mjs';
-import { applicableAdrs, decisionDiagnostics, loadAdrs, normalizePath } from './decision-memory.mjs';
+import { applicableAdrs, decisionDiagnostics, loadAdrs, normalizePath, validateAdrRevision } from './decision-memory.mjs';
+import { readFileSync } from 'node:fs';
 import { extractPaths } from './path-extraction.mjs';
 import { pathToFileURL } from 'node:url';
 
-export function postToolAudit(rawInput) {
+export function postToolAudit(rawInput, root = process.cwd()) {
 const input = rawInput === String(rawInput) ? JSON.parse(rawInput || '{}') : rawInput;
 const toolInput = input.tool_input ?? {};
 const paths = extractPaths(toolInput).map(normalizePath);
@@ -15,14 +16,17 @@ const docPaths = paths.filter(path => /\.(?:md|mmd)$/iu.test(path));
 const { config } = loadProjectConfig();
 const architecturalPaths = config ? paths.filter(path => isSourcePath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config)) : [];
 const contractPaths = config ? paths.filter(path => isContractPath(path, config)) : [];
-const applicable = applicableAdrs(paths);
-const decisionStatus = decisionDiagnostics(paths);
+const applicable = applicableAdrs(paths, root);
+const decisionStatus = decisionDiagnostics(paths, root);
 const changedDecisionPaths = paths.filter(path => /^docs\/decisions\/ADR-(?!0000-).+\.md$/u.test(path));
-const changedDecisions = loadAdrs().filter(adr => changedDecisionPaths.includes(adr.file));
+const changedDecisions = loadAdrs(root).filter(adr => changedDecisionPaths.includes(adr.file));
 const findings = [];
 for (const path of changedDecisionPaths) {
   const adr = changedDecisions.find(item => item.file === path);
-  if (adr && isTracked(path) && !adr.metadata.revised && !adr.metadata['superseded-by']) findings.push(`${path} was modified without revised: true or superseded-by.`);
+  if (adr && isTracked(path, root)) {
+    const before = headFile(path, root);
+    if (before !== null) findings.push(...validateAdrRevision(before, readFileSync(`${root}/${path}`, 'utf8'), path));
+  }
 }
 if ((architecturalPaths.length || contractPaths.length) && !applicable.length && !paths.some(path => path.startsWith('docs/decisions/'))) {
   findings.push(`No applicable ADR for ${[...architecturalPaths, ...contractPaths].join(', ')}. Add one only if this materially changes a boundary, contract, dependency, or cross-component flow.`);
@@ -58,9 +62,14 @@ if (findings.length || process.env.CODEX_POST_TOOL_AUDIT === '1') {
 return null;
 }
 
-function isTracked(path) {
-  try { execFileSync('git', ['ls-files', '--error-unmatch', '--', path], { stdio: 'ignore' }); return true; }
+function isTracked(path, root) {
+  try { execFileSync('git', ['ls-files', '--error-unmatch', '--', path], { cwd: root, stdio: 'ignore' }); return true; }
   catch { return false; }
+}
+
+function headFile(path, root) {
+  try { return execFileSync('git', ['show', `HEAD:${path}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); }
+  catch { return null; }
 }
 
 

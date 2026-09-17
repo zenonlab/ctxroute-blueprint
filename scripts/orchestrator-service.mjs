@@ -18,16 +18,19 @@ import {
 import { queryCtxroute } from './ctxroute-query.mjs';
 import { MODE_DESCRIPTORS, WORKFLOW_DESCRIPTORS, canonicalMode, explainExecutionPolicy, hasValidPolicyDigest, resolveExecutionPolicy } from './orchestration-policy-core.mjs';
 import { writePolicySnapshot } from './orchestrator-policy-snapshot.mjs';
+import { executionBindingForMission } from './orchestrator-execution-binding.mjs';
+import { decide } from './agent-governance.mjs';
 
 export async function readCoordination(root = process.cwd(), environment = process.env) {
   const state = await readOrchestratorState(root);
   if (environment.CTXROUTE_AGENT_ROLE !== 'worker') return state;
   const found = findMission(state, environment.CTXROUTE_MISSION_ID);
   if (!found?.mission.worktree_allocation?.path) throw new Error('worker role requires an assigned CTXROUTE_MISSION_ID');
-  const mission = found.mission;
   const config = await loadOrchestratorConfig(root);
-  const policySnapshot = `${config.policySnapshotRoot}/${found.goal.goal_id}.json`.replaceAll('\\', '/');
-  const view = { mission_id: mission.mission_id, file_scope: mission.file_scope, skill_id: mission.skill_id, skill_version: mission.skill_version, acceptance: mission.acceptance, validations: mission.validations, response_format: mission.response_format, worktree: mission.worktree_allocation.path, requested_mode: found.goal.requested_mode ?? canonicalMode(state.mode), resolved_mode: found.goal.resolved_mode ?? canonicalMode(state.mode), workflow: found.goal.workflow ?? 'STANDARD', stage: mission.stage, strategy: mission.strategy, access: mission.access, policy_digest: found.goal.policy_digest ?? '0'.repeat(64), policy_snapshot: policySnapshot, reinforcements: mission.reinforcements ?? [] };
+  const { binding, mission, requestedMode, resolvedMode } = executionBindingForMission(state, environment.CTXROUTE_MISSION_ID, config, environment.CTXROUTE_SESSION_ID);
+  const portableBinding = { ...binding };
+  delete portableBinding.session_id;
+  const view = { ...portableBinding, file_scope: mission.file_scope, skill_id: mission.skill_id, skill_version: mission.skill_version, acceptance: mission.acceptance, validations: mission.validations, response_format: mission.response_format, worktree: mission.worktree_allocation.path, requested_mode: requestedMode, resolved_mode: resolvedMode, reinforcements: mission.reinforcements ?? [] };
   assertOrchestratorContract('mission-view', view);
   return view;
 }
@@ -279,6 +282,7 @@ export async function reconcileWorktrees(command, root = process.cwd(), environm
   if (dependencies.globalMutationRoot !== resolve(root)) return withGlobalMutationLock(root, dependencies, locked => reconcileWorktrees(command, root, environment, locked));
   const health = await bootstrapOrchestrator(root, dependencies); assertBootstrapAllows(health, command.action);
   assertOrchestratorRole(environment); assertAction(command, 'worktree.reconcile');
+  if (!decide('repository.repair', { authority: 'orchestrator' }).allowed) throw new Error('repository repair requires orchestrator authority');
   const plan = await reconcileManagedWorktrees(root, { ...dependencies, repair: false });
   const begun = await beginOrchestratorTransaction(command, root, dependencies, state => ({ ...state, worktree_operations: [...state.worktree_operations, ...reconciliationOperations(state, command.operation_id, plan, 'PENDING')] }));
   if (begun.replayed && !begun.pending) return begun;
