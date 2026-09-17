@@ -153,6 +153,18 @@ incident has been resolved.
 
 ## Native collector observability
 
+### État déployé le 17 septembre 2026
+
+La migration additive `0023`/`0024` et le Worker
+`95be876e-2727-4b67-b278-c2891d30ea85` sont déployés. L’inspection distante
+confirme qu’aucune migration ne reste à appliquer. En cas d’incident, garder
+les entrées scellées et privilégier un correctif en avant. L’export D1 frais
+documenté dans [`d1-cost-audit.md`](./d1-cost-audit.md) fournit le point de
+restauration ; son import écrasant exige une approbation destructive distincte.
+Ne pas supprimer les tables, événements
+legacy ou index tant que les deux générations de lecteurs et le premier cycle
+hebdomadaire des modèles n’ont pas été vérifiés.
+
 The authoritative recovery order, approval boundaries and local budget table
 are in [the A-to-Z master plan](./tobirink-a-z-master-plan.md). The only active
 operational entry point is `goal-controlled-d1-service-resumption`; historical

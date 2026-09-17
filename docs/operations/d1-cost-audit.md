@@ -349,6 +349,65 @@ Décision : implémenter d'abord la cible R2/D1, reproduire les mêmes fixtures,
 puis choisir Free/Paid après mesure distante des pics et de tous les postes,
 avec une marge explicitement acceptée.
 
+## Déploiement de la cible durable — 17 septembre 2026
+
+Le candidat `e8d9b9d` a été poussé sur
+`origin/perf/adaptive-public-refresh` après `npm run verify`. L’export D1 frais
+`build/backups/tobirink-public-virtual-agenda-predeploy.sql`, ignoré par Git,
+fait 965 788 octets et porte le SHA-256
+`c86bfc65279464fa635da53d9014fce42661beaec37734ba92cdb24d0a7d064a`.
+
+La gate `inspect → plan → apply` a limité l’opération à
+`d1:tobirink-public` puis `worker:tobirink-public-api`. Le plan
+`0b5e0284fce78fc5eafb8fe469abc9b529633b9df66099d7ed3bc40097b76034`
+a appliqué uniquement `0023_catalogue_current_metadata.sql` et
+`0024_virtual_agenda_models.sql`, puis déployé le Worker
+`95be876e-2727-4b67-b278-c2891d30ea85` à 100 %. L’inspection suivante ne
+trouve plus de migration en attente ; la route `tobirink.com/*`, le cron
+`23 3 * * SUN` et le producteur/consommateur Queue sont présents.
+
+Lecture post-déploiement, sans mutation :
+
+| Preuve distante | Résultat |
+|---|---:|
+| fiches canoniques migrées | 5 |
+| conflits d’identité | 0 |
+| modèles Agenda avant le premier cycle hebdomadaire | 0 |
+| événements legacy encore servis | 740 |
+| lecture D1 de contrôle | 745 lignes lues, 0 écrite, `changed_db=false` |
+| `GET /v4/release-models` | 200, collection vide valide |
+| `GET /v3/releases` | 200, projection legacy compatible |
+| objets R2 avant/après déploiement | 56 objets, 15,6 MB |
+
+Le modèle Agenda sera amorcé par la prochaine collecte hebdomadaire réussie.
+L’extension historique continue donc à lire `/v3/releases` pendant cette
+transition ; la nouvelle extension n’est pas publiée dans cette étape. Les
+lectures de vérification n’ont déclenché ni appel fournisseur, ni message
+Queue, ni écriture D1/R2. L’observation native d’un cycle hebdomadaire complet
+reste nécessaire avant de certifier les budgets distants de collecte.
+
+### Inventaire de nettoyage différé
+
+Aucun élément de cette liste n’est supprimé par le déploiement. Les quatre
+index strictement redondants candidats sont
+`public_discovery_v2_pending`, `public_discovery_v2_failed_retention`,
+`public_discovery_v2_nonce_retention` et
+`catalogue_canonical_titles_v1_by_work`. Leur retrait exige la confirmation
+destructive exacte et un nouveau `EXPLAIN QUERY PLAN` distant immédiatement
+avant migration ; les contraintes `UNIQUE` correspondantes restent intactes.
+
+Les tables Agenda historiques candidates sont `public_release_event`,
+`public_release_generation`, `public_release_generation_event`,
+`public_release_active_generation`, `public_release_agenda_lane_state`,
+`public_release_agenda_page` et `public_release_current_event`, avec leurs
+index dédiés. Elles restent temporairement nécessaires au fallback avant le
+premier snapshot R2, à une lane non encore basculée et aux tests de migration.
+La suppression ne peut être proposée qu’après un cycle R2 complet, la preuve
+que `/v3/releases` lit les deux snapshots actifs, l’absence de tout appel
+runtime aux tables et une nouvelle sauvegarde. Le rollback avant suppression
+est le Worker précédent ; après suppression, seule une restauration D1
+explicitement approuvée ou une migration corrective en avant est sûre.
+
 ## Audit des objectifs et parcours A à Z
 
 La [feuille de route](../plans/d1-cost-audit-roadmap.json) décrit les étapes

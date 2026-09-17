@@ -2,6 +2,7 @@ import {
   CloudflareCoverImageAdapter,
   D1PublicCatalogueAdapter,
   D1PublicDiscoveryV3Adapter,
+  R2AgendaOperationStore,
   R2CoverMasterReadAdapter,
   R2PublicReleaseObjectAdapter,
 } from '@tobirink/adapters-cloudflare';
@@ -48,7 +49,7 @@ export function createWorkerServices(bindings: NativeCollectorBindings): WorkerS
     coverMasters: new R2CoverMasterReadAdapter(bindings.COVER_BUCKET),
     policy: cloudPolicy,
     releases: new R2PublicReleaseObjectAdapter(bindings.RELEASE_SNAPSHOTS),
-    releaseCalendar: new D1PublicReleaseCalendarAdapter(d1.database),
+    releaseCalendar: new D1PublicReleaseCalendarAdapter(d1.database, new R2AgendaOperationStore(bindings.RELEASE_SNAPSHOTS)),
     d1Metrics: d1,
   };
 }

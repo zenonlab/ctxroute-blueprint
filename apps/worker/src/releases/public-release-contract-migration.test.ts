@@ -114,6 +114,34 @@ describe('public release contract migration', () => {
     expect(plan.results.map(({ detail }) => detail).join(' ')).toContain('public_release_current_event_cursor_idx');
   });
 
+  it('serves v3 from an active R2 snapshot while completing a missing lane from legacy D1', async () => {
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS);
+    const legacy = {
+      expiresAt: '2026-11-12T00:00:00.000Z', id: 'legacy-manga', occurrence: { kind: 'DATE' as const, value: '2026-09-14' },
+      provenance: { fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'mangaupdates' },
+      provider: 'mangaupdates' as const, providerWorkId: 'legacy-manga', releaseKind: 'chapter' as const, state: 'CONFIRMED' as const,
+    };
+    await commitPublicReleaseGeneration(env.PUBLIC_DB, [legacy], { from: '2026-09-12', to: '2026-09-30' }, 'legacy-transition', '2026-09-14T00:00:00.000Z');
+    const current = eventFixture('r2-anime', '2026-09-13T00:00:00.000Z');
+    const snapshots = {
+      async readLane(provider: 'anilist' | 'mangaupdates') {
+        return provider === 'anilist'
+          ? { activeDigest: 'a'.repeat(64), activeSnapshotId: 'snapshot-a', checkedAt: '2026-09-17T03:23:00.000Z' }
+          : { activeDigest: null, activeSnapshotId: null, checkedAt: null };
+      },
+      async readPageVersion(key: string) {
+        return key === 'snapshots/anilist/snapshot-a' ? { complete: true, events: [current] } : undefined;
+      },
+    };
+    const metrics = instrumentD1(env.PUBLIC_DB);
+    const calendar = new D1PublicReleaseCalendarAdapter(metrics.database, snapshots);
+    const first = await calendar.query({ from: '2026-09-12', limit: 1, to: '2026-09-30' });
+    expect(first).toMatchObject({ entries: [{ id: 'r2-anime' }], nextCursor: '2026-09-13T00:00:00.000Z|r2-anime', revision: expect.stringMatching(/^r2-compat-/u) });
+    await expect(calendar.query({ cursor: first.nextCursor!, from: '2026-09-12', limit: 1, to: '2026-09-30' }))
+      .resolves.toMatchObject({ entries: [{ id: 'legacy-manga' }] });
+    expect(metrics.snapshot().rowsWritten).toBe(0);
+  });
+
   it('replays the same complete generation and never replaces it with an older one', async () => {
     await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS);
     const event = {

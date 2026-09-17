@@ -67,7 +67,8 @@
       "items": [
         "Agenda, Discovery et réhydratation échouent indépendamment",
         "Le dernier modèle ou profil vérifié reste servi",
-        "Une publication remplace l’ancienne vue seulement après validation"
+        "Une publication remplace l’ancienne vue seulement après validation",
+        "v3 lit les snapshots R2 et complète une lane absente depuis la projection legacy"
       ]
     },
     {
