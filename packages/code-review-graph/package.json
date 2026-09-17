@@ -4,7 +4,7 @@
   "private": true,
   "license": "Apache-2.0",
   "description": "Workspace boundary for the pinned official code-review-graph runtime.",
-  "engines": { "node": ">=22.13.0" },
+  "engines": { "node": ">=22.18.0" },
   "blueprintSource": "tirth8205/code-review-graph",
   "integration": "uv-frozen-project",
   "upstreamVersion": "2.3.8",

@@ -6,10 +6,11 @@ scope:
   - package-lock.json
 review: on-change
 revised: true
+superseded-by: ADR-0094-tested-node-runtime-floor.md
 ---
 # ADR-0001 — Node.js for template governance
 
-- Status: accepted
+- Status: superseded
 - Date : 2026-08-24
 
 ## Context

@@ -1,8 +1,9 @@
 # CI/CD du blueprint
 
 Le workflow GitHub Actions valide le template sur Linux, macOS et Windows avec
-Node.js 24, Python 3.12 et uv 0.11.2, tout en conservant le contrat package
-Node.js 22.13+ et npm 10+. Les Actions d'installation sont épinglées par SHA.
+Node.js 24, Python 3.12 et uv 0.11.2. Un job Linux dédié exécute les tests et les
+règles anti-slop avec Node.js 22.18.0 afin de prouver le contrat package
+Node.js 22.18+ et npm 10+. Les Actions d'installation sont épinglées par SHA.
 Il s'exécute sur les pushes vers `main`, sur toutes les pull requests et sur
 lancement manuel (`workflow_dispatch`).
 

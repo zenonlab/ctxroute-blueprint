@@ -11,7 +11,7 @@ silently rewritten.
 - Branch/base: `main`, `eb4b822`
 - Audit date/timezone: 2026-09-06, Europe/Paris
 - Observed tools: Node `v24.18.0`, npm `11.16.0`, Git `2.52.0`
-- Project support contract remains Node `>=22.13.0`, npm `>=10` (`package.json:15-18`); local versions are not a substitute for the CI Node 22 matrix.
+- Project support contract is Node `>=22.18.0`, npm `>=10` (`package.json:15-18`); local versions are not a substitute for the dedicated CI floor job.
 
 ## Commands and results
 

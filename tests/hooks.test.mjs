@@ -10,7 +10,7 @@ import { actionableStderr, applicableHandlers, dispatch, dispatchLifecycle, hand
 import { stopReview } from '../.codex/hooks/stop-review.mjs';
 import { inspectGlobalCtxrouteHooks, inspectHookConfiguration, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
-import { runStep } from '../.githooks/setup.mjs';
+import { runStep, versionAtLeast } from '../.githooks/setup.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -687,6 +687,12 @@ test('setup prerequisite check is available before dependency installation', () 
   });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Setup prerequisites are available/u);
+});
+
+test('setup enforces the documented Node.js runtime floor', () => {
+  assert.equal(versionAtLeast('22.13.0', [22, 18, 0]), false);
+  assert.equal(versionAtLeast('22.18.0', [22, 18, 0]), true);
+  assert.equal(versionAtLeast('24.0.0', [22, 18, 0]), true);
 });
 
 test('setup keeps Sensor pack synchronization quiet unless it fails', () => {
