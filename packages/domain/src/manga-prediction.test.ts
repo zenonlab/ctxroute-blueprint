@@ -10,6 +10,7 @@ describe('manga prediction', () => {
     const observations = [1, 2, 3, 4].map((day, index) => ({ chapter: index + 1, releasedOn: `2026-09-${String(day).padStart(2, '0')}` }));
     expect(predictNextMangaRelease(observations, 'COMPLETED')).toBeUndefined();
     expect(predictNextMangaRelease(observations, 'CANCELLED')).toBeUndefined();
+    expect(predictNextMangaRelease(observations, 'HIATUS')).toBeUndefined();
   });
   it('normalizes skipped chapters and rejects calendar-invalid observations', () => {
     expect(predictNextMangaRelease([

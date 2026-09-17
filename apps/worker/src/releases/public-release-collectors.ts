@@ -1,4 +1,6 @@
-import type { PublicReleaseEventContract } from '@tobirink/application';
+import { publicReleaseEventSchema, type PublicReleaseEventContract } from '@tobirink/application';
+import { predictNextMangaRelease } from '@tobirink/domain';
+import type { R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
 import { publicAgendaReleaseEventSchema, type PublicAgendaPageCheckpoint, type PublicAgendaReleaseEvent } from '@tobirink/public-discovery/agenda';
 
 export {
@@ -55,6 +57,9 @@ interface AgendaGenerationEventRow {
   source: string;
   state: string;
 }
+interface AgendaWorkMappingRow { editorialStatus: 'UPCOMING' | 'ONGOING' | 'HIATUS' | 'COMPLETED' | 'CANCELLED' | 'UNKNOWN' | null; externalId: string; provider: string; workId: string }
+interface AgendaModelDigestRow { modelDigest: string; revision: number; workId: string }
+interface ExpiredAgendaModelRow extends AgendaModelDigestRow { explicitNextJson: string | null; exceptionsJson: string }
 export interface AgendaLaneClaim {
   readonly collectionId: string;
   readonly nextPage: number;
@@ -125,9 +130,22 @@ function laneState(db: PublicReleaseD1Writer, provider: AgendaProvider): Promise
 }
 
 export class D1AgendaCollectionAdapter {
-  constructor(private readonly db: PublicReleaseD1Writer) {}
+  constructor(private readonly db: PublicReleaseD1Writer, private readonly operations?: R2AgendaOperationStore) {}
+
+  private async readLaneState(provider: AgendaProvider): Promise<AgendaLaneStateRow | null> {
+    if (this.operations === undefined) return laneState(this.db, provider);
+    const state = await this.operations.readLane(provider);
+    return {
+      activeDigest: state.activeDigest, activeSnapshotId: state.activeSnapshotId,
+      collectionId: state.collectionId, completedFor: state.completedFor, leaseUntil: state.leaseUntil,
+      nextPage: state.nextPage, notBefore: state.notBefore, receivedCount: state.received,
+      scheduledFor: state.scheduledFor, skippedCount: state.skipped,
+      windowFrom: state.windowFrom, windowTo: state.windowTo,
+    };
+  }
 
   async claimLane(input: { provider: AgendaProvider; scheduledFor: string; window: { from: string; to: string }; now: string; leaseUntil: string; tokenDigest: string; collectionId: string }): Promise<AgendaLaneAdmission> {
+    if (this.operations !== undefined) return this.operations.claimLane(input);
     const current = await laneState(this.db, input.provider);
     if (current?.completedFor === input.scheduledFor) return { status: 'complete' };
     if (current?.scheduledFor === input.scheduledFor && current.notBefore !== null && current.notBefore > input.now) return { status: 'deferred', retryAt: current.notBefore };
@@ -160,6 +178,14 @@ export class D1AgendaCollectionAdapter {
 
   async savePage(claim: AgendaLaneClaim, checkpoint: PublicAgendaPageCheckpoint, savedAt: string): Promise<void> {
     const nextPage = checkpoint.nextPage ?? checkpoint.page;
+    if (this.operations !== undefined) {
+      await this.operations.writePageVersion({
+        key: ['pages', checkpoint.provider, claim.collectionId, String(checkpoint.page)].join('/'),
+        payload: checkpoint, ownerToken: claim.tokenDigest, now: savedAt,
+      });
+      await this.operations.advanceLane({ provider: checkpoint.provider, collectionId: claim.collectionId, tokenDigest: claim.tokenDigest, checkpoint, now: savedAt });
+      return;
+    }
     const results = await this.db.batch([
       this.db.prepare(`INSERT INTO public_release_agenda_page (
         collection_id, provider, page, events_json, event_count, received_count,
@@ -181,6 +207,10 @@ export class D1AgendaCollectionAdapter {
   }
 
   async failLane(input: { provider: AgendaProvider; claim: AgendaLaneClaim; retryAt: string; errorCode: string }): Promise<void> {
+    if (this.operations !== undefined) {
+      await this.operations.failLane({ provider: input.provider, collectionId: input.claim.collectionId, tokenDigest: input.claim.tokenDigest, retryAt: input.retryAt });
+      return;
+    }
     await this.db.prepare(`UPDATE public_release_agenda_lane_state SET not_before = ?1,
       lease_token_hash = NULL, lease_until = NULL, last_error_code = ?2
       WHERE provider = ?3 AND collection_id = ?4 AND lease_token_hash = ?5`)
@@ -188,13 +218,39 @@ export class D1AgendaCollectionAdapter {
   }
 
   async completeLane(input: { provider: AgendaProvider; claim: AgendaLaneClaim; scheduledFor: string; checkedAt: string }): Promise<AgendaLaneCompletion> {
-    const pages = await this.db.prepare(`SELECT complete, events_json AS eventsJson, page
-      FROM public_release_agenda_page WHERE provider = ?1 AND collection_id = ?2 ORDER BY page`)
-      .bind(input.provider, input.claim.collectionId).all<AgendaPageRow>();
-    const events = parseAgendaPages(pages.results);
+    const state = await this.readLaneState(input.provider);
+    if (state?.collectionId !== input.claim.collectionId) throw new Error('agenda-lane-lease-lost');
+    let pageRows: readonly AgendaPageRow[];
+    if (this.operations === undefined) {
+      pageRows = (await this.db.prepare(`SELECT complete, events_json AS eventsJson, page
+        FROM public_release_agenda_page WHERE provider = ?1 AND collection_id = ?2 ORDER BY page`)
+        .bind(input.provider, input.claim.collectionId).all<AgendaPageRow>()).results;
+    } else {
+      const pages: Array<PublicAgendaPageCheckpoint | undefined> = [];
+      for (let index = 0; index < state.nextPage; index += 1) {
+        pages.push(await this.operations.readPageVersion(
+          ['pages', input.provider, input.claim.collectionId, String(index + 1)].join('/'), input.claim.tokenDigest,
+        ));
+      }
+      pageRows = pages.map((page, index) => {
+        if (page === undefined) throw new Error('agenda-staging-page-gap');
+        return { complete: page.complete ? 1 : 0, eventsJson: JSON.stringify(page.events), page: index + 1 };
+      });
+    }
+    const events = parseAgendaPages(pageRows);
     const digest = await digestPublicAgendaEvents(events);
-    const state = await laneState(this.db, input.provider);
     const changed = state?.activeDigest !== digest;
+    if (this.operations !== undefined) {
+      await this.operations.writePageVersion({
+        key: ['snapshots', input.provider, input.claim.collectionId].join('/'),
+        payload: { complete: true, events, page: 1, provider: input.provider, received: events.length, skippedUnidentified: input.claim.skippedUnidentified },
+        ownerToken: input.claim.tokenDigest, now: input.checkedAt, retention: 'retained',
+      });
+    }
+    if (this.operations !== undefined) {
+      await this.operations.completeLane({ provider: input.provider, collectionId: input.claim.collectionId, tokenDigest: input.claim.tokenDigest, scheduledFor: input.scheduledFor, checkedAt: input.checkedAt, digest, changed });
+      return { changed, digest, events };
+    }
     const result = await this.db.prepare(`UPDATE public_release_agenda_lane_state SET
       active_snapshot_id = CASE WHEN ?1 = 1 THEN collection_id ELSE active_snapshot_id END,
       active_digest = CASE WHEN ?1 = 1 THEN ?2 ELSE active_digest END,
@@ -211,26 +267,136 @@ export class D1AgendaCollectionAdapter {
     const [anilist, mangaupdates] = await Promise.all([this.readLaneEvents('anilist'), this.readLaneEvents('mangaupdates')]);
     const events = [...anilist.events, ...mangaupdates.events];
     if (events.length === 0) return null;
-    const digest = await digestPublicAgendaEvents(events);
-    const revision = `calendar-${digest.slice(0, 48)}`;
     const active = await this.db.prepare(`SELECT generation.revision,
       generation.window_from AS windowFrom, generation.window_to AS windowTo
       FROM public_release_active_generation AS pointer
       JOIN public_release_generation AS generation ON generation.revision = pointer.revision
       WHERE pointer.id = 'active'`).first<{ revision: string; windowFrom: string; windowTo: string }>();
+    const from = [anilist.window?.from, mangaupdates.window?.from, active?.windowFrom].filter((value): value is string => value !== undefined).sort()[0] ?? checkedAt.slice(0, 10);
+    const to = [anilist.window?.to, mangaupdates.window?.to, active?.windowTo].filter((value): value is string => value !== undefined).sort().at(-1) ?? checkedAt.slice(0, 10);
+    const virtual = await this.publishVirtualModels(events, { from, to }, checkedAt);
+    if (virtual !== null) {
+      await this.pruneCompletedPages();
+      return { changed: virtual.changed, count: events.length, revision: virtual.revision };
+    }
+    const digest = await digestPublicAgendaEvents(events);
+    const revision = `calendar-${digest.slice(0, 48)}`;
     if (active?.revision === revision) {
       await this.db.prepare('UPDATE public_release_generation SET checked_at = ?1 WHERE revision = ?2').bind(checkedAt, revision).run();
       await this.pruneCompletedPages();
       return { changed: false, count: events.length, revision };
     }
-    const from = [anilist.window?.from, mangaupdates.window?.from, active?.windowFrom].filter((value): value is string => value !== undefined).sort()[0] ?? checkedAt.slice(0, 10);
-    const to = [anilist.window?.to, mangaupdates.window?.to, active?.windowTo].filter((value): value is string => value !== undefined).sort().at(-1) ?? checkedAt.slice(0, 10);
     await commitPublicReleaseGeneration(this.db, events, { from, to }, revision, checkedAt);
     await this.pruneCompletedPages();
     return { changed: true, count: events.length, revision };
   }
 
+  private async publishVirtualModels(events: readonly PublicAgendaReleaseEvent[], window: { from: string; to: string }, checkedAt: string): Promise<{ changed: boolean; revision: string } | null> {
+    const references = [...new Map(events.map((event) => [`${event.provider}:${event.providerWorkId}`, { provider: event.provider, externalId: event.providerWorkId }])).values()];
+    const mappings = (await this.db.prepare(`SELECT reference.provider, reference.external_id AS externalId,
+      reference.work_id AS workId, metadata.editorial_status AS editorialStatus
+      FROM catalogue_external_references AS reference
+      JOIN json_each(?1) AS requested
+        ON reference.provider = json_extract(requested.value, '$.provider')
+       AND reference.external_id = json_extract(requested.value, '$.externalId')
+      LEFT JOIN catalogue_current_metadata AS metadata ON metadata.work_id = reference.work_id`)
+      .bind(JSON.stringify(references)).all<AgendaWorkMappingRow>()).results;
+    const grouped = new Map<string, { events: PublicReleaseEventContract[]; mapping: AgendaWorkMappingRow }>();
+    for (const sourceEvent of events) {
+      const event = publicReleaseEventSchema.parse(sourceEvent);
+      const resolved = mappings.find((row) => row.provider === event.provider && row.externalId === event.providerWorkId);
+      if (resolved === undefined) continue;
+      const current = grouped.get(resolved.workId) ?? { events: [], mapping: resolved };
+      current.events.push(event); grouped.set(resolved.workId, current);
+    }
+    if (grouped.size === 0) return null;
+    const existing = (await this.db.prepare(`SELECT work_id AS workId, model_digest AS modelDigest, revision
+      FROM catalogue_release_model WHERE work_id IN (SELECT value FROM json_each(?1))`)
+      .bind(JSON.stringify([...grouped.keys()])).all<AgendaModelDigestRow>()).results;
+    const digests = new Map(existing.map((row) => [row.workId, row.modelDigest]));
+    const revision = Date.parse(checkedAt);
+    const statements: D1PreparedStatement[] = [];
+    const changedWorkIds: string[] = [];
+    for (const [workId, group] of grouped) {
+      const ordered = group.events.sort((left, right) => left.occurrence.value.localeCompare(right.occurrence.value) || left.id.localeCompare(right.id));
+      const provider = ordered.some((event) => event.provider === 'anilist') ? 'anilist' as const : 'mangaupdates' as const;
+      const selected = ordered.filter((event) => event.provider === provider).slice(-32);
+      const last = selected.at(-1);
+      if (last === undefined) continue;
+      let intervalDays: number | undefined;
+      let anchorDate = last.occurrence.value.slice(0, 10);
+      let anchorSequence = last.sequence;
+      if (provider === 'mangaupdates' && this.operations !== undefined) {
+        const observations = selected.flatMap((event) => {
+          const chapter = Number(event.sequence);
+          return event.occurrence.kind === 'DATE' && Number.isFinite(chapter) ? [{ chapter, releasedOn: event.occurrence.value }] : [];
+        });
+        const history = await this.operations.mergeObservations({ workId, observations, ownerToken: crypto.randomUUID(), now: checkedAt });
+        const lifecycle = group.mapping.editorialStatus === 'UPCOMING' ? 'UNKNOWN' : group.mapping.editorialStatus ?? 'UNKNOWN';
+        const prediction = predictNextMangaRelease(history, lifecycle);
+        const latest = history.at(-1);
+        if (latest !== undefined) { anchorDate = latest.releasedOn; anchorSequence = String(latest.chapter); }
+        if (prediction !== undefined && latest !== undefined) intervalDays = (Date.parse(prediction.releasedOn) - Date.parse(latest.releasedOn)) / 86_400_000;
+      }
+      const explicitNext = provider === 'anilist' ? selected.find((event) => event.state === 'SCHEDULED') : undefined;
+      const validity = {
+        from: selected.map((event) => event.occurrence.value.slice(0, 10)).sort()[0] ?? window.from,
+        to: selected.map((event) => event.expiresAt.slice(0, 10)).sort().at(-1) ?? window.to,
+      };
+      const semantic = { workId, provider, providerWorkId: last.providerWorkId, releaseKind: last.releaseKind, anchorDate, anchorSequence, intervalDays, explicitNextId: explicitNext?.id, events: semanticAgendaEvents(selected), editorialStatus: group.mapping.editorialStatus ?? 'UNKNOWN', source: last.provenance.source, parserVersion: last.provenance.parserVersion, rulesVersion: last.provenance.rulesVersion };
+      const modelDigest = await sha256(JSON.stringify(semantic));
+      if (digests.get(workId) === modelDigest) continue;
+      changedWorkIds.push(workId);
+      if (statements.length === 0) statements.push(this.db.prepare('INSERT OR IGNORE INTO catalogue_revisions(revision, published_at) VALUES (?1, ?2)').bind(revision, checkedAt));
+      statements.push(this.db.prepare(`INSERT INTO catalogue_release_model(
+        work_id, provider, provider_work_id, release_kind, anchor_date, anchor_sequence,
+        interval_days, explicit_next_json, exceptions_json, valid_from, valid_to,
+        editorial_status, source, observed_at, parser_version, rules_version, model_digest, revision)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+        ON CONFLICT(work_id) DO UPDATE SET provider=excluded.provider, provider_work_id=excluded.provider_work_id,
+        release_kind=excluded.release_kind, anchor_date=excluded.anchor_date, anchor_sequence=excluded.anchor_sequence,
+        interval_days=excluded.interval_days, explicit_next_json=excluded.explicit_next_json,
+        exceptions_json=excluded.exceptions_json, valid_from=excluded.valid_from, valid_to=excluded.valid_to,
+        editorial_status=excluded.editorial_status, source=excluded.source, observed_at=excluded.observed_at,
+        parser_version=excluded.parser_version, rules_version=excluded.rules_version,
+        model_digest=excluded.model_digest, revision=excluded.revision
+        WHERE catalogue_release_model.model_digest <> excluded.model_digest`)
+        .bind(workId, provider, last.providerWorkId, last.releaseKind, anchorDate, anchorSequence ?? null,
+          intervalDays ?? null, explicitNext === undefined ? null : JSON.stringify(explicitNext), JSON.stringify(selected),
+          validity.from, validity.to, group.mapping.editorialStatus ?? 'UNKNOWN', last.provenance.source, checkedAt,
+          last.provenance.parserVersion, last.provenance.rulesVersion, modelDigest, revision));
+      const lastConfirmed = selected.filter((event) => event.state === 'CONFIRMED' && event.releaseKind !== 'special').at(-1);
+      if (lastConfirmed !== undefined) {
+        statements.push(this.db.prepare(`UPDATE catalogue_current_metadata SET
+          last_confirmed_kind = ?1, last_confirmed_sequence = ?2, last_confirmed_on = ?3, revision = ?4
+          WHERE work_id = ?5 AND (last_confirmed_on IS NULL OR last_confirmed_on <= ?3)`)
+          .bind(lastConfirmed.releaseKind, lastConfirmed.sequence ?? null, lastConfirmed.occurrence.value.slice(0, 10), revision, workId));
+      }
+    }
+    const expired = (await this.db.prepare(`SELECT work_id AS workId, model_digest AS modelDigest, revision,
+      explicit_next_json AS explicitNextJson, exceptions_json AS exceptionsJson
+      FROM catalogue_release_model
+      WHERE valid_to < ?1 AND (explicit_next_json IS NOT NULL OR exceptions_json <> '[]')
+      LIMIT 1000`).bind(checkedAt.slice(0, 10)).all<ExpiredAgendaModelRow>()).results;
+    for (const stale of expired) {
+      if (grouped.has(stale.workId) || changedWorkIds.includes(stale.workId)) continue;
+      const modelDigest = await sha256(`${stale.modelDigest}|expired|${checkedAt.slice(0, 10)}`);
+      if (statements.length === 0) statements.push(this.db.prepare('INSERT OR IGNORE INTO catalogue_revisions(revision, published_at) VALUES (?1, ?2)').bind(revision, checkedAt));
+      statements.push(this.db.prepare(`UPDATE catalogue_release_model SET explicit_next_json = NULL,
+        exceptions_json = '[]', model_digest = ?1, observed_at = ?2, revision = ?3
+        WHERE work_id = ?4 AND model_digest = ?5`)
+        .bind(modelDigest, checkedAt, revision, stale.workId, stale.modelDigest));
+      changedWorkIds.push(stale.workId);
+    }
+    if (changedWorkIds.length > 0) statements.push(this.db.prepare(`UPDATE catalogue_works SET revision = ?1
+      WHERE work_id IN (SELECT value FROM json_each(?2)) AND revision <> ?1`).bind(revision, JSON.stringify(changedWorkIds)));
+    if (statements.length > 0) await this.db.batch(statements);
+    const activeRevision = statements.length > 0 ? revision : Math.max(...existing.map((row) => row.revision));
+    return { changed: statements.length > 0, revision: `models-${activeRevision}-${grouped.size}` };
+  }
+
   private async pruneCompletedPages(): Promise<void> {
+    if (this.operations !== undefined) return;
     await this.db.prepare(`DELETE FROM public_release_agenda_page
       WHERE NOT EXISTS (
         SELECT 1 FROM public_release_agenda_lane_state AS lane
@@ -239,8 +405,15 @@ export class D1AgendaCollectionAdapter {
   }
 
   private async readLaneEvents(provider: AgendaProvider): Promise<AgendaLaneEvents> {
-    const state = await laneState(this.db, provider);
+    const state = await this.readLaneState(provider);
     if (state?.activeSnapshotId !== null && state?.activeSnapshotId !== undefined) {
+      if (this.operations !== undefined) {
+        const snapshot = await this.operations.readPageVersion(['snapshots', provider, state.activeSnapshotId].join('/'));
+        if (snapshot === undefined || !snapshot.complete) throw new Error('agenda-staging-incomplete');
+        const result: AgendaLaneEvents = { events: Object.freeze(snapshot.events) };
+        if (state.windowFrom !== null && state.windowTo !== null) result.window = { from: state.windowFrom, to: state.windowTo };
+        return result;
+      }
       const pages = await this.db.prepare(`SELECT complete, events_json AS eventsJson, page
         FROM public_release_agenda_page WHERE provider = ?1 AND collection_id = ?2 ORDER BY page`)
         .bind(provider, state.activeSnapshotId).all<AgendaPageRow>();

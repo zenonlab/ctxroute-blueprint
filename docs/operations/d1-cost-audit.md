@@ -1,6 +1,6 @@
 # Audit des coûts D1 et parcours de certification
 
-Date : 17 septembre 2026. État : référence 0021 mesurée; architecture cible non certifiée.
+Date : 17 septembre 2026. État : référence 0021 et cible Agenda virtuel/R2 mesurées localement; certification distante de la cible en attente.
 
 Le [plan maître A à Z](./tobirink-a-z-master-plan.md) est la source de vérité
 pour l'ordre d'exécution, les seuils proposés et les frontières d'approbation.
@@ -19,15 +19,17 @@ crée plus de révision et ne réécrit plus sa fiche catalogue. Le rafraîchiss
 inchangé ou sans changement dans les champs matériellement persistés conserve
 12 écritures de suivi.
 
-L'Agenda 0021 utilise une projection active différentielle. Après
-amorçage, une collecte identique coûte 70 écritures pour les deux lanes et
-leurs treize pages ; un seul événement modifié coûte 76–77 écritures, rétention
-incluse. Après cinq cycles, seules les treize pages actives restent. La première
-réconciliation locale coûte encore 1 798 écritures et doit rester un pic séparé.
+L'Agenda 0021 historique utilisait une projection active différentielle :
+1 798 écritures au premier amorçage, 70 pour une collecte identique et 76–77
+pour un événement modifié. La cible 0024 déplace lanes, pages, snapshots et
+observations dans R2 et conserve un modèle D1 courant par œuvre. Sur la même
+fixture de 579 œuvres, elle mesure 2 895 écritures D1 au premier amorçage, zéro
+sur une collecte identique et cinq pour un événement modifié. Les opérations R2
+correspondantes sont rapportées séparément ci-dessous.
 
-Ces résultats ne reconstituent pas les 100 000 écritures historiques, ne
-certifient pas le montant facturé en production et ne prédisent pas les coûts
-de la cible Agenda/R2. La projection `1 000 × 55 = 55 000` n'est pas une
+Ces résultats ne reconstituent pas les 100 000 écritures historiques et ne
+certifient pas le montant facturé en production. La projection
+`1 000 × 55 = 55 000` n'est pas une
 consommation observée. La taille d'une ligne ne multiplie pas son compteur
 d'écritures; les index effectivement maintenus peuvent ajouter des écritures.
 
@@ -71,13 +73,11 @@ répétition clairement candidate à supprimer sans changer les données produit
 Les écritures de suivi ne sont pas du slop : leases, checkpoints, états
 terminaux, nonce, projection active et suppression des événements absents
 portent chacun une garantie distincte. Les compteurs locaux confirment que les
-rejeux ne réécrivent pas le catalogue (`0` écriture pour les doublons testés),
-que l'Agenda identique reste à `70`, et qu'un changement d'un événement reste à
-`76–77`, contre `1 798` au premier amorçage.
-
-Les deux optimisations candidates ne sont pas implémentées dans cette étape.
-Elles nécessitent une mesure avant/après sur mêmes fixtures et une vérification
-des baux concurrents avant d'être ajoutées au périmètre de code.
+rejeux ne réécrivent pas le catalogue (`0` écriture pour les doublons testés).
+Pour Agenda 0024, une collecte identique écrit zéro ligne D1 et un événement
+changé en écrit cinq, contre respectivement `70` et `76–77` dans la référence
+0021. R2 conserve toutefois 32 écritures opérationnelles dans chacun de ces
+cycles.
 
 ## Méthode et reproductibilité
 
@@ -123,15 +123,16 @@ aucune relation. Stock final : 1 fiche + 4 titres + 4 clés canoniques + 1 réf�
 | Nouvelle demande | 11 | 5 |
 | Confirmation du signal Queue | 3 | 4 |
 | Attribution au collecteur | 20 | 4 |
-| Publication de la fiche à quatre titres et métadonnées canoniques | 54 | 44 |
-| **Total première résolution, hors fournisseur** | **88** | **57** |
+| Publication de la fiche à quatre titres et métadonnées canoniques | 59 | 44 |
+| **Total première résolution, hors fournisseur** | **93** | **57** |
 | 100 admissions identiques pendant PENDING | 1 400 | 0 |
-| 100 lectures VERIFIED unitaires | 300 | 0 |
-| Lookup groupé contenant une clé VERIFIED | 2 | 0 |
+| 100 lectures VERIFIED unitaires | 400 | 0 |
+| Lookup groupé contenant une clé VERIFIED | 3 | 0 |
 | Admission identique déjà VERIFIED | 14 | 0 |
-| Nouvelle clé aboutissant à la même œuvre, cycle complet | 67 | 19 |
-| Refresh identique : admission, confirmation, claim, publication | 36 | 12 |
-| Refresh avec compteur changé | 65 | 16 |
+| Nouvelle clé aboutissant à la même œuvre, cycle complet | 69 | 19 |
+| Refresh identique : admission, confirmation, claim, publication | 37 | 12 |
+| Refresh avec compteur changé | 159 | 16 |
+| Refresh partiel préservant les champs connus | 37 | 12 |
 | Réservation fournisseur + succès | 4 | 2 |
 | Réservation fournisseur + échec | 4 | 2 |
 
@@ -180,10 +181,35 @@ demande PROCESSING épuisée. Ne pas promettre zéro écriture pour tout GET.
 
 ## Agenda : mesures locales
 
-Fixture : 220 événements AniList et 359 MangaUpdates, cinq et huit pages de
-cinquante événements au maximum. La fenêtre reste fixe pour isoler la détection
-de changement. Chaque cycle couvre claim, pages, fin des deux lanes et publication
-fusionnée, sans le transport, le contrôle fournisseur ni le gestionnaire Queue.
+Fixture commune : 220 événements AniList et 359 MangaUpdates, cinq et huit
+pages de cinquante événements au maximum. La fenêtre reste fixe pour isoler la
+détection de changement. Chaque cycle couvre claim, pages, fin des deux lanes et
+publication fusionnée, sans appel HTTP fournisseur.
+
+### Cible 0024 — modèles courants D1 et opérations R2
+
+| Cycle | Lectures D1 | Écritures D1 | Lectures R2 | Écritures R2 | Publication |
+|---|---:|---:|---:|---:|---|
+| Premier amorçage, 579 œuvres / 13 pages | 7 529 | 2 895 | 786 | 391 | 579 modèles initialisés |
+| Collecte identique, horodatage différent | 3 474 | 0 | 425 | 32 | Aucun modèle réécrit |
+| Un événement changé, cycle 2 | 3 487 | 5 | 425 | 32 | Un modèle et sa révision |
+| Un événement changé, cycle 3 | 3 487 | 5 | 425 | 32 | Un modèle et sa révision |
+| Un événement changé, cycle 4 | 3 487 | 5 | 425 | 32 | Un modèle et sa révision |
+
+Stock cible vérifié : **579 modèles courants** et **zéro page Agenda D1**. Le
+premier coût D1 est supérieur à 0021 parce qu'il crée une ligne de modèle
+indexée et actualise la révision de chacune des 579 œuvres. Le bénéfice porte
+sur le régime récurrent : zéro écriture D1 pour une collecte identique et cinq
+pour un changement isolé. Les 32 écritures R2 d'un cycle identique sont réelles :
+elles correspondent aux leases, checkpoints et snapshots de reprise, pas à une
+gratuité obtenue en déplaçant les opérations.
+
+Les pages de travail R2 portent une échéance logique de sept jours. Un snapshot
+actif et ses deux prédécesseurs restent référencés sans expiration automatique;
+le pointeur n'est publié qu'après écriture et relecture du snapshot complet.
+Les observations manga sont dédupliquées et bornées aux douze plus récentes.
+
+### Référence historique 0021 — événements D1 matérialisés
 
 | Cycle | Lignes lues | Écritures | Publication |
 |---|---:|---:|---|
@@ -193,18 +219,9 @@ fusionnée, sans le transport, le contrôle fournisseur ni le gestionnaire Queue
 | Un événement changé, troisième génération | 3 667 | 76 | Diff d'un événement |
 | Un événement changé, quatrième génération | 3 679 | 77 | Diff + rétention d'un snapshot |
 
-Stock final vérifié : **579 lignes actives**, trois métadonnées de génération
-avec leur snapshot JSON restaurable et **13 pages JSON** correspondant aux deux
-snapshots de lane actifs. Une collecte interrompue reste conservée tant qu'elle
-est la collecte courante reprenable ; les pages terminées remplacées sont
-supprimées par le cycle local, sans purge distante dans cette étape.
-
-Treize paires réservation/succès coûteraient 26 écritures supplémentaires selon
-le test de contrôle fournisseur, si exactement un appel est requis par page.
-C'est une composition de mesures, pas un cycle natif complet mesuré :
-**96** écritures pour la collecte inchangée et **103** pour un cycle différentiel
-avec rétention dans cette hypothèse. Les métadonnées supplémentaires et les retries
-du gestionnaire natif restent à mesurer.
+Cette référence conservait 579 événements actifs, trois générations et treize
+pages JSON. Elle reste utile pour la comparaison avant/après, mais ne décrit
+plus le chemin de production visé par 0024.
 
 ### Reprise après interruption
 

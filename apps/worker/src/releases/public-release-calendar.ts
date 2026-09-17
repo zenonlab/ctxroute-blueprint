@@ -1,5 +1,5 @@
-import type { PublicReleaseEventContract } from '@tobirink/application';
-import { publicReleaseEventSchema } from '@tobirink/application';
+import type { PublicReleaseEventContract, VirtualReleaseModelContract, VirtualReleaseModelInput } from '@tobirink/application';
+import { projectVirtualAgenda, publicReleaseEventSchema, virtualReleaseModelSchema } from '@tobirink/application';
 import { commitPublicReleaseGeneration } from './public-release-collectors';
 import type { PublicReleaseIngestion } from './public-release-ingestion';
 
@@ -12,6 +12,13 @@ interface CalendarPage { entries: readonly PublicReleaseEventContract[]; revisio
 interface ReleaseRow { id: string; provider: string; provider_work_id: string; release_kind: string; sequence_label: string | null; occurrence_kind: string; occurrence_value: string; state: string; source: string; fetched_at: string; parser_version: string; rules_version: string; expires_at: string }
 interface ReleaseGenerationRow { revision: string; checked_at: string | null; generated_at: string; window_from: string; window_to: string }
 interface ReleaseCursor { id: string | null; occurrence: string | null }
+interface ReleaseModelRow {
+  anchorDate: string; anchorSequence: string | null; editorialStatus: VirtualReleaseModelContract['editorialStatus'];
+  exceptionsJson: string; explicitNextJson: string | null; intervalDays: number | null; modelDigest: string;
+  observedAt: string; parserVersion: string; provider: VirtualReleaseModelContract['provider']; providerWorkId: string;
+  releaseKind: VirtualReleaseModelContract['releaseKind']; revision: number; rulesVersion: string; source: string;
+  validFrom: string; validTo: string; workId: string;
+}
 function decodeCursor(cursor: string | undefined): ReleaseCursor {
   if (cursor === undefined) return { id: null, occurrence: null };
   const separator = cursor.indexOf('|');
@@ -35,6 +42,39 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
     const cursor = decodeCursor(input.cursor);
     const lowerBound = input.from ?? '0000-01-01';
     const upperBound = input.to ? `${input.to}T23:59:59.999Z` : '9999-12-31T23:59:59.999Z';
+    const modelRows = await this.db.prepare(`SELECT work_id AS workId, provider, provider_work_id AS providerWorkId,
+      release_kind AS releaseKind, anchor_date AS anchorDate, anchor_sequence AS anchorSequence,
+      interval_days AS intervalDays, explicit_next_json AS explicitNextJson, exceptions_json AS exceptionsJson,
+      valid_from AS validFrom, valid_to AS validTo, editorial_status AS editorialStatus,
+      source, observed_at AS observedAt, parser_version AS parserVersion, rules_version AS rulesVersion,
+      model_digest AS modelDigest, revision FROM catalogue_release_model
+      WHERE valid_to >= ?1 AND valid_from <= ?2 ORDER BY work_id LIMIT 1000`)
+      .bind(lowerBound.slice(0, 10), upperBound.slice(0, 10)).all<ReleaseModelRow>();
+    if (modelRows.results.length > 0) {
+      const models = modelRows.results.map((row) => {
+        const model: VirtualReleaseModelInput = {
+          workId: row.workId, provider: row.provider, providerWorkId: row.providerWorkId, releaseKind: row.releaseKind,
+          anchor: { date: row.anchorDate }, exceptions: JSON.parse(row.exceptionsJson),
+          validity: { from: row.validFrom, to: row.validTo }, editorialStatus: row.editorialStatus,
+          provenance: { source: row.source, observedAt: row.observedAt, parserVersion: row.parserVersion, rulesVersion: row.rulesVersion },
+          revision: row.modelDigest,
+        };
+        if (row.anchorSequence !== null) model.anchor.sequence = row.anchorSequence;
+        if (row.intervalDays !== null) model.intervalDays = row.intervalDays;
+        if (row.explicitNextJson !== null) model.explicitNext = JSON.parse(row.explicitNextJson);
+        return virtualReleaseModelSchema.parse(model);
+      });
+      const projected = projectVirtualAgenda(models, { from: lowerBound.slice(0, 10), to: upperBound.slice(0, 10) })
+        .filter((event) => event.occurrence.value > (cursor.occurrence ?? lowerBound)
+          || (event.occurrence.value === cursor.occurrence && event.id > (cursor.id ?? '')));
+      const entries = projected.slice(0, input.limit);
+      const last = entries.at(-1);
+      const nextCursor = projected.length > input.limit && last ? `${last.occurrence.value}|${last.id}` : undefined;
+      const revision = `models-${Math.max(...modelRows.results.map((row) => row.revision))}-${modelRows.results.length}`;
+      const page: CalendarPage = { entries, revision, generatedAt: modelRows.results.map((row) => row.observedAt).sort().at(-1)!, window: { from: lowerBound.slice(0, 10), to: upperBound.slice(0, 10) } };
+      if (nextCursor !== undefined) page.nextCursor = nextCursor;
+      return page;
+    }
     const generation = await this.db.prepare("SELECT generation.revision, generation.checked_at, generation.generated_at, generation.window_from, generation.window_to FROM public_release_generation AS generation JOIN public_release_active_generation AS active ON active.revision = generation.revision AND active.id = 'active' LIMIT 1").first<ReleaseGenerationRow>();
     const emptyRows: ReleaseRow[] = [];
     const rows = generation === null

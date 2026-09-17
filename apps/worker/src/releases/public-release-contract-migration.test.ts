@@ -2,6 +2,7 @@ import { applyD1Migrations, env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { commitPublicReleaseGeneration, D1AgendaCollectionAdapter, upsertPublicReleaseEvents } from './public-release-collectors';
 import { D1PublicReleaseCalendarAdapter } from './public-release-calendar';
+import { instrumentD1 } from '../operational-metrics';
 
 function eventFixture(id: string, value: string) {
   return {
@@ -77,6 +78,28 @@ describe('public release contract migration', () => {
     expect(page.entries).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'textual-release', provider: 'mangaupdates', sequence: '29-29.5 (end)' }),
     ]));
+  });
+
+  it('projects the compact model without writing D1 or advancing a confirmed counter', async () => {
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS);
+    await env.PUBLIC_DB.batch([
+      env.PUBLIC_DB.prepare("INSERT OR IGNORE INTO catalogue_revisions(revision, published_at) VALUES (4242424242, '2026-09-17T00:00:00.000Z')"),
+      env.PUBLIC_DB.prepare("INSERT OR IGNORE INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES ('work_virtual_agenda', 'manga', 'Virtual', 4242424242)"),
+      env.PUBLIC_DB.prepare(`INSERT INTO catalogue_release_model(
+        work_id, provider, provider_work_id, release_kind, anchor_date, anchor_sequence,
+        interval_days, explicit_next_json, exceptions_json, valid_from, valid_to,
+        editorial_status, source, observed_at, parser_version, rules_version, model_digest, revision)
+        VALUES ('work_virtual_agenda', 'mangaupdates', '42', 'chapter', '2026-09-14', '58.5',
+          7, NULL, '[]', '2026-09-14', '2026-10-01', 'ONGOING', 'mangaupdates',
+          '2026-09-17T00:00:00.000Z', '2', '2', ?1, 4242424242)`)
+        .bind('a'.repeat(64)),
+    ]);
+    const metrics = instrumentD1(env.PUBLIC_DB);
+    const page = await new D1PublicReleaseCalendarAdapter(metrics.database).query({ from: '2026-09-14', limit: 10, to: '2026-10-01' });
+    expect(page).toMatchObject({ entries: [{ occurrence: { kind: 'DATE', value: '2026-09-21' }, state: 'ESTIMATED' }], revision: 'models-4242424242-1' });
+    expect(metrics.snapshot().rowsWritten).toBe(0);
+    expect(await env.PUBLIC_DB.prepare("SELECT episode_total AS episodeTotal, chapter_total AS chapterTotal FROM catalogue_current_metadata WHERE work_id = 'work_virtual_agenda'").first()).toBeNull();
+    await env.PUBLIC_DB.prepare("DELETE FROM catalogue_release_model WHERE work_id = 'work_virtual_agenda'").run();
   });
 
   it('commits one generation and pages by occurrence then identity through the covering index', async () => {

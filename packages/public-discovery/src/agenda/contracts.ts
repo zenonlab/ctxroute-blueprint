@@ -23,6 +23,24 @@ export const publicAgendaReleaseEventSchema = z.strictObject({
   return sequence === undefined ? canonical : { ...canonical, sequence: String(sequence) };
 }).pipe(canonicalReleaseSchema);
 
+export const publicAgendaPageCheckpointSchema = z.strictObject({
+  complete: z.boolean(), events: z.array(publicAgendaReleaseEventSchema).max(5_000),
+  nextPage: z.number().int().positive().optional(), notBefore: z.number().int().nonnegative().optional(),
+  page: z.number().int().positive(), provider: z.enum(['anilist', 'mangaupdates']),
+  received: z.number().int().nonnegative(), skippedUnidentified: z.number().int().nonnegative(),
+});
+
+export interface PublicAgendaPageCheckpoint {
+  readonly complete: boolean;
+  readonly events: readonly z.output<typeof publicAgendaReleaseEventSchema>[];
+  readonly nextPage?: number | undefined;
+  readonly notBefore?: number | undefined;
+  readonly page: number;
+  readonly provider: 'anilist' | 'mangaupdates';
+  readonly received: number;
+  readonly skippedUnidentified: number;
+}
+
 export const publicAgendaIngestionSchema = z.strictObject({
   events: z.array(publicAgendaReleaseEventSchema).max(5_000), generatedAt: z.iso.datetime({ offset: false }), nonce: z.uuid(), schemaVersion: z.literal(1),
   window: z.strictObject({ from: z.iso.date(), to: z.iso.date() }),

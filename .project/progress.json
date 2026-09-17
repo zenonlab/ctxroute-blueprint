@@ -2602,7 +2602,7 @@
         {
           "id": "virtual-agenda-r2",
           "title": "Implémenter Agenda virtuel et stockage opérationnel R2",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "D1 conserve un modèle compact courant par œuvre, écrit uniquement si changé; aucune occurrence historique Agenda n’est ajoutée.",
             "R2 conserve travail/checkpoints/observations bornées avec propriété conditionnelle, sept jours de temporaire et trois versions.",
@@ -2639,7 +2639,11 @@
             "npm run archify:validate -- adaptive-public-refresh.dataflow",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "Migration 0024 et publication: un modèle courant par œuvre; projection locale bornée, date AniList prioritaire, prédiction manga historique limitée à 12, suspension hiatus/terminé/annulé et compteurs confirmés séparés.",
+            "R2 porte signals, leases, pages, snapshots actifs + deux précédents et observations avec ETag/jets de propriété; pages temporaires 7 jours, snapshots référencés sans expiration; envoi Queue échoué laisse un signal PENDING vérifié.",
+            "Agenda 34/34, Worker 109/109, adapters-cloudflare 23/23, Public Discovery 62/62, Domain 37/37 et tous les typechecks passent; cible locale 579 œuvres: D1 writes 2895/0/5, R2 writes 391/32/32; Archify dataflow et workflow showcase 9/9."
+          ]
         },
         {
           "id": "switch-readers",

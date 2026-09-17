@@ -41,7 +41,7 @@
     { "id": "agendaLanes", "type": "backend", "label": "Collecte Agenda", "sublabel": "annonces + observations", "stage": 2, "row": 0, "tag": "modèle virtuel" },
     { "id": "discoveryJob", "type": "backend", "label": "Discovery", "sublabel": "identité et titres", "stage": 2, "row": 2, "tag": "claim partagé" },
     { "id": "refreshJob", "type": "backend", "label": "Réhydratation", "sublabel": "profil canonique", "stage": 2, "row": 4, "tag": "sans relations" },
-    { "id": "operationsR2", "type": "database", "label": "Opérations R2", "sublabel": "baux + 12 observations", "stage": 3, "row": 0, "width": 168, "tag": "actif + 2 versions" },
+    { "id": "operationsR2", "type": "database", "label": "Opérations R2", "sublabel": "signal + baux + pages + 12 observations", "stage": 3, "row": 0, "width": 196, "tag": "actif + 2 versions" },
     { "id": "catalogueD1", "type": "database", "label": "Catalogue D1", "sublabel": "métadonnées + modèle courant", "stage": 3, "row": 2, "width": 168, "tag": "une ligne / œuvre" },
     { "id": "localContentPolicy", "type": "backend", "label": "Préférence locale", "sublabel": "adult · non-adult · unknown", "stage": 4, "row": 1, "width": 176, "tag": "OFF conservateur" },
     { "id": "privateIndexedDb", "type": "database", "label": "IndexedDB privée", "sublabel": "lookup groupé par 50 clés", "stage": 4, "row": 2, "width": 154, "tag": "ETag · continuation MV3" }

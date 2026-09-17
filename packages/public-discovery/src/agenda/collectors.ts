@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { FavoriteProviderFetch } from '../provider-http.js';
-import { publicAgendaReleaseEventSchema, type PublicAgendaReleaseEvent } from './contracts.js';
+import { publicAgendaReleaseEventSchema, type PublicAgendaPageCheckpoint, type PublicAgendaReleaseEvent } from './contracts.js';
 import { createMangaUpdatesAgendaEvent, parseAniListAgendaPage, parseMangaUpdatesAgendaPage } from './provider-pages.js';
 
 const aniListPageLimit = 100;
@@ -13,16 +13,6 @@ type SavePageCheckpoint = (checkpoint: PublicAgendaPageCheckpoint) => Promise<vo
 const wait: Wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const ignoreCheckpoint: SavePageCheckpoint = async () => undefined;
 
-export interface PublicAgendaPageCheckpoint {
-  readonly complete: boolean;
-  readonly events: readonly PublicAgendaReleaseEvent[];
-  readonly nextPage?: number;
-  readonly notBefore?: number;
-  readonly page: number;
-  readonly provider: 'anilist' | 'mangaupdates';
-  readonly received: number;
-  readonly skippedUnidentified: number;
-}
 export interface PublicAgendaCollectionCursor {
   readonly nextPage: number;
   readonly received: number;

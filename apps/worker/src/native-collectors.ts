@@ -1,4 +1,4 @@
-import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
+import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter, R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
 import {
   AniListAgendaCollector,
   MangaUpdatesAgendaCollector,
@@ -210,7 +210,7 @@ export async function processAgendaQueue(bindings: NativeCollectorBindings, sche
   const d1 = instrumentD1(bindings.PUBLIC_DB);
   const providers = instrumentProviderFetch(providerFetch(bindings));
   const transport = providers.fetch; const window = calendarWindow(scheduledFor);
-  const state = new D1AgendaCollectionAdapter(d1.database);
+  const state = new D1AgendaCollectionAdapter(d1.database, new R2AgendaOperationStore(bindings.RELEASE_SNAPSHOTS));
   const attempts = await Promise.allSettled((['anilist', 'mangaupdates'] as const).map(async (provider) => {
     const startedAt = new Date();
     const tokenDigest = await digest(randomToken());
@@ -352,5 +352,8 @@ function emitCollectorCost(task: 'agenda' | 'discovery', metrics: CollectorCostM
 }
 
 export async function enqueueAgendaRefresh(controller: ScheduledController, bindings: NativeCollectorBindings): Promise<void> {
-  await bindings.PUBLIC_DISCOVERY_QUEUE.send({ scheduledFor: new Date(controller.scheduledTime).toISOString(), type: 'agenda-refresh', version: 1 }, { contentType: 'json' });
+  const scheduledFor = new Date(controller.scheduledTime).toISOString();
+  const now = new Date().toISOString();
+  await new R2AgendaOperationStore(bindings.RELEASE_SNAPSHOTS).writePendingSignal({ scheduledFor, ownerToken: randomToken(), now });
+  await bindings.PUBLIC_DISCOVERY_QUEUE.send({ scheduledFor, type: 'agenda-refresh', version: 1 }, { contentType: 'json' });
 }

@@ -1,5 +1,5 @@
 import { applyD1Migrations, env } from 'cloudflare:test';
-import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
+import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter, R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
 import type { PublicDiscoveryVerifiedProfile } from '@tobirink/public-discovery';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { instrumentD1 } from './operational-metrics';
@@ -148,7 +148,31 @@ describe('local D1 cost baseline — no external requests', () => {
 
   it('measures both agenda lanes, unchanged collection, one-event changes and retention', async () => {
     const m = meter();
-    const adapter = new D1AgendaCollectionAdapter(m.database);
+    const seedRevision = 7171717171;
+    await env.PUBLIC_DB.prepare("INSERT INTO catalogue_revisions(revision, published_at) VALUES (?1, '2026-09-16T00:00:00.000Z')").bind(seedRevision).run();
+    const seeds = (['anilist', 'mangaupdates'] as const).flatMap((provider) => {
+      const count = provider === 'anilist' ? 220 : 359;
+      return Array.from({ length: count }, (_, index) => [
+        env.PUBLIC_DB.prepare('INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES (?1, ?2, ?3, ?4)')
+          .bind(`work_cost_${provider}_${index}`, provider === 'anilist' ? 'anime' : 'manga', `Cost ${provider} ${index}`, seedRevision),
+        env.PUBLIC_DB.prepare('INSERT INTO catalogue_external_references(provider, external_id, work_id) VALUES (?1, ?2, ?3)')
+          .bind(provider, String(index), `work_cost_${provider}_${index}`),
+      ]).flat();
+    });
+    for (let offset = 0; offset < seeds.length; offset += 100) await env.PUBLIC_DB.batch(seeds.slice(offset, offset + 100));
+    const r2Totals = { reads: 0, writes: 0 };
+    const countingBucket = {
+      async get(objectKey: string) { r2Totals.reads += 1; return env.RELEASE_SNAPSHOTS.get(objectKey); },
+      async put(objectKey: string, value: string, options: R2PutOptions) { r2Totals.writes += 1; return env.RELEASE_SNAPSHOTS.put(objectKey, value, options); },
+    };
+    const adapter = new D1AgendaCollectionAdapter(m.database, new R2AgendaOperationStore(countingBucket, 'cost-agenda-operations/v1'));
+    const r2Records: { scenario: string; reads: number; writes: number }[] = [];
+    const measureAgenda = async (scenario: string, cycle: number, changed: boolean) => {
+      const before = { ...r2Totals };
+      const receipt = await m.measure(scenario, () => collect(cycle, changed));
+      r2Records.push({ scenario, reads: r2Totals.reads - before.reads, writes: r2Totals.writes - before.writes });
+      return receipt;
+    };
     const collect = async (cycle: number, changed: boolean) => {
       const now = at(cycle * 7 * 1440);
       for (const provider of ['anilist', 'mangaupdates'] as const) {
@@ -172,16 +196,18 @@ describe('local D1 cost baseline — no external requests', () => {
       }
       return adapter.publishMergedGeneration(now);
     };
-    expect(await m.measure('agenda-first-579-13-pages', () => collect(0, false))).toMatchObject({ changed: true, count: 579 });
-    expect(await m.measure('agenda-identical-579-13-pages', () => collect(1, false))).toMatchObject({ changed: false, count: 579 });
+    expect(await measureAgenda('agenda-first-579-13-pages', 0, false)).toMatchObject({ changed: true, count: 579 });
+    expect(await measureAgenda('agenda-identical-579-13-pages', 1, false)).toMatchObject({ changed: false, count: 579 });
     for (let cycle = 2; cycle <= 4; cycle += 1) {
-      expect(await m.measure(`agenda-one-change-cycle-${cycle}`, () => collect(cycle, true))).toMatchObject({ changed: true, count: 579 });
+      expect(await measureAgenda(`agenda-one-change-cycle-${cycle}`, cycle, true)).toMatchObject({ changed: true, count: 579 });
     }
-    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_current_event').first()).toEqual({ count: 579 });
-    expect(m.records.find(({ scenario }) => scenario === 'agenda-identical-579-13-pages')?.rowsWritten).toBeGreaterThan(0);
+    expect(m.records.find(({ scenario }) => scenario === 'agenda-identical-579-13-pages')?.rowsWritten).toBe(0);
     const pages = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_agenda_page').first();
-    expect(pages).toEqual({ count: 13 });
-    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([1798, 70, 76, 76, 77]);
+    expect(pages).toEqual({ count: 0 });
+    expect(await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM catalogue_release_model WHERE work_id LIKE 'work_cost_%'").first()).toEqual({ count: 579 });
+    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([2895, 0, 5, 5, 5]);
+    expect(r2Records.map(({ reads, writes }) => [reads, writes])).toEqual([[786, 391], [425, 32], [425, 32], [425, 32], [425, 32]]);
+    console.info('r2-cost-baseline', JSON.stringify(r2Records));
     console.info('d1-cost-baseline-agenda-stock', JSON.stringify(pages));
     m.report();
   });

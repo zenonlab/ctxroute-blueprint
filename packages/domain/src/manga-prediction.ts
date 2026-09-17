@@ -2,7 +2,7 @@ export interface MangaReleaseObservation { readonly releasedOn: string; readonly
 export interface MangaReleasePrediction { readonly releasedOn: string; readonly confidence: 'estimated'; readonly basedOn: number; }
 export type ReleaseLifecycleStatus = 'FINISHED' | 'COMPLETED' | 'CANCELLED' | 'ONGOING' | 'RELEASING' | 'HIATUS' | 'UNKNOWN';
 export function predictNextMangaRelease(observations: readonly MangaReleaseObservation[], lifecycle: ReleaseLifecycleStatus = 'UNKNOWN'): MangaReleasePrediction | undefined {
-  if (lifecycle === 'FINISHED' || lifecycle === 'COMPLETED' || lifecycle === 'CANCELLED') return undefined;
+  if (lifecycle === 'FINISHED' || lifecycle === 'COMPLETED' || lifecycle === 'CANCELLED' || lifecycle === 'HIATUS') return undefined;
   const validObservations = observations.filter(({ chapter, releasedOn }) => Number.isFinite(chapter) && chapter >= 0 && /^\d{4}-\d{2}-\d{2}$/u.test(releasedOn) && new Date(`${releasedOn}T00:00:00.000Z`).toISOString().slice(0, 10) === releasedOn);
   const byChapter = new Map<number, MangaReleaseObservation>();
   for (const observation of validObservations) {
