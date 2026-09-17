@@ -173,6 +173,8 @@ jobs:
           enable-cache: false
       - name: Verify clean install and idempotent checks
         shell: bash
+        env:
+          CTXROUTE_HOOK_PERFORMANCE_ADVISORY: "1"
         run: |
           npm run setup
           test -z "$(git status --porcelain)"

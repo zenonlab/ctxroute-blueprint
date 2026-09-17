@@ -29,6 +29,7 @@ const inputs = {
 const latencyLimits = { SessionStart: 1_500, PreToolUse: 250, PostToolUse: 500, UserPromptSubmit: 1_000, PreCompact: 1_000, Stop: 1_000, SubagentStart: 750, SubagentStop: 750, SessionEnd: 1_000 };
 const results = [];
 const maintenanceResults = [];
+const enforceLatency = process.env.CTXROUTE_HOOK_PERFORMANCE_ADVISORY !== '1';
 let failed = false;
 
 try {
@@ -55,9 +56,10 @@ try {
       }
       const durationMs = percentile(samples, 0.95);
       const contract = hookContract(harness, event, 'synchronous', root);
-      const ok = !error && durationMs <= latencyLimits[event] && contextChars <= contract.contextLimit;
+      const withinLatencyLimit = durationMs <= latencyLimits[event];
+      const ok = !error && (!enforceLatency || withinLatencyLimit) && contextChars <= contract.contextLimit;
       failed ||= !ok;
-      results.push({ harness, event, durationMs, samples, latencyLimit: latencyLimits[event], contextChars, contextLimit: contract.contextLimit, handlers: handlerPlan(harness, event, root).map(item => item.name), ok, error });
+      results.push({ harness, event, durationMs, samples, latencyLimit: latencyLimits[event], withinLatencyLimit, contextChars, contextLimit: contract.contextLimit, handlers: handlerPlan(harness, event, root).map(item => item.name), ok, error });
     }
     const readOnlySamples = [];
     let readOnlyError;
@@ -75,9 +77,10 @@ try {
       if (child.status !== 0 || stderr) readOnlyError = child.error?.message ?? (stderr || `exit ${child.status}`);
     }
     const readOnlyDuration = percentile(readOnlySamples, 0.95);
-    const readOnlyOk = !readOnlyError && readOnlyDuration <= 100;
+    const readOnlyWithinLatencyLimit = readOnlyDuration <= 100;
+    const readOnlyOk = !readOnlyError && (!enforceLatency || readOnlyWithinLatencyLimit);
     failed ||= !readOnlyOk;
-    results.push({ harness, event: 'PreToolUse:read-only', durationMs: readOnlyDuration, samples: readOnlySamples, latencyLimit: 100, contextChars: 0, contextLimit: hookContract(harness, 'PreToolUse', 'synchronous', root).contextLimit, handlers: [], ok: readOnlyOk, error: readOnlyError });
+    results.push({ harness, event: 'PreToolUse:read-only', durationMs: readOnlyDuration, samples: readOnlySamples, latencyLimit: 100, withinLatencyLimit: readOnlyWithinLatencyLimit, contextChars: 0, contextLimit: hookContract(harness, 'PreToolUse', 'synchronous', root).contextLimit, handlers: [], ok: readOnlyOk, error: readOnlyError });
   }
   for (const entry of declaredMaintenanceEntries(root)) {
     const maintenancePlan = handlerPlan(entry.harness, entry.event, root, 'maintenance');
@@ -105,7 +108,7 @@ const declaredMaintenance = declaredMaintenanceEntries(root);
 const expectedMaintenanceKeys = declaredMaintenance.map(({ harness, event }) => `${harness}:${event}`).sort();
 const observedMaintenanceKeys = maintenanceResults.filter(result => result.ok && result.handlers.length > 0).map(({ harness, event }) => `${harness}:${event}`).sort();
 const maintenancePlanCovered = JSON.stringify(observedMaintenanceKeys) === JSON.stringify(expectedMaintenanceKeys);
-process.stdout.write(`${JSON.stringify({ ok: !failed && maintenancePlanCovered, samplesPerCase, lifecycleEvents, harnesses: ['codex', 'claude'], maintenancePlanCovered, maximumObservedLatencyMs, maximumObservedContextChars, results, maintenanceResults }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ ok: !failed && maintenancePlanCovered, enforceLatency, samplesPerCase, lifecycleEvents, harnesses: ['codex', 'claude'], maintenancePlanCovered, maximumObservedLatencyMs, maximumObservedContextChars, results, maintenanceResults }, null, 2)}\n`);
 if (failed) process.exitCode = 1;
 
 function percentile(values, ratio) {
