@@ -2,7 +2,10 @@ import { pathToFileURL } from 'node:url';
 import { reconcileManagedWorktrees } from '../../scripts/worktree-manager.mjs';
 
 export async function reconcileHook(root = process.cwd()) {
-  const { results } = await reconcileManagedWorktrees(root, { repair: false });
+  const inventory = await reconcileManagedWorktrees(root, { repair: false })
+    .catch(error => error.causeCode === 'STATE_MISSING' ? null : Promise.reject(error));
+  if (!inventory) return null;
+  const { results } = inventory;
   const actionable = results.filter(item => item.action === 'NEEDS_ATTENTION'
     || ['REGISTERED_PATH_MISSING', 'ORPHAN_REGISTERED_MISSING'].includes(item.classification));
   return actionable.length
