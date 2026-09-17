@@ -60,6 +60,20 @@ if (!paths.length) {
   process.exit(0);
 }
 
+// Template-mode decisions depend only on the declared starter boundary. Avoid
+// scanning Git and the ADR catalog when those results cannot affect the verdict.
+if (config.status === 'template') {
+  const projectPaths = paths.filter(path => !isStarterPath(path, config) && !isDocumentationPath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
+  if (projectPaths.length) {
+    block([
+      'Write blocked: the project is still in template mode.',
+      `Product files: ${projectPaths.join(', ')}`,
+      'Complete the brief, decisions, Archify architecture evidence, and quality strategy, then set the configuration to initialized before writing product code.',
+    ]);
+  }
+  process.exit(0);
+}
+
 const changePaths = [...new Set([...paths, ...gitChangedFiles()])];
 const invalidDecisionPaths = loadAdrs().filter(adr => adr.errors.length).map(adr => adr.file);
 const decisionStatus = decisionDiagnostics(changePaths);
@@ -87,18 +101,6 @@ if (mutationTool && contractPaths.length && !adrEvidence) {
 function requiresContractDecision(path, input) {
   if (!/(?:^|\/)package\.json$/u.test(path)) return true;
   return /["'](?:dependencies|devDependencies|optionalDependencies|peerDependencies|overrides|resolutions)["']\s*:/u.test(addedContent(input));
-}
-
-if (config.status === 'template') {
-  const projectPaths = paths.filter(path => !isStarterPath(path, config) && !isDocumentationPath(path, config) && !isTestPath(path, config) && !isGeneratedPath(path, config));
-  if (projectPaths.length) {
-    block([
-      'Write blocked: the project is still in template mode.',
-      `Product files: ${projectPaths.join(', ')}`,
-      'Complete the brief, decisions, Archify architecture evidence, and quality strategy, then set the configuration to initialized before writing product code.',
-    ]);
-  }
-  process.exit(0);
 }
 
 const codeOutsideDeclaredRoots = paths.filter(path => isCodePath(path, config) && !isSourcePath(path, config) && !isTestPath(path, config) && !isStarterPath(path, config) && !isGeneratedPath(path, config));
