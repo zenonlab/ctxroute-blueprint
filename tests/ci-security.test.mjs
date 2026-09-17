@@ -9,8 +9,12 @@ const read = path => readFileSync(join(root, path), 'utf8');
 
 test('validation matrix pins Python and uv and captures Archify visual evidence', () => {
   const workflow = read('.github/workflows/validate.yml');
+  assert.match(workflow, /name: Node 24 \/ \$\{\{ matrix\.os \}\}/u);
+  assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/u);
+  assert.match(workflow, /actions\/setup-node@820762786026740c76f36085b0efc47a31fe5020/u);
   assert.match(workflow, /actions\/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97/u);
-  assert.match(workflow, /astral-sh\/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78/u);
+  assert.match(workflow, /astral-sh\/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4/u);
+  assert.match(workflow, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/u);
   assert.match(workflow, /uv sync --project packages\/code-review-graph --frozen --python 3\.12/u);
   assert.match(workflow, /npm run archify:visual-check/u);
   assert.match(workflow, /crg-smoke\.json/u);
