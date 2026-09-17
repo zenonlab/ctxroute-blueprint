@@ -389,6 +389,18 @@ lectures de vérification n’ont déclenché ni appel fournisseur, ni message
 Queue, ni écriture D1/R2. L’observation native d’un cycle hebdomadaire complet
 reste nécessaire avant de certifier les budgets distants de collecte.
 
+La vue Archify
+[`durable-catalogue-cost-certification.architecture.json`](../architecture/src/durable-catalogue-cost-certification.architecture.json)
+sépare le runtime effectivement déployé, les budgets issus des fixtures et du
+canari, et la certification hebdomadaire encore ouverte. Son artefact livré
+porte le SHA-256
+`f91aa273af518009224984b0c7c877b53cd97e95e8707763654794f89bfe7f6a` ;
+la source porte le SHA-256
+`1bb19d4e8c46329ee9a488edb4f2d882a2fa7a557f93c73e828b6a9cdccf54b5`.
+La validation showcase passe 9 contrôles sur 9, sans erreur ni avertissement,
+et le contrôle visuel passe en thèmes clair et sombre à 1440×900 et 2048×1320
+sans débordement.
+
 ### Inventaire de nettoyage différé
 
 Aucun élément de cette liste n’est supprimé par le déploiement. Les quatre
@@ -471,9 +483,10 @@ différent, nombre variable d'alias/références, lots de cinquante clés, CPU,
 ETag/304/cache navigateur, cycle client complet, couverture de toutes les API,
 métriques distantes et observation sept jours.
 
-N/A pour cette étape : nouvelle architecture/ADR, car aucun module produit,
-contrat, flux, schéma ou dépendance n'est changé. Les nouvelles décisions
-structurelles sont explicitement reportées aux étapes approuvées correspondantes.
+La vue d’architecture de certification a été ajoutée sans changer de module
+produit, contrat, flux runtime, schéma ou dépendance. Aucun nouvel ADR n’est
+nécessaire : la vue matérialise les décisions et preuves déjà acceptées sans en
+introduire de nouvelle.
 Le test monofichier déclenche un avertissement Sensor de taille AST, sans erreur ;
 le périmètre approuvé est conservé, sans désactiver de règle.
 

@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Tobirink — catalogue durable et certification des coûts",
+    "quality_profile": "showcase",
+    "viewBox": [1180, 610],
+    "views": [
+      {
+        "id": "runtime",
+        "label": "Runtime déployé",
+        "focus": ["extension", "publicWorker", "publicD1", "operationsR2", "collectorQueue", "providerGateway", "providers"],
+        "note": "Le catalogue et les modèles courants restent dans D1 ; les baux, pages, snapshots et observations bornées vivent dans R2."
+      },
+      {
+        "id": "costEvidence",
+        "label": "Preuves de coûts",
+        "focus": ["publicWorker", "publicD1", "operationsR2", "collectorQueue", "nativeMetrics"],
+        "note": "Les compteurs D1, R2, Queue, Worker et fournisseur restent séparés ; la fenêtre distante hebdomadaire est encore en observation."
+      },
+      {
+        "id": "compatibility",
+        "label": "Compatibilité Agenda v3",
+        "focus": ["extension", "publicWorker", "operationsR2", "publicD1"],
+        "note": "v3 lit les snapshots R2 actifs et complète une lane absente depuis la projection D1 legacy pendant la transition."
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [70, 55],
+    "cols": 4,
+    "gapX": 105,
+    "gapY": 35,
+    "cellW": 175,
+    "cellH": 64
+  },
+  "components": [
+    {
+      "id": "extension",
+      "type": "frontend",
+      "label": "Extension locale",
+      "sublabel": "profils + Agenda projeté",
+      "tag": "adult masqué · unknown visible",
+      "row": 1,
+      "col": 0
+    },
+    {
+      "id": "weeklyCron",
+      "type": "cloud",
+      "label": "Cron hebdomadaire",
+      "sublabel": "dimanche 03:23 UTC",
+      "tag": "une session",
+      "row": 3,
+      "col": 0
+    },
+    {
+      "id": "publicWorker",
+      "type": "backend",
+      "label": "Worker public",
+      "sublabel": "v3 · modèles v4",
+      "tag": "déployé",
+      "row": 1,
+      "col": 1
+    },
+    {
+      "id": "collectorQueue",
+      "type": "messagebus",
+      "label": "Queue de collecte",
+      "sublabel": "signal opaque · reprise",
+      "tag": "au moins une fois",
+      "row": 3,
+      "col": 1
+    },
+    {
+      "id": "publicD1",
+      "type": "database",
+      "label": "D1 courant",
+      "sublabel": "fiche + modèle par œuvre",
+      "tag": "écriture si changement",
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "operationsR2",
+      "type": "database",
+      "label": "R2 opérationnel",
+      "sublabel": "baux · pages · snapshots",
+      "tag": "actif + 2 versions",
+      "row": 2,
+      "col": 2
+    },
+    {
+      "id": "providerGateway",
+      "type": "security",
+      "label": "Transport fournisseur",
+      "sublabel": "allowlist + enveloppe signée",
+      "tag": "aucune exploration relationnelle",
+      "row": 4,
+      "col": 2,
+      "size": [185, 72]
+    },
+    {
+      "id": "nativeMetrics",
+      "type": "cloud",
+      "label": "Métriques natives",
+      "sublabel": "D1 · R2 · Queue · Worker",
+      "tag": "sans payload privé",
+      "row": 0,
+      "col": 3
+    },
+    {
+      "id": "providers",
+      "type": "external",
+      "label": "Fournisseurs publics",
+      "sublabel": "AniList · MangaUpdates · autres",
+      "tag": "requêtes comptées",
+      "row": 4,
+      "col": 3,
+      "size": [175, 72]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Cloudflare — production",
+      "wraps": ["weeklyCron", "publicWorker", "collectorQueue", "publicD1", "operationsR2", "nativeMetrics"]
+    },
+    {
+      "kind": "security-group",
+      "label": "Sortie fournisseur contrôlée",
+      "wraps": ["providerGateway"]
+    }
+  ],
+  "connections": [
+    { "id": "extensionRead", "from": "extension", "to": "publicWorker", "label": "HTTPS v3 / v4", "variant": "emphasis" },
+    { "id": "cronSignal", "from": "weeklyCron", "to": "collectorQueue", "label": "agenda-refresh", "variant": "emphasis" },
+    { "id": "queueConsume", "from": "collectorQueue", "to": "publicWorker", "label": "claim + reprise" },
+    { "id": "currentState", "from": "publicWorker", "to": "publicD1", "label": "profil et modèle changés", "variant": "emphasis" },
+    { "id": "operationalState", "from": "publicWorker", "to": "operationsR2", "label": "ETag écrit · snapshots v3 lus", "variant": "security", "labelDx": 120 },
+    { "id": "providerRequest", "from": "publicWorker", "to": "providerGateway", "label": "requête bornée", "variant": "security" },
+    { "id": "providerFetch", "from": "providerGateway", "to": "providers", "label": "API autorisée", "variant": "security" },
+    { "id": "costCounters", "from": "publicWorker", "to": "nativeMetrics", "label": "D1 · R2 · Queue · Worker", "variant": "dashed", "labelDy": 11 }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Déployé et vérifié",
+      "items": [
+        "Migrations additives 0023 et 0024 ; aucune migration restante",
+        "v3, v4 et site public répondent 200",
+        "Consultation et projection Agenda sans écriture distante"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Budgets séparés",
+      "items": [
+        "Fixture locale : première publication 2 895 écritures D1 et 391 écritures R2",
+        "Fixture inchangée : 0 écriture D1 et 32 écritures R2",
+        "Lecture distante post-migration : 745 lignes lues et 0 écrite"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Certification encore ouverte",
+      "items": [
+        "Premier cycle hebdomadaire et observation de sept jours requis",
+        "Aucune suppression avant preuve des deux snapshots R2 actifs",
+        "Coûts futurs jamais déduits des seules fixtures"
+      ]
+    }
+  ]
+}

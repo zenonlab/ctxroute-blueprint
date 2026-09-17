@@ -2133,7 +2133,8 @@
             "Échantillon distant corrélé: HTTP 200, Worker bfd038ea, CPU 9 ms, wall 28 ms, providerRequests=0, d1RowsRead=64, d1RowsWritten=0; aucun identifiant ou payload conservé.",
             "Cible 0023/0024 déployée le 2026-09-17 avec sauvegarde vérifiée; lecture distante post-migration: 745 rows read, 0 written, changed_db=false, 5 fiches, 0 conflit, 740 événements legacy.",
             "Worker 2e2e534b sert /v3 et /v4 en HTTP 200; R2 reste à 56 objets/15.6 MB avant premier cycle hebdomadaire.",
-            "La certification native de collecte reste ouverte jusqu'au premier cycle hebdomadaire complet et à l'observation de sept jours; aucune mesure future n'est déclarée acquise."
+            "La certification native de collecte reste ouverte jusqu'au premier cycle hebdomadaire complet et à l'observation de sept jours; aucune mesure future n'est déclarée acquise.",
+            "La vue Archify durable-catalogue-cost-certification passe le profil showcase 9/9 et le contrôle visuel clair/sombre à 1440×900 et 2048×1320 sans débordement."
           ]
         }
       ]
