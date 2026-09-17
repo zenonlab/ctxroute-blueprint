@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { setImmediate as waitImmediate } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { isLatestMaintenanceRequest, shouldUpdate } from '../.codex/hooks/post-tool-crg.mjs';
 import { CRG_MCP_TOOLS, CRG_VERSION, MAX_OUTPUT_BYTES, crgInvocation, runCrgCommand, runCrgUpdate } from '../scripts/crg-runner.mjs';
@@ -63,10 +64,15 @@ test('PostToolUse triggers only one successful normal write', () => {
 test('PostToolUse maintenance coalesces an edit burst to its latest request', async () => {
   const projectRoot = await mkdtemp(join(tmpdir(), 'crg-maintenance-'));
   const stateDirectory = join(projectRoot, '.ctxroute/state');
-  const first = isLatestMaintenanceRequest({ root: projectRoot, stateDirectory, quietMs: 30, token: 'first' });
-  await new Promise(resolveWait => { setTimeout(resolveWait, 5); });
-  const second = isLatestMaintenanceRequest({ root: projectRoot, stateDirectory, quietMs: 30, token: 'second' });
+  const waits = [];
+  const waitForQuiet = () => new Promise(resolveWait => { waits.push(resolveWait); });
+  const first = isLatestMaintenanceRequest({ root: projectRoot, stateDirectory, token: 'first', waitForQuiet });
+  await waitUntil(() => waits.length === 1);
+  const second = isLatestMaintenanceRequest({ root: projectRoot, stateDirectory, token: 'second', waitForQuiet });
+  await waitUntil(() => waits.length === 2);
+  waits[0]();
   assert.equal(await first, false);
+  waits[1]();
   assert.equal(await second, true);
 });
 
@@ -79,3 +85,7 @@ test('embeddings remain absent by default and cloud egress requires explicit con
   assert.match(decision, /CRG_ACCEPT_CLOUD_EMBEDDINGS=1/u);
   assert.match(decision, /secrets and provider configuration are never\nversioned/u);
 });
+
+async function waitUntil(predicate) {
+  while (!predicate()) await waitImmediate();
+}
