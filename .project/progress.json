@@ -2500,7 +2500,7 @@
         {
           "id": "reproduce-budgets",
           "title": "Établir les budgets actuels reproductibles et les tailles réelles",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Ventiler admission, claim, publication, titres, index, compteurs, classification et reprises sur fixtures froides/chaudes.",
             "Mesurer les octets avec length(CAST(... AS BLOB)) et compter les copies de profils sans appeler de fournisseur.",
@@ -2520,7 +2520,11 @@
             "npm run validate:docs -- --all",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "Fixture locale: 2 copies VERIFIED identiques = 678 octets BLOB; après changement de compteur, 2 profils distincts = 696 octets; chaînes catalogue 15/59/6 octets.",
+            "Le test métrique prouve qu'un payload de 64 000 caractères avec rows_written=1 compte une écriture native, sans coefficient de taille.",
+            "Worker 105/105, tous les typechecks, validate:docs --all et git diff --check réussissent; aucun appel fournisseur ni mutation distante."
+          ]
         },
         {
           "id": "remove-relational-crawl",

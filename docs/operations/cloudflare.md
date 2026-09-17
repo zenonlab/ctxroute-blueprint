@@ -172,7 +172,7 @@ and deploying a forward fix. Restoring the pre-migration backup is a separate,
 destructive provider operation and requires exact approval.
 
 Outside the emergency shutdown, Agenda is scheduled by Wrangler at
-`23 3 * * 0` (UTC). During the shutdown, `triggers.crons` remains empty.
+`23 3 * * SUN` (UTC). During the shutdown, `triggers.crons` remains empty.
 Cloudflare cron changes can take up to fifteen minutes to propagate. Between
 weekly triggers, no Agenda provider request is expected. The single Queue
 message opens two independent D1 lanes; each lane owns one fifteen-minute lease,
@@ -271,6 +271,112 @@ for `deduplicated`, at most one accepted rehydration per work and week, and at
 most eight retries. Compare daily `d1RowsWritten` with the native Cloudflare D1
 usage view before investigating a regression; never inspect `request_json` or
 `result_json` for cost analysis.
+
+### Local cost certification
+
+The Miniflare D1 integration suite freezes two volume references after all
+migrations are applied. Fifty simultaneous admissions for the same unknown
+work converge to one request row and five aggregate `rows_written`; the other
+49 admissions reuse it. One HTTP lookup containing fifty absent keys reports
+357 `rows_read` and zero `rows_written`. Provider counters also count attempted
+AniList and MangaUpdates calls when their responses are 429 or 5xx, while the
+collector error exposed to logs remains a bounded provider/status code.
+
+These are deterministic local regression budgets, not production usage. A
+native Cloudflare cycle and the D1 dashboard reconciliation remain required
+after controlled service resumption before using them for paid-plan sizing.
+
+The baseline also records storage bytes with SQLite
+`length(CAST(value AS BLOB))`. Its synthetic same-work alias creates two
+identical VERIFIED profile copies totalling 678 bytes. A later counter change
+leaves two distinct copies totalling 696 bytes, while the relational preferred
+title, titles and reference strings total 15, 59 and
+6 bytes. These values expose current duplication; they are not database-file
+size, index bytes or billable writes. The metrics wrapper trusts only native
+`D1Result.meta`: a 64,000-character returned payload with `rows_written=1`
+still counts as one write.
+
+### Remote measurement checkpoint — 2026-09-17
+
+At `2026-09-17T10:12:08Z`, `wrangler d1 info PUBLIC_DB --json` reported a
+rolling 24-hour window of 23,567 rows read, 5,753 rows written, 345 read
+queries, 720 write queries and 1,257,472 bytes of database storage. The
+deployed Worker remained version `bfd038ea-4596-49aa-9add-7de77af5056c` at
+100%, with no pending D1 migration and one producer plus one consumer attached
+to the primary Queue.
+
+A controlled one-key MISS lookup observed through `wrangler tail` completed
+with HTTP 200, 9 ms CPU time and 28 ms wall time. Its bounded `worker.cost`
+event reported 64 D1 rows read, zero D1 rows written, zero provider requests
+and no accepted result. No request key or response payload is retained in this
+runbook.
+
+Two controlled MISS lookups occurred between the first native snapshot and a
+second snapshot at `2026-09-17T10:14:58Z`. The rolling native values then read
+23,652 rows read, 5,753 rows written, 348 read queries and 720 write queries:
+an observed delta of 85 rows read, zero rows written and three read queries.
+This is not an exact per-request reconciliation. The native counters are a
+moving 24-hour aggregate with ingestion delay, while the application event is
+per invocation and only one of the two lookups was tailed. Certification must
+therefore compare complete UTC intervals after analytics have settled; it must
+not force equality between an instantaneous tail event and two rolling
+snapshots.
+
+`wrangler d1 insights` confirms retained query analytics rather than only live
+tail output. The seven-day view still includes the retired materialized Agenda
+path, including 166,476 rows written by per-event generation inserts. The
+one-day view still contains pre-cutover Agenda cleanup, including 13,896 rows
+written by one retained-generation deletion shape. These historical queries
+must be separated from the corrected version's post-deployment interval before
+the seven-day economic result is certified.
+
+The bounded post-cutover query at `2026-09-17T10:16:28Z`, using
+`wrangler d1 insights PUBLIC_DB --time-period 10h`, isolates the corrected
+runtime from approximately 00:16 UTC. Across 25 query shapes and 32 executions,
+it reports 4,753 rows read, **zero rows written** and 70.3341 ms cumulative D1
+query time. This reconciles the apparent write activity in the wider views,
+but ten hours with no scheduled weekly cycle is only an early canary. It does
+not certify the seven-day interval or an Agenda collection.
+
+### Final seven-day reconciliation procedure
+
+The certification interval is fixed at
+`2026-09-17T00:29:00Z..2026-09-24T00:29:00Z`. Do not replace it with a later
+rolling seven-day window. Cloudflare retains D1 analytics for 31 days, so query
+that exact UTC interval through the D1 Metrics dashboard or GraphQL Analytics
+API. Use `wrangler d1 insights PUBLIC_DB --time-period 7d --limit 1000 --json`
+only as a corroborating query when run at the interval boundary; its rolling
+window is not an exact substitute when run later.
+
+For the same fixed interval:
+
+1. export only retained Workers Logs whose parsed message has
+   `type=worker.cost`, then group by UTC date, `task`, `provider` and `result`;
+2. sum `d1RowsRead`, `d1RowsWritten`, `providerRequests`, `pagesRequested`,
+   `acceptedResults`, `retries` and `durationMs`, and count Agenda sessions;
+3. obtain native D1 `rowsRead`, `rowsWritten`, read/write query counts,
+   response bytes, query time and maximum storage bytes for the database;
+4. list D1 insights by total writes and reads, retaining the normalized query
+   shape, execution count and totals but no bound parameters or result data;
+5. record Queue delivered/retried/failed counts, Worker invocations/CPU, R2
+   Class A/Class B operations and provider request counts as separate units;
+6. verify that version `bfd038ea-4596-49aa-9add-7de77af5056c` served the
+   interval, the cron remained `23 3 * * SUN`, and the primary Queue retained
+   exactly one producer and one consumer.
+
+Native D1 totals cover every database caller. `worker.cost` covers instrumented
+Discovery HTTP and Queue processing, but not ordinary Catalogue or Agenda
+public reads, operator inspections, migrations or direct D1 diagnostics.
+Therefore reconcile the difference with D1 query shapes and invocation counts;
+do not require the two aggregates to be identical. Every native write absent
+from `worker.cost` needs a named query shape and an authorized cause.
+
+The interval passes only when it contains the Sunday Agenda attempt, no
+unexpected provider call occurs between Agenda sessions, no retry loop exceeds
+the configured bound, no unexplained D1 write remains, and the previous valid
+Agenda remains readable after any failed lane. Record zero-change weeks as a
+real measured outcome. Keep the step open if logs are missing, analytics have
+not settled or the exact interval cannot be reconstructed.
 
 `ack-success` confirms a completed message. `ack-invalid` confirms that an
 untrusted malformed signal was discarded. `retry` remains recoverable.

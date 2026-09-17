@@ -66,6 +66,13 @@ describe('local D1 cost baseline — no external requests', () => {
     });
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_revisions').first()).toEqual(revisionCountBeforeAlias);
     expect(await env.PUBLIC_DB.prepare('SELECT revision FROM catalogue_works WHERE work_id = ?1').bind(profile.workId).first()).toEqual(workRevisionBeforeAlias);
+    const aliasStorage = await env.PUBLIC_DB.prepare(`SELECT
+      COUNT(*) AS profileCopies,
+      COUNT(DISTINCT result_json) AS distinctProfiles,
+      SUM(length(CAST(result_json AS BLOB))) AS profileBytes
+      FROM public_discovery_requests_v3
+      WHERE state = 'VERIFIED' AND json_extract(result_json, '$.profile.workId') = ?1`).bind(profile.workId).first();
+    expect(aliasStorage).toEqual({ profileBytes: expect.any(Number), profileCopies: 2, distinctProfiles: 1 });
     for (const [label, minute, selected] of [
       ['refresh-identical', 8 * 1440, profile],
       ['refresh-changed', 16 * 1440, { ...profile, candidate: { ...profile.candidate, episodeCount: 24 } }],
@@ -87,7 +94,17 @@ describe('local D1 cost baseline — no external requests', () => {
       (SELECT COUNT(*) FROM catalogue_canonical_titles_v1 WHERE work_id = ?1) AS canonical,
       (SELECT COUNT(*) FROM catalogue_external_references WHERE work_id = ?1) AS refs`).bind(profile.workId).first();
     expect(stock).toEqual({ works: 1, titles: 4, canonical: 4, refs: 1 });
+    const byteStock = await env.PUBLIC_DB.prepare(`SELECT
+      (SELECT TOTAL(length(CAST(preferred_title AS BLOB))) FROM catalogue_works WHERE work_id = ?1) AS workBytes,
+      (SELECT TOTAL(length(CAST(title AS BLOB))) FROM catalogue_titles WHERE work_id = ?1) AS titleBytes,
+      (SELECT TOTAL(length(CAST(external_id AS BLOB))) FROM catalogue_external_references WHERE work_id = ?1) AS referenceBytes,
+      (SELECT COUNT(*) FROM public_discovery_requests_v3 WHERE state = 'VERIFIED' AND json_extract(result_json, '$.profile.workId') = ?1) AS profileCopies,
+      (SELECT COUNT(DISTINCT result_json) FROM public_discovery_requests_v3 WHERE state = 'VERIFIED' AND json_extract(result_json, '$.profile.workId') = ?1) AS distinctProfiles,
+      (SELECT TOTAL(length(CAST(result_json AS BLOB))) FROM public_discovery_requests_v3 WHERE state = 'VERIFIED' AND json_extract(result_json, '$.profile.workId') = ?1) AS profileBytes`).bind(profile.workId).first();
+    expect(byteStock).toMatchObject({ distinctProfiles: 2, profileCopies: 2 });
+    for (const value of Object.values(byteStock ?? {})) expect(value).toEqual(expect.any(Number));
     expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([5, 4, 0, 4, 42, 0, 0, 0, 19, 12, 12]);
+    console.info('d1-cost-baseline-storage-bytes', JSON.stringify({ afterAlias: aliasStorage, afterCounterChange: byteStock }));
     m.report();
   });
 

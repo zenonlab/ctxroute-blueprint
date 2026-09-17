@@ -141,6 +141,22 @@ révisions catalogue reste inchangé. La fixture ne prétend pas reproduire tout
 les variantes du parseur de favoris.
 Le test de lookup avec une clé ne mesure pas un lot de cinquante clés.
 
+### Octets et copies de profils
+
+La fixture mesure les chaînes persistées avec
+`length(CAST(colonne AS BLOB))`, jamais avec `length(TEXT)`. Après publication
+d'une deuxième clé vers la même œuvre, les deux lignes VERIFIED contiennent
+deux copies identiques du profil : 2 copies, 1 valeur distincte et 678 octets
+JSON cumulés. Après modification du compteur d'épisodes, la clé rafraîchie et
+l'alias ancien portent 2 profils distincts pour 696 octets cumulés. Le
+catalogue relationnel correspondant contient
+15 octets de titre préféré, 59 octets de titres et 6 octets de référence.
+
+Ce résultat prouve la duplication actuelle dans `result_json`; il ne mesure ni
+la taille des pages SQLite, ni les octets d'index, ni une facturation distante.
+La future fiche canonique doit ramener le profil courant à une seule copie sans
+effacer les clés de résolution.
+
 ### Échecs et relations
 
 | Scénario | Lignes lues | Écritures |
@@ -301,20 +317,19 @@ d'écritures au-delà de l'inclus, plus la base Workers de 5 USD et tous les aut
 postes. Une petite charge sous l'inclus ne produit aucun supplément d'écritures
 D1, mais ne garantit pas une facture totale de 5 USD.
 
-R2 ne remplace pas directement les recherches relationnelles et les états D1.
-Il peut servir les objets et, après benchmark, des snapshots partitionnés
-d'Agenda. Il n'est pas nécessaire de charger un catalogue JSON entier à chaque
-requête : l'ancienne affirmation d'une impossibilité absolue était excessive.
-Cette option constitue une autre conception, pas une correction automatique.
+La cible conserve les données publiques courantes et filtrables dans D1, mais
+déplace les demandes temporaires, leases, checkpoints, reprises et observations
+bornées dans R2. Ce choix architectural doit être benchmarké en opérations A/B
+et octets; il ne transforme aucune écriture en opération gratuite.
 
 R2 Standard a une franchise mensuelle de 10 Go-mois, 1 million d'opérations A
 et 10 millions B, avec tarification propre au-delà.
 [Source officielle R2](https://developers.cloudflare.com/r2/pricing/).
 Aucun abonnement, déplacement de données ou coût R2 du compte n'a été validé.
 
-Décision : aucune obligation de migration R2 démontrée ; ne pas acheter un
-forfait pour masquer les réécritures. Choisir Free/Paid après mesure distante
-des pics et de tous les postes, avec une marge explicitement acceptée.
+Décision : implémenter d'abord la cible R2/D1, reproduire les mêmes fixtures,
+puis choisir Free/Paid après mesure distante des pics et de tous les postes,
+avec une marge explicitement acceptée.
 
 ## Audit des objectifs et parcours A à Z
 

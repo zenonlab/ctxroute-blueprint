@@ -22,11 +22,28 @@ describe('operational metrics', () => {
   });
 
   it('counts real provider HTTP requests by bounded provider name', async () => {
-    const upstream = vi.fn(async () => new Response('{}'));
+    const upstream = vi.fn(async (input: string) => new Response('{}', {
+      status: input.includes('anilist') ? 429 : input.includes('mangaupdates') ? 503 : 200,
+    }));
     const metrics = instrumentProviderFetch(upstream);
-    await metrics.fetch('https://graphql.anilist.co', {});
-    await metrics.fetch('https://api.mangaupdates.com/v1/releases/search', {});
-    await metrics.fetch('https://tobirink.com/v3/releases', {});
+    expect((await metrics.fetch('https://graphql.anilist.co', {})).status).toBe(429);
+    expect((await metrics.fetch('https://api.mangaupdates.com/v1/releases/search', {})).status).toBe(503);
+    expect((await metrics.fetch('https://tobirink.com/v3/releases', {})).status).toBe(200);
     expect(metrics.snapshot()).toEqual({ anilist: 1, kitsu: 0, mangadex: 0, mangaupdates: 1 });
+    expect(Object.keys(metrics.snapshot())).toEqual(['anilist', 'kitsu', 'mangadex', 'mangaupdates']);
+  });
+
+  it('uses native row metadata instead of multiplying writes by payload size', async () => {
+    const statement = {
+      all: vi.fn(), bind: vi.fn(), first: vi.fn(), raw: vi.fn(),
+      run: vi.fn(async () => ({ meta: { rows_read: 0, rows_written: 1 }, results: [{ payload: 'x'.repeat(64_000) }], success: true })),
+    };
+    statement.bind.mockReturnValue(statement);
+    const database: D1Database = Object.assign(Object.create(null), {
+      batch: vi.fn(), dump: vi.fn(), exec: vi.fn(), prepare: vi.fn(() => statement), withSession: vi.fn(),
+    });
+    const metrics = instrumentD1(database);
+    await metrics.database.prepare('INSERT synthetic payload').run();
+    expect(metrics.snapshot()).toEqual({ rowsRead: 0, rowsWritten: 1 });
   });
 });
