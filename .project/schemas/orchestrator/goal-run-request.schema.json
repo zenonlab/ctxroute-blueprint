@@ -1,18 +1,9 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ctxroute.dev/schemas/orchestrator/goal-run-request.schema.json",
-  "type": "object",
-  "required": ["goal_id", "title", "objective", "acceptance_criteria", "suggested_paths", "expected_revision"],
-  "properties": {
-    "goal_id": { "$ref": "common.schema.json#/$defs/identifier" },
-    "title": { "$ref": "common.schema.json#/$defs/text" },
-    "objective": { "$ref": "common.schema.json#/$defs/text" },
-    "acceptance_criteria": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/text" } },
-    "suggested_paths": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/relativePath" } },
-    "expected_revision": { "type": "integer", "minimum": 0 },
-    "importance": { "enum": ["low", "normal", "high", "critical"] },
-    "change_kind": { "enum": ["routine", "feature", "bugfix", "security", "migration", "incident", "audit"] },
-    "consumption": { "$ref": "consumption-policy.schema.json" }
-  },
-  "unevaluatedProperties": false
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://ctxroute.dev/schemas/orchestrator/goal-run-request.schema.json",
+  "type": "object", "required": ["goal_id", "title"], "properties": {
+    "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "title": { "$ref": "common.schema.json#/$defs/text" },
+    "requested_mode": { "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT"] },
+    "workflow": { "enum": ["STANDARD", "RESEARCH", "AUDIT", "SECURITY", "MIGRATION", "INCIDENT", "EXPERIMENT", "RECOVERY"] },
+    "capabilities": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+  }, "unevaluatedProperties": false
 }

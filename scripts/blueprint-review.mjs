@@ -12,16 +12,10 @@ export const REQUIRED_SKILL_RUNTIME = Object.freeze([
   'scripts/verify-blueprint-skills.mjs',
   '.agents/skills/blueprint-audit/SKILL.md',
   '.agents/skills/blueprint-audit/blueprint.json',
-  '.agents/skills/goal-auditor/SKILL.md',
-  '.agents/skills/goal-auditor/blueprint.json',
-  '.agents/skills/goal-planner/SKILL.md',
-  '.agents/skills/goal-planner/blueprint.json',
   '.agents/skills/session-auditor/SKILL.md',
   '.agents/skills/session-auditor/blueprint.json',
   '.agents/skills/skill-creator/SKILL.md',
   '.agents/skills/skill-creator/blueprint.json',
-  'scripts/orchestrator-goal.mjs',
-  'scripts/orchestrator-worker.mjs',
 ]);
 
 export function reviewBlueprint(root = process.cwd()) {

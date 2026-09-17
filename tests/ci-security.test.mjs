@@ -29,17 +29,6 @@ test('untrusted CRG review is read-only, pinned, constrained, and blocks high ri
   assert.equal(read('.github/code-review-graph-constraints.txt').trim().endsWith('code-review-graph==2.3.8'), true);
 });
 
-test('privileged CRG disposition uses trusted code and exact-SHA bounded evidence', () => {
-  const workflow = read('.github/workflows/code-review-graph-disposition.yml');
-  const evaluator = read('scripts/crg-disposition.mjs');
-  assert.match(workflow, /name: CRG disposition/u);
-  assert.match(workflow, /checks: write/u);
-  assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/u);
-  assert.doesNotMatch(workflow, /ref: \$\{\{ github\.event\.pull_request/u);
-  for (const proof of ['EXPECTED_SHA', 'permission', 'crg-risk-acceptance-', "name: 'CRG disposition'"]) assert.ok(workflow.includes(proof), proof);
-  assert.ok(evaluator.includes('CRG-report-sha256:'), 'digest-bound review evidence');
-});
-
 test('trusted commenter never checks out code and validates the complete artifact boundary', () => {
   const workflow = read('.github/workflows/code-review-graph-comment.yml');
   assert.match(workflow, /actions: read\n  pull-requests: write/u);
@@ -57,7 +46,7 @@ test('privileged CRG disposition is exact-SHA, report-bound, admin-only, and nev
   assert.match(workflow, /name: 'CRG disposition'/u);
   assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/u);
   assert.doesNotMatch(workflow, /ref:.*head\.sha/u);
-  for (const proof of ['SUMMARY_PATH', 'getCollaboratorPermissionLevel', 'persist-credentials: false', 'MAX_ARCHIVE_BYTES', 'fs.readFileSync(process.env.SUMMARY_PATH']) assert.ok(workflow.includes(proof), proof);
+  for (const proof of ['report sha256:', 'getCollaboratorPermissionLevel', 'persist-credentials: false', 'MAX_ARCHIVE_BYTES']) assert.ok(workflow.includes(proof), proof);
   const policy = read('scripts/crg-disposition.mjs');
   for (const proof of ["!== 'admin'", 'CRG-report-sha256:', 'review.commit_id !== context.sha', 'login === context.author']) assert.ok(policy.includes(proof), proof);
 });

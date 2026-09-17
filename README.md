@@ -10,12 +10,12 @@
 [![code-review-graph v2.3.8](https://img.shields.io/badge/context-code--review--graph_v2.3.8-10b981)](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8)
 [![Archify v2.16.0](https://img.shields.io/badge/architecture-Archify_v2.16.0-06b6d4)](https://github.com/tt-a1i/archify/releases/tag/v2.16.0)
 [![tree-sitter Sensor](https://img.shields.io/badge/security-tree--sitter_Sensor-ef4444)](https://tree-sitter.github.io/tree-sitter/)
-[![Codex + Claude + Gemini](https://img.shields.io/badge/agents-Codex_%2B_Claude_%2B_Gemini-111827)](AGENTS.md)
+[![Codex + Claude](https://img.shields.io/badge/agents-Codex_%2B_Claude-111827)](AGENTS.md)
 [![Linux, macOS, Windows](https://img.shields.io/badge/CI-Linux_%7C_macOS_%7C_Windows-2563eb)](.github/workflows/validate.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-An architecture-first GitHub template for building software with Codex,
-Claude, or Gemini while keeping decisions, context, diagrams, checks, and review evidence
+An architecture-first GitHub template for building software with Codex or
+Claude while keeping decisions, context, diagrams, checks, and review evidence
 inside the repository.
 
 The generated product stays stack-neutral: the blueprint does not impose a
@@ -33,7 +33,7 @@ deliberately and verify the result.
 
 | Capability | What it provides |
 | --- | --- |
-| Agent governance | One repository doctrine for Codex, Claude, and Gemini workers, enforced by project-local lifecycle and Git hooks. |
+| Agent governance | One repository doctrine for Codex and Claude, enforced by project-local lifecycle and Git hooks. |
 | Relevant context | CTXRoute injects only the guidance needed for the current action and reinjects bounded context after compaction. |
 | Universal execution | `SWARM_ON` delegates minimal missions through the orchestrator; `SWARM_OFF` executes directly without tickets or worktrees. |
 | Code intelligence | `npm run setup` installs the official [Code Review Graph](https://github.com/tirth8205/code-review-graph) Python package at [`code-review-graph==2.3.8`](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8) for bounded MCP context, impact analysis, and fork-safe PR risk review. |
@@ -53,10 +53,8 @@ Python 3.12 is the reference runtime for official code-review-graph.
    npm run setup
    ```
 
-3. In Codex, trust the exact generated workspace, then open `/hooks` and
-   approve the seven workspace definitions. Until both steps are complete,
-   Codex deliberately ignores local hooks. Claude reads the tracked
-   `.claude/settings.json` configuration directly.
+3. In Codex, open `/hooks` and approve the six workspace definitions. Claude
+   reads the tracked `.claude/settings.json` configuration directly.
 4. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
    [`CLAUDE.md`](CLAUDE.md), then initialize the project from your requirements.
 5. Review the generated [project brief](docs/00-project-brief.md),
@@ -105,9 +103,6 @@ without a ticket, worktree, or MCP call; skills remain unchanged in both modes.
 
 ```sh
 npm run orchestrator:read
-npm run orchestrator:models
-npm run orchestrator:explain-route -- route.json
-npm run orchestrator:usage -- usage.json
 npm run orchestrator:cli -- mutate transaction.json
 npm run orchestrator:cli -- prepare-mission transaction.json
 npm run orchestrator:cli -- submit-report transaction.json
@@ -139,7 +134,6 @@ servers.
 npm run mcp:validate
 npm run mcp:smoke
 npm run crg:smoke
-npm run crg:health
 ```
 
 CRG embeddings are disabled by default. Local embeddings require an explicit
@@ -156,13 +150,11 @@ and Claude-compatible tooling without automatic per-tool injection.
 
 The lifecycle covers `SessionStart`, `PreToolUse`, `PostToolUse`,
 `UserPromptSubmit`, `PreCompact`, and `Stop`. Session start injects only an
-explicit worker mission. `PostToolUse` runs the blocking Sensor, opportunistic
-problem memory, and the local documentation audit. CRG maintenance is explicit
-or runs through a separate asynchronous lifecycle lane after successful editor
-writes. `npm run crg:health` confirms whether MCP context matches `HEAD` and
-names `npm run crg:update` when remediation is required. `PreCompact` and Stop
-clean CTXRoute session state; Stop is fail-open and never schedules
-continuation.
+explicit worker `MissionView` and durable execution binding. Synchronous
+`PostToolUse` runs bounded Sensor and documentation audit handlers; problem
+observation and coalesced CRG updates use the declared host-async maintenance
+lane. Archify preview remains manual. `PreCompact` and Stop clean CTXRoute
+session state; Stop is fail-open and never schedules continuation.
 
 Keep only the project-local lifecycle definitions after approval. Legacy global
 CTXRoute hooks would run in addition to them, duplicating context and process

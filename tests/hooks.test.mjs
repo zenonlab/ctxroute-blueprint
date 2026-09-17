@@ -6,34 +6,32 @@ import { get as requestLoopback } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { actionableStderr, applicableHandlers, dispatch, executeHandler, handlerPlan, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
-import { routingContext } from '../.codex/hooks/mission-context.mjs';
+import { actionableStderr, applicableHandlers, dispatch, dispatchLifecycle, handlerPlan, isBlocking, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
 import { stopReview } from '../.codex/hooks/stop-review.mjs';
-import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
+import { inspectGlobalCtxrouteHooks, inspectHookConfiguration, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
 import { runStep } from '../.githooks/setup.mjs';
-import { CODE_CONTEXT_POLICY } from '../scripts/code-context-policy.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-test('Codex and Claude expose one synchronous dispatcher plus explicit PostToolUse maintenance', () => {
+test('Codex and Claude expose the same six events and explicit hook lanes', () => {
   for (const [file, harness] of [['.codex/hooks.json', 'codex'], ['.claude/settings.json', 'claude']]) {
     const config = JSON.parse(readFileSync(join(root, file), 'utf8'));
     assert.deepEqual(Object.keys(config.hooks).sort(), [...lifecycleEvents].sort());
     for (const event of lifecycleEvents) {
       const handlers = config.hooks[event].flatMap(block => block.hooks ?? []);
-      assert.equal(handlers.length, event === 'PostToolUse' ? 2 : 1, `${file} ${event}`);
+      const expectedCount = ['PostToolUse', 'UserPromptSubmit'].includes(event) ? 2 : 1;
+      assert.equal(handlers.length, expectedCount, `${file} ${event}`);
       assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
       assert.ok(handlers[0].timeout > 0, `${file} ${event} timeout`);
       assert.equal('statusMessage' in handlers[0], false, `${file} ${event} should remain quiet`);
-      if (harness === 'codex' && event !== 'Stop') assert.equal(handlers[0].additionalContextLimit, ['SessionStart', 'PreCompact'].includes(event) ? 1600 : 1200, `${file} ${event} context limit`);
-      if (event === 'PostToolUse') {
-        assert.equal(handlers[1].command, `node ./.codex/hooks/lifecycle.mjs ${harness} PostToolUse maintenance`);
-        assert.equal(handlers[1].async, true);
-        assert.ok(handlers[1].timeout > 0, `${file} maintenance timeout`);
-        assert.equal(config.hooks.PostToolUse[1].matcher, 'apply_patch|Edit|Write');
+      if (harness === 'codex') assert.equal(handlers[0].additionalContextLimit, 1200, `${file} ${event} context limit`);
+      for (const maintenance of handlers.slice(1)) {
+        assert.equal(maintenance.async, true, `${file} ${event} maintenance async`);
+        assert.equal(maintenance.command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event} maintenance`);
       }
     }
+    assert.deepEqual(Object.keys(config.hookLanes).sort(), ['maintenance', 'manual', 'synchronous']);
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
   }
 });
@@ -90,11 +88,11 @@ test('architecture evidence rejects unrelated documentation', () => {
 test('the lifecycle dispatcher declares every event and the required sequence', () => {
   const expected = {
     SessionStart: ['worktree-reconcile.mjs', 'mission-context.mjs'],
-    PreToolUse: ['pre-tool-goal.mjs', 'pre-tool-architecture.mjs'],
-    PostToolUse: ['post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs'],
-    UserPromptSubmit: ['goal-routing.mjs', 'problem-memory.mjs'],
-    PreCompact: ['ctxroute-reset.js', 'mission-context.mjs'],
-    Stop: ['worker-restitution.mjs', 'ctxroute-reset.js', 'stop-review.mjs'],
+    PreToolUse: ['pre-tool-architecture.mjs'],
+    PostToolUse: ['post-tool-sensor.mjs', 'post-tool-audit.mjs'],
+    UserPromptSubmit: [],
+    PreCompact: ['ctxroute-reset.mjs'],
+    Stop: ['worker-restitution.mjs', 'ctxroute-reset.mjs', 'stop-review.mjs'],
   };
   for (const event of lifecycleEvents) {
     assert.deepEqual(handlerPlan('codex', event, root).map(handler => handler.name), expected[event]);
@@ -108,22 +106,10 @@ test('the lifecycle dispatcher declares every event and the required sequence', 
     });
     assert.deepEqual(called, expected[event], `${event} simulation`);
   }
-  assert.equal(handlerPlan('claude', 'PreToolUse', root).length, 2);
+  assert.equal(handlerPlan('claude', 'PreToolUse', root).length, 1);
+  assert.deepEqual(handlerPlan('codex', 'PostToolUse', root, 'maintenance').map(handler => handler.name), ['problem-memory.mjs', 'post-tool-crg.mjs']);
+  assert.deepEqual(handlerPlan('codex', 'PostToolUse', root, 'manual').map(handler => handler.name), ['archify-preview.mjs']);
   assert.equal(handlerPlan('codex', 'PostToolUse', root).some(handler => /doc-inject|session-inject/u.test(handler.name)), false);
-  for (const harness of ['codex', 'claude']) {
-    assert.deepEqual(handlerPlan(harness, 'PostToolUse', root, 'maintenance').map(handler => handler.name), ['post-tool-crg.mjs']);
-    assert.deepEqual(handlerPlan(harness, 'PreToolUse', root, 'maintenance'), []);
-  }
-});
-
-test('the maintenance lane is dispatched independently from synchronous context', () => {
-  const synchronous = [];
-  const maintenance = [];
-  const input = JSON.stringify({ tool_name: 'Edit', tool_response: {} });
-  dispatch({ harness: 'codex', event: 'PostToolUse', input, root, execute(handler) { synchronous.push(handler.name); return { outputs: [] }; } });
-  dispatch({ harness: 'codex', event: 'PostToolUse', lane: 'maintenance', input, root, execute(handler) { maintenance.push(handler.name); return { outputs: [] }; } });
-  assert.deepEqual(synchronous, ['post-tool-sensor.mjs', 'problem-memory.mjs', 'post-tool-audit.mjs']);
-  assert.deepEqual(maintenance, ['post-tool-crg.mjs']);
 });
 
 test('the lifecycle dispatcher executes sequentially and merges non-blocking context', () => {
@@ -138,47 +124,8 @@ test('the lifecycle dispatcher executes sequentially and merges non-blocking con
       return { outputs: [{ hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: handler.name } }] };
     },
   });
-  assert.deepEqual(called, ['pre-tool-goal.mjs', 'pre-tool-architecture.mjs']);
-  assert.equal(result.hookSpecificOutput.additionalContext, 'pre-tool-goal.mjs\n\npre-tool-architecture.mjs');
-});
-
-test('SessionStart retains the canonical file routing and hook timing', () => {
-  const output = routingContext(root);
-  const context = output.hookSpecificOutput?.additionalContext ?? '';
-  assert.match(context, /source: packages\/, scripts\//u);
-  assert.match(context, /architecture: docs\/architecture\/src\/blueprint\.architecture\.json/u);
-  assert.match(context, /Declare intended files before mutation/u);
-  assert.match(context, /PreToolUse handles prerequisites, PostToolUse audits/u);
-  assert.match(context, /use the code-review-graph MCP before native search/u);
-  assert.match(context, /start with get_minimal_context_tool/u);
-  assert.match(context, /_graph\.head_matches_build is true/u);
-  const merged = mergeOutputs('SessionStart', [output], [], 1600);
-  assert.doesNotMatch(merged.hookSpecificOutput.additionalContext, /contexte tronqué/u);
-  assert.match(merged.hookSpecificOutput.additionalContext, /state any native-tool fallback/u);
-});
-
-test('AGENTS keeps CRG ahead of native tools for relational code context', () => {
-  const instructions = readFileSync(join(root, 'AGENTS.md'), 'utf8');
-  assert.match(instructions, /use the code-review-graph MCP before native search/u);
-  assert.match(instructions, /Start with `get_minimal_context_tool`/u);
-  assert.match(instructions, /Use `rg` and direct file reads for exact-text lookup/u);
-  assert.match(instructions, /state the native-tool fallback/u);
-});
-
-test('the shared code-context policy is complete and bounded', () => {
-  const policy = CODE_CONTEXT_POLICY;
-  assert.match(policy, /code-review-graph MCP before native search/u);
-  assert.match(policy, /get_minimal_context_tool/u);
-  assert.match(policy, /_graph\.head_matches_build is true/u);
-  assert.match(policy, /npm run crg:update/u);
-  assert.ok(policy.length <= 700);
-});
-
-test('PreCompact refreshes canonical routing with the correct event envelope', () => {
-  const output = routingContext(root, 'PreCompact');
-  assert.equal(output.hookSpecificOutput?.hookEventName, 'PreCompact');
-  assert.match(output.hookSpecificOutput?.additionalContext ?? '', /Canonical change routing/u);
-  assert.match(output.hookSpecificOutput?.additionalContext ?? '', /Code-context tool routing/u);
+  assert.deepEqual(called, ['pre-tool-architecture.mjs']);
+  assert.equal(result.hookSpecificOutput.additionalContext, 'pre-tool-architecture.mjs');
 });
 
 test('the lifecycle dispatcher skips architecture policy for read-only tools', () => {
@@ -208,6 +155,23 @@ test('applicable lifecycle handlers reserve architecture policy for mutations', 
   );
 });
 
+test('both hosts block worker Git mutations before handler execution', () => {
+  for (const harness of ['codex', 'claude']) {
+    let calls = 0;
+    const result = dispatch({
+      harness,
+      event: 'PreToolUse',
+      input: JSON.stringify({ tool_name: harness === 'codex' ? 'exec_command' : 'Bash', tool_input: { cmd: 'git commit -m forbidden' } }),
+      root,
+      environment: { CTXROUTE_AGENT_ROLE: 'worker', CTXROUTE_POLICY_DIGEST: 'a'.repeat(64) },
+      execute() { calls += 1; return { outputs: [] }; },
+    });
+    assert.equal(calls, 0);
+    assert.equal(isBlocking(result), true);
+    assert.match(JSON.stringify(result), /WORKER_GIT_MUTATION_FORBIDDEN/u);
+  }
+});
+
 test('the lifecycle dispatcher keeps architecture feedback local and targeted', () => {
   const called = [];
   const result = dispatch({
@@ -220,7 +184,7 @@ test('the lifecycle dispatcher keeps architecture feedback local and targeted', 
       return { outputs: handler.name === 'pre-tool-architecture.mjs' ? [{ hookSpecificOutput: { additionalContext: 'Architecture gate' } }] : [] };
     },
   });
-  assert.deepEqual(called, ['pre-tool-goal.mjs', 'pre-tool-architecture.mjs']);
+  assert.deepEqual(called, ['pre-tool-architecture.mjs']);
   assert.match(result.hookSpecificOutput.additionalContext, /Architecture gate/u);
   assert.doesNotMatch(result.hookSpecificOutput.additionalContext, /Applicable architectural decisions/u);
 });
@@ -246,17 +210,17 @@ test('the lifecycle dispatcher keeps failures fail-open and visible', () => {
   let calls = 0;
   const result = dispatch({
     harness: 'codex',
-    event: 'UserPromptSubmit',
+    event: 'PostToolUse',
     input: '{}',
     root,
     execute(handler) {
       calls += 1;
-      if (handler.name === 'problem-memory.mjs') return { error: 'simulated failure', outputs: [] };
+      if (handler.name === 'post-tool-sensor.mjs') return { error: 'simulated failure', outputs: [] };
       return { outputs: [] };
     },
   });
   assert.equal(calls, 2);
-  assert.match(result.systemMessage, /problem-memory\.mjs failed open: simulated failure/u);
+  assert.match(result.systemMessage, /post-tool-sensor\.mjs failed open: simulated failure/u);
 });
 
 test('the lifecycle dispatcher hides only the Node 22 SQLite stability warning', () => {
@@ -265,23 +229,31 @@ test('the lifecycle dispatcher hides only the Node 22 SQLite stability warning',
   assert.equal(actionableStderr(`${warning}\nreal diagnostic`), 'real diagnostic');
 });
 
-test('the lifecycle handler executor suppresses the SQLite warning but preserves diagnostics', () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'lifecycle-handler-'));
-  const hook = join(cwd, 'fixture.mjs');
-  writeFileSync(hook, [
-    "process.stderr.write('(node:14537) ExperimentalWarning: SQLite is an experimental feature and might change at any time\\n');",
-    "process.stderr.write('(Use `node --trace-warnings ...` to show where the warning was created)\\n');",
-    "process.stderr.write('real diagnostic\\n');",
-    "process.stdout.write(JSON.stringify({ continue: true }));",
-  ].join('\n'));
-  try {
-    assert.deepEqual(executeHandler({ path: hook, args: [] }, '{}', cwd), {
-      stderr: 'real diagnostic',
-      outputs: [{ continue: true }],
+test('the production lifecycle imports handlers in-process without nested Node execution', async () => {
+  for (const event of lifecycleEvents) for (const handler of handlerPlan('codex', event, root)) assert.equal(handler.run instanceof Function, true, `${event}:${handler.name}`);
+  const source = readFileSync(join(root, '.codex/hooks/lifecycle.mjs'), 'utf8');
+  assert.doesNotMatch(source, /spawnSync|execFileSync|child_process/u);
+  const result = await dispatchLifecycle({ harness: 'codex', event: 'PreToolUse', input: JSON.stringify({ tool_name: 'Read', tool_input: { file_path: 'README.md' } }), root });
+  assert.equal(result, null);
+});
+
+test('real SessionStart is silent and cannot mutate repository or worktree state', () => {
+  const before = {
+    status: execFileSync('git', ['status', '--porcelain=v1'], { cwd: root, encoding: 'utf8' }),
+    worktrees: execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: root, encoding: 'utf8' }),
+  };
+  for (const harness of ['codex', 'claude']) {
+    const result = spawnSync(process.execPath, [join(root, '.codex/hooks/lifecycle.mjs'), harness, 'SessionStart'], {
+      cwd: root,
+      input: '{}',
+      encoding: 'utf8',
     });
-  } finally {
-    rmSync(cwd, { recursive: true, force: true });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '', harness);
+    assert.doesNotMatch(result.stdout, /failed open|cleanup/iu, harness);
   }
+  assert.equal(execFileSync('git', ['status', '--porcelain=v1'], { cwd: root, encoding: 'utf8' }), before.status);
+  assert.equal(execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: root, encoding: 'utf8' }), before.worktrees);
 });
 
 test('merged lifecycle output preserves messages and context', () => {
@@ -293,6 +265,11 @@ test('merged lifecycle output preserves messages and context', () => {
   assert.equal(result.hookSpecificOutput.additionalContext, 'alpha\n\nbeta');
 });
 
+test('merged lifecycle output bounds the total system message', () => {
+  const result = mergeOutputs('PostToolUse', Array.from({ length: 4 }, (_, index) => ({ systemMessage: `${index}:${'x'.repeat(600)}` })));
+  assert.ok(result.systemMessage.length <= 1000);
+});
+
 test('CLAUDE.md is the single effective import of AGENTS.md', () => {
   assert.equal(readFileSync(join(root, 'CLAUDE.md'), 'utf8').trim(), '@AGENTS.md');
 });
@@ -301,7 +278,25 @@ test('postinstall verifies the complete local installation', () => {
   assert.deepEqual(inspectInstallation(root), []);
   const result = spawnSync('node', [join(root, '.githooks/postinstall.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /trust this exact workspace, then open \/hooks and approve the seven workspace definitions/u);
+  assert.match(result.stdout, /open \/hooks and approve the six workspace definitions/u);
+});
+
+test('structural hook validation rejects context, matcher, parity, and async coverage drift', () => {
+  const contextRoot = hookConfigurationFixture();
+  const codexPath = join(contextRoot, '.codex/hooks.json');
+  const codex = JSON.parse(readFileSync(codexPath, 'utf8'));
+  delete codex.hooks.PreToolUse[0].hooks[0].additionalContextLimit;
+  codex.hooks.UserPromptSubmit[0].matcher = '*';
+  writeFileSync(codexPath, JSON.stringify(codex));
+  assert.match(inspectHookConfiguration(contextRoot).join('\n'), /context limit|matcher declaration/u);
+
+  const parityRoot = hookConfigurationFixture();
+  const claudePath = join(parityRoot, '.claude/settings.json');
+  const claude = JSON.parse(readFileSync(claudePath, 'utf8'));
+  claude.hookModules.manual = [];
+  claude.hooks.UserPromptSubmit[0].hooks.pop();
+  writeFileSync(claudePath, JSON.stringify(claude));
+  assert.match(inspectHookConfiguration(parityRoot).join('\n'), /module classifications|maintenance lifecycle handler|lane contracts/u);
 });
 
 test('postinstall diagnoses a missing CTXRoute installation', () => {
@@ -328,18 +323,17 @@ test('postinstall detects legacy global CTXRoute hooks without changing them', (
   ]);
 });
 
-test('both lifecycle dialects route unowned SWARM_ON mutations to the goal runner', () => {
+test('both lifecycle dialects enforce local governance without automatic CTXRoute injection', () => {
   for (const harness of ['codex', 'claude']) {
     const session = `dispatcher-${harness}-${process.pid}-${Date.now()}`;
     const pseudoPatch = ['***', 'Update File: .project/project-config.json'].join(' ');
     const result = spawnSync('node', [join(root, '.codex/hooks/lifecycle.mjs'), harness, 'PreToolUse'], {
       cwd: root,
-      env: { ...process.env, CTXROUTE_SWARM_MODE: 'SWARM_ON' },
       input: JSON.stringify({ session_id: session, cwd: root, tool_name: 'apply_patch', tool_input: { patch: pseudoPatch } }),
       encoding: 'utf8',
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout.trim(), /orchestrator_run_goal/u, `${harness} must route the mutation`);
+    assert.equal(result.stdout.trim(), '', `${harness} nominal PreToolUse should stay silent`);
     assert.equal(result.stderr.trim(), '', `${harness} nominal PreToolUse should not emit diagnostics`);
   }
 });
@@ -361,12 +355,17 @@ test('both host dispatchers report an unsafe file through the real PostToolUse c
 });
 
 function run(script, input, options = {}) {
-  return spawnSync('node', [join(root, script)], {
-    cwd: options.cwd ?? root,
-    env: { ...process.env, ...options.env },
-    input: JSON.stringify(input),
-    encoding: 'utf8',
-  });
+  return spawnSync('node', [join(root, script)], { cwd: options.cwd ?? root, input: JSON.stringify(input), encoding: 'utf8' });
+}
+
+function hookConfigurationFixture() {
+  const directory = mkdtempSync(join(tmpdir(), 'hook-configuration-'));
+  mkdirSync(join(directory, '.codex/hooks'), { recursive: true });
+  mkdirSync(join(directory, '.claude'), { recursive: true });
+  copyFileSync(join(root, '.codex/hooks.json'), join(directory, '.codex/hooks.json'));
+  copyFileSync(join(root, '.claude/settings.json'), join(directory, '.claude/settings.json'));
+  for (const name of readdirSync(join(root, '.codex/hooks')).filter(name => name.endsWith('.mjs'))) writeFileSync(join(directory, '.codex/hooks', name), '');
+  return directory;
 }
 
 function stopProcessTree(pid) {
@@ -414,32 +413,6 @@ test('PostToolUse reminds about documentation after a code change', () => {
 test('PostToolUse audits documents and Archify sources', () => {
   const result = run('.codex/hooks/post-tool-audit.mjs', { tool_name: 'Edit', tool_input: { file_path: 'docs/architecture/runtime-loop.mmd' } });
   assert.equal(result.stdout, '');
-});
-
-test('PostToolUse audits the cumulative diff without retroactive prerequisite advice', () => {
-  const cwd = initializedWorkspace();
-  git(cwd, ['init', '-q']);
-  git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
-  git(cwd, ['config', 'user.name', 'Fixture']);
-  writeFileSync(join(cwd, 'src/existing.rb'), 'puts :initial\n');
-  git(cwd, ['add', '.']);
-  git(cwd, ['commit', '-qm', 'chore: fixture']);
-  writeFileSync(join(cwd, 'src/existing.rb'), 'puts :changed\n');
-  const result = run('.codex/hooks/post-tool-audit.mjs', {
-    tool_name: 'Edit',
-    tool_input: { file_path: 'docs/architecture/src/blueprint.architecture.json' },
-  }, { cwd, env: { CODEX_POST_TOOL_AUDIT: '1' } });
-  const context = JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
-  assert.match(context, /Cumulative code scope: src\/existing\.rb/u);
-  assert.doesNotMatch(context, /Read relevant documentation and diagrams before changing code/u);
-});
-
-test('AGENTS defines file declaration and lifecycle timing from canonical policy', () => {
-  const source = readFileSync(join(root, 'AGENTS.md'), 'utf8');
-  assert.match(source, /state the intended repository-relative files/u);
-  assert.match(source, /PreToolUse owns prerequisite routing/u);
-  assert.match(source, /PostToolUse audits the completed write/u);
-  assert.match(source, /PreCompact refreshes it after context compaction/u);
 });
 
 test('Archify preview health checks accept only unauthenticated loopback HTTP URLs', async () => {

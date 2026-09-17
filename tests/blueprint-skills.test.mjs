@@ -4,7 +4,7 @@ import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LOCAL_SKILLS, validateBlueprintSkills } from '../scripts/validate-blueprint-skills.mjs';
+import { validateBlueprintSkills } from '../scripts/validate-blueprint-skills.mjs';
 import { verifyBlueprintSkills } from '../scripts/verify-blueprint-skills.mjs';
 import { REQUIRED_SKILL_RUNTIME, validateRuntimeAllowlist } from '../scripts/blueprint-review.mjs';
 import { trackedControlFiles } from '../scripts/blueprint-sync.mjs';
@@ -13,7 +13,7 @@ const repository = fileURLToPath(new URL('..', import.meta.url));
 
 test('blueprint skill companions are strict, structured, and non-recursive', () => {
   assert.deepEqual(validateBlueprintSkills(repository), []);
-  for (const name of LOCAL_SKILLS) {
+  for (const name of ['blueprint-audit', 'session-auditor', 'skill-creator']) {
     const companion = JSON.parse(readFileSync(join(repository, '.agents', 'skills', name, 'blueprint.json'), 'utf8'));
     assert.equal(companion.schemaVersion, 2);
     assert.ok(companion.validations.every(validation => validation.executable && Array.isArray(validation.args)));
@@ -46,7 +46,7 @@ test('skills verifier runs exact structured commands and redacts bounded failure
   const calls = [];
   const success = await verifyBlueprintSkills({ root: repository, execute: async validation => { calls.push(structuredClone(validation)); return { exit_code: 0 }; } });
   assert.equal(success.ok, true);
-  assert.equal(calls.length, LOCAL_SKILLS.length);
+  assert.equal(calls.length, 3);
   assert.ok(calls.every(call => Object.keys(call).sort().join(',') === 'args,cwd,executable,id,timeout_ms'));
   const failure = await verifyBlueprintSkills({ root: repository, execute: async () => { throw new Error(`token=must-not-leak ${'x'.repeat(2000)}`); } });
   assert.equal(failure.ok, false);
@@ -56,7 +56,7 @@ test('skills verifier runs exact structured commands and redacts bounded failure
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'blueprint-skills-'));
-  for (const name of LOCAL_SKILLS) {
+  for (const name of ['blueprint-audit', 'session-auditor', 'skill-creator']) {
     const target = join(root, '.agents', 'skills', name);
     cpSync(join(repository, '.agents', 'skills', name), target, { recursive: true });
     assert.equal(dirname(target).endsWith(join('.agents', 'skills')), true);

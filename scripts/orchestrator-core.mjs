@@ -4,32 +4,30 @@ import { lstat, mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/p
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { assertOrchestratorContract } from './orchestrator-contracts.mjs';
 import { emitDecisionEvent } from './orchestrator-telemetry.mjs';
+import { canonicalMode, decisionCanResolve, hasValidPolicyDigest, resolveExecutionPolicy } from './orchestration-policy-core.mjs';
 
-export const MODES = Object.freeze(['SWARM_ON', 'SWARM_OFF']);
-export const GOAL_STATUSES = Object.freeze(['RESEARCHING', 'WAITING_FOR_RESEARCH', 'ROUTING', 'ACTIVE', 'ESCALATING', 'WAITING_FOR_CAPABILITY', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
-export const MISSION_STATUSES = Object.freeze(['WAITING_FOR_SKILL', 'PREPARING', 'ASSIGNED', 'RUNNING', 'VALIDATING', 'INTEGRATING', 'NEEDS_ATTENTION', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
-const GOAL_TRANSITIONS = Object.freeze({ RESEARCHING: ['WAITING_FOR_RESEARCH', 'ROUTING', 'BLOCKED'], WAITING_FOR_RESEARCH: ['RESEARCHING', 'BLOCKED'], ROUTING: ['ACTIVE', 'WAITING_FOR_CAPABILITY', 'BLOCKED'], ACTIVE: ['ESCALATING', 'WAITING_FOR_CAPABILITY', 'BLOCKED', 'COMPLETED', 'CANCELLED'], ESCALATING: ['ACTIVE', 'WAITING_FOR_CAPABILITY', 'BLOCKED'], WAITING_FOR_CAPABILITY: ['ROUTING', 'ACTIVE', 'BLOCKED', 'CANCELLED'], BLOCKED: ['ACTIVE', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
-const MISSION_TRANSITIONS = Object.freeze({ WAITING_FOR_SKILL: ['PREPARING', 'BLOCKED', 'CANCELLED'], PREPARING: ['ASSIGNED', 'WAITING_FOR_SKILL', 'BLOCKED', 'CANCELLED'], ASSIGNED: ['RUNNING', 'BLOCKED', 'CANCELLED'], RUNNING: ['VALIDATING', 'BLOCKED', 'CANCELLED'], VALIDATING: ['INTEGRATING', 'BLOCKED', 'CANCELLED'], INTEGRATING: ['COMPLETED', 'NEEDS_ATTENTION', 'BLOCKED'], NEEDS_ATTENTION: ['INTEGRATING', 'CANCELLED'], BLOCKED: ['PREPARING', 'RUNNING', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
+export const MODES = Object.freeze(['SWARM', 'AUTO', 'SOLO', 'GUARDED', 'DIRECT']);
+export const LEGACY_MODES = Object.freeze(['SWARM_ON', 'SWARM_OFF']);
+export const GOAL_STATUSES = Object.freeze(['ACTIVE', 'WAITING_FOR_USER_DECISION', 'READY_FOR_PROMOTION', 'COMPLETED', 'CANCELLED']);
+export const MISSION_STATUSES = Object.freeze(['PREPARING', 'ASSIGNED', 'RUNNING', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
+const GOAL_TRANSITIONS = Object.freeze({ ACTIVE: ['WAITING_FOR_USER_DECISION', 'READY_FOR_PROMOTION', 'COMPLETED', 'CANCELLED'], WAITING_FOR_USER_DECISION: ['ACTIVE', 'CANCELLED'], READY_FOR_PROMOTION: ['COMPLETED', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
+const MISSION_TRANSITIONS = Object.freeze({ PREPARING: ['ASSIGNED', 'BLOCKED', 'CANCELLED'], ASSIGNED: ['RUNNING', 'CANCELLED'], RUNNING: ['BLOCKED', 'COMPLETED', 'CANCELLED'], BLOCKED: ['RUNNING', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
 const SECRET_KEY = /(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)/iu;
-const SAFE_USAGE_KEY = /^(?:input|output|total|cached|reasoning)_tokens$/u;
 const SECRET_VALUE = /(?:bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)\s*[:=]\s*\S+)/iu;
 const DEFAULTS = Object.freeze({
-  defaultMode: 'SWARM_ON',
+  defaultMode: 'SWARM',
   statePath: '.ctxroute/orchestrator/state.json',
   worktreeRoot: '.ctxroute/worktrees',
   recoveryRoot: '.ctxroute/recovery',
   telemetryPath: '.ctxroute/orchestrator/events.jsonl',
+  policySnapshotPath: '.ctxroute/orchestrator/policy.json',
+  policySnapshotRoot: '.ctxroute/orchestrator/policies',
   stateBytes: 512 * 1024,
   reportBytes: 64 * 1024,
   contextBytes: 16 * 1024,
   lockTimeoutMs: 2000,
   subprocessTimeoutMs: 30_000,
-  goalTimeoutMs: 15 * 60_000,
-  workerTimeoutMs: 5 * 60_000,
   parallelWorktrees: 8,
-  workerStdoutBytes: 64 * 1024,
-  workerStderrBytes: 16 * 1024,
-  workerRuntime: 'auto',
   minFreeBytes: 256 * 1024 * 1024,
   telemetryBytes: 1024 * 1024,
   rollbackBytes: 16 * 1024 * 1024,
@@ -47,8 +45,8 @@ export function createOrchestratorDependencies(overrides = {}) {
   };
 }
 
-export function emptyOrchestratorState(mode = 'SWARM_ON') {
-  const state = { revision: 0, mode, telemetry_sequence: 0, goals: [], skills: [], audits: [], transactions: [], worktree_operations: [] };
+export function emptyOrchestratorState(mode = 'SWARM') {
+  const state = { revision: 0, mode, telemetry_sequence: 0, goals: [], skills: [], audits: [], transactions: [], worktree_operations: [], decision_requests: [], decision_receipts: [], checkpoints: [], experiment_receipts: [], outcome_receipts: [] };
   assertOrchestratorContract('state', state);
   return state;
 }
@@ -61,6 +59,7 @@ export async function loadOrchestratorConfig(root = process.cwd()) {
     return {
       ...DEFAULTS,
       ...config,
+      defaultMode: config.default_mode ?? config.defaultMode,
       ...config.limits,
       minFreeBytes: config.limits.minimumFreeBytes,
       rollbackBytes: config.limits.recoveryBytes,
@@ -93,7 +92,7 @@ export async function readOrchestratorState(root = process.cwd(), _dependencies 
 export async function currentSwarmMode(root = process.cwd(), environment = process.env) {
   const override = environment.CTXROUTE_SWARM_MODE;
   if (override !== undefined) {
-    if (!MODES.includes(override)) throw new Error(`CTXROUTE_SWARM_MODE must be one of: ${MODES.join(', ')}`);
+    if (![...MODES, ...LEGACY_MODES].includes(override)) throw new Error(`CTXROUTE_SWARM_MODE must be one of: ${[...MODES, ...LEGACY_MODES].join(', ')}`);
     return { mode: override, mode_source: 'environment' };
   }
   const config = await loadOrchestratorConfig(root);
@@ -101,6 +100,13 @@ export async function currentSwarmMode(root = process.cwd(), environment = proce
   if (!state) return { mode: config.defaultMode, mode_source: 'default' };
   if (state.revision > 0 || state.mode !== config.defaultMode) return { mode: state.mode, mode_source: 'state' };
   return { mode: config.defaultMode, mode_source: 'default' };
+}
+
+export async function currentOperatingMode(root = process.cwd()) {
+  const config = await loadOrchestratorConfig(root);
+  const state = await readOrchestratorState(root).catch(error => error.causeCode === 'STATE_MISSING' ? null : Promise.reject(error));
+  const raw = state?.mode ?? config.defaultMode;
+  return { mode: canonicalMode(raw), mode_source: state && (state.revision > 0 || state.mode !== config.defaultMode) ? 'state' : 'default', legacy_value: LEGACY_MODES.includes(raw) ? raw : null };
 }
 
 export async function beginOrchestratorTransaction(command, root = process.cwd(), dependencies = {}, intentMutation = null) {
@@ -205,54 +211,116 @@ export function transactionDigest(command) { return createHash('sha256').update(
 
 function applyOperation(state, command) {
   const payload = command.payload;
-  if (command.action === 'mode.set') return { ...state, mode: payload.mode };
+  if (['operating-mode.set', 'mode.set'].includes(command.action)) return { ...state, mode: canonicalMode(payload.mode) ?? payload.mode };
   if (command.action === 'goal.create') {
     if (state.goals.some(goal => goal.goal_id === payload.goal_id)) throw new Error(`goal already exists: ${payload.goal_id}`);
-    const goal = { goal_id: payload.goal_id, title: payload.title.trim(), status: 'ACTIVE', missions: [] };
-    if (payload.objective) goal.objective = payload.objective;
-    if (payload.acceptance_criteria) goal.acceptance_criteria = payload.acceptance_criteria;
-    if (payload.base_revision) goal.base_revision = payload.base_revision;
-    for (const field of ['importance', 'change_kind', 'assessment', 'consumption_policy', 'documentation_evidence', 'documentation_freshness', 'routing_decisions']) if (payload[field] !== undefined) goal[field] = payload[field];
-    if (goal.assessment) { goal.execution_receipts = payload.execution_receipts ?? []; goal.escalations = []; }
-    return { ...state, goals: [...state.goals, goal] };
+    const policy = resolveExecutionPolicy({ requested_mode: payload.requested_mode ?? canonicalMode(state.mode), workflow: payload.workflow ?? 'STANDARD', capabilities: payload.capabilities ?? ['git'] });
+    if (policy.resolution_status !== 'RESOLVED') throw categorized(policy.resolution_status, `goal policy did not resolve: ${policy.causes?.join(', ') ?? policy.missing_capabilities?.join(', ')}`);
+    const firstStage = policy.stages[0] ?? { stage: 'inventory', strategy: 'deterministic' };
+    return { ...state, goals: [...state.goals, {
+      goal_id: payload.goal_id, title: payload.title.trim(), status: 'ACTIVE', missions: [],
+      requested_mode: policy.requested_mode, resolved_mode: policy.mode, workflow: policy.workflow,
+      policy_digest: policy.policy_digest, resolved_policy: policy,
+      stage: firstStage.stage, stage_index: 0, strategy: firstStage.strategy,
+      reinforcements: policy.reinforcements ?? [], policy_justification: policy.reinforcements ?? [],
+      repository_baseline: payload.repository_baseline ?? null, outcome_receipt_id: null,
+    }] };
   }
-  if (command.action === 'goal.transition') return updateGoal(state, payload.goal_id, goal => {
-    assertTransition(GOAL_TRANSITIONS, goal.status, payload.status, 'goal');
-    const updated = { ...goal, status: payload.status };
-    if (payload.acceptance_report) updated.acceptance_report = payload.acceptance_report;
-    if (payload.blocked_cause !== undefined) updated.blocked_cause = payload.blocked_cause;
-    if (payload.resume_action !== undefined) updated.resume_action = payload.resume_action;
-    return updated;
+  if (command.action === 'goal.stage.advance') {
+    const checkpoint = payload.checkpoint;
+    const goal = state.goals.find(item => item.goal_id === payload.goal_id);
+    if (!goal || goal.status !== 'ACTIVE') throw new Error('stage advancement requires an active goal');
+    assertFrozenPolicy(goal);
+    if (checkpoint.goal_id !== goal.goal_id || checkpoint.policy_digest !== goal.policy_digest || checkpoint.completed_stage !== goal.stage) throw new Error('stage checkpoint does not match the active stage');
+    if (state.checkpoints.some(item => item.checkpoint_id === checkpoint.checkpoint_id)) throw new Error('stage checkpoint was already consumed');
+    const nextIndex = goal.stage_index + 1;
+    const next = goal.resolved_policy.stages[nextIndex];
+    if (!next || next.stage !== checkpoint.next_stage) throw new Error('checkpoint next stage does not match the frozen workflow');
+    const readyExperiment = goal.workflow === 'EXPERIMENT' && next.stage === 'promotion';
+    if (next.strategy === 'human-decision' && !readyExperiment) throw new Error('human-decision stages require an atomic decision.request checkpoint');
+    if (readyExperiment) {
+      const receipt = payload.experiment_receipt;
+      if (!receipt || receipt.goal_id !== goal.goal_id || receipt.policy_digest !== goal.policy_digest || receipt.status !== 'READY_FOR_PROMOTION') throw new Error('experiment terminal stage requires a matching ExperimentReceipt');
+    }
+    const updated = updateGoal(state, goal.goal_id, item => ({ ...item, stage: next.stage, stage_index: nextIndex, strategy: next.strategy, status: readyExperiment ? 'READY_FOR_PROMOTION' : item.status }));
+    return {
+      ...updated,
+      checkpoints: [...updated.checkpoints, checkpoint],
+      experiment_receipts: readyExperiment ? [...updated.experiment_receipts, payload.experiment_receipt] : updated.experiment_receipts,
+    };
+  }
+  if (command.action === 'goal.transition') {
+    const updated = updateGoal(state, payload.goal_id, goal => {
+      assertTransition(GOAL_TRANSITIONS, goal.status, payload.status, 'goal');
+      if (payload.status === 'COMPLETED') validateOutcomeForGoal(goal, payload.outcome_receipt);
+      return { ...goal, status: payload.status, outcome_receipt_id: payload.outcome_receipt?.receipt_id ?? goal.outcome_receipt_id };
+    });
+    return payload.outcome_receipt ? { ...updated, outcome_receipts: [...(updated.outcome_receipts ?? []), payload.outcome_receipt] } : updated;
+  }
+  if (command.action === 'goal.policy.rebase') return updateGoal(state, payload.goal_id, goal => {
+    if (!['ACTIVE', 'WAITING_FOR_USER_DECISION', 'READY_FOR_PROMOTION'].includes(goal.status)) throw new Error('policy rebase requires a safe checkpoint');
+    if (goal.policy_digest !== payload.expected_policy_digest) throw new Error('policy digest mismatch');
+    assertFrozenPolicy(goal);
+    const checkpoint = state.checkpoints.find(item => item.checkpoint_id === payload.checkpoint_id && item.goal_id === goal.goal_id && item.policy_digest === goal.policy_digest);
+    if (!checkpoint || checkpoint.next_stage !== goal.stage) throw new Error('policy rebase requires the current safe checkpoint');
+    if (goal.missions.some(mission => ['ASSIGNED', 'RUNNING'].includes(mission.status))) throw new Error('policy rebase requires no active mission');
+    assertPolicyRebasePreservesInvariants(goal.resolved_policy, payload.policy);
+    const stageIndex = payload.policy.stages.findIndex(item => item.stage === goal.stage);
+    if (stageIndex < 0) throw new Error('rebased policy must preserve the current stage');
+    return { ...goal, requested_mode: payload.policy.requested_mode, resolved_mode: payload.policy.mode, workflow: payload.policy.workflow, policy_digest: payload.policy.policy_digest, resolved_policy: payload.policy, stage_index: stageIndex, strategy: payload.policy.stages[stageIndex].strategy, reinforcements: payload.policy.reinforcements ?? [], policy_justification: payload.policy.reinforcements ?? [] };
+  });
+  if (command.action === 'decision.request') {
+    if (state.decision_requests?.some(item => item.decision_id === payload.request.decision_id)) throw new Error(`decision already exists: ${payload.request.decision_id}`);
+    const goal = state.goals.find(item => item.goal_id === payload.request.goal_id);
+    if (!goal || goal.policy_digest !== payload.request.policy_digest || payload.checkpoint.policy_digest !== goal.policy_digest || payload.request.checkpoint_id !== payload.checkpoint.checkpoint_id) throw new Error('decision policy digest or checkpoint mismatch');
+    assertFrozenPolicy(goal);
+    if (payload.checkpoint.goal_id !== goal.goal_id || payload.checkpoint.completed_stage !== goal.stage) throw new Error('decision checkpoint does not match the active stage');
+    const nextIndex = goal.stage_index + 1;
+    const next = goal.resolved_policy.stages[nextIndex];
+    if (!next || next.stage !== payload.checkpoint.next_stage) throw new Error('decision request does not match the frozen next stage');
+    const promotionDecision = goal.workflow === 'EXPERIMENT' && goal.status === 'READY_FOR_PROMOTION' && goal.stage === 'promotion' && payload.request.category === 'promotion';
+    if (payload.request.category === 'promotion' && !promotionDecision) throw new Error('promotion decision requires a ready experiment');
+    const updated = updateGoal(state, goal.goal_id, item => ({ ...item, status: 'WAITING_FOR_USER_DECISION' }));
+    return { ...updated, decision_requests: [...(updated.decision_requests ?? []), payload.request], checkpoints: [...(updated.checkpoints ?? []), payload.checkpoint] };
+  }
+  if (command.action === 'decision.resolve') {
+    const request = state.decision_requests?.find(item => item.decision_id === payload.receipt.decision_id && item.status === 'PENDING');
+    if (!decisionCanResolve(request, payload.receipt)) throw new Error('decision receipt is incompatible with the pending request');
+    const checkpoint = state.checkpoints.find(item => item.checkpoint_id === request.checkpoint_id && item.goal_id === request.goal_id && item.policy_digest === request.policy_digest);
+    if (!checkpoint) throw new Error('decision checkpoint is missing');
+    const updated = updateGoal(state, request.goal_id, goal => {
+      assertFrozenPolicy(goal);
+      if (request.category === 'promotion') return { ...goal, status: payload.receipt.selection === 'promote' ? 'READY_FOR_PROMOTION' : 'CANCELLED' };
+      const nextIndex = goal.stage_index + 1;
+      const next = goal.resolved_policy.stages[nextIndex];
+      if (!next || next.stage !== checkpoint.next_stage) throw new Error('decision checkpoint no longer matches the frozen workflow');
+      return { ...goal, status: 'ACTIVE', stage: next.stage, stage_index: nextIndex, strategy: next.strategy };
+    });
+    return { ...updated, decision_requests: updated.decision_requests.map(item => item.decision_id === request.decision_id ? { ...item, status: 'RESOLVED' } : item), decision_receipts: [...(updated.decision_receipts ?? []), payload.receipt] };
+  }
+  if (command.action === 'experiment.promote') return updateGoal(state, payload.goal_id, goal => {
+    if (goal.workflow !== 'EXPERIMENT' || goal.status !== 'READY_FOR_PROMOTION') throw new Error('experiment is not ready for promotion');
+    const receipt = state.decision_receipts?.find(item => item.receipt_id === payload.decision_receipt_id && item.policy_digest === goal.policy_digest && item.selection === 'promote');
+    if (!receipt) throw new Error('experiment promotion requires a matching decision receipt');
+    const integrationIndex = goal.resolved_policy.stages.findIndex(item => item.stage === 'integration');
+    if (integrationIndex < 0) throw new Error('experiment policy has no integration stage');
+    return { ...goal, status: 'ACTIVE', stage: 'integration', stage_index: integrationIndex, strategy: goal.resolved_policy.stages[integrationIndex].strategy };
   });
   if (command.action === 'mission.prepare') {
     const request = payload.mission;
     if (state.goals.some(goal => goal.missions.some(mission => mission.mission_id === request.mission_id))) throw new Error(`mission already exists: ${request.mission_id}`);
-    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : 'AUTO_COORDINATED', status: 'PREPARING', worktree_allocation: null, report: null, validation_receipt: null, blocking_cause: null, integration_status: 'NOT_STARTED', worker_commit: null, integrated_commit: null };
-    if (request.routing_decision) { record.escalations = []; record.execution_receipts = []; }
+    const goal = state.goals.find(item => item.goal_id === payload.goal_id);
+    assertFrozenPolicy(goal);
+    const stage = goal.resolved_policy.stages[goal.stage_index];
+    const record = { ...request, response_format: 'worker-report', execution_reason: request.execution === 'direct' ? 'EXPLICIT_DIRECT' : request.execution === 'coordinated' ? 'EXPLICIT_COORDINATED' : request.file_scope.length === 1 ? 'AUTO_SINGLE_SCOPE' : 'AUTO_COORDINATED', stage: stage.stage, strategy: stage.strategy, access: stage.access, policy_digest: goal.policy_digest, reinforcements: goal.reinforcements ?? [], status: 'PREPARING', worktree_allocation: null, orchestrator_commit: null, integrated_commit: null, report: null, validation_receipt: null };
     assertOrchestratorContract('mission-record', record);
     return addMission(state, payload.goal_id, record);
   }
   if (command.action === 'mission.transition') return updateMission(state, payload.goal_id, payload.mission_id, mission => {
     assertTransition(MISSION_TRANSITIONS, mission.status, payload.status, 'mission');
-    if (payload.status === 'COMPLETED' && (mission.validation_receipt?.status !== 'PASSED' || mission.integration_status !== 'INTEGRATED')) throw new Error('mission completion requires validation and main-branch integration');
-    const updated = { ...mission, status: payload.status };
-    if (payload.routing_decision) updated.routing_decision = payload.routing_decision;
-    if (payload.escalation_event) updated.escalations = [...(mission.escalations ?? []), payload.escalation_event];
-    if (payload.documentation_evidence) updated.documentation_evidence = payload.documentation_evidence;
-    if (payload.documentation_freshness) updated.documentation_freshness = payload.documentation_freshness;
-    return updated;
+    if (payload.status === 'COMPLETED' && mission.validation_receipt?.status !== 'PASSED') throw new Error('mission completion requires an orchestrator PASSED receipt');
+    return { ...mission, status: payload.status };
   });
-  if (command.action === 'receipt.record') {
-    const withGoalReceipt = updateGoal(state, payload.goal_id, goal => {
-      if ((goal.execution_receipts ?? []).some(receipt => receipt.receipt_id === payload.receipt.receipt_id)) return goal;
-      return { ...goal, execution_receipts: [...(goal.execution_receipts ?? []), payload.receipt] };
-    });
-    if (!payload.mission_id) return withGoalReceipt;
-    return updateMission(withGoalReceipt, payload.goal_id, payload.mission_id, mission => {
-      if ((mission.execution_receipts ?? []).some(receipt => receipt.receipt_id === payload.receipt.receipt_id)) return mission;
-      return { ...mission, execution_receipts: [...(mission.execution_receipts ?? []), payload.receipt] };
-    });
-  }
   if (command.action === 'report.submit') return updateMission(state, payload.goal_id, payload.report.mission_id, mission => ({ ...mission, report: payload.report, status: 'BLOCKED' }));
   if (command.action === 'audit.apply') {
     if (state.audits.some(audit => audit.audit_id === payload.report.audit_id)) throw new Error(`audit already exists: ${payload.report.audit_id}`);
@@ -262,7 +330,7 @@ function applyOperation(state, command) {
     if (state.skills.some(skill => skill.skill_id === payload.skill_id)) throw new Error(`skill already registered: ${payload.skill_id}`);
     return { ...state, skills: [...state.skills, { skill_id: payload.skill_id, version: payload.version, path: payload.path, artifact_digest: payload.artifact_digest, validation_receipt: payload.validation_receipt, audit_id: payload.audit_id, registered_revision: state.revision + 1 }] };
   }
-  if (['worktree.reconcile', 'mission.rollback', 'worktree.purge'].includes(command.action)) throw new Error(`${command.action} requires the orchestrator service effect handler`);
+  if (['mission.commit', 'mission.integrate', 'worktree.reconcile', 'mission.rollback', 'worktree.purge'].includes(command.action)) throw new Error(`${command.action} requires the orchestrator service effect handler`);
   throw new Error(`unsupported orchestrator action: ${command.action}`);
 }
 
@@ -358,6 +426,8 @@ export async function withGlobalMutationLock(root = process.cwd(), dependencies 
   return withLock(path, config.lockTimeoutMs, deps, () => operation({ ...deps, globalMutationRoot: canonicalRoot }));
 }
 
+export const repositoryMutationLock = withGlobalMutationLock;
+
 async function recoverStaleLock(path, deps) {
   let first;
   try { first = JSON.parse(await readFile(path, 'utf8')); } catch { return; }
@@ -368,17 +438,18 @@ async function recoverStaleLock(path, deps) {
 }
 
 function validateContract(name, value, maximumBytes, label) { try { const source = JSON.stringify(value); if (Buffer.byteLength(source) > maximumBytes) throw new Error(`${label} exceeds ${maximumBytes} bytes`); assertNoSecrets(value); assertOrchestratorContract(name, value); return []; } catch (error) { return [error.message]; } }
-export function assertNoSecrets(value, key = '', depth = 0) { if (depth > 16) throw new Error('object exceeds safe inspection depth'); if (SECRET_KEY.test(key) && !SAFE_USAGE_KEY.test(key)) throw new Error('secret-like key is forbidden'); if (value === String(value) && SECRET_VALUE.test(value)) throw new Error('secret-like material is forbidden'); if (Array.isArray(value)) value.forEach(item => assertNoSecrets(item, key, depth + 1)); else if (value && value === Object(value)) Object.entries(value).forEach(([name, item]) => assertNoSecrets(item, name, depth + 1)); }
+export function assertNoSecrets(value, key = '', depth = 0) { if (depth > 16) throw new Error('object exceeds safe inspection depth'); if (SECRET_KEY.test(key)) throw new Error('secret-like key is forbidden'); if (value === String(value) && SECRET_VALUE.test(value)) throw new Error('secret-like material is forbidden'); if (Array.isArray(value)) value.forEach(item => assertNoSecrets(item, key, depth + 1)); else if (value && value === Object(value)) Object.entries(value).forEach(([name, item]) => assertNoSecrets(item, name, depth + 1)); }
 export function safeRelativePath(value) { if (value !== String(value) || value.length === 0 || value.length > 1024 || isAbsolute(value) || value.startsWith('~') || [...value].some(character => character.codePointAt(0) < 32)) return false; const normalized = value.replaceAll('\\', '/').replace(/\/$/u, ''); if (normalized === '.') return true; return Boolean(normalized) && !normalized.split('/').includes('..') && relative('.', normalized).replaceAll('\\', '/') === normalized; }
 function assertTransition(graph, before, after, label) { if (before === after) return; if (!graph[before]?.includes(after)) throw new Error(`illegal ${label} transition: ${before} -> ${after}`); }
 function stableJson(value) { if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`; if (value && value === Object(value)) return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`; return JSON.stringify(value); }
 function operationResult(action) { if (action.endsWith('.create') || action === 'mission.prepare' || action === 'skill.register') return 'CREATED'; if (action === 'worktree.reconcile') return 'RECONCILED'; if (action === 'mission.rollback') return 'ROLLED_BACK'; if (action === 'worktree.purge') return 'PURGED'; return 'UPDATED'; }
 async function emitSafely(root, config, event, deps) { try { if (deps.emitTelemetry) await deps.emitTelemetry(root, config, event); else await emitDecisionEvent(root, config, event, deps); } catch { /* State remains authoritative when telemetry is unavailable. */ } }
 function eventType(action) { if (action === 'report.submit') return 'VALIDATION'; if (action === 'audit.apply') return 'AUDIT'; if (action === 'skill.register') return 'SKILL_REGISTRATION'; if (action === 'worktree.reconcile') return 'RECONCILIATION'; if (action === 'mission.rollback') return 'ROLLBACK'; if (action === 'worktree.purge') return 'PURGE'; if (action.includes('transition')) return 'TRANSITION'; return 'TRANSACTION'; }
-function entityType(action) { if (action === 'report.submit') return 'validation'; if (action.startsWith('goal.')) return 'goal'; if (action.startsWith('mission.')) return 'mission'; if (action.startsWith('worktree.')) return 'worktree'; if (action.startsWith('audit.')) return 'audit'; if (action.startsWith('skill.')) return 'skill'; if (action.startsWith('mode.')) return 'mode'; return 'transaction'; }
+function entityType(action) { if (action === 'report.submit') return 'validation'; if (action.startsWith('goal.')) return 'goal'; if (action.startsWith('mission.')) return 'mission'; if (action.startsWith('worktree.')) return 'worktree'; if (action.startsWith('audit.')) return 'audit'; if (action.startsWith('skill.')) return 'skill'; if (action.endsWith('mode.set')) return 'mode'; return 'transaction'; }
 function entityId(command) { return command.payload?.mission_id ?? command.payload?.report?.mission_id ?? command.payload?.goal_id ?? command.payload?.audit_id ?? command.payload?.skill_id ?? null; }
 function decisionEvents(command, before, after, result, cause = null) {
-  const common = { operation_id: command.operation_id, revision_before: before.revision, revision_after: after.revision, result, cause };
+  const context = policyEventContext(command, before, after);
+  const common = { operation_id: command.operation_id, revision_before: before.revision, revision_after: after.revision, result, cause, ...context };
   const events = [];
   const beforeEntity = transitionEntity(before, command);
   const afterEntity = transitionEntity(after, command);
@@ -391,6 +462,24 @@ function decisionEvents(command, before, after, result, cause = null) {
   if (events.length === 0) events.push({ ...common, event_type: cause ? 'BLOCKED' : eventType(command.action), entity_type: entityType(command.action), entity_id: entityId(command), policy_id: actionPolicy(command.action), schema_id: 'transaction', evidence_digest: evidenceDigest({ action: command.action, result, cause }) });
   return events;
 }
+function policyEventContext(command, before, after) {
+  const goalId = command.payload?.goal_id;
+  const missionId = command.payload?.mission_id ?? command.payload?.report?.mission_id ?? command.payload?.mission?.mission_id;
+  const located = missionId ? findMission(after, missionId) ?? findMission(before, missionId) : null;
+  const goal = located?.goal ?? after.goals.find(item => item.goal_id === goalId) ?? before.goals.find(item => item.goal_id === goalId);
+  if (!goal?.policy_digest) return {};
+  const mission = located?.mission;
+  return {
+    requested_mode: goal.requested_mode ?? null,
+    resolved_mode: goal.resolved_mode ?? null,
+    workflow: goal.workflow ?? null,
+    stage: mission?.stage ?? goal.stage ?? null,
+    strategy: mission?.strategy ?? goal.strategy ?? null,
+    policy_digest: goal.policy_digest,
+    reinforcements: goal.reinforcements ?? [],
+    policy_justification: goal.policy_justification ?? [],
+  };
+}
 function transitionEntity(state, command) {
   if (command.action.startsWith('goal.')) return state.goals.find(goal => goal.goal_id === command.payload.goal_id) ?? null;
   const missionId = command.payload?.mission_id ?? command.payload?.report?.mission_id ?? command.payload?.mission?.mission_id;
@@ -400,4 +489,21 @@ function transitionPolicy(action) { return action.startsWith('goal.') ? 'goal-tr
 function actionPolicy(action) { return action.replaceAll('.', '-'); }
 function evidenceDigest(value) { return createHash('sha256').update(stableJson(value)).digest('hex'); }
 function categorized(code, message) { const error = new Error(message); error.causeCode = code; return error; }
+function validateOutcomeForGoal(goal, receipt) {
+  if (!receipt || receipt.goal_id !== goal.goal_id || receipt.policy_digest !== goal.policy_digest) throw new Error('goal completion requires a matching OutcomeReceipt');
+  if (goal.workflow === 'EXPERIMENT' && receipt.effect !== 'experiment') throw new Error('experiment completion requires an experiment outcome');
+  if (['RESEARCH', 'AUDIT'].includes(goal.workflow) && (receipt.effect !== 'read-only' || receipt.repository_unchanged !== true)) throw new Error('read-only completion requires unchanged-repository evidence');
+  if (!['RESEARCH', 'AUDIT', 'RECOVERY'].includes(goal.workflow) && !receipt.integrated_commit) throw new Error('mutation completion requires an integrated commit');
+}
+function assertFrozenPolicy(goal) {
+  if (!goal?.resolved_policy || goal.policy_digest !== goal.resolved_policy.policy_digest || !hasValidPolicyDigest(goal.resolved_policy)) throw new Error('goal frozen policy digest is invalid');
+}
+function assertPolicyRebasePreservesInvariants(before, after) {
+  if (after.resolution_status !== 'RESOLVED' || !hasValidPolicyDigest(after)) throw new Error('rebased policy must be a valid resolved policy');
+  if (before.repository_mutation_serialized && !after.repository_mutation_serialized) throw new Error('policy rebase cannot weaken repository mutation serialization');
+  if (before.isolation_required && !after.isolation_required) throw new Error('policy rebase cannot weaken mandatory isolation');
+  if (before.critical_audit_required && !after.critical_audit_required) throw new Error('policy rebase cannot remove critical audit');
+  if (!before.write_allowed && after.write_allowed) throw new Error('policy rebase cannot grant write access denied by the frozen policy');
+  if ((after.risk_floor ?? 0) < (before.risk_floor ?? 0) || (after.model_floor ?? 0) < (before.model_floor ?? 0)) throw new Error('policy rebase cannot lower risk or model floors');
+}
 function escapeRegex(value) { return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'); }

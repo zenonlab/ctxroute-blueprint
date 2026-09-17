@@ -4,6 +4,9 @@ import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { decide } from '../../scripts/agent-governance.mjs';
+import { safeStateDirectory } from '../../scripts/safe-state-directory.mjs';
+import { emitGovernanceEvent } from '../../scripts/governance-telemetry.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const MAX_FIELD_LENGTH = 4000;
@@ -207,15 +210,25 @@ export class ProblemStore {
   close() { this.database.close(); }
 }
 
-export function resolveProblem(problemId, resolution, stateDirectory, projectRoot = root) {
+export function resolveProblem(problemId, resolution, stateDirectory, projectRoot = root, options = {}) {
+  const resolutionDecision = decide('memory.resolve', { authority: options.authority });
+  const requestedState = stateDirectory ?? process.env.CTXROUTE_STATE_DIR ?? join(projectRoot, '.ctxroute', 'state');
+  const storeDirectory = stateDirectory ? requestedState : safeStateDirectory(requestedState, projectRoot);
+  emitGovernanceEvent(storeDirectory, resolutionDecision, { authority: options.authority });
+  if (!resolutionDecision.allowed) throw new TypeError('Problem resolution requires orchestrator authority');
   if (resolution?.type === 'persistent-instruction' && resolution.approved !== true) {
     throw new TypeError('A persistent instruction requires approved: true');
   }
-  const store = new ProblemStore(stateDirectory ?? process.env.CTXROUTE_STATE_DIR ?? join(root, '.ctxroute', 'state'));
+  if (resolution?.type === 'persistent-instruction') {
+    const persistenceDecision = decide('memory.protection.persist', { approved: resolution.approved, decisionReceipt: options.decisionReceipt });
+    emitGovernanceEvent(storeDirectory, persistenceDecision, { approvalPresent: resolution.approved, receiptPresent: Boolean(options.decisionReceipt), authority: options.authority });
+    if (!persistenceDecision.allowed) throw new TypeError('A persistent instruction requires a DecisionReceipt');
+  }
+  const store = new ProblemStore(storeDirectory);
   try {
     if (!store.get(Number(problemId))) return false;
     if (resolution.type === 'persistent-instruction' && resolution.approved === true) {
-      applyPersistentInstruction(problemId, resolution, projectRoot);
+      applyPersistentInstruction(problemId, resolution, projectRoot, options);
     }
     return store.resolve(Number(problemId), resolution);
   } finally {
@@ -223,10 +236,11 @@ export function resolveProblem(problemId, resolution, stateDirectory, projectRoo
   }
 }
 
-export function applyPersistentInstruction(problemId, resolution, projectRoot = root) {
+export function applyPersistentInstruction(problemId, resolution, projectRoot = root, options = {}) {
   if (resolution?.type !== 'persistent-instruction' || resolution.approved !== true) {
     throw new TypeError('A persistent instruction requires approved: true');
   }
+  if (!decide('memory.protection.persist', { approved: resolution.approved, decisionReceipt: options.decisionReceipt }).allowed) throw new TypeError('A persistent instruction requires a DecisionReceipt');
   const numericId = Number(problemId);
   if (!Number.isSafeInteger(numericId) || numericId < 1) throw new TypeError('Problem id must be a positive integer');
   const scope = resolution.scope ?? {};
@@ -323,7 +337,7 @@ function emit(observation, record, config) {
   return {
     systemMessage: resolution
       ? `Recurring problem recognized (${record.occurrences} occurrences). Reuse the approved resolution before asking the user again.`
-      : `Recurring problem recognized (${record.occurrences} occurrences, ${record.match} signature). An optional protection proposal is available; continue the current task without waiting for approval.`,
+      : `Recurring problem recognized (${record.occurrences} occurrences, ${record.match} signature). A protection proposal requires approval.`,
     hookSpecificOutput: {
       hookEventName: observation.event,
       additionalContext: JSON.stringify({ problemMemory: {
@@ -347,8 +361,15 @@ export function handle(input, event, options = {}) {
   if (!configuration?.enabled || !configuration.recordOn?.includes(event)) return null;
   const observation = extractObservation(input, event);
   if (!observation) return null;
+  const observationDecision = decide('memory.observe');
   const signatures = buildSignatures(observation);
-  const store = new ProblemStore(options.stateDirectory ?? process.env.CTXROUTE_STATE_DIR ?? join(root, '.ctxroute', 'state'));
+  const requestedState = options.stateDirectory ?? process.env.CTXROUTE_STATE_DIR ?? join(root, '.ctxroute', 'state');
+  const stateDirectory = options.projectRoot || !options.stateDirectory
+    ? safeStateDirectory(requestedState, options.projectRoot ?? root)
+    : requestedState;
+  emitGovernanceEvent(stateDirectory, observationDecision);
+  if (!observationDecision.allowed) return null;
+  const store = new ProblemStore(stateDirectory);
   try { return emit(observation, store.record(observation, signatures, new Date().toISOString(), configuration.matching), configuration); }
   finally { store.close(); }
 }
@@ -356,7 +377,10 @@ export function handle(input, event, options = {}) {
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   if (process.argv[2] === 'resolve') {
     try {
-      const result = resolveProblem(process.argv[3], JSON.parse(process.argv[4] ?? '{}'));
+      const result = resolveProblem(process.argv[3], JSON.parse(process.argv[4] ?? '{}'), undefined, root, {
+        authority: process.env.CTXROUTE_CONTROL_CHANNEL === 'cli' ? 'orchestrator' : null,
+        decisionReceipt: process.argv[5] ? JSON.parse(process.argv[5]) : null,
+      });
       process.stdout.write(JSON.stringify({ resolved: result }));
     } catch (error) {
       process.stderr.write(`Problem memory resolution failed: ${error.message}`);

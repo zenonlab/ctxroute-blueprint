@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ctxroute.dev/schemas/orchestrator/execution-binding.schema.json",
+  "type": "object",
+  "required": ["goal_id", "policy_snapshot", "policy_digest", "workflow", "stage", "strategy", "access", "revision"],
+  "properties": {
+    "goal_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "mission_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "session_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000-\\u001f]+$" },
+    "policy_snapshot": { "$ref": "common.schema.json#/$defs/relativePath" },
+    "policy_digest": { "$ref": "common.schema.json#/$defs/digest" },
+    "workflow": { "enum": ["STANDARD", "RESEARCH", "AUDIT", "SECURITY", "MIGRATION", "INCIDENT", "EXPERIMENT", "RECOVERY"] },
+    "stage": { "enum": ["inventory", "research", "decision", "planning", "work", "validation", "audit", "integration", "recovery", "promotion"] },
+    "strategy": { "enum": ["deterministic", "primary", "single-worker", "parallel-workers", "independent-auditor", "human-decision"] },
+    "access": { "enum": ["read-only", "write"] },
+    "revision": { "type": "integer", "minimum": 0 }
+  },
+  "unevaluatedProperties": false
+}

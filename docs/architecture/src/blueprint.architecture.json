@@ -6,20 +6,20 @@
     "quality_profile": "showcase",
     "viewBox": [1390, 700],
     "views": [
-      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "contracts", "state", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "Session and worker prompts route relational questions to CRG first; native reads confirm lines and async maintenance keeps graph current." },
-      { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "state", "worktrees", "recovery", "telemetry"], "note": "A single fail-closed bootstrap owns the global mutation lock, resumes pending intent, and preserves ambiguous worktrees." },
+      { "id": "agent-context", "label": "Agent context", "focus": ["agents", "orchestrator", "policy", "contracts", "state", "decisions", "workers", "validation", "lifecycle", "ctxroute", "crg", "graph"], "note": "The pure resolver freezes mode, workflow, stage strategy, and policy digest before durable two-phase effects." },
+      { "id": "recovery", "label": "Recovery", "focus": ["orchestrator", "policy", "state", "decisions", "worktrees", "recovery", "telemetry"], "note": "A single repository mutation lock resumes pending intent while bounded checkpoints preserve human decisions across sessions." },
       { "id": "security", "label": "Security", "focus": ["lifecycle", "sensor", "grammars", "crg", "githubActions", "ciArtifacts"], "note": "Sensor blocks unsafe changes; CRG stays fail-closed at high and accepts only exact-SHA, digest-bound administrator dispositions." },
       { "id": "architecture", "label": "Architecture", "focus": ["archify", "jsonIr", "githubActions", "ciArtifacts"], "note": "Pinned Archify validates the versioned JSON IR and CI publishes deterministic and visual evidence." }
     ]
   },
   "components": [
     { "id": "agents", "type": "external", "label": "Coding agents", "sublabel": "Codex / Claude", "pos": [40, 50], "size": [150, 60] },
-    { "id": "lifecycle", "type": "backend", "label": "Lifecycle dispatch", "sublabel": "Sync + async maintenance lanes", "pos": [280, 50], "size": [180, 60] },
+    { "id": "lifecycle", "type": "backend", "label": "Lifecycle dispatch", "sublabel": "sync + maintenance lanes", "pos": [280, 50], "size": [180, 60] },
     { "id": "ctxroute", "type": "external", "label": "CTXRoute", "sublabel": "On-demand context", "pos": [540, 50], "size": [170, 60] },
     { "id": "crg", "type": "backend", "label": "code-review-graph", "sublabel": "Official v2.3.8 CLI + MCP", "pos": [790, 50], "size": [190, 60] },
     { "id": "archify", "type": "external", "label": "Archify v2.16.0", "sublabel": "Pinned official skill", "pos": [1060, 50], "size": [170, 60] },
-    { "id": "orchestrator", "type": "backend", "label": "Goal orchestrator", "sublabel": "Plan + dispatch + Git + audit", "pos": [30, 230], "size": [170, 60] },
-    { "id": "workers", "type": "external", "label": "Local worker adapters", "sublabel": "Codex / Claude / Gemini / fixture", "pos": [30, 410], "size": [200, 60] },
+    { "id": "orchestrator", "type": "backend", "label": "Orchestrator", "sublabel": "Stages + repository authority", "pos": [30, 230], "size": [170, 60] },
+    { "id": "workers", "type": "external", "label": "Isolated workers", "sublabel": "Minimal mission + worktree", "pos": [30, 410], "size": [190, 60] },
     { "id": "sensor", "type": "security", "label": "Sensor", "sublabel": "Blocking security checks", "pos": [280, 230], "size": [180, 60] },
     { "id": "grammars", "type": "external", "label": "Tree-sitter grammars", "sublabel": "Sensor-only parsing", "pos": [540, 230], "size": [180, 60] },
     { "id": "graph", "type": "database", "label": "CRG graph.db", "sublabel": "Ignored local graph", "pos": [790, 230], "size": [190, 60] },
@@ -27,26 +27,28 @@
     { "id": "githubActions", "type": "cloud", "label": "GitHub Actions", "sublabel": "Matrix + fork-safe review", "pos": [1060, 410], "size": [190, 60] },
     { "id": "ciArtifacts", "type": "database", "label": "Validation artifacts", "sublabel": "CRG / Sensor / Archify", "pos": [790, 410], "size": [190, 60] }
     ,{ "id": "contracts", "type": "security", "label": "Contract registry", "sublabel": "JSON Schema 2020-12 + Ajv", "pos": [280, 410], "size": [210, 60] }
-    ,{ "id": "state", "type": "database", "label": "Transactional state", "sublabel": "Intent + receipts", "pos": [540, 410], "size": [190, 60] }
+    ,{ "id": "state", "type": "database", "label": "Transactional state", "sublabel": "Checkpoints + outcome receipts", "pos": [540, 410], "size": [190, 60] }
     ,{ "id": "validation", "type": "backend", "label": "Validation runner", "sublabel": "execFile / no shell", "pos": [30, 580], "size": [190, 60] }
     ,{ "id": "worktrees", "type": "database", "label": "Managed worktrees", "sublabel": "reconciled Git state", "pos": [280, 580], "size": [210, 60] }
     ,{ "id": "recovery", "type": "database", "label": "Recovery proofs", "sublabel": "bounded restorable patch", "pos": [540, 580], "size": [190, 60] }
     ,{ "id": "telemetry", "type": "database", "label": "Decision events", "sublabel": "bounded JSONL rotation", "pos": [790, 580], "size": [190, 60] }
+    ,{ "id": "policy", "type": "backend", "label": "Policy resolver", "sublabel": "pure mode + workflow + stage", "pos": [1060, 560], "size": [170, 60] }
+    ,{ "id": "decisions", "type": "database", "label": "Human checkpoints", "sublabel": "closed receipts + artifact refs", "pos": [1060, 640], "size": [200, 45] }
   ],
   "connections": [
-    { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "file + tool policy", "variant": "emphasis", "labelAt": [235, 124] },
-    { "id": "lifecycle-ctxroute", "from": "lifecycle", "to": "ctxroute", "label": "bounded routing context", "labelAt": [500, 124] },
+    { "id": "agents-lifecycle", "from": "agents", "to": "lifecycle", "label": "six lifecycle events", "variant": "emphasis", "labelAt": [235, 124] },
+    { "id": "lifecycle-ctxroute", "from": "lifecycle", "to": "ctxroute", "label": "dispatch context and policy", "labelAt": [500, 124] },
     { "id": "lifecycle-sensor", "from": "lifecycle", "to": "sensor", "label": "validate successful writes", "variant": "security", "labelAt": [450, 170] },
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse supported sources", "labelAt": [500, 304] },
-    { "id": "agents-orchestrator", "from": "agents", "to": "orchestrator", "label": "bounded GoalRunRequest", "fromSide": "bottom", "toSide": "top", "via": [[115, 170]], "labelAt": [110, 170] },
-    { "id": "orchestrator-lifecycle", "from": "orchestrator", "to": "lifecycle", "label": "targeted mission", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [315, 140] },
+    { "id": "agents-orchestrator", "from": "agents", "to": "orchestrator", "label": "MCP or CLI transaction", "fromSide": "bottom", "toSide": "top", "via": [[115, 170]], "labelAt": [110, 170] },
+    { "id": "orchestrator-lifecycle", "from": "orchestrator", "to": "lifecycle", "label": "bound MissionView", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [305, 122] },
     { "id": "orchestrator-workers", "from": "orchestrator", "to": "workers", "label": "scope + worktree", "fromSide": "bottom", "toSide": "top", "labelAt": [90, 350] },
     { "id": "workers-orchestrator", "from": "workers", "to": "orchestrator", "label": "bounded report", "variant": "emphasis", "fromSide": "right", "toSide": "right", "via": [[250, 440], [250, 260]], "labelAt": [285, 395] },
-    { "id": "agents-crg", "from": "agents", "to": "crg", "label": "CRG-first relational context", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
-    { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "async coalesced update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
-    { "id": "crg-graph", "from": "crg", "to": "graph", "label": "update + HEAD freshness", "labelAt": [800, 170] },
+    { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
+    { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "status / single-flight update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
+    { "id": "crg-graph", "from": "crg", "to": "graph", "label": "build / incremental update", "labelAt": [800, 170] },
     { "id": "json-archify", "from": "jsonIr", "to": "archify", "label": "showcase validation", "labelAt": [1070, 170] },
-    { "id": "ci-crg", "from": "githubActions", "to": "crg", "label": "high gate + disposition", "variant": "security", "fromSide": "top", "toSide": "bottom", "via": [[1155, 330], [1000, 330], [1000, 170], [885, 170]], "labelAt": [1080, 315] },
+    { "id": "ci-crg", "from": "githubActions", "to": "crg", "label": "pinned PR risk gate", "variant": "security", "fromSide": "top", "toSide": "bottom", "via": [[1155, 330], [1000, 330], [1000, 170], [885, 170]], "labelAt": [1080, 315] },
     { "id": "ci-archify", "from": "githubActions", "to": "archify", "label": "build + visual-check", "fromSide": "right", "toSide": "right", "via": [[1260, 440], [1260, 80]], "labelAt": [1195, 320] },
     { "id": "ci-artifacts", "from": "githubActions", "to": "ciArtifacts", "label": "publish bounded evidence", "labelAt": [1020, 484] }
     ,{ "id": "contracts-orchestrator", "from": "contracts", "to": "orchestrator", "label": "validate every boundary", "variant": "security", "fromSide": "top", "toSide": "right", "via": [[385, 380], [240, 380], [240, 260]], "labelAt": [320, 395] }

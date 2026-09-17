@@ -32,9 +32,9 @@ sa stratégie de rollback.
 Pendant une modification, utiliser le test ou validateur ciblé. Exécuter
 `npm run validate` une fois par chantier cohérent, puis `npm run verify` avant
 une livraison. Le job d'installation propre exécute le bootstrap réel. Dans
-Codex, la confiance du workspace exact puis l'approbation des sept définitions
-de `/hooks` restent des actions manuelles ; le dépôt ne modifie pas les réglages
-globaux Codex ou Claude.
+Codex, l'approbation des
+neuf définitions de `/hooks` reste une action manuelle ; le dépôt ne modifie pas
+les réglages globaux Codex ou Claude.
 
 Trois workflows distincts gèrent la revue CRG des PR. Le workflow non privilégié
 checkout le code PR avec `contents: read`, exécute l'Action officielle épinglée
@@ -50,13 +50,9 @@ Un risque `high` ou `critical` exige une review `APPROVED` sur ce SHA par un
 administrateur distinct de l’auteur, avec une ligne `Justification:` de 32 à 512
 caractères, une issue de suivi et `CRG-report-sha256:<digest>`. L’acceptation
 produit un artefact `CrgRiskAcceptance`; tout nouveau SHA ou rapport l’invalide.
-Le check requis et son commentaire de disposition répètent le score, la portée,
-les principaux symboles à examiner, leur couverture directe et le modèle exact
-d’acceptation. Un blocage reste ainsi actionnable depuis l’API des checks, sans
-devoir retrouver manuellement l’artefact ou interpréter un code d’erreur interne.
 
 Après le premier run distant réussi, rendre le check **CRG disposition**
-obligatoire sur `main` à la place du check brut, en le conservant avec tous les checks déjà requis,
+obligatoire sur `main` à la place du check brut, en le conservant avec les checks existants,
 `strict: true`. Le workflow de commentaire ne doit pas être obligatoire.
 Les Actions internes à l'Action composite CRG sont des dépendances transitives
 du commit officiel et sont réévaluées lors de toute mise à jour du pin.

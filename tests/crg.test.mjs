@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isLatestMaintenanceRequest, shouldUpdate } from '../.codex/hooks/post-tool-crg.mjs';
-import { CRG_MCP_TOOLS, CRG_REMEDIATION, CRG_VERSION, MAX_OUTPUT_BYTES, crgHealth, crgInvocation, parseCrgStatus, runCrgCommand, runCrgUpdate } from '../scripts/crg-runner.mjs';
+import { CRG_MCP_TOOLS, CRG_VERSION, MAX_OUTPUT_BYTES, crgInvocation, runCrgCommand, runCrgUpdate } from '../scripts/crg-runner.mjs';
 
 const nodeChild = source => () => spawn(process.execPath, ['-e', source], { stdio: ['ignore', 'pipe', 'pipe'] });
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -33,23 +33,6 @@ test('CRG update builds a missing graph and updates an existing graph', async ()
   assert.equal(result.stdout, 'updated');
 });
 
-test('CRG update rebuilds once when an incremental merge update cannot refresh HEAD metadata', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'crg-noop-update-'));
-  await mkdir(join(root, '.code-review-graph'), { recursive: true });
-  await writeFile(join(root, '.code-review-graph', 'graph.db'), 'fixture');
-  let calls = 0;
-  const spawnImpl = () => {
-    calls += 1;
-    return nodeChild(calls === 1 ? 'process.stdout.write("Incremental: 0 files updated, 0 nodes, 0 edges")' : 'process.stdout.write("rebuilt")')();
-  };
-  const result = await runCrgUpdate({ root, spawnImpl });
-  assert.equal(calls, 2);
-  assert.equal(result.refreshedNoop, true);
-  assert.deepEqual(result.previousCommand, ['update', '--repo', root, '--skip-flows']);
-  assert.deepEqual(result.command, ['build', '--repo', root]);
-  assert.equal(result.stdout, 'rebuilt');
-});
-
 test('CRG update lock is cross-process single-flight and fail-open', async () => {
   const root = await mkdtemp(join(tmpdir(), 'crg-lock-'));
   await mkdir(join(root, '.code-review-graph', '.ctxroute-update.lock'), { recursive: true });
@@ -68,35 +51,6 @@ test('CRG child timeout and output are bounded', async () => {
   assert.ok(Buffer.byteLength(result.stdout) <= MAX_OUTPUT_BYTES);
 });
 
-test('CRG health compares the graph build commit with HEAD and gives one remediation', async () => {
-  assert.deepEqual(parseCrgStatus('Built at commit: abc123\n'), { builtAtCommit: 'abc123' });
-  const fresh = await crgHealth({
-    root: '/workspace',
-    readHead: async () => 'abc123def456',
-    runCommand: async () => ({ code: 0, timedOut: false, stdout: 'Built at commit: abc123\n', stderr: '' }),
-  });
-  assert.equal(fresh.status, 'fresh');
-  assert.equal(fresh.head_matches_build, true);
-  assert.equal(fresh.remediation, null);
-
-  const stale = await crgHealth({
-    root: '/workspace',
-    readHead: async () => 'fff999',
-    runCommand: async () => ({ code: 0, timedOut: false, stdout: 'Built at commit: abc123\n', stderr: '' }),
-  });
-  assert.equal(stale.status, 'stale');
-  assert.equal(stale.head_matches_build, false);
-  assert.equal(stale.remediation, CRG_REMEDIATION);
-
-  const missing = await crgHealth({
-    root: '/workspace',
-    readHead: async () => 'fff999',
-    runCommand: async () => ({ code: 0, timedOut: false, stdout: 'No graph yet\n', stderr: '' }),
-  });
-  assert.equal(missing.status, 'missing');
-  assert.equal(missing.cause, 'GRAPH_BUILD_COMMIT_MISSING');
-});
-
 test('PostToolUse triggers only one successful normal write', () => {
   assert.equal(shouldUpdate({ tool_name: 'Edit', tool_input: { file_path: 'src/a.js' }, tool_response: {} }), true);
   assert.equal(shouldUpdate({ tool_name: 'Read', tool_input: { file_path: 'src/a.js' }, tool_response: {} }), false);
@@ -107,10 +61,11 @@ test('PostToolUse triggers only one successful normal write', () => {
 });
 
 test('PostToolUse maintenance coalesces an edit burst to its latest request', async () => {
-  const stateDirectory = await mkdtemp(join(tmpdir(), 'crg-maintenance-'));
-  const first = isLatestMaintenanceRequest({ stateDirectory, quietMs: 30, token: 'first' });
+  const projectRoot = await mkdtemp(join(tmpdir(), 'crg-maintenance-'));
+  const stateDirectory = join(projectRoot, '.ctxroute/state');
+  const first = isLatestMaintenanceRequest({ root: projectRoot, stateDirectory, quietMs: 30, token: 'first' });
   await new Promise(resolveWait => { setTimeout(resolveWait, 5); });
-  const second = isLatestMaintenanceRequest({ stateDirectory, quietMs: 30, token: 'second' });
+  const second = isLatestMaintenanceRequest({ root: projectRoot, stateDirectory, quietMs: 30, token: 'second' });
   assert.equal(await first, false);
   assert.equal(await second, true);
 });

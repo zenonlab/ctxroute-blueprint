@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +16,10 @@ import {
   validateInstructionPaths,
   validateInstructionTools,
 } from '../.codex/hooks/problem-memory.mjs';
+import { emitGovernanceEvent } from '../scripts/governance-telemetry.mjs';
+
+const decisionReceipt = { receipt_id: 'memory-receipt', selection: 'persist' };
+const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
 test('normalization removes volatile values while preserving the cause', () => {
   assert.equal(normalizeText('MODULE_NOT_FOUND at 123 on https://example.test/run/abc'), 'module_not_found at <n> on <url>');
@@ -82,6 +86,30 @@ test('handle emits a proposal only at the configured recurrence threshold', () =
   assert.match(result.systemMessage, /Recurring problem recognized/u);
   assert.match(result.hookSpecificOutput.additionalContext, /problemId/u);
   assert.match(result.hookSpecificOutput.additionalContext, /approvalRequired/u);
+  const telemetry = readFileSync(join(directory, 'governance-events.jsonl'), 'utf8');
+  assert.match(telemetry, /"action":"memory.observe"/u);
+  assert.doesNotMatch(telemetry, /failed|problemId|error/u);
+});
+
+test('governance telemetry remains bounded through rotation and concurrent writers', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'governance-telemetry-bounded-'));
+  const decision = { action: 'memory.observe', decision: 'allow', allowed: true };
+  for (let index = 0; index < 600; index += 1) assert.equal(emitGovernanceEvent(directory, decision), true);
+  const path = join(directory, 'governance-events.jsonl');
+  assert.ok(statSync(path).size <= 64 * 1024);
+  assert.ok(statSync(`${path}.1`).size <= 64 * 1024);
+
+  const moduleUrl = new URL('../scripts/governance-telemetry.mjs', import.meta.url).href;
+  const source = `import { emitGovernanceEvent } from ${JSON.stringify(moduleUrl)}; for (let index = 0; index < 150; index += 1) { if (!emitGovernanceEvent(process.argv[1], { action: 'memory.observe', decision: 'allow', allowed: true })) process.exitCode = 1; }`;
+  const results = await Promise.all(Array.from({ length: 4 }, () => runNode(['--input-type=module', '-e', source, directory])));
+  assert.ok(results.every(result => result.code === 0), results.map(result => result.stderr).join('\n'));
+  assert.ok(statSync(path).size <= 64 * 1024);
+  assert.ok(statSync(`${path}.1`).size <= 64 * 1024);
+});
+
+test('governance telemetry fails open on storage failure', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'governance-telemetry-failure-'));
+  assert.equal(emitGovernanceEvent(directory, { action: 'memory.observe', decision: 'allow', allowed: true }, {}, { now() { throw new Error('clock unavailable'); } }), false);
 });
 
 test('a recorded resolution is reused on recurrence', () => {
@@ -101,20 +129,22 @@ test('a recorded resolution is reused on recurrence', () => {
 });
 
 test('resolutions can be recorded through the controlled CLI', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'problem-memory-cli-'));
+  mkdirSync(join(repositoryRoot, 'node_modules', '.test-state'), { recursive: true });
+  const directory = mkdtempSync(join(repositoryRoot, 'node_modules', '.test-state', 'problem-memory-cli-'));
   const store = new ProblemStore(directory);
   const observation = extractObservation({ success: false, tool_name: 'npm', error: 'failed' }, 'PostToolUse');
   const record = store.record(observation, buildSignatures(observation));
   store.close();
   const output = execFileSync(process.execPath, ['.codex/hooks/problem-memory.mjs', 'resolve', String(record.id), JSON.stringify({ type: 'correction', summary: 'Keep the lockfile pinned' })], {
-    cwd: fileURLToPath(new URL('..', import.meta.url)),
-    env: { ...process.env, CTXROUTE_STATE_DIR: directory },
+    cwd: repositoryRoot,
+    env: { ...process.env, CTXROUTE_STATE_DIR: directory, CTXROUTE_CONTROL_CHANNEL: 'cli' },
     encoding: 'utf8',
   });
   assert.deepEqual(JSON.parse(output), { resolved: true });
   const check = new ProblemStore(directory);
   assert.equal(JSON.parse(check.get(record.id).resolution_json).summary, 'Keep the lockfile pinned');
   check.close();
+  rmSync(directory, { recursive: true, force: true });
 });
 
 test('approved persistent instructions create valid scoped CTXRoute rules', () => {
@@ -128,7 +158,7 @@ test('approved persistent instructions create valid scoped CTXRoute rules', () =
     approved: true,
     summary: 'Check the lockfile before retrying.',
     scope: { paths: ['package-lock.json'], events: ['PreToolUse'], tools: ['Edit'] },
-  }, directory, directory);
+  }, directory, directory, { authority: 'orchestrator', decisionReceipt });
   const artifactPath = join(directory, '.claude', 'hooks', 'docs', 'problem-memory', `problem-${record.id}-0.md`);
   assert.equal(artifact, true);
   assert.equal(existsSync(artifactPath), true);
@@ -150,9 +180,9 @@ test('generated CTXRoute rules inject only for the declared tool and scope', () 
     approved: true,
     summary: 'Check the lockfile before retrying.',
     scope: { paths: ['package-lock.json'], tools: ['Edit'] },
-  }, directory, directory);
+  }, directory, directory, { authority: 'orchestrator', decisionReceipt });
 
-  const projectRoot = fileURLToPath(new URL('..', import.meta.url));
+  const projectRoot = repositoryRoot;
   const hook = join(projectRoot, 'node_modules/ctxroute/src/hooks/codex-doc-inject.js');
   const environment = {
     ...process.env,
@@ -198,7 +228,8 @@ test('persistent instructions cannot be written without approval', () => {
   const observation = extractObservation({ success: false, error: 'failed' }, 'PostToolUse');
   const record = store.record(observation, buildSignatures(observation));
   store.close();
-  assert.throws(() => resolveProblem(record.id, { type: 'persistent-instruction', summary: 'Do this' }, directory), /approved/u);
+  assert.throws(() => resolveProblem(record.id, { type: 'persistent-instruction', summary: 'Do this' }, directory, directory, { authority: 'orchestrator' }), /approved/u);
+  assert.throws(() => resolveProblem(record.id, { type: 'persistent-instruction', approved: true, summary: 'Do this' }, directory, directory, { authority: 'orchestrator' }), /DecisionReceipt/u);
 });
 
 test('the hook fails open when disabled', () => {
@@ -213,3 +244,12 @@ test('structural matching can be disabled without changing exact matching', () =
   assert.equal(handle(input, 'PostToolUse', { config, stateDirectory: directory }), null);
   assert.equal(handle(JSON.stringify({ success: false, tool_name: 'npm', error_code: 'EFAIL', error: 'failed for beta' }), 'PostToolUse', { config, stateDirectory: directory }), null);
 });
+
+function runNode(args) {
+  return new Promise(resolveRun => {
+    const child = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.on('close', code => resolveRun({ code, stderr }));
+  });
+}

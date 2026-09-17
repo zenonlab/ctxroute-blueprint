@@ -13,7 +13,7 @@ test('session audit streams bounded traces, redacts secrets, and detects defecti
     JSON.stringify({ mission_id: 'mission-one', skill_id: 'wrong-skill', token: 'must-not-leak', file_path: 'outside/file.mjs' }),
     JSON.stringify({ exit_code: 1, command: 'npm test', message: 'password=must-not-leak' }),
   ].join('\n'));
-  const report = await auditSessions({ sessionPaths: [path], approvedRoots: [root], mission: { mission_id: 'mission-one', skill_id: 'expected-skill', file_scope: ['src/'], validation_commands: ['npm test', 'npm run lint'] } });
+  const report = await auditSessions({ sessionPaths: [path], approvedRoots: [root], mission: { mission_id: 'mission-one', skill_id: 'expected-skill', file_scope: ['src/'], validations: [{ executable: 'npm', args: ['test'] }, { executable: 'npm', args: ['run', 'lint'] }] } });
   assert.ok(report.signals.includes('skill-id-mismatch'));
   assert.ok(report.signals.includes('files-outside-scope'));
   assert.ok(report.signals.includes('validations-missing'));
@@ -38,7 +38,7 @@ test('session audit skips traces marked active', async () => {
   const trace = join(directory, 'active.jsonl');
   writeFileSync(trace, `${JSON.stringify({ mission_id: 'wrong' })}\n`);
   writeFileSync(`${trace}.active`, '1');
-  const report = await auditSessions({ sessionPaths: [trace], approvedRoots: [directory], mission: { mission_id: 'expected', skill_id: 'skill', file_scope: [], validation_commands: [] } });
+  const report = await auditSessions({ sessionPaths: [trace], approvedRoots: [directory], mission: { mission_id: 'expected', skill_id: 'skill', file_scope: [], validations: [] } });
   assert.ok(report.signals.includes('active-sessions-skipped'));
   assert.match(report.validations[0].diagnostic, /files=0/u);
 });

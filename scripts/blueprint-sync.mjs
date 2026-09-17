@@ -11,13 +11,10 @@ export const CONTROL_FILES = Object.freeze([
   '.github/workflows/code-review-graph-comment.yml', '.github/workflows/code-review-graph-disposition.yml',
   '.github/schemas/crg-risk-acceptance.schema.json', 'eslint.config.mjs',
   '.project/blueprint-version.json', '.project/orchestrator-config.json',
-  'scripts/code-context-policy.mjs',
   'scripts/orchestrator-core.mjs', 'scripts/orchestrator-cli.mjs', 'scripts/orchestrator-mcp.mjs',
   'scripts/orchestrator-service.mjs', 'scripts/orchestrator-bootstrap.mjs', 'scripts/orchestrator-contracts.mjs',
+  'scripts/orchestration-policy-core.mjs', 'scripts/orchestrator-policy-snapshot.mjs', 'scripts/git-command-policy.mjs',
   'scripts/orchestrator-telemetry.mjs', 'scripts/orchestrator-validation.mjs',
-  'scripts/orchestrator-goal.mjs', 'scripts/orchestrator-worker.mjs', 'scripts/orchestrator-fixture-worker.mjs',
-  'scripts/orchestrator-audit-sharding.mjs', 'scripts/orchestrator-documentation.mjs',
-  'scripts/orchestrator-models.mjs', 'scripts/orchestrator-routing-core.mjs', 'scripts/orchestrator-routing-service.mjs',
   'scripts/validate-orchestrator-contracts.mjs', 'scripts/worktree-manager.mjs',
   'scripts/session-audit.mjs', 'scripts/validate-blueprint-skills.mjs',
   'scripts/verify-blueprint-skills.mjs', 'scripts/blueprint-review.mjs', 'scripts/crg-disposition.mjs',
@@ -73,10 +70,10 @@ async function blueprintVersion(root) {
 
 export function trackedControlFiles(root = scriptRoot) {
   const repository = resolve(root);
-  const output = execFileSync('git', ['ls-files', '-z', '--', ...CONTROL_FILES, ...CONTROL_DIRECTORIES], {
+  const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', ...CONTROL_FILES, ...CONTROL_DIRECTORIES], {
     cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
   });
-  const allTracked = new Set(execFileSync('git', ['ls-files', '-z'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean));
+  const allTracked = new Set(execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean));
   const selected = new Set(output.split('\0')
     .filter(Boolean)
     .filter(file => !file.startsWith('.claude/hooks/docs/adr-memory/')));

@@ -18,9 +18,6 @@ proportionate level of verification.
 | Security | required | Minimal CI permissions, pinned actions, whole-blueprint Sensor gate, no secret diagnostics | `npm audit --audit-level=high`, `npm run sensor:blueprint`, and the Sensor checklist |
 | Accessibility | required when a product UI exists | Generated product and Archify surfaces remain keyboard-operable, labelled, responsive, and status-announced | Product UI tests plus Archify showcase checks and `npm run archify:visual-check`; the orchestrator itself has no UI or HTTP surface |
 | Migration / recovery | required for local tooling | Can the orchestrator recover atomic state and reclaim dead worktrees without disturbing live locks? | Orchestrator crash-window, reconciliation, and multi-process tests |
-| Adaptive routing | required | Do risk floors dominate presets, insufficient capabilities fail closed, fallback stays same-level before monotone escalation, and explanation reproduce execution? | Pure routing property/negative tests plus fixture HOOTL goals |
-| Documentation evidence | required | Does every adaptive goal produce fresh primary evidence or a mechanical `NOT_APPLICABLE`, with no page body or secret persisted? | Documentation gate, ledger citation, freshness, unavailable-Web, and local-only fixtures |
-| Provider dialect | required per adapter | Are model, effort, schema, sandbox, tools, metrics, and failure categories exact and permission bypasses absent? | Closed command/parser tests; authenticated smokes remain opt-in |
 
 ## Template baseline
 
@@ -45,15 +42,9 @@ The dedicated pull-request CRG workflow blocks findings at level `high` or
 above. This risk gate supplements deterministic tests and never proves runtime
 correctness by itself.
 
-Routing tests must cover all L0–L4 floors, context rejection, deterministic
-tie-breaking, economy/quality behavior, budget exhaustion, independent audit,
-provider fallback, and `explain-route` equivalence. Documentation tests use
-process fixtures rather than live network access; opt-in authenticated provider
-smokes are never required in CI.
-
 ## Sensor and CRG boundary
 
-The Sensor catalogue classifies recognition, parsing, common rules, and
+The Sensor v2 catalogue classifies recognition, parsing, common rules, and
 ecosystem rules separately. JavaScript, TypeScript/TSX, Python, Ruby/ERB, and
 JSON have verified syntax parsing. Other formats are `PARTIAL` or `MISSING`
 until their Node 22 parser and valid/invalid fixture matrix are verified. Astro

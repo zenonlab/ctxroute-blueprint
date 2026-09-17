@@ -10,10 +10,11 @@ review: on-change
 revised: true
 contracts:
   - .project/schemas/orchestrator/worktree-operation.schema.json
+superseded-by: ADR-0089-repository-authority-and-outcome-proof.md
 ---
 # ADR-0025 — Recoverable worktree effects
 
-- Status: accepted
+- Status: superseded
 - Date: 2026-09-06
 
 ## Decision

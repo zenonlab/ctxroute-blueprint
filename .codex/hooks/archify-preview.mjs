@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { selectArchifyDiagrams } from '../../scripts/archify-registry.mjs';
+import { safeStateDirectory } from '../../scripts/safe-state-directory.mjs';
 
 const root = resolve(process.cwd());
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -23,7 +24,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 }
 
 async function ensurePreview(input) {
-  const stateDirectory = resolve(process.env.CTXROUTE_STATE_DIR ?? join(root, '.ctxroute', 'state'));
+  const stateDirectory = safeStateDirectory(process.env.CTXROUTE_STATE_DIR ?? join(root, '.ctxroute', 'state'), root);
   const diagram = selectPreviewDiagram(input, selectArchifyDiagrams('all', root));
   if (!diagram) return null;
   const source = diagram.source;

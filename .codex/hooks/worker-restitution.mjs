@@ -5,7 +5,8 @@ import { submitWorkerReport } from '../../scripts/orchestrator-service.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-export async function restituteWorker(reportPath = process.env.CTXROUTE_WORKER_REPORT, projectRoot = root) {
+export async function restituteWorker(reportPath = process.env.CTXROUTE_WORKER_REPORT, projectRoot = root, environment = process.env) {
+  reportPath ??= environment.CTXROUTE_WORKER_REPORT;
   if (!reportPath) return null;
   const absolute = resolve(projectRoot, reportPath);
   const local = relative(projectRoot, absolute).replaceAll('\\', '/');

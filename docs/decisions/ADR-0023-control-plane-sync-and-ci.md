@@ -42,16 +42,6 @@ edit. Problem memory and Archify preview handlers are skipped before process
 creation when the event cannot affect them. SessionEnd also asks CTXRoute to
 purge that session's scoped injection state.
 
-File routing has one source of truth: `.project/project-config.json` classifies
-source, test, generated, documentation, architecture, and contract paths, while
-active ADR front matter maps decisions to those paths. `AGENTS.md` requires the
-agent to state its intended repository-relative files at the start of a change.
-SessionStart exposes the canonical route map, PreCompact refreshes it after
-context compaction, PreToolUse handles prerequisite reads and policy before the first write, PostToolUse reviews the completed
-write and cumulative diff, and Stop plus Git gates validate the complete
-change. Hooks do not infer authority from prose or persist a parallel hidden
-file list.
-
 ## Consequences
 
 Routine tool calls create fewer processes and external service instability does
