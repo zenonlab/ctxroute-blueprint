@@ -117,6 +117,14 @@ unknown paths keep their explicit JSON/404 behavior. Versioned downloads stream
 from `tobirink-public-releases` with immutable caching, attachment disposition,
 ETag, and content-type metadata.
 
+The post-cleanup publication used plan
+`74c982060b8ea554797494ca6aa682c59e62b75ab0e96309f5ac6b665019266d`,
+whose only action was `worker:tobirink-public-api`. Worker version
+`7d514091-35ff-496d-b533-e57d13fea3fd` then served the route and weekly cron.
+Production probes returned HTTP 200 for the home page, `/download`, both
+published `1.0.30` archives, `/v3/releases`, and `/v4/release-models`; the
+download page contained no `1.0.31` publication link.
+
 ## Emergency provider shutdown
 
 The fail-closed emergency state is versioned in `apps/worker/wrangler.jsonc`:

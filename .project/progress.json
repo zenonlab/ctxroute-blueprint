@@ -2795,7 +2795,7 @@
         {
           "id": "deploy-and-final-audit",
           "title": "Déployer, pousser et certifier le résultat",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Téléchargements publics répondent HTTP 200",
             "Worker, D1, R2 et queues actives sont sains",
@@ -2814,7 +2814,7 @@
             "git push"
           ],
           "evidence": [
-            "État initial audité: cœur sain, seule publication des ZIP et dette orpheline en défaut."
+            "Commits locaux 6fb061c et 47b9742 vérifiés; préparation du plan Worker borné avant déploiement et probes production."
           ]
         }
       ]
