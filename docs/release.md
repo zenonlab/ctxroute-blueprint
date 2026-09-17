@@ -77,13 +77,13 @@ Cloudflare et sa propre étape destructive.
 
 ## Build a release candidate
 
-The current production archives remain immutable. The published production
-archives are `1.0.30`; the repository source is the unpublished `1.0.31`
-candidate.
+The current production archives are `1.0.31`, published after the
+provider-free candidate passed the installed Chrome and Agenda smoke tests.
+The repository source and public pointer now agree on `1.0.31`.
 `apps/extension/package.json` is the candidate version source: WXT reads it for
 both manifests and the packager reads it for ZIP names. The download page reads
-`apps/web/published-extension.json`, which remains on the last verified upload
-until both candidate ZIPs have been accepted and published.
+`apps/web/published-extension.json`; advance that pointer only with both
+matching ZIPs and a verified Worker deployment.
 
 Run `npm run package:extension` from the repository root. The command rebuilds
 both browser targets and writes these ignored, reproducible artifacts:
@@ -247,7 +247,7 @@ une URL fournisseur explicite peut encore demander volontairement
 l'hydratation exacte à AniList, MangaUpdates, MangaDex ou Kitsu; elle n'est pas
 une recherche automatique de titre.
 
-### Candidate sans fournisseur MV3 — 1.0.31
+### Publication sans fournisseur MV3 — 1.0.31
 
 La candidate locale `1.0.31` ferme aussi le dernier chemin manuel direct : un
 identifiant fournisseur explicite produit une demande Public Discovery v3 et
@@ -259,14 +259,14 @@ que `https://tobirink.com/*` et ne déclarent aucun ruleset DNR.
 Deux constructions isolées reproduisent exactement les archives de vingt
 fichiers :
 
-- Chrome : 291601 octets, SHA-256
-  `a4bf87ecc73f03566ad84d8a6b2d8ee61dae0fe6e1cbf3f9f1897afb81dbd390`.
-- Firefox : 291642 octets, SHA-256
-  `01657bc68988fc97360881f7a2f6bd431e52d82dbfc95440fb0ca58a545e3358`.
+- Chrome : SHA-256
+  `465bab47f804106719975be8d7bb3a3ab5caa3ba8f24f4a0cbfb143776976ce4`.
+- Firefox : SHA-256
+  `d369886eddf9ea75a3fb19625622f305c421d521084f6d9fc937e164cdc696c4`.
 
-Cette candidate n’est pas publiée. La production, les liens de téléchargement
-et le rollback restent en `1.0.30` jusqu’à une opération R2 et un déploiement
-Worker explicitement approuvés et vérifiés.
+Cette candidate a ensuite été publiée comme `1.0.31` après l’opération R2
+bornée et le déploiement Worker vérifié. `1.0.30` reste disponible comme
+version de rollback.
 
 ### Publication D1-first et Agenda OIDC — 2026-09-14
 

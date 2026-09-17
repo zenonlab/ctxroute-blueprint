@@ -122,8 +122,15 @@ The post-cleanup publication used plan
 whose only action was `worker:tobirink-public-api`. Worker version
 `7d514091-35ff-496d-b533-e57d13fea3fd` then served the route and weekly cron.
 Production probes returned HTTP 200 for the home page, `/download`, both
-published `1.0.30` archives, `/v3/releases`, and `/v4/release-models`; the
-download page contained no `1.0.31` publication link.
+published `1.0.31` archives, `/v3/releases`, and `/v4/release-models`; the
+download page contains only the provider-free `1.0.31` publication links.
+
+The extension promotion used plan
+`df8f2d8beaa37dd01095338998d3962de924bc30b3b875c27acfe109f33d715b`
+for the two R2 objects, followed by Worker plan
+`a63179af88b96eae46f3a57a56863f9a6209f283c0642f37c5f73cf1a7a0dbea`.
+The final Worker version is `25589148-ce66-43ab-9634-ed6a6a635f10`; production
+hashes match the local archives exactly.
 
 ## Emergency provider shutdown
 

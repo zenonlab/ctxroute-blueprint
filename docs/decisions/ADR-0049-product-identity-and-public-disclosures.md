@@ -40,7 +40,7 @@ n’envoie jamais l’URL brute du favori, ses dossiers, la progression ou la
 bibliothèque au Worker, à D1 ou aux fournisseurs. Seul le consumer Queue natif
 appelle les APIs fournisseurs, au travers du transport serveur isolé.
 
-Les documents et diagrammes actifs reflètent la version extension 1.0.30, les
+Les documents et diagrammes actifs reflètent désormais la version extension 1.0.31, les
 deux builds MV3 vérifiés et les migrations D1 versionnées. Ils distinguent une
 configuration locale préparée d’une cadence ou publication effectivement
 observée; aucune cible locale non poussée n’est présentée comme déployée.

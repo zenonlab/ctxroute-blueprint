@@ -2814,10 +2814,10 @@
             "git push"
           ],
           "evidence": [
-            "Plan Cloudflare 74c982060b8ea554797494ca6aa682c59e62b75ab0e96309f5ac6b665019266d limité au Worker; version 7d514091-35ff-496d-b533-e57d13fea3fd sert 100 %, cron dimanche 03:23 UTC et bindings actifs conservés.",
-            "Production: accueil, /download, deux ZIP 1.0.30, /v3/releases et /v4/release-models répondent 200; la page ne contient aucun lien 1.0.31 et le revalidate ETag v3 répond 304.",
-            "npm run verify, npm ls --all et npm audit passent; Worker 113/113, Extension 145/145, Application 380/380, builds Chromium/Firefox et tous les diagrammes Archify showcase sont verts; 0 vulnérabilité.",
-            "Commits 6fb061c, 47b9742 et f478b80 poussés; origin/perf/adaptive-public-refresh pointe exactement sur f478b80800ef31d65dec02a75bf688c35b4e2f5d, .codex/config.toml préservé hors commit."
+            "Publication corrigée: apps/web/published-extension.json pointe 1.0.31; /download, ZIP Chrome et ZIP Firefox répondent 200 et les hashes distants correspondent exactement aux archives locales.",
+            "Chrome 1.0.31 installé: smoke Review hors ligne, convergence automatique des favoris et Agenda virtuel sans requête fournisseur réussissent; manifest uniquement https://tobirink.com/*, sans DNR ni origines fournisseur.",
+            "R2 promotion df8f2d8beaa37dd01095338998d3962de924bc30b3b875c27acfe109f33d715b puis Worker plan a63179af88b96eae46f3a57a56863f9a6209f283c0642f37c5f73cf1a7a0dbea appliqués; Worker 25589148-ce66-43ab-9634-ed6a6a635f10 sert 100 %, cron dimanche 03:23 UTC conservé.",
+            "npm run verify complet, validations Archify production-publication/production-surface et npm audit 0 vulnérabilité réussissent; 1.0.30 reste disponible comme rollback."
           ]
         }
       ]

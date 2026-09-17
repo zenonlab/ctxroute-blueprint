@@ -28,12 +28,12 @@ describe('Workbench web routes', () => {
     ]);
   });
 
-  it('keeps an unpublished source candidate out of public download links', () => {
+  it('publishes only the provider-free candidate version', () => {
     expect(extensionPackage.version).toBe('1.0.31');
-    expect(publishedExtension.version).toBe('1.0.30');
+    expect(publishedExtension.version).toBe('1.0.31');
     expect(publicDownloads(publishedExtension.version)).toEqual([
-      { browser: 'Chrome', href: '/downloads/tobirink-chrome-mv3-1.0.30.zip' },
-      { browser: 'Firefox', href: '/downloads/tobirink-firefox-mv3-1.0.30.zip' },
+      { browser: 'Chrome', href: '/downloads/tobirink-chrome-mv3-1.0.31.zip' },
+      { browser: 'Firefox', href: '/downloads/tobirink-firefox-mv3-1.0.31.zip' },
     ]);
   });
 });
