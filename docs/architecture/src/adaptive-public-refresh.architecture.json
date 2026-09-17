@@ -161,6 +161,7 @@
       "items": [
         "Favoris, dossiers et historique restent dans le navigateur",
         "Aucune relation saison, suite ou adaptation n'est explorée",
+        "La Queue historique orpheline a été retirée par une gate exacte",
         "Les logs de coût sont agrégés et dépourvus d’identité"
       ]
     }

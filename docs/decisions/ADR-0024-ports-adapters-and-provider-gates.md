@@ -54,6 +54,11 @@ last. No generic R2 key, bucket deletion, or arbitrary local path is accepted.
 Adding another R2 mutation or provider still requires an explicit driver
 operation and its contract tests; it does not expand the generic gate.
 
+The retired Queue inventory is separate from active Worker bindings. When it is
+non-empty, deletion refuses any active or undeclared Queue and still requires a
+fresh plan digest plus the exact Queue allowlist. The one-entry
+`tobirink-jobs-production` inventory was cleared after the approved deletion.
+
 ## Consequences
 
 Provider replacement is concentrated in adapters and operational drivers.

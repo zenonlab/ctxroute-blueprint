@@ -18,6 +18,24 @@ test('Queue operations are derived only from checked-in configuration', () => {
   assert.throws(() => driver.resolveOperations(['queue-create:other']), /unsupported-operation/u);
 });
 
+test('Queue deletion is limited to the explicit retired inventory', async () => {
+  const calls = [];
+  const run = async args => {
+    calls.push(args);
+    return 'deleted';
+  };
+  const driver = createCloudflareDriver({ config, retiredQueues: ['retired-jobs'], workerDirectory: '/worker', run });
+  assert.deepEqual(driver.listOperations().filter(operation => operation.kind === 'queue-delete'), [
+    { name: 'queue-delete:retired-jobs', kind: 'queue-delete', target: 'queue:retired-jobs' },
+  ]);
+  const actions = driver.resolveOperations(['queue-delete:retired-jobs']);
+  assert.deepEqual(await driver.preview(actions), { actions });
+  await driver.apply(actions);
+  assert.deepEqual(calls, [['queues', 'delete', 'retired-jobs']]);
+  assert.throws(() => driver.resolveOperations(['queue-delete:public-discovery']), /unsupported-operation/u);
+  assert.throws(() => createCloudflareDriver({ config, retiredQueues: ['public-discovery'], workerDirectory: '/worker' }), /invalid-retired-queue/u);
+});
+
 test('Queue inspection is read-only and creation translation is bounded', async () => {
   const calls = [];
   const contexts = [];

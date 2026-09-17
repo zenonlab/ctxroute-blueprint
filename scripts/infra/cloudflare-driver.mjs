@@ -49,11 +49,13 @@ export async function loadCloudflareConfig(path) {
   return { worker, d1, r2, queues: [...queueNames].sort().map(name => ({ name })) };
 }
 
-export function createCloudflareDriver({ config, workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET] }) {
+export function createCloudflareDriver({ config, retiredQueues = [], workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET] }) {
   validateCloudflareConfig(config);
+  validateRetiredQueues(config, retiredQueues);
   const operations = new Map([
     ...releasePublishOperations(config),
     ...config.queues.map(queue => [`queue-create:${queue.name}`, { kind: 'queue-create', target: `queue:${queue.name}`, queue: queue.name }]),
+    ...retiredQueues.map(queue => [`queue-delete:${queue}`, { kind: 'queue-delete', target: `queue:${queue}`, queue }]),
     ['worker-secret-set:PROVIDER_GATEWAY_HMAC_KEY', { kind: 'worker-secret-set', target: `worker-secret:${config.worker}/${PROVIDER_GATEWAY_SECRET}` }],
     ['worker-deploy', { kind: 'worker-deploy', target: `worker:${config.worker}` }],
     ...config.d1.map(database => [`d1-migrate:${database.binding}`, { kind: 'd1-migrate', target: `d1:${database.name}`, binding: database.binding }]),
@@ -122,6 +124,7 @@ export function createCloudflareDriver({ config, workerDirectory, releaseDirecto
 
 function mutationArguments(action) {
   if (action.kind === 'queue-create') return ['queues', 'create', action.queue];
+  if (action.kind === 'queue-delete') return ['queues', 'delete', action.queue];
   if (action.kind === 'worker-deploy') return ['deploy'];
   if (action.kind === 'worker-secret-set') return ['secret', 'put', PROVIDER_GATEWAY_SECRET, '--name', action.target.split('/')[0].slice('worker-secret:'.length)];
   if (action.kind === 'd1-migrate') return ['d1', 'migrations', 'apply', action.binding, '--remote'];
@@ -211,6 +214,7 @@ function findAction(operations, expected) {
 function operationPriority(action) {
   if (action.kind === 'queue-create') return 0;
   if (action.kind === 'd1-migrate') return 1;
+  if (action.kind === 'queue-delete') return 2;
   if (action.kind === 'r2-publish' || action.kind === 'r2-release-snapshot') return 2;
   if (action.kind === 'r2-release-pointer') return 3;
   if (action.kind === 'worker-secret-set') return 3;
@@ -234,6 +238,17 @@ export function validateCloudflareConfig(config) {
   config.d1.forEach(item => { requiredString(item.binding, 'd1-binding'); requiredString(item.name, 'd1-name'); });
   config.r2.forEach(item => { requiredString(item.binding, 'r2-binding'); requiredString(item.name, 'r2-name'); });
   config.queues.forEach(item => requiredQueueName(item.name));
+}
+
+function validateRetiredQueues(config, retiredQueues) {
+  if (!Array.isArray(retiredQueues)) throw new Error('invalid-retired-queues');
+  const active = new Set(config.queues.map(queue => queue.name));
+  const seen = new Set();
+  for (const queue of retiredQueues) {
+    requiredQueueName(queue);
+    if (active.has(queue) || seen.has(queue)) throw new Error('invalid-retired-queue');
+    seen.add(queue);
+  }
 }
 
 function parseJson(value, error) {

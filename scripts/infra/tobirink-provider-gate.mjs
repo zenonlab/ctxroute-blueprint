@@ -5,6 +5,8 @@ import { applyApprovedPlan, createOperationPlan } from './provider-gate-core.mjs
 import { createCloudflareDriver, loadCloudflareConfig } from './cloudflare-driver.mjs';
 import { createProviderGatewayDriver } from './provider-gateway-driver.mjs';
 
+const RETIRED_CLOUDFLARE_QUEUES = [];
+
 export async function runProviderGate(argv, { cwd = process.cwd(), stdout = console.log } = {}) {
   const { command, values } = parseArguments(argv);
   const provider = values.provider ?? 'cloudflare';
@@ -14,7 +16,7 @@ export async function runProviderGate(argv, { cwd = process.cwd(), stdout = cons
   } else if (provider === 'cloudflare') {
     const workerDirectory = resolve(cwd, 'apps/worker');
     const config = await loadCloudflareConfig(resolve(workerDirectory, 'wrangler.jsonc'));
-    driver = createCloudflareDriver({ config, workerDirectory });
+    driver = createCloudflareDriver({ config, retiredQueues: RETIRED_CLOUDFLARE_QUEUES, workerDirectory });
   } else {
     throw new Error('unsupported-provider');
   }

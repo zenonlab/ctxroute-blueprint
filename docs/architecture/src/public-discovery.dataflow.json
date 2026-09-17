@@ -5,7 +5,7 @@
     "title": "TobiRink — découverte publique D1-first",
     "output": "public-discovery.dataflow.html",
     "quality_profile": "showcase",
-    "viewBox": [1080, 700],
+    "viewBox": [1080, 560],
     "views": [
       {
         "id": "cache-hit",
@@ -16,19 +16,19 @@
       {
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
-        "focus": ["extension", "worker", "publicD1", "queue", "collector", "providerControl", "transportPort", "providers", "verifiedD1", "extensionResult"],
+        "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
         "note": "Seule la transition D1 MISS vers PENDING émet un signal; le consumer réclame ensuite un lot borné."
       },
       {
         "id": "verified-refresh",
         "label": "Fiche VERIFIED échue",
-        "focus": ["extension", "worker", "publicD1", "queue", "collector", "providerControl", "transportPort", "providers", "verifiedD1", "extensionResult"],
+        "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
         "note": "La fiche VERIFIED reste servie pendant qu’un état de refresh orthogonal reconstruit une demande depuis ses références publiques."
       },
       {
         "id": "boundaries",
         "label": "Frontières",
-        "focus": ["extension", "worker", "publicD1", "queue", "collector", "providerControl", "transportPort", "providers"],
+        "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers"],
         "note": "La gate route AniList et MangaUpdates via Deno; MangaDex et Kitsu restent directs."
       }
     ]
@@ -47,7 +47,7 @@
       "label": "Extension MV3",
       "sublabel": "demande une œuvre",
       "stage": 0,
-      "row": 1,
+      "row": 0,
       "width": 140,
       "tag": "D1-first"
     },
@@ -57,7 +57,7 @@
       "label": "API TobiRink v3",
       "sublabel": "lecture ou création · v2 retiré",
       "stage": 1,
-      "row": 1,
+      "row": 0,
       "width": 140,
       "tag": "aucun appel fournisseur"
     },
@@ -67,7 +67,7 @@
       "label": "D1 catalogue public",
       "sublabel": "admission · refresh orthogonal",
       "stage": 2,
-      "row": 1,
+      "row": 0,
       "width": 140,
       "tag": "VERIFIED toujours lisible"
     },
@@ -77,8 +77,7 @@
       "label": "Cloudflare Queue",
       "sublabel": "signal unique · DLQ ×8",
       "stage": 2,
-      "row": 2,
-      "yOffset": 20,
+      "row": 1,
       "width": 140,
       "tag": "ressources gated"
     },
@@ -88,32 +87,19 @@
       "label": "Collecteur Worker",
       "sublabel": "un claim D1 de 20 par lot",
       "stage": 3,
-      "row": 2,
-      "yOffset": 20,
+      "row": 1,
       "width": 140,
       "tag": "ack ou retry explicite"
     },
     {
-      "id": "providerControl",
-      "type": "database",
-      "label": "Contrôle fournisseur D1",
-      "sublabel": "réservation cadence · circuit",
-      "stage": 3,
-      "row": 3,
-      "yOffset": 50,
-      "width": 140,
-      "tag": "état partagé"
-    },
-    {
       "id": "transportPort",
       "type": "security",
-      "label": "ProviderTransportPort",
-      "sublabel": "gate par endpoint",
-      "stage": 4,
+      "label": "Contrôle et transport",
+      "sublabel": "cadence · circuit · endpoint",
+      "stage": 3,
       "row": 2,
-      "yOffset": 20,
       "width": 140,
-      "tag": "adaptateurs isolés"
+      "tag": "ProviderTransportPort"
     },
     {
       "id": "providers",
@@ -121,8 +107,7 @@
       "label": "APIs fournisseurs",
       "sublabel": "AniList · MU · MD · Kitsu ×2",
       "stage": 4,
-      "row": 3,
-      "yOffset": 50,
+      "row": 2,
       "width": 140,
       "tag": "transport sélectionné"
     },
@@ -130,10 +115,9 @@
       "id": "verifiedD1",
       "type": "database",
       "label": "D1 fiche VERIFIED",
-      "sublabel": "profil + relations exactes",
+      "sublabel": "profil + références même œuvre",
       "stage": 4,
       "row": 1,
-      "yOffset": -20,
       "width": 140,
       "tag": "œuvres distinctes"
     },
@@ -179,11 +163,11 @@
     {
       "from": "publicD1",
       "to": "queue",
-      "label": "MISS, refresh ou relation : signal unique",
-      "classification": "uniquement created · cible liée exacte",
+      "label": "MISS ou refresh : signal unique",
+      "classification": "uniquement created · identité canonique",
       "variant": "security",
       "route": "auto",
-      "labelAt": [530, 338]
+      "labelAt": [500, 350]
     },
     {
       "from": "queue",
@@ -192,24 +176,16 @@
       "classification": "un claim(20) · bail D1 idempotent",
       "variant": "emphasis",
       "route": "straight",
-      "labelAt": [638, 448]
+      "labelAt": [638, 480]
     },
     {
       "from": "collector",
-      "to": "providerControl",
-      "label": "réserve une requête réelle",
-      "classification": "priorité identité · média · ambigu",
+      "to": "transportPort",
+      "label": "requête réservée",
+      "classification": "priorité identité · Retry-After · seuil configurable",
       "variant": "security",
       "route": "auto",
-      "labelAt": [755, 500]
-    },
-    {
-      "from": "providerControl",
-      "to": "transportPort",
-      "label": "cadence et circuit validés",
-      "classification": "Retry-After · seuil configurable",
-      "variant": "security",
-      "route": "auto"
+      "labelAt": [740, 428]
     },
     {
       "from": "transportPort",
@@ -223,10 +199,11 @@
     {
       "from": "collector",
       "to": "verifiedD1",
-      "label": "publication atomique validée",
+      "label": "fiche validée",
       "classification": "profil inchangé sans réécriture · ancien profil servi",
       "variant": "security",
-      "route": "auto"
+      "route": "auto",
+      "labelAt": [900, 320]
     },
     {
       "from": "verifiedD1",
@@ -236,56 +213,6 @@
       "variant": "emphasis",
       "route": "straight",
       "labelAt": [850, 204]
-    }
-  ],
-  "cards": [
-    {
-      "dot": "emerald",
-      "title": "HIT D1",
-      "items": [
-        "La fiche hydratée repart directement vers l’extension",
-        "Aucun appel AniList, MangaUpdates ou autre fournisseur"
-      ]
-    },
-    {
-      "dot": "cyan",
-      "title": "MISS D1",
-      "items": [
-        "D1 retourne created, existing ou saturated; seule created émet dans la Queue",
-        "Titre normalisé + média possède un unique workId versionné",
-        "Un bail PROCESSING empêche tout second collecteur concurrent",
-        "Les caches NOT_FOUND et AMBIGUOUS portent une échéance explicite",
-        "La huitième tentative expirée devient FAILED puis UNAVAILABLE",
-        "Un POST identique est requis pour remettre FAILED à PENDING",
-        "Le résultat VERIFIED répond aux prochaines lectures; request_json devient {}",
-        "Le refresh reconstruit 4 titres maximum depuis le profil et une référence exacte",
-        "VERIFIED reste lisible pendant PENDING et PROCESSING; un échec conserve le profil",
-        "Une adaptation est une œuvre distincte; sa référence exacte peut amorcer une seule demande secondaire",
-        "Le backfill terminal historique conserve PENDING, PROCESSING et FAILED"
-      ]
-    },
-    {
-      "dot": "amber",
-      "title": "Runtime Cloudflare déployé",
-      "items": [
-        "Aucun utilisateur, compte, consentement ou Collectif",
-        "Nonces 7 jours · FAILED 30 jours · négatifs 7 jours · VERIFIED conservé",
-        "La découverte automatique de l’extension n’appelle aucune API fournisseur",
-        "D1, le collecteur et le code Worker restent dans le dépôt principal privé",
-        "Cadence et coupe-circuit sont réservés atomiquement dans D1 avant ProviderTransportPort",
-        "Le mode direct reste disponible comme rollback mais le smoke réel reçoit HTTP 403 depuis Cloudflare",
-        "Le mode selective-gateway est actif; Deno ne reçoit qu’AniList et MangaUpdates"
-      ]
-    },
-    {
-      "dot": "cyan",
-      "title": "Mesure sans identité",
-      "items": [
-        "Les lectures publient seulement les nombres de HIT et MISS",
-        "Les admissions comptent created, deduplicated, saturated et refresh",
-        "Le consumer compte les requêtes HTTP réelles et D1Result.meta",
-        "Les agrégats quotidiens ne contiennent aucune clé, aucun titre et aucune IP"
-      ]
     }
   ]
 }

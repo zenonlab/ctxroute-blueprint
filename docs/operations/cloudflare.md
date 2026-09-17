@@ -97,6 +97,20 @@ and a repeated dry-run. Any mismatch fails closed. When both operations are
 approved, D1 migrations run before release uploads, and the Worker deployment
 runs last. No CI workflow calls `infra:apply`.
 
+The approved orphan cleanup was bounded by the gate:
+
+```sh
+npm run infra:plan -- --account <cloudflare-account-id> \
+  --operation d1-migrate:PUBLIC_DB \
+  --operation queue-delete:tobirink-jobs-production
+```
+
+Its apply allowlist was exactly `d1:tobirink-public` and
+`queue:tobirink-jobs-production`. Plan
+`b3a217a0561d3174499527b46dc21732ebd565981b5c7ee1937c38e9b03bae38`
+applied migration `0025` before deleting that Queue. The consumed retired
+inventory is now empty; active queues remain rejected by the driver.
+
 The Worker serves the static export through its `ASSETS` binding on
 `tobirink.com/*`. Only declared member routes fall back to the export; API and
 unknown paths keep their explicit JSON/404 behavior. Versioned downloads stream
@@ -241,14 +255,12 @@ PROCESSING → IDLE`, emits one Queue signal on the first transition, keeps
 profile must not add a catalogue revision. A provider failure or non-VERIFIED
 result must leave the previous profile readable.
 
-Apply additive migration `0020_catalogue_work_relations.sql` before deploying
-relation-aware collectors. It creates only the relation table and indexes; it
-does not rewrite existing works. Verify that a source publication with an
-unknown exact target creates one relation with `target_work_id IS NULL`, one
-PENDING exact Discovery request and one Queue signal. After the target becomes
-VERIFIED, the same relation must point to its distinct work ID. Never repair a
-collision by editing or merging work IDs manually; route uncertain evidence to
-Review in a separately approved operation.
+Migration `0020_catalogue_work_relations.sql` is historical. Relation-aware
+collection was retired before producing remote rows. After a fresh D1 export,
+zero-row verification and consumer audit, migration
+`0025_drop_catalogue_work_relations.sql` removes only that table and its owned
+indexes. Exact references that identify the same work remain in the canonical
+catalogue; no season, sequel, source or adaptation creates Discovery work.
 
 The Queue consumer emits one bounded JSON record with
 `type=native-collector.queue`, `messageType`, `attempt` and `disposition`.

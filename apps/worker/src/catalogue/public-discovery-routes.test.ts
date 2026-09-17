@@ -474,10 +474,10 @@ describe('verified public discovery cache', () => {
       .toEqual({ attempts: 0, refreshState: 'IDLE' });
   });
 
-  it('publishes one work without creating relation requests or relation rows', async () => {
+  it('publishes one work without relation admission or relation storage', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const requestsBefore = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first<{ count: number }>();
-    const relationsBefore = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_work_relations').first<{ count: number }>();
+    expect(await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'catalogue_work_relations'").first()).toEqual({ count: 0 });
     const sourceKey = { ...discoveryKey('a'), fingerprint: 'ab'.repeat(32) };
     const now = '2026-09-16T09:00:00.000Z';
     const sourceRequest = {
@@ -502,7 +502,6 @@ describe('verified public discovery cache', () => {
       results: [sourceResult], schemaVersion: 3, verifiedAt: now,
     }, 'u'.repeat(64), 'b'.repeat(64), now)).resolves.toEqual({ published: 0, replayed: 1 });
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first()).toEqual({ count: (requestsBefore?.count ?? 0) + 1 });
-    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_work_relations').first()).toEqual(relationsBefore);
   });
 
   it('rejects a normalized-title collision atomically', async () => {

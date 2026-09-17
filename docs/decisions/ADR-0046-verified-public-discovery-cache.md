@@ -149,9 +149,10 @@ sans réécrire les tables catalogue; un profil changé n’est publié qu’apr
 mêmes validations atomiques de références et de titres.
 
 Une relation saison, suite, source ou adaptation n'appartient plus au contrat
-de sortie Discovery et ne crée jamais de demande ou signal Queue. Les champs
-relationnels historiques restent uniquement des données de rollback jusqu'au
-nettoyage séparément approuvé. En revanche, `linkedReferences` conserve jusqu'à
+de sortie Discovery et ne crée jamais de demande ou signal Queue. La migration
+`0025_drop_catalogue_work_relations.sql` retire la table historique vide après
+sauvegarde et vérification de l'absence de consommateur. En revanche,
+`linkedReferences` conserve jusqu'à
 cinq références exactes de fournisseurs qui identifient la même œuvre; elles
 sont dédupliquées dans `catalogue_external_references`. Une collision
 fournisseur ou canonique refuse le batch au lieu de fusionner silencieusement

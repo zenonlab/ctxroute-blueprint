@@ -217,7 +217,7 @@ describe('local D1 cost baseline — no external requests', () => {
     const adapter = new D1PublicDiscoveryV3Adapter(m.database);
     const now = at(0);
     const requestsBefore = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first<{ count: number }>();
-    const relationsBefore = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_work_relations').first<{ count: number }>();
+    expect(await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'catalogue_work_relations'").first()).toEqual({ count: 0 });
     await adapter.request(request('f'), now);
     await adapter.claimBatch({ claimToken: 'f'.repeat(48), tokenDigest: 'f'.repeat(64), now, leaseUntil: at(15), limit: 20 });
     const selected: PublicDiscoveryVerifiedProfile = { workId: 'work_cost_replay', references: [{ provider: 'anilist', externalId: '910003' }], candidate: { ...profile.candidate, externalId: '910003', displayTitle: 'Synthetic Replay', titles: ['Synthetic Replay'] } };
@@ -225,7 +225,6 @@ describe('local D1 cost baseline — no external requests', () => {
     await m.measure('publish-without-relation', () => adapter.publishBatch(batch, 'f'.repeat(64), 'f'.repeat(64), now));
     await m.measure('replay-same-publication', async () => expect(await adapter.publishBatch(batch, 'f'.repeat(64), 'f'.repeat(64), now)).toEqual({ published: 0, replayed: 1 }));
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first()).toEqual({ count: (requestsBefore?.count ?? 0) + 1 });
-    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_work_relations').first()).toEqual(relationsBefore);
     m.report();
   });
 

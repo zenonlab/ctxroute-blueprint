@@ -428,6 +428,20 @@ l’ordre sont identiques à l’index explicite retiré. Les quatre copies sont
 absentes, aucune migration ne reste en attente et la taille D1 rapportée passe
 de 1 298 432 à 1 273 856 octets, soit 24 576 octets libérés.
 
+Le nettoyage relationnel séparément approuvé a utilisé la migration
+`0025_drop_catalogue_work_relations.sql`. Le préflight distant a confirmé zéro
+ligne et aucune référence runtime; la sauvegarde préalable
+`tobirink-public-pre-orphan-cleanup-2026-09-17.sql` fait 978 242 octets et porte
+le SHA-256
+`16261b340b2e1118e3a5f9b6a7f59fbc10a20a2b957e7bbdf1500aee31c23f76`.
+Le plan
+`b3a217a0561d3174499527b46dc21732ebd565981b5c7ee1937c38e9b03bae38`
+a retiré uniquement la table historique, ses index propriétaires et la Queue
+orpheline `tobirink-jobs-production`. La taille D1 rapportée est passée de
+1 273 856 à 1 257 472 octets. Les deux Queues actives, les 740 événements
+Agenda courants et les 3 générations sont conservés; les références fournisseur
+de la même œuvre restent dans le catalogue.
+
 Les tables Agenda historiques candidates sont `public_release_event`,
 `public_release_generation`, `public_release_generation_event`,
 `public_release_active_generation`, `public_release_agenda_lane_state`,
