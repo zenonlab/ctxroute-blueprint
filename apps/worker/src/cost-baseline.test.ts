@@ -76,6 +76,7 @@ describe('local D1 cost baseline — no external requests', () => {
     for (const [label, minute, selected] of [
       ['refresh-identical', 8 * 1440, profile],
       ['refresh-changed', 16 * 1440, { ...profile, candidate: { ...profile.candidate, episodeCount: 24 } }],
+      ['refresh-partial-preserves', 24 * 1440, profile],
     ] as const) {
       await m.measure(label, async () => {
         expect((await adapter.requestRefresh(key('a'), at(minute))).outcome).toBe('created');
@@ -84,6 +85,11 @@ describe('local D1 cost baseline — no external requests', () => {
         return publish('a', minute, selected);
       });
     }
+    await expect(adapter.read(key('b'), at(24 * 1440))).resolves.toMatchObject({
+      profile: { candidate: { episodeCount: 24 }, workId: profile.workId }, state: 'VERIFIED',
+    });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_current_metadata WHERE work_id = ?1')
+      .bind(profile.workId).first()).toEqual({ count: 1 });
     for (const name of ['duplicate-pending-100', 'verified-read-100', 'verified-readMany-one', 'duplicate-verified']) {
       expect(m.records.find(({ scenario }) => scenario === name)?.rowsWritten).toBe(0);
     }
@@ -103,7 +109,7 @@ describe('local D1 cost baseline — no external requests', () => {
       (SELECT TOTAL(length(CAST(result_json AS BLOB))) FROM public_discovery_requests_v3 WHERE state = 'VERIFIED' AND json_extract(result_json, '$.profile.workId') = ?1) AS profileBytes`).bind(profile.workId).first();
     expect(byteStock).toMatchObject({ distinctProfiles: 2, profileCopies: 2 });
     for (const value of Object.values(byteStock ?? {})) expect(value).toEqual(expect.any(Number));
-    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([5, 4, 0, 4, 42, 0, 0, 0, 19, 12, 15]);
+    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([5, 4, 0, 4, 44, 0, 0, 0, 19, 12, 16, 12]);
     console.info('d1-cost-baseline-storage-bytes', JSON.stringify({ afterAlias: aliasStorage, afterCounterChange: byteStock }));
     m.report();
   });

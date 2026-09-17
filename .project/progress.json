@@ -2564,7 +2564,7 @@
         {
           "id": "canonical-metadata",
           "title": "Introduire la fiche canonique courante par œuvre",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Une table courante par œuvre contient statut, totaux, derniers confirmés, couverture, genres, classification et provenance minimale.",
             "La migration backfill choisit le profil VERIFIED le plus récent et complète seulement ses champs absents; les conflits d’identité échouent fermés.",
@@ -2593,7 +2593,11 @@
             "npm run archify:validate -- adaptive-public-refresh.architecture",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "Migration 0023: fiche unique par work_id, backfill du VERIFIED le plus récent, complétion non destructive et conflits de type isolés.",
+            "Tests D1 29/29, Worker 105/105 et adaptateurs Cloudflare 20/20; lecture alias, refresh partiel, classification et compteur couverts.",
+            "Tous les typechecks, ADR/docs, Archify architecture et workflow showcase passent; aucune ressource distante modifiée."
+          ]
         },
         {
           "id": "virtual-agenda-r2",

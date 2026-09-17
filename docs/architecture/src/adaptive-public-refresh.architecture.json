@@ -67,7 +67,7 @@
       "id": "catalogueD1",
       "type": "database",
       "label": "Catalogue D1",
-      "sublabel": "identités + métadonnées courantes",
+      "sublabel": "identités + 1 fiche courante/œuvre",
       "pos": [740, 140],
       "size": [180, 66],
       "tag": "lecture partagée"
@@ -126,7 +126,7 @@
   "connections": [
     { "id": "local-state", "from": "extension", "to": "indexedDb", "label": "profils versionnés", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [110, 250] },
     { "id": "public-lookup", "from": "extension", "to": "publicApi", "label": "lots de 50 clés", "variant": "emphasis", "route": "straight", "labelAt": [230, 90] },
-    { "id": "cache-first", "from": "publicApi", "to": "catalogueD1", "label": "HIT · MISS · fraîcheur", "variant": "emphasis", "route": "straight", "labelAt": [590, 125] },
+    { "id": "cache-first", "from": "publicApi", "to": "catalogueD1", "label": "alias → même fiche canonique", "variant": "emphasis", "route": "straight", "labelAt": [590, 125] },
     { "id": "admit-created", "from": "publicApi", "to": "publicQueue", "label": "created uniquement", "fromSide": "bottom", "toSide": "left", "via": [[355, 230], [230, 230], [230, 533]], "labelAt": [215, 420] },
     { "id": "weekly-agenda", "from": "weeklyCron", "to": "collectors", "label": "Agenda hebdomadaire", "variant": "emphasis", "fromSide": "right", "toSide": "top", "via": [[480, 333], [480, 380], [670, 380]], "labelAt": [545, 365] },
     { "id": "queued-work", "from": "publicQueue", "to": "collectors", "label": "Discovery · réhydratation", "fromSide": "right", "toSide": "left", "via": [[500, 533], [500, 440]], "labelAt": [505, 545] },
@@ -151,6 +151,7 @@
       "items": [
         "La charge fournisseur dépend des œuvres uniques",
         "Une identité canonique partage son refresh et tous ses alias",
+        "Une réponse partielle conserve les métadonnées déjà vérifiées",
         "Tous les utilisateurs lisent le même catalogue public"
       ]
     },

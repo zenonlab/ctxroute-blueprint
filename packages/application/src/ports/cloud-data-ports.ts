@@ -3,6 +3,20 @@ import type { FavoritePublicReference } from '../favorites/favorite-identity-loo
 export interface PublicCatalogueWork {
   id: string;
   mediaKind: 'anime' | 'manga';
+  metadata?: {
+    categories: readonly string[];
+    chapterTotal?: number;
+    contentClassification: 'adult' | 'non-adult' | 'unknown';
+    cover?: { attribution: string; url: string };
+    editorialStatus?: 'UPCOMING' | 'ONGOING' | 'HIATUS' | 'COMPLETED' | 'CANCELLED' | 'UNKNOWN';
+    endYear?: number;
+    episodeTotal?: number;
+    format?: string;
+    genres: readonly string[];
+    source: { externalId: string; observedAt: string; provider: string; version: number };
+    startYear?: number;
+    volumeTotal?: number;
+  };
   preferredTitle: string;
   revision: number;
 }

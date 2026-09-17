@@ -123,15 +123,15 @@ aucune relation. Stock final : 1 fiche + 4 titres + 4 clés canoniques + 1 réf�
 | Nouvelle demande | 11 | 5 |
 | Confirmation du signal Queue | 3 | 4 |
 | Attribution au collecteur | 20 | 4 |
-| Publication de la fiche à quatre titres | 52 | 42 |
-| **Total première résolution, hors fournisseur** | **86** | **55** |
+| Publication de la fiche à quatre titres et métadonnées canoniques | 54 | 44 |
+| **Total première résolution, hors fournisseur** | **88** | **57** |
 | 100 admissions identiques pendant PENDING | 1 400 | 0 |
 | 100 lectures VERIFIED unitaires | 300 | 0 |
 | Lookup groupé contenant une clé VERIFIED | 2 | 0 |
 | Admission identique déjà VERIFIED | 14 | 0 |
 | Nouvelle clé aboutissant à la même œuvre, cycle complet | 67 | 19 |
 | Refresh identique : admission, confirmation, claim, publication | 36 | 12 |
-| Refresh avec compteur changé | 64 | 15 |
+| Refresh avec compteur changé | 65 | 16 |
 | Réservation fournisseur + succès | 4 | 2 |
 | Réservation fournisseur + échec | 4 | 2 |
 
@@ -287,7 +287,7 @@ Pour D nouvelles œuvres, A nouvelles clés d'œuvres existantes, H refreshes
 inchangés, M refreshes modifiés et P paires de contrôle fournisseur, le modèle
 local indicatif est :
 
-`writes = 55D + 19A + 12H + 15M + 2P + Agenda + échecs + autres écritures`.
+`writes = 57D + 19A + 12H + 16M + 2P + Agenda + échecs + autres écritures`.
 
 Ces coefficients sont propres aux fixtures. La première publication d'une
 révision commune peut être mutualisée par un batch; alias, références et index

@@ -1,5 +1,6 @@
 import { applyD1Migrations, env, SELF } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
+import type { PublicDiscoveryCandidate } from '@tobirink/public-discovery';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { instrumentD1 } from '../operational-metrics';
@@ -50,8 +51,10 @@ describe('verified public discovery cache', () => {
   it('preserves active requests and redacts historical terminal requests during migration', async () => {
     const v3AlignmentIndex = env.TEST_MIGRATIONS.findIndex(({ name }) => name === '0015_public_discovery_v3_alignment.sql');
     const minimizationIndex = env.TEST_MIGRATIONS.findIndex(({ name }) => name === '0016_public_discovery_terminal_minimization.sql');
+    const metadataIndex = env.TEST_MIGRATIONS.findIndex(({ name }) => name === '0023_catalogue_current_metadata.sql');
     expect(v3AlignmentIndex).toBeGreaterThan(-1);
     expect(minimizationIndex).toBeGreaterThan(v3AlignmentIndex);
+    expect(metadataIndex).toBeGreaterThan(minimizationIndex);
     await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(0, v3AlignmentIndex));
     const key = discoveryKey('0');
     const now = '2026-09-15T12:00:00.000Z';
@@ -84,7 +87,7 @@ describe('verified public discovery cache', () => {
         state === 'FAILED' ? '2026-10-15T12:00:00.000Z' : null,
       )));
 
-    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(minimizationIndex));
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(minimizationIndex, metadataIndex));
 
     const rows = (await env.PUBLIC_DB.prepare(`SELECT state, request_json AS requestJson
       FROM public_discovery_requests_v3 WHERE fingerprint IN (?1, ?2, ?3, ?4, ?5, ?6) ORDER BY state`)
@@ -97,6 +100,43 @@ describe('verified public discovery cache', () => {
       { requestJson, state: 'PROCESSING' },
       { requestJson: '{}', state: 'VERIFIED' },
     ]);
+
+    await env.PUBLIC_DB.prepare("INSERT INTO catalogue_revisions(revision, published_at) VALUES (987654321, '2026-09-01T00:00:00.000Z')").run();
+    await env.PUBLIC_DB.prepare("INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES ('work_backfill', 'anime', 'Backfill', 987654321)").run();
+    const insert = async (fingerprint: string, verifiedAt: string, candidate: PublicDiscoveryCandidate) => env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v3(
+      fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
+      state, result_json, retry_at, verified_at, created_at, updated_at, next_refresh_at)
+      VALUES (?1, 'ANIME', '5', '3', ?1, '{}', 'VERIFIED', ?2, ?3, ?3, ?3, ?3, ?3)`)
+      .bind(fingerprint, JSON.stringify({ profile: { candidate, references: [{ externalId: String(candidate.externalId), provider: 'anilist' }], workId: 'work_backfill' }, state: 'VERIFIED' }), verifiedAt).run();
+    const olderFingerprint = '0123456789abcdef'.repeat(4);
+    const newestFingerprint = 'fedcba9876543210'.repeat(4);
+    await insert(olderFingerprint, '2026-09-01T00:00:00.000Z', { episodeCount: 24, externalId: '6001', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Backfill'] });
+    await insert(newestFingerprint, '2026-09-08T00:00:00.000Z', { contentClassification: 'adult', externalId: '6001', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Backfill'] });
+    await env.PUBLIC_DB.batch([
+      env.PUBLIC_DB.prepare("INSERT INTO catalogue_revisions(revision, published_at) VALUES (987654322, '2026-09-08T00:00:00.000Z')"),
+      env.PUBLIC_DB.prepare("INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES ('work_media_conflict', 'anime', 'Conflict', 987654322)"),
+      env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v3(
+        fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
+        state, result_json, retry_at, verified_at, created_at, updated_at, next_refresh_at)
+        VALUES (?1, 'MANGA', '5', '3', ?1, '{}', 'VERIFIED', ?2, ?3, ?3, ?3, ?3, ?3)`)
+        .bind('13579bdf02468ace'.repeat(4), JSON.stringify({ profile: {
+          candidate: { externalId: 'conflict-1', mediaKind: 'MANGA', preSerialization: false, provider: 'anilist', titles: ['Conflict'] },
+          references: [{ externalId: 'conflict-1', provider: 'anilist' }], workId: 'work_media_conflict',
+        }, state: 'VERIFIED' }), '2026-09-08T00:00:00.000Z'),
+    ]);
+
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS.slice(metadataIndex));
+    expect(await env.PUBLIC_DB.prepare(`SELECT episode_total AS episodeTotal, content_classification AS contentClassification,
+      source_external_id AS sourceExternalId FROM catalogue_current_metadata WHERE work_id = 'work_backfill'`).first())
+      .toEqual({ contentClassification: 'adult', episodeTotal: 24, sourceExternalId: '6001' });
+    expect(await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM catalogue_metadata_identity_conflicts WHERE work_id = 'work_backfill'").first()).toEqual({ count: 0 });
+    expect(await env.PUBLIC_DB.prepare("SELECT catalogue_media_kind AS catalogueMediaKind, profile_media_kinds_json AS profileMediaKindsJson FROM catalogue_metadata_identity_conflicts WHERE work_id = 'work_media_conflict'").first())
+      .toEqual({ catalogueMediaKind: 'anime', profileMediaKindsJson: '["manga"]' });
+    expect(await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM catalogue_current_metadata WHERE work_id = 'work_media_conflict'").first()).toEqual({ count: 0 });
+    const backfilled = await new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB).read({
+      fingerprint: newestFingerprint, mediaKind: 'ANIME', parserVersion: '5', siteRulesVersion: '3',
+    }, '2026-09-08T00:00:00.000Z');
+    expect(backfilled).toMatchObject({ profile: { candidate: { contentClassification: 'adult', episodeCount: 24 } }, state: 'VERIFIED' });
   });
 
   it('emits exact D1 read and write metadata for public HTTP lookups', async () => {
@@ -154,6 +194,7 @@ describe('verified public discovery cache', () => {
   it('reads up to fifty discovery states in one public request', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const keys = Array.from({ length: 50 }, (_, index) => ({ ...discoveryKey('8'), fingerprint: `${'8'.repeat(62)}${index.toString(16).padStart(2, '0')}` }));
+    const existingRows = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first<{ count: number }>();
     const response = await SELF.fetch('https://tobirink.test/v3/catalogue/discoveries/lookup', {
       body: JSON.stringify({ keys, schemaVersion: 3 }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
@@ -171,7 +212,7 @@ describe('verified public discovery cache', () => {
     });
     info.mockRestore();
     expect(events).toContainEqual(expect.objectContaining({ d1RowsWritten: 0, task: 'discovery-lookup', type: 'worker.cost' }));
-    expect(events.find(({ task }) => task === 'discovery-lookup')?.d1RowsRead).toBe(357);
+    expect(events.find(({ task }) => task === 'discovery-lookup')?.d1RowsRead).toBe(51 * (existingRows?.count ?? 0));
     expect(JSON.stringify(events)).not.toContain(keys[0]?.fingerprint);
   });
 

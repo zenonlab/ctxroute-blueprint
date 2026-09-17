@@ -6,6 +6,7 @@ import {
   publicDiscoveryTerminalResolutionSchema,
   publicDiscoveryVerifiedProfileSchema,
   type PublicDiscoveryClaimBatch,
+  type PublicDiscoveryCandidate,
   type PublicDiscoveryKeyV3,
   type PublicDiscoveryReadState,
   type PublicDiscoveryRequest,
@@ -56,6 +57,7 @@ interface DiscoveryRowWithKey extends DiscoveryRow {
   fingerprint: string;
   mediaKind: PublicDiscoveryKeyV3['mediaKind'];
   parserVersion: string;
+  profileJson: string | null;
   siteRulesVersion: string;
 }
 export type PublicDiscoveryAdmission =
@@ -113,6 +115,17 @@ function stateFromRow(row: DiscoveryRow | null, now: string): PublicDiscoveryRea
   return { candidates: resolution.candidates, reason: resolution.reason, state: 'AMBIGUOUS', verifiedAt: row.verifiedAt };
 }
 
+function mergeProfile(current: PublicDiscoveryVerifiedProfile | undefined, incoming: PublicDiscoveryVerifiedProfile): PublicDiscoveryVerifiedProfile {
+  if (current === undefined) return incoming;
+  if (current.workId !== incoming.workId || current.candidate.mediaKind !== incoming.candidate.mediaKind) {
+    throw new Error('public-discovery-metadata-identity-conflict');
+  }
+  const references = [...new Map([...current.references, ...incoming.references]
+    .map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
+  const candidate: PublicDiscoveryCandidate = { ...current.candidate, ...incoming.candidate };
+  return publicDiscoveryVerifiedProfileSchema.parse({ candidate, references, workId: incoming.workId });
+}
+
 export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   constructor(private readonly database: PublicDiscoveryV3D1Database, private readonly pendingLimit = publicDiscoveryPendingLimit) {
     if (!Number.isSafeInteger(pendingLimit) || pendingLimit < 1 || pendingLimit > publicDiscoveryPendingLimit) {
@@ -131,6 +144,12 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       .bind(...keyValues(key)).first<DiscoveryRow>();
   }
 
+  private async metadataProfile(workId: string): Promise<PublicDiscoveryVerifiedProfile | undefined> {
+    const row = await this.database.prepare('SELECT profile_json AS profileJson FROM catalogue_current_metadata WHERE work_id = ?1 LIMIT 1')
+      .bind(workId).first<{ profileJson: string }>();
+    return row === null ? undefined : publicDiscoveryVerifiedProfileSchema.parse(JSON.parse(row.profileJson));
+  }
+
   async readMany(keys: readonly PublicDiscoveryKeyV3[], now: string) {
     if (keys.length < 1 || keys.length > 50) throw new RangeError('public-discovery-lookup-limit-out-of-range');
     const parsed = keys.map((key) => publicDiscoveryKeyV3Schema.parse(key));
@@ -142,16 +161,24 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       request_json AS requestJson, refresh_attempt_count AS refreshAttemptCount,
       refresh_state AS refreshState, next_refresh_at AS nextRefreshAt,
       result_expires_at AS resultExpiresAt, result_json AS resultJson,
-      retry_at AS retryAt, state, verified_at AS verifiedAt
+      retry_at AS retryAt, state, verified_at AS verifiedAt,
+      metadata.profile_json AS profileJson
       FROM public_discovery_requests_v3 AS discovery
       JOIN json_each(?1) AS requested
         ON discovery.fingerprint = json_extract(requested.value, '$.fingerprint')
        AND discovery.media_kind = json_extract(requested.value, '$.mediaKind')
        AND discovery.parser_version = json_extract(requested.value, '$.parserVersion')
-       AND discovery.rules_version = json_extract(requested.value, '$.siteRulesVersion')`)
+       AND discovery.rules_version = json_extract(requested.value, '$.siteRulesVersion')
+      LEFT JOIN catalogue_current_metadata AS metadata
+        ON metadata.work_id = json_extract(discovery.result_json, '$.profile.workId')`)
       .bind(JSON.stringify(parsed)).all<DiscoveryRowWithKey>()).results;
     const byKey = new Map(rows.map((row) => [JSON.stringify({ fingerprint: row.fingerprint, mediaKind: row.mediaKind, parserVersion: row.parserVersion, siteRulesVersion: row.siteRulesVersion }), row]));
-    return parsed.map((key) => ({ key, state: stateFromRow(byKey.get(JSON.stringify(key)) ?? null, now) }));
+    return parsed.map((key) => {
+      const row = byKey.get(JSON.stringify(key));
+      const state = stateFromRow(row ?? null, now);
+      if (state.state !== 'VERIFIED' || row?.profileJson === null || row?.profileJson === undefined) return { key, state };
+      return { key, state: { ...state, profile: publicDiscoveryVerifiedProfileSchema.parse(JSON.parse(row.profileJson)) } };
+    });
   }
 
   private async failExhaustedKey(key: PublicDiscoveryKeyV3, now: string): Promise<void> {
@@ -185,7 +212,10 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
 
   async read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState> {
     await this.failExhaustedKey(key, now);
-    return stateFromRow(await this.row(key), now);
+    const state = stateFromRow(await this.row(key), now);
+    if (state.state !== 'VERIFIED') return state;
+    const profile = await this.metadataProfile(state.profile.workId);
+    return profile === undefined ? state : { ...state, profile };
   }
 
   async request(input: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryAdmission> {
@@ -373,13 +403,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         WHERE NOT EXISTS (SELECT 1 FROM catalogue_external_references
           WHERE provider = json_extract(proposed.value, '$.provider')
             AND external_id = json_extract(proposed.value, '$.externalId') AND work_id = ?1))
-      OR NOT EXISTS (SELECT 1 FROM public_discovery_requests_v3 AS current
-        WHERE current.state = 'VERIFIED'
-          AND json_extract(current.result_json, '$.profile.workId') = ?1
-          AND json_extract(current.result_json, '$.profile.candidate.episodeCount') IS ?8
-          AND json_extract(current.result_json, '$.profile.candidate.chapterCount') IS ?9
-          AND json_extract(current.result_json, '$.profile.candidate.volumeCount') IS ?10
-          AND json_extract(current.result_json, '$.profile.candidate.contentClassification') IS ?11)
+      OR NOT EXISTS (SELECT 1 FROM catalogue_current_metadata
+        WHERE work_id = ?1 AND profile_json = ?8)
       THEN 1 ELSE 0 END AS needsPublication`)
       .bind(
         profile.workId,
@@ -389,10 +414,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         JSON.stringify(canonical.normalizedTitles),
         favoriteTitlePreparationVersion,
         JSON.stringify(profile.references),
-        candidate.episodeCount ?? null,
-        candidate.chapterCount ?? null,
-        candidate.volumeCount ?? null,
-        candidate.contentClassification ?? null,
+        JSON.stringify(profile),
       ).first<{ needsPublication: number }>();
     return result?.needsPublication === 1;
   }
@@ -474,6 +496,50 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
             JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
             WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
         ON CONFLICT(provider, external_id) DO NOTHING`).bind(reference.provider, reference.externalId, profile.workId, ...guardValues)),
+      this.database.prepare(`INSERT INTO catalogue_current_metadata(
+          work_id, profile_json, editorial_status, format, start_year, end_year,
+          episode_total, chapter_total, volume_total, cover_url, cover_attribution,
+          genres_json, categories_json, content_classification, source_provider,
+          source_external_id, value_observed_at, normalization_version, revision)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+          fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
+          AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
+          AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
+          AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing
+            JOIN json_each(?) AS proposed
+              ON existing.provider = json_extract(proposed.value, '$.provider')
+              AND existing.external_id = json_extract(proposed.value, '$.externalId')
+            WHERE existing.work_id <> ?)
+          AND NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 AS existing
+            JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
+            WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
+        ON CONFLICT(work_id) DO UPDATE SET
+          profile_json = excluded.profile_json,
+          editorial_status = COALESCE(excluded.editorial_status, catalogue_current_metadata.editorial_status),
+          format = COALESCE(excluded.format, catalogue_current_metadata.format),
+          start_year = COALESCE(excluded.start_year, catalogue_current_metadata.start_year),
+          end_year = COALESCE(excluded.end_year, catalogue_current_metadata.end_year),
+          episode_total = COALESCE(excluded.episode_total, catalogue_current_metadata.episode_total),
+          chapter_total = COALESCE(excluded.chapter_total, catalogue_current_metadata.chapter_total),
+          volume_total = COALESCE(excluded.volume_total, catalogue_current_metadata.volume_total),
+          cover_url = COALESCE(excluded.cover_url, catalogue_current_metadata.cover_url),
+          cover_attribution = COALESCE(excluded.cover_attribution, catalogue_current_metadata.cover_attribution),
+          genres_json = excluded.genres_json, categories_json = excluded.categories_json,
+          content_classification = excluded.content_classification,
+          source_provider = excluded.source_provider, source_external_id = excluded.source_external_id,
+          value_observed_at = excluded.value_observed_at,
+          normalization_version = excluded.normalization_version, revision = excluded.revision
+        WHERE catalogue_current_metadata.profile_json IS NOT excluded.profile_json`)
+        .bind(
+          profile.workId, JSON.stringify(profile), candidate.editorialStatus ?? null, candidate.format ?? null,
+          candidate.startYear ?? null, candidate.endYear ?? null, candidate.episodeCount ?? null,
+          candidate.chapterCount ?? null, candidate.volumeCount ?? null, candidate.cover?.url ?? null,
+          candidate.cover?.attribution ?? null, JSON.stringify(candidate.genres ?? []),
+          JSON.stringify(candidate.categories ?? []), candidate.contentClassification ?? 'unknown',
+          candidate.provider, candidate.externalId, verifiedAt, candidate.metadataVersion ?? 1, revision,
+          ...guardValues,
+        ),
     ];
   }
 
@@ -504,7 +570,11 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
 
   private async publishOne(result: PublicDiscoveryResult, tokenDigest: string, verifiedAt: string, now: string): Promise<'published' | 'replayed'> {
     const row = await this.row(result.key);
-    const resultJson = JSON.stringify(result.resolution);
+    const profile = result.resolution.state === 'VERIFIED'
+      ? mergeProfile(await this.metadataProfile(result.resolution.profile.workId), publicDiscoveryVerifiedProfileSchema.parse(result.resolution.profile))
+      : undefined;
+    const resolution = profile === undefined ? result.resolution : { profile, state: 'VERIFIED' as const };
+    const resultJson = JSON.stringify(resolution);
     const refreshing = row?.state === 'VERIFIED' && row.refreshState === 'PROCESSING';
     if (refreshing && result.resolution.state !== 'VERIFIED') throw new Error('public-discovery-refresh-not-verified');
     if (refreshing && row.resultJson === resultJson && row.claimTokenHash === tokenDigest && row.requestDigest === result.requestDigest) {
@@ -525,9 +595,6 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       return 'replayed';
     }
     if (!row || (row.state !== 'PROCESSING' && !refreshing) || row.claimTokenHash !== tokenDigest || row.requestDigest !== result.requestDigest) throw new Error('stale-public-discovery-result');
-    const profile = result.resolution.state === 'VERIFIED'
-      ? publicDiscoveryVerifiedProfileSchema.parse(result.resolution.profile)
-      : undefined;
     const guardValues = this.publicationGuardValues(result, profile, tokenDigest, now);
     const statements = profile && await this.catalogueNeedsPublication(profile)
       ? this.catalogueStatements(profile, verifiedAt, guardValues)
