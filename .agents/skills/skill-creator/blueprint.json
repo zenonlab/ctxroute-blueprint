@@ -2,7 +2,11 @@
   "schemaVersion": 2,
   "skillId": "skill-creator",
   "version": "1.0.0",
-  "modes": ["SWARM_ON", "SWARM_OFF"],
+  "phases": ["research", "planning", "work", "validation", "audit"],
+  "capabilities": ["skill-authoring"],
+  "access": "write",
+  "tools": ["read", "search", "edit", "test"],
+  "independent": false,
   "mutationAuthority": "orchestrator",
   "researchLabels": ["official-documentation", "implementation", "recommendation", "hypothesis"],
   "validations": [

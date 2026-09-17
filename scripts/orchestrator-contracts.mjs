@@ -16,28 +16,23 @@ export const ORCHESTRATOR_SCHEMA_IDS = Object.freeze({
   missionRequest: 'https://ctxroute.dev/schemas/orchestrator/mission-request.schema.json',
   missionRecord: 'https://ctxroute.dev/schemas/orchestrator/mission-record.schema.json',
   missionView: 'https://ctxroute.dev/schemas/orchestrator/mission-view.schema.json',
+  executionBinding: 'https://ctxroute.dev/schemas/orchestrator/execution-binding.schema.json',
   workerReport: 'https://ctxroute.dev/schemas/orchestrator/worker-report.schema.json',
   auditReport: 'https://ctxroute.dev/schemas/orchestrator/audit-report.schema.json',
   validationReceipt: 'https://ctxroute.dev/schemas/orchestrator/validation-receipt.schema.json',
   worktreeOperation: 'https://ctxroute.dev/schemas/orchestrator/worktree-operation.schema.json',
   decisionEvent: 'https://ctxroute.dev/schemas/orchestrator/decision-event.schema.json',
   bootstrapReport: 'https://ctxroute.dev/schemas/orchestrator/bootstrap-report.schema.json',
+  operatingModeDescriptor: 'https://ctxroute.dev/schemas/orchestrator/operating-mode-descriptor.schema.json',
+  workflowDescriptor: 'https://ctxroute.dev/schemas/orchestrator/workflow-descriptor.schema.json',
+  stagePlan: 'https://ctxroute.dev/schemas/orchestrator/stage-plan.schema.json',
+  resolvedExecutionPolicy: 'https://ctxroute.dev/schemas/orchestrator/resolved-execution-policy.schema.json',
+  stageCheckpoint: 'https://ctxroute.dev/schemas/orchestrator/stage-checkpoint.schema.json',
+  decisionRequest: 'https://ctxroute.dev/schemas/orchestrator/decision-request.schema.json',
+  decisionReceipt: 'https://ctxroute.dev/schemas/orchestrator/decision-receipt.schema.json',
+  experimentReceipt: 'https://ctxroute.dev/schemas/orchestrator/experiment-receipt.schema.json',
+  outcomeReceipt: 'https://ctxroute.dev/schemas/orchestrator/outcome-receipt.schema.json',
   goalRunRequest: 'https://ctxroute.dev/schemas/orchestrator/goal-run-request.schema.json',
-  goalPlan: 'https://ctxroute.dev/schemas/orchestrator/goal-plan.schema.json',
-  workerDispatch: 'https://ctxroute.dev/schemas/orchestrator/worker-dispatch.schema.json',
-  goalAcceptanceReport: 'https://ctxroute.dev/schemas/orchestrator/goal-acceptance-report.schema.json',
-  providerCapabilities: 'https://ctxroute.dev/schemas/orchestrator/provider-capabilities.schema.json',
-  modelDescriptor: 'https://ctxroute.dev/schemas/orchestrator/model-descriptor.schema.json',
-  consumptionPolicy: 'https://ctxroute.dev/schemas/orchestrator/consumption-policy.schema.json',
-  taskAssessment: 'https://ctxroute.dev/schemas/orchestrator/task-assessment.schema.json',
-  routingDecision: 'https://ctxroute.dev/schemas/orchestrator/routing-decision.schema.json',
-  executionReceipt: 'https://ctxroute.dev/schemas/orchestrator/execution-receipt.schema.json',
-  escalationEvent: 'https://ctxroute.dev/schemas/orchestrator/escalation-event.schema.json',
-  modelEvaluation: 'https://ctxroute.dev/schemas/orchestrator/model-evaluation.schema.json',
-  documentationRequirement: 'https://ctxroute.dev/schemas/orchestrator/documentation-requirement.schema.json',
-  documentationSource: 'https://ctxroute.dev/schemas/orchestrator/documentation-source.schema.json',
-  documentationEvidenceReport: 'https://ctxroute.dev/schemas/orchestrator/documentation-evidence-report.schema.json',
-  documentationFreshnessReceipt: 'https://ctxroute.dev/schemas/orchestrator/documentation-freshness-receipt.schema.json',
 });
 
 const aliases = new Map(Object.entries(ORCHESTRATOR_SCHEMA_IDS).flatMap(([key, id]) => [
@@ -47,9 +42,6 @@ const aliases = new Map(Object.entries(ORCHESTRATOR_SCHEMA_IDS).flatMap(([key, i
 ]));
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 for (const schema of schemaDocuments) ajv.addSchema(schema);
-for (const id of Object.values(ORCHESTRATOR_SCHEMA_IDS)) {
-  if (!ajv.getSchema(id)) throw new Error(`Orchestrator schema was not compiled: ${id}`);
-}
 
 export function listOrchestratorContracts() {
   return Object.entries(ORCHESTRATOR_SCHEMA_IDS).map(([name, id]) => ({ name, id }));
@@ -58,7 +50,9 @@ export function listOrchestratorContracts() {
 export function getOrchestratorValidator(nameOrId) {
   const id = aliases.get(nameOrId);
   if (!id) throw new TypeError(`Unknown orchestrator contract: ${nameOrId}`);
-  return ajv.getSchema(id);
+  const validator = ajv.getSchema(id);
+  if (!validator) throw new Error(`Orchestrator schema was not compiled: ${id}`);
+  return validator;
 }
 
 export function validateOrchestratorContract(nameOrId, value) {

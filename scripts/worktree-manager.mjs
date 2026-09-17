@@ -65,62 +65,51 @@ export async function inspectMissionChanges(worktreePath, fileScope, root = proc
   return { files, outsideScope, ok: outsideScope.length === 0, head: (await git(worktree, ['rev-parse', 'HEAD'], config, deps)).stdout.trim() };
 }
 
-export async function integrateMissionChanges(mission, root = process.cwd(), dependencies = {}) {
+export async function commitMissionWorktree(mission, message, root = process.cwd(), dependencies = {}) {
+  if (!mission?.worktree_allocation?.path || mission.validation_receipt?.status !== 'PASSED' || mission.status !== 'COMPLETED') throw new Error('orchestrator commit requires a completed validated mission');
+  if (mission.access !== 'write') throw new Error('read-only missions cannot be committed');
+  if (message !== String(message) || !message.trim() || /[\r\n\0]/u.test(message)) throw new Error('invalid orchestrator commit message');
   const deps = createWorktreeDependencies(dependencies);
   const config = await loadOrchestratorConfig(root);
-  const allocation = mission.worktree_allocation;
-  if (!allocation?.path || !allocation.base_revision) throw categorized('INTEGRATION_UNPROVABLE', 'mission has no active base revision');
-  const worktree = await resolveManagedPath(root, config.worktreeRoot, allocation.path, true);
-  const before = await inspectMissionChanges(allocation.path, mission.file_scope, root, allocation.base_revision, deps);
-  if (before.head !== allocation.base_revision) throw categorized('WORKER_COMMITTED', 'worker changed worktree HEAD');
-  if (!before.ok) throw categorized('OUTSIDE_SCOPE', `worktree changed files outside mission scope: ${before.outsideScope.join(', ')}`);
-  if (!before.files.length) throw categorized('EMPTY_WORKER_DIFF', 'worker produced no repository change');
-  await git(worktree, ['add', '-A', '--', '.'], config, deps);
-  const staged = parseNull((await git(worktree, ['diff', '--cached', '--name-only', '-z'], config, deps)).stdout).map(normalizePath).sort();
-  if (stableJson(staged) !== stableJson(before.files)) throw categorized('STAGED_SCOPE_MISMATCH', 'staged files differ from inspected mission files');
-  const commitEnvironment = {
-    ...process.env,
-    GIT_AUTHOR_NAME: 'CTXRoute Orchestrator',
-    GIT_AUTHOR_EMAIL: 'orchestrator@ctxroute.invalid',
-    GIT_COMMITTER_NAME: 'CTXRoute Orchestrator',
-    GIT_COMMITTER_EMAIL: 'orchestrator@ctxroute.invalid',
-  };
-  await git(worktree, ['commit', '--no-gpg-sign', '-m', `feat(orchestrator): integrate ${mission.mission_id}`], config, { ...deps, gitEnvironment: commitEnvironment });
-  const workerCommit = (await git(worktree, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
-  const mainBefore = (await git(root, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
-  if (mainBefore !== allocation.base_revision) {
-    const mainChanged = parseNull((await git(root, ['diff', '--name-only', '-z', `${allocation.base_revision}..${mainBefore}`], config, deps)).stdout).map(normalizePath);
-    const ignoreCase = (await git(root, ['config', '--bool', 'core.ignoreCase'], config, deps, true)).stdout.trim() === 'true';
-    const conflicts = mainChanged.filter(file => mission.file_scope.some(scope => scopeContains(scope, file, ignoreCase)));
-    if (conflicts.length) {
-      const proof = await writeIntegrationProof(root, mission.mission_id, workerCommit, mainBefore, conflicts, deps);
-      const error = categorized('MAIN_SCOPE_CONFLICT', 'main checkout changed mission-scoped paths since the mission base');
-      error.recoveryProof = proof;
-      error.workerCommit = workerCommit;
-      throw error;
-    }
+  const worktree = await resolveManagedPath(root, config.worktreeRoot, mission.worktree_allocation.path, true);
+  const before = await worktreeStatus(worktree, config, deps);
+  if (!before.dirty) {
+    if (before.head !== mission.worktree_allocation.base_revision) return { commit: before.head, path: mission.worktree_allocation.path, base_revision: mission.worktree_allocation.base_revision };
+    throw new Error('orchestrator commit requires validated worktree changes');
   }
-  const picked = await git(root, ['cherry-pick', '--no-edit', workerCommit], config, deps, true);
-  if (picked.code !== 0) {
+  await git(worktree, ['add', '--all'], config, deps);
+  await git(worktree, ['commit', '-m', message.trim()], config, deps);
+  const commit = (await git(worktree, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
+  return { commit, path: mission.worktree_allocation.path, base_revision: mission.worktree_allocation.base_revision };
+}
+
+export async function integrateMissionCommit(commitOid, root = process.cwd(), dependencies = {}) {
+  if (!/^[0-9a-f]{40}$/u.test(String(commitOid))) throw new Error('integration requires an exact commit OID');
+  const deps = createWorktreeDependencies(dependencies);
+  const config = await loadOrchestratorConfig(root);
+  const status = (await git(root, ['status', '--porcelain=v1', '-z', '--', '.', ':(exclude).ctxroute/**'], config, deps)).stdout;
+  if (status) throw categorized('PRIMARY_CHECKOUT_DIRTY', 'integration requires a clean primary checkout');
+  await git(root, ['cat-file', '-e', `${commitOid}^{commit}`], config, deps);
+  const before = (await git(root, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
+  const alreadyIntegrated = await git(root, ['diff', '--quiet', commitOid, before], config, deps, true);
+  if (alreadyIntegrated.code === 0) return { source_commit: commitOid, previous_head: before, integrated_commit: before };
+  try { await git(root, ['cherry-pick', commitOid], config, deps); }
+  catch (error) {
     await git(root, ['cherry-pick', '--abort'], config, deps, true);
-    const proof = await writeIntegrationProof(root, mission.mission_id, workerCommit, mainBefore, staged, deps);
-    const error = categorized('CHERRY_PICK_CONFLICT', 'orchestrator cherry-pick conflicted and was aborted');
-    error.recoveryProof = proof;
-    error.workerCommit = workerCommit;
     throw error;
   }
-  const integratedCommit = (await git(root, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
-  return { files: staged, worker_commit: workerCommit, integrated_commit: integratedCommit };
+  const integrated = (await git(root, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
+  return { source_commit: commitOid, previous_head: before, integrated_commit: integrated };
 }
 
 export async function reconcileManagedWorktrees(root = process.cwd(), dependencies = {}, suppliedState = null) {
   const deps = createWorktreeDependencies(dependencies);
-  const repair = dependencies.repair !== false;
+  const repair = dependencies.repair === true;
   const config = await loadOrchestratorConfig(root);
   const state = suppliedState ?? await readOrchestratorState(root);
-  const managedRoot = await ensureManagedRoot(root, config.worktreeRoot);
+  const managedRoot = await managedRootForInventory(root, config.worktreeRoot);
   const missions = new Map(state.goals.flatMap(goal => goal.missions).filter(mission => mission.worktree_allocation?.path && !['REMOVED', 'ROLLED_BACK'].includes(mission.worktree_allocation.status)).map(mission => [normalizePath(mission.worktree_allocation.path), mission]));
-  const registered = await listManagedWorktrees(root, config, deps);
+  const registered = await listManagedWorktrees(root, config, deps, false);
   const remaining = new Map(registered.map(item => [item.relative, item]));
   const results = [];
   let shouldPrune = false;
@@ -143,9 +132,10 @@ export async function reconcileManagedWorktrees(root = process.cwd(), dependenci
     const base = mission.worktree_allocation.base_revision;
     if (status.indexLock) { results.push(result(worktreePath, 'INDEX_LOCK', 'NEEDS_ATTENTION', base, status)); continue; }
     if (!TERMINAL.has(mission.status)) { results.push(result(worktreePath, status.dirty ? 'ACTIVE_DIRTY' : 'ACTIVE_COHERENT', 'PRESERVED', base, status)); continue; }
+    if (mission.status === 'COMPLETED' && mission.validation_receipt?.status === 'PASSED' && !mission.orchestrator_commit && status.dirty) { results.push(result(worktreePath, 'VALIDATED_AWAITING_COMMIT', 'PRESERVED', base, status)); continue; }
     if (status.dirty) { results.push(result(worktreePath, 'TERMINAL_DIRTY', 'NEEDS_ATTENTION', base, status)); continue; }
-    const expectedHead = mission.integration_status === 'INTEGRATED' && mission.worker_commit ? mission.worker_commit : base;
-    if (status.head !== expectedHead) { results.push(result(worktreePath, 'REVISION_DIVERGED', 'NEEDS_ATTENTION', base, status)); continue; }
+    if (mission.orchestrator_commit === status.head && !mission.integrated_commit) { results.push(result(worktreePath, 'COMMITTED_AWAITING_INTEGRATION', 'PRESERVED', base, status)); continue; }
+    if (status.head !== base && !mission.integrated_commit) { results.push(result(worktreePath, 'REVISION_DIVERGED', 'NEEDS_ATTENTION', base, status)); continue; }
     if (repair) {
       await git(root, ['worktree', 'remove', registration.absolute], config, deps);
       await deps.fault?.('afterWorktreeRemove', worktreePath);
@@ -160,7 +150,7 @@ export async function reconcileManagedWorktrees(root = process.cwd(), dependenci
     results.push(result(registration.relative, status.indexLock ? 'INDEX_LOCK' : status.dirty ? 'ORPHAN_REGISTERED_DIRTY' : 'ORPHAN_REGISTERED_CLEAN', 'NEEDS_ATTENTION', null, status));
   }
   const registeredPaths = new Set(registered.filter(item => item.present).map(item => item.absolute));
-  for (const entry of await readdir(managedRoot, { withFileTypes: true })) {
+  for (const entry of managedRoot ? await readdir(managedRoot, { withFileTypes: true }) : []) {
     const absolute = resolve(managedRoot, entry.name);
     if (registeredPaths.has(absolute)) continue;
     const path = `${config.worktreeRoot}/${entry.name}`;
@@ -170,6 +160,43 @@ export async function reconcileManagedWorktrees(root = process.cwd(), dependenci
   if (shouldPrune && repair) await git(root, ['worktree', 'prune'], config, deps);
   if (!repair) for (const item of results) if (item.action === 'PRUNE_METADATA') item.action = 'PRESERVED';
   return { results: results.sort((left, right) => left.path.localeCompare(right.path)), changed: repair && results.some(item => ['REMOVED', 'PRUNE_METADATA'].includes(item.action)) };
+}
+
+export async function inventoryRepositoryRecovery(root = process.cwd(), dependencies = {}) {
+  const deps = createWorktreeDependencies(dependencies);
+  const config = await loadOrchestratorConfig(root);
+  const probe = await git(root, ['rev-parse', '--git-dir'], config, deps, true);
+  if (probe.code !== 0) return [];
+  const repository = await realpath(root);
+  const results = [];
+  const worktrees = (await git(root, ['worktree', 'list', '--porcelain'], config, deps)).stdout.split(/\n\n+/u);
+  for (const record of worktrees) {
+    const lines = record.split(/\r?\n/u);
+    const absolute = lines.find(line => line.startsWith('worktree '))?.slice(9);
+    const head = lines.find(line => line.startsWith('HEAD '))?.slice(5) ?? null;
+    if (!absolute || resolve(absolute) === resolve(repository)) continue;
+    const path = normalizePath(relative(repository, absolute));
+    if (path.startsWith('../')) results.push(result(`external-worktrees/${createHash('sha256').update(absolute).digest('hex').slice(0, 16)}`, 'UNMANAGED_WORKTREE', 'PRESERVED', null, { head, dirty: null }));
+  }
+  const branches = (await git(root, ['for-each-ref', '--format=%(refname:short)%00%(objectname)', 'refs/heads'], config, deps)).stdout.split('\n').filter(Boolean);
+  const primary = (await git(root, ['rev-parse', 'HEAD'], config, deps)).stdout.trim();
+  for (const row of branches) {
+    const [branch, oid] = row.split('\0');
+    if (!branch || oid === primary) continue;
+    const branchAncestor = await git(root, ['merge-base', '--is-ancestor', oid, primary], config, deps, true);
+    const primaryAncestor = await git(root, ['merge-base', '--is-ancestor', primary, oid], config, deps, true);
+    if (branchAncestor.code !== 0 && primaryAncestor.code !== 0) results.push(result(`refs/heads/${branch}`, 'DIVERGENT_BRANCH', 'PRESERVED', oid, { head: primary, dirty: null }));
+  }
+  for (const marker of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'rebase-merge', 'rebase-apply']) {
+    const path = (await git(root, ['rev-parse', '--git-path', marker], config, deps)).stdout.trim();
+    if (await pathExists(path)) results.push(result(`.git/${marker}`, 'INTERRUPTED_GIT_OPERATION', 'NEEDS_ATTENTION', null, { head: primary, dirty: null }));
+  }
+  const fsck = await git(root, ['fsck', '--unreachable', '--no-reflogs', '--no-progress'], config, deps, true);
+  for (const line of `${fsck.stdout}\n${fsck.stderr}`.split(/\r?\n/u)) {
+    const match = /^unreachable commit ([0-9a-f]{40})$/u.exec(line.trim());
+    if (match) results.push(result(`objects/${match[1]}`, 'UNREACHABLE_COMMIT', 'PRESERVED', match[1], { head: primary, dirty: null }));
+  }
+  return results.sort((left, right) => left.path.localeCompare(right.path));
 }
 
 export async function rollbackMissionWorktree(mission, root = process.cwd(), dependencies = {}) {
@@ -214,8 +241,7 @@ export async function recoverRollbackProof(missionId, root = process.cwd()) {
     let header;
     try { header = JSON.parse(bytes.subarray(0, newline).toString('utf8')); } catch { continue; }
     const patch = bytes.subarray(newline + 1);
-    const patchDigest = `sha256:${createHash('sha256').update(patch).digest('hex')}`;
-    if (!validRollbackHeader(header, missionId, patchDigest)) continue;
+    if (header?.mission_id !== missionId || header.digest !== `sha256:${createHash('sha256').update(patch).digest('hex')}`) continue;
     return { mission_id: missionId, status: 'ROLLED_BACK', proof: relativePath, digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}` };
   }
   throw categorized('ROLLBACK_PROOF_MISSING', 'pending rollback removed its worktree without a valid recovery proof');
@@ -234,14 +260,6 @@ export async function purgeMissionWorktree({ mission_id, worktree, confirmation,
 async function inspectRollbackState(worktree, config, deps) {
   const status = await worktreeStatus(worktree, config, deps);
   return { ...status, head: (await git(worktree, ['rev-parse', 'HEAD'], config, deps)).stdout.trim() };
-}
-function validRollbackHeader(value, missionId, patchDigest) {
-  if (!value || value !== Object(value) || Array.isArray(value)) return false;
-  const keys = Object.keys(value).sort();
-  if (keys.join('\0') !== ['digest', 'files', 'head', 'mission_id'].join('\0')) return false;
-  if (value.mission_id !== missionId || value.digest !== patchDigest || !/^[0-9a-f]{40,64}$/u.test(value.head)) return false;
-  return Array.isArray(value.files) && value.files.length <= 4096
-    && new Set(value.files).size === value.files.length && value.files.every(safeRelativePath);
 }
 async function capturePatch(worktree, files, config, deps) {
   let source = (await git(worktree, ['diff', '--binary', '--no-ext-diff', 'HEAD'], config, deps)).stdout;
@@ -263,8 +281,10 @@ async function worktreeStatus(worktree, config, deps) {
   const lock = await lstat(resolve(gitDirectory, 'index.lock')).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
   return { dirty: source.length > 0, files: parseNull(source).map(record => normalizePath(record.slice(3))).sort(), head, indexLock: Boolean(lock) };
 }
-async function listManagedWorktrees(root, config, deps) {
-  const managedRoot = await ensureManagedRoot(root, config.worktreeRoot);
+async function listManagedWorktrees(root, config, deps, createRoot = true) {
+  const managedRoot = createRoot
+    ? await ensureManagedRoot(root, config.worktreeRoot)
+    : await managedRootForInventory(root, config.worktreeRoot);
   const repository = await realpath(root);
   const records = (await git(root, ['worktree', 'list', '--porcelain'], config, deps)).stdout.split(/\n\n+/u);
   const entries = [];
@@ -272,11 +292,23 @@ async function listManagedWorktrees(root, config, deps) {
     const first = record.split(/\r?\n/u).find(line => line.startsWith('worktree '));
     if (!first) continue;
     const absolute = first.slice(9);
-    if (absolute !== managedRoot && !absolute.startsWith(`${managedRoot}${sep}`)) continue;
+    if (!managedRoot || (absolute !== managedRoot && !absolute.startsWith(`${managedRoot}${sep}`))) continue;
     const details = await lstat(absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
     entries.push({ absolute, relative: normalizePath(relative(repository, absolute)), present: Boolean(details), symlink: details?.isSymbolicLink() ?? false });
   }
   return entries;
+}
+async function managedRootForInventory(root, worktreeRoot) {
+  if (!safeRelativePath(worktreeRoot)) throw new Error('invalid managed worktree root');
+  const repository = await realpath(root);
+  const absolute = resolve(repository, worktreeRoot);
+  assertContained(repository, absolute, 'managed root');
+  const details = await lstat(absolute).catch(error => error.code === 'ENOENT' ? null : Promise.reject(error));
+  if (!details) return null;
+  if (!details.isDirectory() || details.isSymbolicLink()) throw new Error('managed worktree root must be a real directory');
+  const canonical = await realpath(absolute);
+  assertContained(repository, canonical, 'managed root');
+  return canonical;
 }
 async function resolveManagedPath(root, worktreeRoot, candidate, mustExist) {
   if (!safeRelativePath(candidate) || !normalizePath(candidate).startsWith(`${normalizePath(worktreeRoot)}/`)) throw new Error('path is outside the managed worktree root');
@@ -303,7 +335,7 @@ async function ensureManagedRoot(root, worktreeRoot) {
 }
 async function git(cwd, args, config, deps, acceptFailure = false) {
   try {
-    const value = await deps.execFile('git', args, { cwd, encoding: 'utf8', timeout: config.subprocessTimeoutMs, maxBuffer: config.reportBytes, windowsHide: true, env: deps.gitEnvironment ?? process.env });
+    const value = await deps.execFile('git', args, { cwd, encoding: 'utf8', timeout: config.subprocessTimeoutMs, maxBuffer: config.reportBytes, windowsHide: true });
     return { ...value, code: 0 };
   } catch (error) {
     const code = Number.isInteger(error.code) ? error.code : error.killed ? 124 : 1;
@@ -311,21 +343,6 @@ async function git(cwd, args, config, deps, acceptFailure = false) {
     throw categorized(error.killed ? 'GIT_TIMEOUT' : 'GIT_FAILED', `git ${args[0]} failed (${code})`);
   }
 }
-async function writeIntegrationProof(root, missionId, workerCommit, mainHead, files, deps) {
-  const config = await loadOrchestratorConfig(root);
-  const directory = resolve(root, config.recoveryRoot);
-  await mkdir(directory, { recursive: true, mode: 0o700 });
-  const relativePath = `${config.recoveryRoot.replace(/\/$/u, '')}/${missionId}-integration-${deps.now().toISOString().replace(/[:.]/gu, '-')}.json`;
-  const target = resolve(root, relativePath);
-  const temporary = `${target}.${process.pid}.tmp`;
-  const source = `${JSON.stringify({ mission_id: missionId, worker_commit: workerCommit, main_head: mainHead, files }, null, 2)}\n`;
-  if (Buffer.byteLength(source) > config.reportBytes) throw categorized('RECOVERY_PROOF_TOO_LARGE', 'integration recovery proof exceeds its byte budget');
-  const handle = await open(temporary, 'wx', 0o600);
-  try { await handle.writeFile(source, 'utf8'); await handle.sync(); } finally { await handle.close(); }
-  await rename(temporary, target);
-  return relativePath;
-}
-function stableJson(value) { return JSON.stringify(value); }
 function scopeContains(scope, file, ignoreCase) { const normalize = value => ignoreCase ? normalizePath(value).toLocaleLowerCase('en-US') : normalizePath(value); const left = normalize(scope).replace(/\/$/u, ''); const right = normalize(file); return right === left || right.startsWith(`${left}/`); }
 function result(path, classification, action, baseRevision = null, status = {}) { return { path, classification, action, head: status.head ?? null, base_revision: baseRevision, dirty: status.dirty ?? null, index_lock: status.indexLock ?? false }; }
 function parseNull(source) { return source.split('\0').filter(Boolean); }

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://ctxroute.dev/schemas/orchestrator/resolved-execution-policy.schema.json",
+  "type": "object", "required": ["resolution_status", "requested_mode", "mode", "workflow", "stages", "policy_digest"],
+  "properties": {
+    "resolution_status": { "enum": ["RESOLVED", "WAITING_FOR_USER_DECISION", "WAITING_FOR_CAPABILITY", "BLOCKED", "POLICY_UNSATISFIABLE"] },
+    "requested_mode": { "type": ["string", "null"] }, "mode": { "type": ["string", "null"], "enum": ["SWARM", "AUTO", "SOLO", "GUARDED", "DIRECT", null] },
+    "workflow": { "enum": ["STANDARD", "RESEARCH", "AUDIT", "SECURITY", "MIGRATION", "INCIDENT", "EXPERIMENT", "RECOVERY"] },
+    "stages": { "type": "array", "items": { "$ref": "stage-plan.schema.json" } }, "policy_digest": { "$ref": "common.schema.json#/$defs/digest" },
+    "permissions": { "type": "array", "items": { "type": "string" } }, "requirements": { "type": "array", "items": { "type": "string" } },
+    "risk_floor": { "type": "number", "minimum": 0 }, "model_floor": { "type": "number", "minimum": 0 }, "parallel_limit": { "type": "integer", "minimum": 1 },
+    "write_allowed": { "type": "boolean" }, "repository_mutation_serialized": { "type": "boolean" },
+    "isolation_required": { "type": "boolean" }, "critical_audit_required": { "type": "boolean" },
+    "parallel_writers_allowed": { "type": "boolean" },
+    "reinforcements": { "type": "array", "items": { "type": "string" } }, "causes": { "type": "array", "items": { "type": "string" } },
+    "missing_capabilities": { "type": "array", "items": { "type": "string" } }, "alternatives": { "type": "array", "items": { "type": "string" } }
+  }, "unevaluatedProperties": false
+}

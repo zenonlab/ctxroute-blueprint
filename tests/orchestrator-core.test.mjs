@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,14 +10,17 @@ import {
   validateAuditReport, validateWorkerReport,
 } from '../scripts/orchestrator-core.mjs';
 import { bootstrapOrchestrator } from '../scripts/orchestrator-bootstrap.mjs';
-import { prepareMission, reconcileWorktrees, rollbackMission, submitWorkerReport } from '../scripts/orchestrator-service.mjs';
-import { recoverRollbackProof } from '../scripts/worktree-manager.mjs';
+import { commitMission, integrateMission, mutateCoordination, prepareMission, readCoordination, reconcileWorktrees, rollbackMission, submitWorkerReport } from '../scripts/orchestrator-service.mjs';
+import { writePolicySnapshot } from '../scripts/orchestrator-policy-snapshot.mjs';
+import { resolvedPolicyDecision } from '../.codex/hooks/resolved-policy.mjs';
+import { resolveExecutionPolicy } from '../scripts/orchestration-policy-core.mjs';
+import { reconcileHook } from '../.codex/hooks/worktree-reconcile.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 
 test('state is created atomically and mode reports its source', async () => {
   const root = fixture();
-  assert.deepEqual(await currentSwarmMode(root, {}), { mode: 'SWARM_ON', mode_source: 'default' });
+  assert.deepEqual(await currentSwarmMode(root, {}), { mode: 'SWARM', mode_source: 'default' });
   assert.deepEqual(await currentSwarmMode(root, { CTXROUTE_SWARM_MODE: 'SWARM_OFF' }), { mode: 'SWARM_OFF', mode_source: 'environment' });
   await bootstrapOrchestrator(root);
   const state = await readOrchestratorState(root);
@@ -76,7 +78,7 @@ test('stale dead locks recover but a live lock times out', async () => {
 
 test('environment SWARM_OFF and explicit direct execution create no mission or worktree', async () => {
   const root = fixture(true);
-  const goal = await transactOrchestrator(goalCommand(), root);
+  const goal = await createGoalAtWork(root);
   const environmentResult = await prepareMission(missionCommand(goal.state.revision), root, { CTXROUTE_SWARM_MODE: 'SWARM_OFF' });
   assert.equal(environmentResult.bypassed, true);
   assert.equal(environmentResult.mode_source, 'environment');
@@ -87,22 +89,9 @@ test('environment SWARM_OFF and explicit direct execution create no mission or w
   assert.equal(directResult.state.goals[0].missions.length, 0);
 });
 
-test('automatic execution uses the worker pipeline even for a single scope', async () => {
-  const root = fixture(true);
-  const goal = await transactOrchestrator(goalCommand(), root);
-  const command = missionCommand(goal.state.revision);
-  command.payload.mission.file_scope = ['src/'];
-  command.payload.mission.execution = 'auto';
-  const result = await prepareMission(command, root);
-  assert.equal(result.bypassed, undefined);
-  assert.equal(result.reason, 'AUTO_COORDINATED');
-  assert.equal(result.state.goals[0].missions[0].status, 'ASSIGNED');
-  assert.ok(result.state.goals[0].missions[0].worktree_allocation.path);
-});
-
 test('coordinated mission is isolated and completes only after orchestrator validation replay', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   const prepareCommand = missionCommand(state.revision);
   prepareCommand.payload.mission.validations.push({ id: 'syntax-again', executable: 'node', args: ['--check', 'src/change.mjs'], cwd: '.', timeout_ms: 30_000 });
   const prepared = await prepareMission(prepareCommand, root);
@@ -126,9 +115,57 @@ test('coordinated mission is isolated and completes only after orchestrator vali
   assert.deepEqual(validateWorkerReport(report), []);
 });
 
+test('worker mutation policy resolves a durable ExecutionBinding and rejects contradictions', async () => {
+  const root = fixture(true);
+  let state = (await createGoalAtWork(root)).state;
+  const prepared = await prepareMission(missionCommand(state.revision), root);
+  state = prepared.state;
+  const goal = state.goals[0];
+  await writePolicySnapshot(goal.resolved_policy, join(root, '.ctxroute/orchestrator/policies/goal-one.json'));
+  const environment = { CTXROUTE_AGENT_ROLE: 'worker', CTXROUTE_MISSION_ID: 'mission-one' };
+  const view = await readCoordination(root, environment);
+  assert.equal(view.goal_id, 'goal-one');
+  assert.equal(view.stage, 'work');
+  assert.equal(view.access, 'write');
+  assert.equal(view.revision, state.revision);
+  assert.equal((await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, environment)).decision, null);
+  await writePolicySnapshot(resolveExecutionPolicy({ requested_mode: 'DIRECT', workflow: 'STANDARD', capabilities: [] }), join(root, '.ctxroute/orchestrator/policy.json'));
+  assert.equal((await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, environment)).decision, null, 'global policy changes cannot replace a goal binding');
+  const contradictory = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, { ...environment, CTXROUTE_STAGE: 'audit' });
+  assert.equal(contradictory.decision.cause, 'EXECUTION_BINDING_ENVIRONMENT_MISMATCH');
+  const stale = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, { ...environment, CTXROUTE_BINDING_REVISION: String(state.revision - 1) });
+  assert.equal(stale.decision.cause, 'EXECUTION_BINDING_STALE');
+  const adr = await resolvedPolicyDecision({ tool_name: 'apply_patch', tool_input: { patch: '*** Update File: docs/decisions/ADR-0092-execution-bindings-and-hook-lanes.md' } }, root, environment);
+  assert.equal(adr.decision.cause, 'ADR_WORKER_AUTHORITY_REQUIRED');
+  await writePolicySnapshot(resolveExecutionPolicy({ requested_mode: 'SWARM', workflow: 'AUDIT', capabilities: ['git'] }), join(root, '.ctxroute/orchestrator/policies/goal-one.json'));
+  const wrongGoalSnapshot = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, environment);
+  assert.equal(wrongGoalSnapshot.decision.cause, 'POLICY_DIGEST_MISMATCH');
+});
+
+test('a STANDARD read-only worker stage blocks mutation through its binding', async () => {
+  const root = fixture(true);
+  let state = (await createGoalAtWork(root)).state;
+  for (const [index, completedStage, nextStage] of [[3, 'work', 'validation'], [4, 'validation', 'audit']]) {
+    const goal = state.goals[0];
+    state = (await transactOrchestrator({
+      operation_id: `audit-stage-${index}`,
+      expected_revision: state.revision,
+      action: 'goal.stage.advance',
+      payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: `audit-checkpoint-${index}`, goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage: completedStage, completed_receipt_ids: [], artifact_refs: [], next_stage: nextStage, created_at: `2026-09-17T12:0${index}:00Z` } },
+    }, root)).state;
+  }
+  const command = missionCommand(state.revision, 'audit-mission-prepare');
+  command.payload.mission.mission_id = 'audit-mission';
+  const prepared = await prepareMission(command, root);
+  const goal = prepared.state.goals[0];
+  await writePolicySnapshot(goal.resolved_policy, join(root, '.ctxroute/orchestrator/policies/goal-one.json'));
+  const blocked = await resolvedPolicyDecision({ tool_name: 'apply_patch' }, root, { CTXROUTE_AGENT_ROLE: 'worker', CTXROUTE_MISSION_ID: 'audit-mission' });
+  assert.equal(blocked.decision.cause, 'POLICY_READ_ONLY');
+});
+
 test('worker claims cannot hide a failing orchestrator validation or an out-of-scope diff', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   const command = missionCommand(state.revision);
   command.payload.mission.validations[0].args = ['--check', 'src/broken.mjs'];
   let prepared = await prepareMission(command, root);
@@ -140,9 +177,56 @@ test('worker claims cannot hide a failing orchestrator validation or an out-of-s
   assert.equal(blocked.state.goals[0].missions[0].validation_receipt.status, 'FAILED');
 });
 
+test('the orchestrator alone commits validated work and integrates the exact commit', async () => {
+  const root = fixture(true);
+  let state = (await createGoalAtWork(root)).state;
+  const prepared = await prepareMission(missionCommand(state.revision), root);
+  state = (await transactOrchestrator({ operation_id: 'start-commit', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'RUNNING' } }, root)).state;
+  const worktree = state.goals[0].missions[0].worktree_allocation.path;
+  writeFileSync(join(root, worktree, 'src/change.mjs'), 'export const integrated = true;\n');
+  state = (await submitWorkerReport({ operation_id: 'report-commit', expected_revision: state.revision, action: 'report.submit', payload: { goal_id: 'goal-one', report: workerReport(['src/change.mjs']) } }, root)).state;
+  const committed = await commitMission({ operation_id: 'commit-one', expected_revision: state.revision, action: 'mission.commit', payload: { goal_id: 'goal-one', mission_id: 'mission-one', message: 'feat: integrate validated mission' } }, root);
+  const sourceCommit = committed.state.goals[0].missions[0].orchestrator_commit;
+  assert.match(sourceCommit, /^[0-9a-f]{40}$/u);
+  state = committed.state;
+  for (const [index, completed_stage, next_stage] of [[3, 'work', 'validation'], [4, 'validation', 'audit'], [5, 'audit', 'integration']]) {
+    const goal = state.goals[0];
+    state = (await transactOrchestrator({ operation_id: `stage-${index}`, expected_revision: state.revision, action: 'goal.stage.advance', payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: `checkpoint-${index}`, goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage, completed_receipt_ids: [], artifact_refs: [], next_stage, created_at: `2026-09-17T12:0${index}:00Z` } } }, root)).state;
+  }
+  const integrated = await integrateMission({ operation_id: 'integrate-one', expected_revision: state.revision, action: 'mission.integrate', payload: { goal_id: 'goal-one', mission_id: 'mission-one', commit_oid: sourceCommit } }, root);
+  const resultCommit = integrated.state.goals[0].missions[0].integrated_commit;
+  assert.equal(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(), resultCommit);
+  assert.equal(readFileSync(join(root, 'src/change.mjs'), 'utf8'), 'export const integrated = true;\n');
+  const completed = await mutateCoordination({ operation_id: 'complete-one', expected_revision: integrated.state.revision, action: 'goal.transition', payload: { goal_id: 'goal-one', status: 'COMPLETED', outcome_receipt: { receipt_id: 'outcome-one', goal_id: 'goal-one', effect: 'mutation', policy_digest: integrated.state.goals[0].policy_digest, evidence_refs: ['src/change.mjs'], repository_unchanged: false, integrated_commit: resultCommit, recovery_backup_refs: [], final_repository_digest: null, completed_at: '2026-09-17T12:10:00Z' } } }, root);
+  assert.equal(completed.state.goals[0].status, 'COMPLETED');
+  assert.equal(completed.state.outcome_receipts[0].integrated_commit, resultCommit);
+});
+
+test('read-only completion proves the primary repository snapshot stayed unchanged', async () => {
+  const root = fixture(true);
+  let state = (await mutateCoordination({ ...goalCommand(), payload: { ...goalCommand().payload, workflow: 'AUDIT' } }, root)).state;
+  const goal = state.goals[0];
+  state = (await transactOrchestrator({ operation_id: 'audit-stage', expected_revision: state.revision, action: 'goal.stage.advance', payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: 'audit-checkpoint', goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage: 'inventory', completed_receipt_ids: [], artifact_refs: ['src/base.mjs'], next_stage: 'audit', created_at: '2026-09-17T13:00:00Z' } } }, root)).state;
+  const completed = await mutateCoordination({ operation_id: 'audit-complete', expected_revision: state.revision, action: 'goal.transition', payload: { goal_id: goal.goal_id, status: 'COMPLETED', outcome_receipt: { receipt_id: 'audit-outcome', goal_id: goal.goal_id, effect: 'read-only', policy_digest: goal.policy_digest, evidence_refs: ['src/base.mjs'], repository_unchanged: true, integrated_commit: null, recovery_backup_refs: [], final_repository_digest: null, completed_at: '2026-09-17T13:10:00Z' } } }, root);
+  assert.equal(completed.state.goals[0].status, 'COMPLETED');
+});
+
+test('read-only workflows reject a worker diff mechanically', async () => {
+  const root = fixture(true);
+  let state = (await transactOrchestrator({ ...goalCommand(), payload: { ...goalCommand().payload, workflow: 'RESEARCH' } }, root)).state;
+  const goal = state.goals[0];
+  state = (await transactOrchestrator({ operation_id: 'research-stage', expected_revision: state.revision, action: 'goal.stage.advance', payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: 'research-checkpoint', goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage: 'inventory', completed_receipt_ids: [], artifact_refs: [], next_stage: 'research', created_at: '2026-09-17T13:00:00Z' } } }, root)).state;
+  const command = missionCommand(state.revision);
+  const prepared = await prepareMission(command, root);
+  state = (await transactOrchestrator({ operation_id: 'research-start', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'RUNNING' } }, root)).state;
+  const worktree = state.goals[0].missions[0].worktree_allocation.path;
+  writeFileSync(join(root, worktree, 'src/change.mjs'), 'export const forbidden = true;\n');
+  await assert.rejects(() => submitWorkerReport({ operation_id: 'research-report', expected_revision: state.revision, action: 'report.submit', payload: { goal_id: 'goal-one', report: workerReport(['src/change.mjs']) } }, root), /read-only mission/u);
+});
+
 test('reconciliation preserves dirty terminal worktrees and removes only clean terminal worktrees', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   let prepared = await prepareMission(missionCommand(state.revision), root);
   state = (await transactOrchestrator({ operation_id: 'cancel-one', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'CANCELLED' } }, root)).state;
   const worktree = prepared.state.goals[0].missions[0].worktree_allocation.path;
@@ -153,9 +237,28 @@ test('reconciliation preserves dirty terminal worktrees and removes only clean t
   assert.ok(reconciled.state.worktree_operations.some(item => item.classification === 'TERMINAL_DIRTY'));
 });
 
+test('SessionStart inventory preserves a clean terminal worktree', async () => {
+  const root = fixture(true);
+  let state = (await createGoalAtWork(root)).state;
+  const prepared = await prepareMission(missionCommand(state.revision), root);
+  state = prepared.state;
+  state = (await transactOrchestrator({ operation_id: 'cancel-for-session', expected_revision: state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'CANCELLED' } }, root)).state;
+  const worktree = state.goals[0].missions[0].worktree_allocation.path;
+  assert.equal(await reconcileHook(root), null);
+  assert.equal(existsSync(join(root, worktree)), true);
+});
+
+test('SessionStart inventory does not create the managed worktree directory', async () => {
+  const root = fixture(true);
+  await bootstrapOrchestrator(root);
+  assert.equal(existsSync(join(root, '.ctxroute/worktrees')), false);
+  assert.equal(await reconcileHook(root), null);
+  assert.equal(existsSync(join(root, '.ctxroute/worktrees')), false);
+});
+
 test('reconciliation removes clean terminal worktrees but preserves clean revision divergence', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   let prepared = await prepareMission(missionCommand(state.revision), root);
   const worktree = prepared.state.goals[0].missions[0].worktree_allocation.path;
   state = (await transactOrchestrator({ operation_id: 'cancel-clean', expected_revision: prepared.state.revision, action: 'mission.transition', payload: { goal_id: 'goal-one', mission_id: 'mission-one', status: 'CANCELLED' } }, root)).state;
@@ -177,7 +280,7 @@ test('reconciliation removes clean terminal worktrees but preserves clean revisi
 
 test('reconciliation never removes a worktree with an index lock', async () => {
   const root = fixture(true);
-  const goal = await transactOrchestrator(goalCommand(), root);
+  const goal = await createGoalAtWork(root);
   const prepared = await prepareMission(missionCommand(goal.state.revision), root);
   const worktree = prepared.state.goals[0].missions[0].worktree_allocation.path;
   const gitDirectory = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-dir'], { cwd: join(root, worktree), encoding: 'utf8' }).trim();
@@ -189,7 +292,7 @@ test('reconciliation never removes a worktree with an index lock', async () => {
 
 test('rollback captures a bounded recovery proof before force removal', async () => {
   const root = fixture(true);
-  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  let state = (await createGoalAtWork(root)).state;
   const prepared = await prepareMission(missionCommand(state.revision), root);
   const mission = prepared.state.goals[0].missions[0];
   writeFileSync(join(root, mission.worktree_allocation.path, 'src/change.mjs'), 'export const proof = true;\n');
@@ -200,24 +303,6 @@ test('rollback captures a bounded recovery proof before force removal', async ()
   assert.equal(existsSync(join(root, allocation.path)), false);
 });
 
-test('rollback recovery accepts only the exact current proof header', async () => {
-  const root = fixture();
-  const recovery = join(root, '.ctxroute/recovery');
-  mkdirSync(recovery, { recursive: true });
-  const patch = Buffer.from('bounded recovery evidence\n');
-  const header = {
-    mission_id: 'mission-one',
-    head: 'a'.repeat(40),
-    files: ['src/change.mjs'],
-    digest: `sha256:${createHash('sha256').update(patch).digest('hex')}`,
-  };
-  const proof = join(recovery, 'mission-one-proof.patch');
-  writeFileSync(proof, Buffer.concat([Buffer.from(`${JSON.stringify({ ...header, obsolete_marker: 1 })}\n`), patch]));
-  await assert.rejects(() => recoverRollbackProof('mission-one', root), /without a valid recovery proof/u);
-  writeFileSync(proof, Buffer.concat([Buffer.from(`${JSON.stringify(header)}\n`), patch]));
-  assert.equal((await recoverRollbackProof('mission-one', root)).proof, '.ctxroute/recovery/mission-one-proof.patch');
-});
-
 test('worker authority and symlinked worktrees fail closed', async () => {
   const root = fixture(true);
   const worker = { CTXROUTE_AGENT_ROLE: 'worker', CTXROUTE_MISSION_ID: 'mission-one' };
@@ -225,7 +310,7 @@ test('worker authority and symlinked worktrees fail closed', async () => {
   await assert.rejects(() => mutateCoordination(goalCommand(), root, worker), /workers cannot mutate/u);
   mkdirSync(join(root, '.ctxroute/worktrees'), { recursive: true });
   symlinkSync(join(root, 'src'), join(root, '.ctxroute/worktrees/mission-one'));
-  const state = (await transactOrchestrator(goalCommand(), root)).state;
+  const state = (await createGoalAtWork(root)).state;
   await assert.rejects(() => prepareMission(missionCommand(state.revision), root), /symlink|SYMLINK|already exists/u);
 });
 
@@ -238,6 +323,19 @@ test('formal report and audit contracts reject unknown fields and conversational
 });
 
 function goalCommand() { return { operation_id: 'goal-create-one', expected_revision: 0, action: 'goal.create', payload: { goal_id: 'goal-one', title: 'Ship one goal' } }; }
+async function createGoalAtWork(root) {
+  let state = (await transactOrchestrator(goalCommand(), root)).state;
+  for (const [index, completed_stage, next_stage] of [[1, 'inventory', 'planning'], [2, 'planning', 'work']]) {
+    const goal = state.goals[0];
+    state = (await transactOrchestrator({
+      operation_id: `stage-${index}`,
+      expected_revision: state.revision,
+      action: 'goal.stage.advance',
+      payload: { goal_id: goal.goal_id, checkpoint: { checkpoint_id: `checkpoint-${index}`, goal_id: goal.goal_id, policy_digest: goal.policy_digest, completed_stage, completed_receipt_ids: [], artifact_refs: [], next_stage, created_at: `2026-09-17T12:0${index}:00Z` } },
+    }, root)).state;
+  }
+  return { state };
+}
 function missionCommand(revision, operation_id = 'mission-prepare-one') { return { operation_id, expected_revision: revision, action: 'mission.prepare', payload: { goal_id: 'goal-one', mission: { mission_id: 'mission-one', skill_id: 'blueprint-audit', requested_skill_id: null, skill_version: '1.0.0', file_scope: ['src/', 'lib/'], acceptance: ['Scoped file is valid'], validations: [{ id: 'syntax', executable: 'node', args: ['--check', 'src/change.mjs'], cwd: '.', timeout_ms: 30_000 }], execution: 'coordinated' } } }; }
 function workerReport(files) { return { mission_id: 'mission-one', status: 'READY_FOR_VALIDATION', files_touched: files, validation_results: [{ id: 'syntax', status: 'PASSED', exit_code: 0, duration_ms: 1, timed_out: false, cause: null, diagnostic: null }], summary: 'Worker reports readiness; orchestrator must verify.' }; }
 function fixture(gitRepository = false) {

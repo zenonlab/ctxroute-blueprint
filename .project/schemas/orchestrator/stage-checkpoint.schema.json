@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://ctxroute.dev/schemas/orchestrator/stage-checkpoint.schema.json",
+  "type": "object", "required": ["checkpoint_id", "goal_id", "policy_digest", "completed_stage", "completed_receipt_ids", "artifact_refs", "next_stage", "created_at"],
+  "properties": {
+    "checkpoint_id": { "$ref": "common.schema.json#/$defs/identifier" }, "goal_id": { "$ref": "common.schema.json#/$defs/identifier" },
+    "policy_digest": { "$ref": "common.schema.json#/$defs/digest" }, "completed_receipt_ids": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/identifier" }, "uniqueItems": true },
+    "artifact_refs": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/relativePath" }, "uniqueItems": true },
+    "completed_stage": { "enum": ["inventory", "research", "decision", "planning", "work", "validation", "audit", "integration", "recovery", "promotion"] },
+    "next_stage": { "enum": ["inventory", "research", "decision", "planning", "work", "validation", "audit", "integration", "recovery", "promotion"] }, "created_at": { "$ref": "common.schema.json#/$defs/timestamp" }
+  }, "unevaluatedProperties": false
+}

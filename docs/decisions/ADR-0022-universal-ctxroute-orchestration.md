@@ -18,10 +18,11 @@ revised: true
 contracts:
   - package.json
   - docs/document-contracts.json
+superseded-by: ADR-0087-durable-modular-orchestration.md
 ---
 # ADR-0022 — Universal CTXRoute orchestration
 
-- Status: accepted
+- Status: superseded
 - Date: 2026-09-06
 
 ## Decision

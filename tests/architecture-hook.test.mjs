@@ -83,33 +83,6 @@ test('allows a routine package script change without demanding an ADR', () => {
   assert.doesNotMatch(result.stdout, /decision":"block/u);
 });
 
-test('routes applicable ADR reading before the product mutation', () => {
-  const cwd = initializedWorkspace();
-  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
-  writeFileSync(join(cwd, 'src/existing.rb'), 'puts :initial\n');
-  writeFileSync(join(cwd, 'docs/decisions/ADR-0001-runtime.md'), [
-    '---',
-    'scope:',
-    '  - src/**',
-    'review: on-change',
-    '---',
-    '# Runtime decision',
-  ].join('\n'));
-  const result = executeArchitectureHook({ file_path: 'src/existing.rb' }, { cwd });
-  const context = JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
-  assert.match(context, /Before mutating product code/u);
-  assert.match(context, /Read applicable ADRs now: ADR-0001-runtime\.md/u);
-});
-
-test('routes architecture candidates before a structural mutation', () => {
-  const cwd = initializedWorkspace();
-  const result = executeArchitectureHook({ patch: '*** Add File: src/service.rb\n+export class Service {}' }, { cwd });
-  const context = JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
-  assert.match(context, /Before mutating src\/service\.rb/u);
-  assert.match(context, /Relevant architecture candidates: docs\/architecture\/src\/blueprint\.architecture\.json/u);
-  assert.match(context, /before product code/u);
-});
-
 test('reads patches supplied through a patch property', () => {
   const result = run({ patch: '*** Add File: application.rb' });
   assert.match(result.stdout, /template mode/u);
@@ -240,6 +213,38 @@ test('allows a contract with a real ADR', () => {
   const cwd = initializedWorkspace();
   const result = run({ patch: '*** Update File: package.json\n*** Add File: docs/decisions/ADR-0001-dependency.md' }, { cwd });
   assert.equal(result.stdout, '');
+});
+
+test('pre-tool ADR protection applies only to tracked accepted decisions', () => {
+  const cwd = initializedWorkspace();
+  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+  const path = join(cwd, 'docs/decisions/ADR-0001-fixture.md');
+  writeFileSync(path, '---\nscope:\n  - src/**\nreview: on-change\n---\n# ADR\n\n- Status: accepted\n\n## Decision\n\nKeep it.\n\n## Consequences\n\nStable.\n');
+  const untracked = run({ file_path: 'docs/decisions/ADR-0001-fixture.md' }, { cwd });
+  assert.doesNotMatch(untracked.stdout, /accepted ADR cannot be rewritten/u);
+  git(cwd, ['init', '-q']);
+  git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
+  git(cwd, ['config', 'user.name', 'Fixture']);
+  git(cwd, ['add', '.']);
+  git(cwd, ['commit', '-qm', 'chore: fixture']);
+  const tracked = run({ file_path: 'docs/decisions/ADR-0001-fixture.md' }, { cwd });
+  assert.match(tracked.stdout, /accepted ADR cannot be rewritten/u);
+});
+
+test('pre-tool ADR protection validates reconstructed supersession patches', () => {
+  const cwd = initializedWorkspace();
+  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+  const path = 'docs/decisions/ADR-0001-fixture.md';
+  writeFileSync(join(cwd, path), '---\nscope:\n  - src/**\nreview: on-change\n---\n# ADR\n\n- Status: accepted\n\n## Decision\n\nKeep it.\n\n## Consequences\n\nStable.\n');
+  git(cwd, ['init', '-q']);
+  git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
+  git(cwd, ['config', 'user.name', 'Fixture']);
+  git(cwd, ['add', '.']);
+  git(cwd, ['commit', '-qm', 'chore: fixture']);
+  const valid = executeArchitectureHook({ patch: '*** Begin Patch\n*** Update File: docs/decisions/ADR-0001-fixture.md\n@@\n review: on-change\n+superseded-by: ADR-0002-replacement.md\n ---\n@@\n-- Status: accepted\n+- Status: superseded\n*** End Patch' }, { cwd });
+  assert.doesNotMatch(valid.stdout, /decision":"block/u);
+  const bypass = executeArchitectureHook({ patch: '*** Begin Patch\n*** Update File: docs/decisions/ADR-0001-fixture.md\n@@\n review: on-change\n+superseded-by: ADR-0002-replacement.md\n ---\n@@\n-- Status: accepted\n+- Status: superseded\n@@\n-Keep it.\n+Rewrite it.\n*** End Patch' }, { cwd });
+  assert.match(bypass.stdout, /accepted ADR cannot be rewritten/u);
 });
 
 test('blocks governed changes while an ADR is invalid or superseded', () => {

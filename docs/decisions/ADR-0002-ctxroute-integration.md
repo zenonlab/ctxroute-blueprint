@@ -7,10 +7,11 @@ scope:
   - package-lock.json
 review: on-change
 revised: true
+superseded-by: ADR-0092-execution-bindings-and-hook-lanes.md
 ---
 # ADR-0002 — CTXRoute integration
 
-- Status: accepted
+- Status: superseded
 - Date: 2026-08-24
 - Last reviewed: 2026-09-06
 

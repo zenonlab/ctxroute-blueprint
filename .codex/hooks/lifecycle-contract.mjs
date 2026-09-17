@@ -9,12 +9,23 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 function commandHook(config, event, lane) {
   const groups = config?.hooks?.[event] ?? [];
   const hooks = groups.flatMap(group => group.hooks ?? []);
-  return hooks.find(hook => Boolean(hook.async) === (lane === 'maintenance'));
+  return hooks.find(hook => Boolean(hook.async) === (lane === 'maintenance'))
+    ?? hooks.find(hook => !hook.async)
+    ?? hooks[0];
 }
 
 function readConfig(root, harness) {
   const path = harness === 'claude' ? join(root, '.claude', 'settings.json') : join(root, '.codex', 'hooks.json');
   return JSON.parse(readFileSync(path, 'utf8'));
+}
+
+export function declaredMaintenanceEntries(root = projectRoot) {
+  return ['codex', 'claude'].flatMap(harness => {
+    const config = readConfig(root, harness);
+    return Object.entries(config.hooks ?? {}).flatMap(([event, groups]) => groups.flatMap(group => (group.hooks ?? [])
+      .filter(hook => hook.async === true)
+      .map(hook => ({ harness, event, command: hook.command, timeout: hook.timeout }))));
+  });
 }
 
 export function hookContract(harness, event, lane = 'synchronous', root = projectRoot) {
@@ -23,7 +34,6 @@ export function hookContract(harness, event, lane = 'synchronous', root = projec
   // equivalent field, so both dispatchers deliberately use the same cap.
   const portable = commandHook(readConfig(root, 'codex'), event, lane);
   return {
-    declared: Boolean(selected),
     timeoutMs: Math.max(250, Number(selected?.timeout ?? DEFAULT_TIMEOUT_MS / 1000) * 1000),
     contextLimit: Number(portable?.additionalContextLimit ?? DEFAULT_CONTEXT_LIMIT),
   };

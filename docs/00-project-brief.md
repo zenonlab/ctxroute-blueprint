@@ -53,12 +53,6 @@ application availability target. The orchestrator owns revisioned goals,
 missions, validation receipts, audit records, and recoverable worktree
 operations; workers receive only the bounded mission projection they need.
 
-Adaptive goals add a provider-neutral L0–L4 routing decision, current official
-documentation evidence, normalized consumption receipts, monotone escalation,
-and an independent final audit when risk requires it. Provider access remains
-through allowlisted local CLIs; the blueprint adds no HTTP client, daemon, or
-remote control plane. Legacy `workerRuntime` configuration stays readable.
-
 Git worktrees isolate checkout and index state, not hostile processes. The
 security boundary assumes cooperative local agents. Any future remote,
 multi-tenant, adversarial, externally served, or production-SLA requirement
@@ -91,8 +85,6 @@ For the blueprint control plane, success requires schema-validated state and
 messages, deterministic crash/replay and multi-process coverage, orchestrator-
 owned validation receipts, non-destructive worktree reconciliation, bounded
 redacted telemetry, internal Archify validation, and a blocking CRG `high`
-risk gate. Adaptive routing must prefer the smallest qualified model without
-lowering mechanical risk floors, and external dependencies must block before
-mutation when fresh primary evidence is unavailable. The complete repository validation must pass without introducing an
+risk gate. The complete repository validation must pass without introducing an
 HTTP, daemon, Kubernetes, GitOps-runtime, hardware-simulation, LLM, or network
 dependency into orchestration tests.

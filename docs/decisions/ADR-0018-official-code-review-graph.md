@@ -16,10 +16,11 @@ revised: true
 supersedes:
   - ADR-0006-ephemeral-crg-pipeline.md
   - ADR-0016-ast-context-mcp.md
+superseded-by: ADR-0092-execution-bindings-and-hook-lanes.md
 ---
 # ADR-0018 — Official code-review-graph and MCP governance
 
-- Status: accepted
+- Status: superseded
 - Date: 2026-09-01
 
 ## Context

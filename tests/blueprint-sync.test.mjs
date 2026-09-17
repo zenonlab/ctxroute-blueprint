@@ -15,9 +15,9 @@ test('blueprint sync includes transitive local dependencies of control files', (
 });
 
 const source = fileURLToPath(new URL('..', import.meta.url));
+const sourceVersion = JSON.parse(readFileSync(join(source, '.project/blueprint-version.json'), 'utf8')).version;
 
 test('blueprint sync previews, backs up, applies, and refuses dirty targets', async () => {
-  const sourceVersion = JSON.parse(readFileSync(join(source, '.project/blueprint-version.json'), 'utf8')).version;
   const target = mkdtempSync(join(tmpdir(), 'blueprint-sync-'));
   git(target, ['init']);
   git(target, ['config', 'user.email', 'test@example.test']);
