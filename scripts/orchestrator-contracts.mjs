@@ -42,9 +42,6 @@ const aliases = new Map(Object.entries(ORCHESTRATOR_SCHEMA_IDS).flatMap(([key, i
 ]));
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 for (const schema of schemaDocuments) ajv.addSchema(schema);
-for (const id of Object.values(ORCHESTRATOR_SCHEMA_IDS)) {
-  if (!ajv.getSchema(id)) throw new Error(`Orchestrator schema was not compiled: ${id}`);
-}
 
 export function listOrchestratorContracts() {
   return Object.entries(ORCHESTRATOR_SCHEMA_IDS).map(([name, id]) => ({ name, id }));
@@ -53,7 +50,9 @@ export function listOrchestratorContracts() {
 export function getOrchestratorValidator(nameOrId) {
   const id = aliases.get(nameOrId);
   if (!id) throw new TypeError(`Unknown orchestrator contract: ${nameOrId}`);
-  return ajv.getSchema(id);
+  const validator = ajv.getSchema(id);
+  if (!validator) throw new Error(`Orchestrator schema was not compiled: ${id}`);
+  return validator;
 }
 
 export function validateOrchestratorContract(nameOrId, value) {
