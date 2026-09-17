@@ -2730,7 +2730,7 @@
       "schemaVersion": 1,
       "id": "goal-production-download-and-cleanup",
       "title": "Réparer la publication des téléchargements et nettoyer les ressources orphelines",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
@@ -2795,7 +2795,7 @@
         {
           "id": "deploy-and-final-audit",
           "title": "Déployer, pousser et certifier le résultat",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Téléchargements publics répondent HTTP 200",
             "Worker, D1, R2 et queues actives sont sains",
@@ -2814,7 +2814,10 @@
             "git push"
           ],
           "evidence": [
-            "Commits locaux 6fb061c et 47b9742 vérifiés; préparation du plan Worker borné avant déploiement et probes production."
+            "Plan Cloudflare 74c982060b8ea554797494ca6aa682c59e62b75ab0e96309f5ac6b665019266d limité au Worker; version 7d514091-35ff-496d-b533-e57d13fea3fd sert 100 %, cron dimanche 03:23 UTC et bindings actifs conservés.",
+            "Production: accueil, /download, deux ZIP 1.0.30, /v3/releases et /v4/release-models répondent 200; la page ne contient aucun lien 1.0.31 et le revalidate ETag v3 répond 304.",
+            "npm run verify, npm ls --all et npm audit passent; Worker 113/113, Extension 145/145, Application 380/380, builds Chromium/Firefox et tous les diagrammes Archify showcase sont verts; 0 vulnérabilité.",
+            "Commits 6fb061c, 47b9742 et f478b80 poussés; origin/perf/adaptive-public-refresh pointe exactement sur f478b80800ef31d65dec02a75bf688c35b4e2f5d, .codex/config.toml préservé hors commit."
           ]
         }
       ]
