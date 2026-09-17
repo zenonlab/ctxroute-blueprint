@@ -121,8 +121,11 @@ export async function dispatchLifecycle({ harness, event, input, root = projectR
   const plan = applicableHandlers(handlerPlan(harness, event, root, lane), event, input);
   if (event === 'PreToolUse' && plan.length === 0) return null;
   if (lane === 'manual') return null;
-  const resolved = lane === 'synchronous'
-    ? await (await import('./resolved-policy.mjs')).resolvedPolicyDecision(input, root, environment)
+  const resolved = lane === 'synchronous' && event === 'PreToolUse'
+    ? (await Promise.all([
+        import('./resolved-policy.mjs').then(module => module.resolvedPolicyDecision(input, root, environment)),
+        import('./pre-tool-architecture.mjs'),
+      ]))[0]
     : { decision: null, source: 'not-required', diagnostic: null };
   if (resolved.decision) {
     const adapted = adaptHostDecision(harness, event, resolved.decision);
