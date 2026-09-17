@@ -13,15 +13,19 @@ export function shouldUpdate(input) {
   return successful(input) && isWrite(input);
 }
 
-export async function isLatestMaintenanceRequest({ root: projectRoot = root, stateDirectory = process.env.CTXROUTE_STATE_DIR || join(projectRoot, '.ctxroute', 'state'), quietMs = 600, token = randomUUID() } = {}) {
+export async function isLatestMaintenanceRequest({ root: projectRoot = root, stateDirectory = process.env.CTXROUTE_STATE_DIR || join(projectRoot, '.ctxroute', 'state'), quietMs = 600, token = randomUUID(), waitForQuiet = delay } = {}) {
   stateDirectory = safeStateDirectory(stateDirectory, projectRoot);
   const marker = join(stateDirectory, 'crg-maintenance-request');
   const temporary = `${marker}.${createHash('sha256').update(token).digest('hex')}.tmp`;
   await mkdir(stateDirectory, { recursive: true });
   await writeFile(temporary, token, { encoding: 'utf8', mode: 0o600 });
   await rename(temporary, marker);
-  await new Promise(resolveWait => { setTimeout(resolveWait, quietMs); });
+  await waitForQuiet(quietMs);
   return await readFile(marker, 'utf8').catch(() => '') === token;
+}
+
+function delay(durationMs) {
+  return new Promise(resolveWait => { setTimeout(resolveWait, durationMs); });
 }
 
 export async function runCrgMaintenance(rawInput, options = {}) {

@@ -11,6 +11,7 @@ const fixture = mkdtempSync(join(root, '.hook-performance-'));
 const state = join(fixture, 'state');
 const hook = join(root, '.codex/hooks/lifecycle.mjs');
 const samplesPerCase = 10;
+const warmupSamplesPerCase = 1;
 const fixturePath = path => relative(root, path).split(sep).join('/');
 const unsafePath = join(fixture, 'unsafe.js');
 writeFileSync(unsafePath, "eval('performance fixture');\n");
@@ -38,7 +39,7 @@ try {
       const samples = [];
       let contextChars = 0;
       let error;
-      for (let sample = 0; sample < samplesPerCase; sample += 1) {
+      for (let sample = -warmupSamplesPerCase; sample < samplesPerCase; sample += 1) {
         const started = performance.now();
         const child = spawnSync(process.execPath, [hook, harness, event], {
           cwd: root,
@@ -47,7 +48,8 @@ try {
           encoding: 'utf8',
           timeout: hookContract(harness, event, 'synchronous', root).timeoutMs,
         });
-        samples.push(Math.round(performance.now() - started));
+        const durationMs = Math.round(performance.now() - started);
+        if (sample >= 0) samples.push(durationMs);
         let output = {};
         try { output = child.stdout.trim() ? JSON.parse(child.stdout) : {}; } catch { error = 'invalid dispatcher JSON'; }
         contextChars = Math.max(contextChars, String(output?.hookSpecificOutput?.additionalContext ?? '').length);
@@ -108,7 +110,7 @@ const declaredMaintenance = declaredMaintenanceEntries(root);
 const expectedMaintenanceKeys = declaredMaintenance.map(({ harness, event }) => `${harness}:${event}`).sort();
 const observedMaintenanceKeys = maintenanceResults.filter(result => result.ok && result.handlers.length > 0).map(({ harness, event }) => `${harness}:${event}`).sort();
 const maintenancePlanCovered = JSON.stringify(observedMaintenanceKeys) === JSON.stringify(expectedMaintenanceKeys);
-process.stdout.write(`${JSON.stringify({ ok: !failed && maintenancePlanCovered, enforceLatency, samplesPerCase, lifecycleEvents, harnesses: ['codex', 'claude'], maintenancePlanCovered, maximumObservedLatencyMs, maximumObservedContextChars, results, maintenanceResults }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ ok: !failed && maintenancePlanCovered, enforceLatency, warmupSamplesPerCase, samplesPerCase, lifecycleEvents, harnesses: ['codex', 'claude'], maintenancePlanCovered, maximumObservedLatencyMs, maximumObservedContextChars, results, maintenanceResults }, null, 2)}\n`);
 if (failed) process.exitCode = 1;
 
 function percentile(values, ratio) {
