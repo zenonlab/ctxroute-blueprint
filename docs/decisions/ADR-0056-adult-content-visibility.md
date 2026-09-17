@@ -1,7 +1,6 @@
 ---
 scope:
   - packages/domain/src/favorites/contracts.ts
-  - packages/application/src/ports/quick-preferences-port.ts
   - packages/application/src/library/read-library-catalogue.ts
   - packages/application/src/library/read-library-page.ts
   - packages/application/src/use-cases/search-local-library.ts
@@ -14,18 +13,19 @@ scope:
   - docs/02-quality-strategy.md
   - docs/architecture/src/adaptive-public-refresh.dataflow.json
 review: on-change
+revised: true
 ---
 
 # ADR-0056 — Classification adulte et visibilité locale
 
 - Status: accepted
 - Date: 2026-09-16
+- Revised: 2026-09-17
 
 ## Context
 
-Les fournisseurs peuvent exposer des œuvres adultes, mais la préférence de
-l’utilisateur est une décision locale de présentation. La collecte publique et
-la conservation locale doivent donc rester indépendantes de cette préférence.
+Les fournisseurs peuvent exposer des œuvres adultes. La collecte publique et
+la conservation locale restent indépendantes de leur visibilité par défaut.
 Les signaux ne sont pas uniformes et leur absence ne doit pas être interprétée
 comme une preuve de contenu non adulte.
 
@@ -37,26 +37,24 @@ avec le signal du fournisseur comme provenance : AniList `isAdult`, MangaDex
 explicites de MangaUpdates. Les signaux absents ou ambigus deviennent
 `unknown`; `ecchi` seul ne devient pas adulte.
 
-La préférence locale `showAdultContent` est persistée dans les préférences
-rapides et vaut `false` par défaut. Lorsqu’elle est désactivée, seules les
-œuvres explicitement `adult` sont exclues des surfaces et actions locales.
-`unknown` reste visible : une absence de signal n'est jamais enregistrée comme
-preuve `non-adult`. Les données exclues restent stockées et redeviennent
-visibles après activation.
+Les surfaces et actions locales excluent par défaut uniquement les œuvres
+explicitement `adult`. `unknown` reste visible : une absence de signal n'est
+jamais enregistrée comme preuve `non-adult`. Les données exclues restent
+stockées. Aucun badge ni réglage supplémentaire n'est ajouté.
 
 ## Alternatives
 
-Supprimer les données à la désactivation perdrait l’état privé et provoquerait
-une recollecte inutile. Masquer `unknown` bloquerait des œuvres sans preuve
-adulte; le marquer `non-adult` fabriquerait une preuve inexistante. Un simple
+Supprimer les données masquées perdrait l’état privé et provoquerait une
+recollecte inutile. Masquer `unknown` bloquerait des œuvres sans preuve adulte;
+le marquer `non-adult` fabriquerait une preuve inexistante. Un simple
 masquage CSS laisserait passer les URLs, actions et notifications.
 
 ## Consequences
 
 Les lecteurs locaux filtrent avant pagination, facettes, statistiques,
-notifications et projection WebBridge. Les tests couvrent les cinq adaptateurs,
-la compatibilité des préférences existantes et le comportement conservateur
-`OFF`/`ON`.
+notifications et projection WebBridge. Les tests couvrent les cinq adaptateurs
+et le comportement conservateur qui masque `adult` tout en conservant
+`unknown` visible.
 
 ## Sources
 

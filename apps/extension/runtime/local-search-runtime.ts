@@ -2,8 +2,8 @@ import { searchLocalLibrary } from '@tobirink/application';
 import type { StoragePort } from '@tobirink/application';
 import type { LibraryId } from '@tobirink/domain';
 
-export async function readLocalSearchSnapshot(storage: StoragePort, libraryId: LibraryId, query: string) {
-  const snapshot = await searchLocalLibrary(storage, { libraryId, query });
+export async function readLocalSearchSnapshot(storage: StoragePort, libraryId: LibraryId, query: string, showAdultContent = true) {
+  const snapshot = await searchLocalLibrary(storage, { libraryId, query, showAdultContent });
   return {
     items: snapshot.items.map((work) => ({
       id: work.id,

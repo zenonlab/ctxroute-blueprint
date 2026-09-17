@@ -17,6 +17,7 @@ export interface LibraryCatalogueQuery {
   readonly offset?: number;
   readonly query?: string;
   readonly sort?: LibrarySort;
+  readonly showAdultContent?: boolean;
 }
 
 export interface LibraryCatalogueItem {

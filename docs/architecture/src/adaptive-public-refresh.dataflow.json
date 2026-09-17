@@ -43,7 +43,7 @@
     { "id": "refreshJob", "type": "backend", "label": "Réhydratation", "sublabel": "profil canonique", "stage": 2, "row": 4, "tag": "sans relations" },
     { "id": "operationsR2", "type": "database", "label": "Opérations R2", "sublabel": "signal + baux + pages + 12 observations", "stage": 3, "row": 0, "width": 196, "tag": "actif + 2 versions" },
     { "id": "catalogueD1", "type": "database", "label": "Catalogue D1", "sublabel": "métadonnées + modèle courant", "stage": 3, "row": 2, "width": 168, "tag": "une ligne / œuvre" },
-    { "id": "localContentPolicy", "type": "backend", "label": "Préférence locale", "sublabel": "adult · non-adult · unknown", "stage": 4, "row": 1, "width": 176, "tag": "OFF conservateur" },
+    { "id": "localContentPolicy", "type": "backend", "label": "Politique locale", "sublabel": "masque adult explicite", "stage": 4, "row": 1, "width": 176, "tag": "unknown visible" },
     { "id": "privateIndexedDb", "type": "database", "label": "IndexedDB privée", "sublabel": "lookup groupé par 50 clés", "stage": 4, "row": 2, "width": 154, "tag": "ETag · continuation MV3" }
   ],
   "flows": [
@@ -57,8 +57,8 @@
     { "id": "agenda-publish", "from": "agendaLanes", "to": "catalogueD1", "label": "modèle changé", "classification": "aucune occurrence matérialisée", "variant": "emphasis" },
     { "id": "discovery-publish", "from": "discoveryJob", "to": "catalogueD1", "label": "fiche + classification", "classification": "sans exploration relationnelle", "variant": "emphasis", "labelAt": [780, 485] },
     { "id": "refresh-publish", "from": "refreshJob", "to": "catalogueD1", "label": "profil validé", "classification": "compteurs inclus", "variant": "emphasis" },
-    { "id": "catalogue-read", "from": "catalogueD1", "to": "privateIndexedDb", "label": "profil + modèle", "classification": "projection locale : 0 écriture distante", "variant": "emphasis", "route": "straight", "labelDy": 53 },
-    { "id": "local-filter", "from": "catalogueD1", "to": "localContentPolicy", "label": "classification", "classification": "OFF masque adult explicite", "variant": "emphasis" }
+    { "id": "catalogue-read", "from": "catalogueD1", "to": "privateIndexedDb", "label": "profil + modèle v4", "classification": "projection locale : 0 écriture distante", "variant": "emphasis", "route": "straight", "labelDy": 53 },
+    { "id": "local-filter", "from": "catalogueD1", "to": "localContentPolicy", "label": "classification", "classification": "masque adult explicite", "variant": "emphasis" }
   ],
   "cards": [
     {

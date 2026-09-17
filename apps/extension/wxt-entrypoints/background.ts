@@ -14,7 +14,7 @@ import {
   HttpPublicReleaseLoader,
 } from '@tobirink/adapters-browser';
 import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
-import { libraryId, workId } from '@tobirink/domain';
+import { isContentVisible, libraryId, workId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
@@ -89,7 +89,7 @@ export default defineBackground({
     const privateRecovery = new DexiePrivateRecoveryStore(privateStorage.storage.database);
     const publicDiscovery = new HttpPublicDiscoveryAdapter(configuredSiteOrigin);
     const refreshPublicDiscovery = createPublicDiscoveryRefreshRuntime({ checkpointStorage: browser.storage.local, client: publicDiscovery, now, storage: privateStorage.storage });
-    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, publicDiscovery, releaseAgenda);
+    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, publicDiscovery, releaseAgenda, async () => false);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const ensureAgendaReconcileAlarm = () => browser.alarms.create(agendaReconcileAlarmName, { periodInMinutes: agendaReconcileAlarmPeriodMinutes });
@@ -187,8 +187,12 @@ export default defineBackground({
       await privateStorage.ensureReady();
       await refreshPublicReleases();
       const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
-      if ((await preferences.read()).nativeNotifications) {
-        await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries);
+      const quickPreferences = await preferences.read();
+      if (quickPreferences.nativeNotifications) {
+        const visibleWorkIds = new Set((await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, releaseWindow())).items
+          .filter(({ work }) => isContentVisible(work.hydration?.candidate, false))
+          .map(({ work }) => work.id));
+        await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries.filter((entry) => visibleWorkIds.has(entry.workId)));
       }
       await drainDueAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, new Date());
     };
@@ -261,7 +265,7 @@ export default defineBackground({
       if (parsed.data.type === 'review.queue.read') {
         try {
           await privateStorage.ensureReady();
-          return { ok: true, snapshot: await readReviewQueue(privateStorage.storage) };
+          return { ok: true, snapshot: await readReviewQueue(privateStorage.storage, false) };
         } catch {
           return { error: 'review-queue-unavailable', ok: false };
         }
@@ -269,7 +273,7 @@ export default defineBackground({
       if (parsed.data.type === 'review.candidates.read') {
         try {
           await privateStorage.ensureReady();
-          return { ok: true, snapshot: await readLocalReviewCandidateSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.reviewId) };
+          return { ok: true, snapshot: await readLocalReviewCandidateSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.reviewId, false) };
         } catch {
           return { error: 'review-candidates-unavailable', ok: false };
         }
@@ -277,7 +281,7 @@ export default defineBackground({
       if (parsed.data.type === 'review.decision.write') {
         try {
           await privateStorage.ensureReady();
-          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data, publicDiscovery);
+          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data, publicDiscovery, false);
           return { ok: true, status: review.status };
         } catch (error) {
           return { error: error instanceof Error && /conflict|stale/u.test(error.message) ? 'conflict' : 'unavailable', ok: false };
@@ -289,7 +293,7 @@ export default defineBackground({
           const input = parsed.data.afterId
             ? { afterId: workId(parsed.data.afterId), libraryId: primaryLibraryId }
             : { libraryId: primaryLibraryId };
-          const snapshot = await readLibraryPage(privateStorage.storage, input);
+          const snapshot = await readLibraryPage(privateStorage.storage, { ...input, showAdultContent: false });
           return {
             ok: true,
             snapshot: {
@@ -310,7 +314,7 @@ export default defineBackground({
       if (parsed.data.type === 'library.catalogue.read') {
         try {
           await privateStorage.ensureReady();
-          return { ok: true, snapshot: await readLocalLibraryCatalogueSnapshot(privateStorage.storage, primaryLibraryId, parsed.data) };
+          return { ok: true, snapshot: await readLocalLibraryCatalogueSnapshot(privateStorage.storage, primaryLibraryId, parsed.data, false) };
         } catch {
           return { error: 'library-catalogue-unavailable', ok: false };
         }
@@ -318,7 +322,7 @@ export default defineBackground({
       if (parsed.data.type === 'library.search.read') {
         try {
           await privateStorage.ensureReady();
-          return { ok: true, snapshot: await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query) };
+          return { ok: true, snapshot: await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query, false) };
         } catch {
           return { error: 'library-search-unavailable', ok: false };
         }
@@ -326,7 +330,7 @@ export default defineBackground({
       if (parsed.data.type === 'search.open') {
         try {
           await privateStorage.ensureReady();
-          await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query);
+          await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query, false);
           const target = new URL(browser.runtime.getURL('/library.html'));
           target.searchParams.set('query', parsed.data.query.trim());
           await browser.tabs.create({ url: target.toString() });
@@ -342,13 +346,15 @@ export default defineBackground({
           const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
           const quickPreferences = await preferences.read();
           const snapshot = await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, parsed.data);
+          const visibleItems = snapshot.items.filter(({ work }) => isContentVisible(work.hydration?.candidate, false));
+          const visibleWorkIds = new Set(visibleItems.map(({ work }) => work.id));
           if (quickPreferences.nativeNotifications) {
-            await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries);
+            await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries.filter((entry) => visibleWorkIds.has(entry.workId)));
           }
           return {
             ok: true,
             snapshot: {
-              items: snapshot.items.filter(({ event }) => quickPreferences.showEstimatedReleases || event.availability !== 'estimated').map(({ event, source, work }) => {
+              items: visibleItems.filter(({ event }) => quickPreferences.showEstimatedReleases || event.availability !== 'estimated').map(({ event, source, work }) => {
                 const item = {
                   availability: event.availability,
                   id: event.id,
@@ -438,7 +444,7 @@ export default defineBackground({
       if (parsed.data.type === 'popup.context.read') {
         try {
           await privateStorage.ensureReady();
-          const snapshot = await readPopupContext({ cache, now: () => new Date().toISOString(), pageContext, storage: privateStorage.storage });
+          const snapshot = await readPopupContext({ cache, now: () => new Date().toISOString(), pageContext, showAdultContent: false, storage: privateStorage.storage });
           return { ok: true, snapshot };
         } catch {
           return { error: 'popup-context-unavailable', ok: false };

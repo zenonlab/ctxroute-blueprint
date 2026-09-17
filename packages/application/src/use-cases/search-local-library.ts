@@ -1,3 +1,4 @@
+import { isContentVisible } from '@tobirink/domain';
 import type { LibraryId, Work } from '@tobirink/domain';
 import type { StorageReadPort } from '../ports/storage-port';
 
@@ -15,7 +16,7 @@ export interface LocalLibrarySearchSnapshot {
 
 export async function searchLocalLibrary(
   storage: StorageReadPort,
-  input: { libraryId: LibraryId; limit?: number; query: string },
+  input: { libraryId: LibraryId; limit?: number; query: string; showAdultContent?: boolean },
 ): Promise<LocalLibrarySearchSnapshot> {
   const query = normalizeLocalSearch(input.query);
   if (!query || input.query.length > 200) throw new TypeError('Local search requires a query between 1 and 200 characters.');
@@ -28,7 +29,7 @@ export async function searchLocalLibrary(
   if (!library) return { items: [], truncated: false };
   const selectedIds = library.workIds.slice(0, localSearchScanLimit);
   const works = await Promise.all(selectedIds.map((id) => storage.getWork(id)));
-  const matches = works.flatMap((work) => work && normalizeLocalSearch(work.preferredTitle).includes(query) ? [work] : []);
+  const matches = works.flatMap((work) => work && (input.showAdultContent === undefined || isContentVisible(work.hydration?.candidate, input.showAdultContent)) && normalizeLocalSearch(work.preferredTitle).includes(query) ? [work] : []);
   return Object.freeze({
     items: Object.freeze(matches.slice(0, limit)),
     truncated: library.workIds.length > localSearchScanLimit || matches.length > limit,

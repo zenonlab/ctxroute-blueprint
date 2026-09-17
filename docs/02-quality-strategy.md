@@ -226,8 +226,9 @@ browser or `workerd` test when platform behavior is the risk.
   R2 operation-store and Worker tests. It proves strict public fields, stable
   ordering, duplicate rejection, bounded observations, conditional writes,
   interrupted publication recovery, local time projection and fallback to the
-  last complete model. `/v3/releases` is generated on demand from models with
-  its existing window and pagination bounds.
+  last complete model. `/v4/release-models` lets the extension project locally;
+  `/v3/releases` remains generated on demand with its existing window and
+  pagination bounds for compatibility.
 
 ## Favorite correction acceptance
 

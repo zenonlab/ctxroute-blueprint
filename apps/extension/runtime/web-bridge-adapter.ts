@@ -1,6 +1,6 @@
 import { providerCoverFallbackPath, readAgendaPeriod, readLibraryBootstrapSummary, readLibraryCatalogue, readLocalReleaseAgenda, readReviewQueue } from '@tobirink/application';
 import type { LocalReleaseAgendaPort, PublicDiscoveryRequestClientPort, StoragePort } from '@tobirink/application';
-import { libraryId, workId } from '@tobirink/domain';
+import { isContentVisible, libraryId, workId } from '@tobirink/domain';
 import type { FavoriteSource, WorkId } from '@tobirink/domain';
 import type { LibraryCatalogueItem } from '@tobirink/application';
 import type { WebAgendaPeriod, WebBootstrapSnapshot, WebLibraryItem, WebLibraryPage, WebRequest, WebReviewSnapshot } from '@tobirink/contracts/web-bridge';
@@ -104,12 +104,12 @@ function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCa
   };
 }
 
-export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscovery?: PublicDiscoveryRequestClientPort, localAgenda?: LocalReleaseAgendaPort): WebBridgeRequestHandler {
+export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscovery?: PublicDiscoveryRequestClientPort, localAgenda?: LocalReleaseAgendaPort, readShowAdultContent: () => Promise<boolean> = async () => true): WebBridgeRequestHandler {
   return async (request: WebRequest): Promise<WebBridgeValue> => {
     if (request.type === 'bootstrap.read') {
       const [library, review] = await Promise.all([
         readLibraryBootstrapSummary(storage, primaryLibraryId),
-        readReviewQueue(storage),
+        readReviewQueue(storage, await readShowAdultContent()),
       ]);
       const snapshot: WebBootstrapSnapshot = { availability: 'connected', generation: 0, libraryCount: library.libraryCount, pendingReviewCount: review.items.length, protocolVersion: 4 };
       return snapshot;
@@ -119,13 +119,14 @@ export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscov
       const legacyType = request.query.facet === 'all' ? undefined : { [request.query.facet.toUpperCase()]: 'include' as const };
       const facets = legacyType === undefined ? request.query.facets : { ...request.query.facets, type: request.query.facets?.type ?? legacyType };
       const catalogue = await readLibraryCatalogue(storage, {
-        facets, libraryId: primaryLibraryId, limit: request.query.limit, offset: start,
+        facets, libraryId: primaryLibraryId, limit: request.query.limit, offset: start, showAdultContent: await readShowAdultContent(),
         query: request.query.search, sort: request.query.sort,
       });
       let selected = catalogue.items;
       if (request.query.workId !== undefined) {
         const requestedWork = await storage.getWork(workId(request.query.workId));
         if (requestedWork === undefined) selected = [];
+        else if (!isContentVisible(requestedWork.hydration?.candidate, await readShowAdultContent())) selected = [];
         else {
           const progress = await storage.findProgressByWorkId(requestedWork.id);
           const base: LibraryCatalogueItem = requestedWork.hydration === undefined
@@ -155,7 +156,8 @@ export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscov
       const to = localMidnight(request.to);
       const legacy = localAgenda === undefined ? await readAgendaPeriod(storage, { from, to }) : undefined;
       const projected = localAgenda === undefined ? undefined : await readLocalReleaseAgenda(storage, localAgenda, { from: request.from, to: request.to });
-      const periodItems = projected?.items.map(({ event, source, work }) => ({ occurrence: event.occurrence, availability: event.availability, releaseLabel: event.releaseLabel, source, work })) ?? legacy?.items.map(({ entry, source, work }) => ({ occurrence: { kind: 'INSTANT' as const, value: entry.occursAt }, availability: entry.availability, releaseLabel: entry.releaseLabel, source, work })) ?? [];
+      const showAdultContent = await readShowAdultContent();
+      const periodItems = projected?.items.filter(({ work }) => isContentVisible(work.hydration?.candidate, showAdultContent)).map(({ event, source, work }) => ({ occurrence: event.occurrence, availability: event.availability, releaseLabel: event.releaseLabel, source, work })) ?? legacy?.items.filter(({ work }) => isContentVisible(work.hydration?.candidate, showAdultContent)).map(({ entry, source, work }) => ({ occurrence: { kind: 'INSTANT' as const, value: entry.occursAt }, availability: entry.availability, releaseLabel: entry.releaseLabel, source, work })) ?? [];
       const entries = periodItems.flatMap(({ availability, occurrence, releaseLabel, source, work }) => {
         if (availability === 'unavailable') return [];
         const base = { availability, kind: work.mediaKind, releaseLabel, title: work.preferredTitle, workId: work.id };
@@ -167,12 +169,12 @@ export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscov
       return snapshot;
     }
     if (request.type === 'review.read') {
-      const queue = await readReviewQueue(storage);
+      const queue = await readReviewQueue(storage, await readShowAdultContent());
       if (!queue.items[0]) return { candidates: [], context: 'local' };
-      return mapReviewSnapshot(await readLocalReviewCandidateSnapshot(storage, primaryLibraryId, queue.items[0].id));
+      return mapReviewSnapshot(await readLocalReviewCandidateSnapshot(storage, primaryLibraryId, queue.items[0].id, await readShowAdultContent()));
     }
     if (request.type === 'review.decision.write') {
-      await writeLocalReviewDecision(storage, primaryLibraryId, request.command, publicDiscovery);
+      await writeLocalReviewDecision(storage, primaryLibraryId, request.command, publicDiscovery, await readShowAdultContent());
       return { candidates: [], context: 'local' };
     }
     return { error: 'unsupported-web-request' };

@@ -1,8 +1,8 @@
-import { publicReleaseEventSchema, publicReleaseGenerationSchema } from '@tobirink/application';
-import type { PublicReleaseGeneration, PublicReleaseGenerationCachePort } from '@tobirink/application';
+import { projectVirtualAgenda, publicReleaseGenerationSchema, virtualReleaseModelSchema } from '@tobirink/application';
+import type { PublicReleaseGeneration, PublicReleaseGenerationCachePort, VirtualReleaseModelContract } from '@tobirink/application';
 import { z } from 'zod';
 export interface PublicReleaseFetch { (input: RequestInfo | URL, init?: RequestInit): Promise<Response> }
-const pageSchema = z.strictObject({ entries: z.array(publicReleaseEventSchema).max(100), generatedAt: z.iso.datetime({ offset: false }), nextCursor: z.string().min(1).max(512).optional(), revision: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/u), window: z.strictObject({ from: z.iso.date(), to: z.iso.date() }) });
+const pageSchema = z.strictObject({ models: z.array(virtualReleaseModelSchema).max(100), generatedAt: z.iso.datetime({ offset: false }), nextCursor: z.string().min(1).max(128).optional(), revision: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/u), window: z.strictObject({ from: z.iso.date(), to: z.iso.date() }) });
 const maximumSharedGenerationAgeMs = 8 * 86_400_000;
 async function parsePage(response: Response): Promise<z.output<typeof pageSchema>> {
   const declaredLength = Number(response.headers.get('content-length') ?? 0);
@@ -18,14 +18,14 @@ export class HttpPublicReleaseLoader {
     const matchingCache = cached?.source === 'shared' && cached.revision !== 'd1-empty' && cached.window.from === window.from && cached.window.to === window.to ? cached : undefined;
     const matchingCacheAge = matchingCache ? this.clock() - Date.parse(matchingCache.generatedAt) : undefined;
     if (matchingCache && matchingCacheAge !== undefined && matchingCacheAge >= 0 && matchingCacheAge < 86_400_000) return { snapshot: publicReleaseGenerationSchema.parse(matchingCache), source: 'cache' };
-    const events = new Map<string, PublicReleaseGeneration['events'][number]>();
+    const models = new Map<string, VirtualReleaseModelContract>();
     let cursor: string | undefined;
     let etag: string | undefined;
     let revision: string | undefined;
     let generatedAt: string | undefined;
     let sourceWindow: { from: string; to: string } | undefined;
     for (let pageNumber = 1; pageNumber <= 100; pageNumber += 1) {
-      const url = new URL('/v3/releases', this.origin);
+      const url = new URL('/v4/release-models', this.origin);
       url.searchParams.set('from', window.from); url.searchParams.set('to', window.to); url.searchParams.set('limit', '100');
       if (cursor) url.searchParams.set('cursor', cursor);
       const headers = pageNumber === 1 && matchingCache ? { 'If-None-Match': matchingCache.etag } : undefined;
@@ -54,14 +54,15 @@ export class HttpPublicReleaseLoader {
       const generationAge = this.clock() - Date.parse(body.generatedAt);
       if (generationAge < 0 || generationAge >= maximumSharedGenerationAgeMs) throw new Error('public-release-generation-stale');
       revision = body.revision; generatedAt = body.generatedAt; sourceWindow = body.window;
-      for (const event of body.entries) { if (events.has(event.id)) throw new Error('public-release-duplicate-event'); events.set(event.id, event); }
+      for (const model of body.models) { if (models.has(model.workId)) throw new Error('public-release-duplicate-model'); models.set(model.workId, model); }
       if (!body.nextCursor) {
-        if (revision === 'd1-empty') throw new Error('public-release-generation-empty');
-        const snapshot = publicReleaseGenerationSchema.parse({ etag, events: [...events.values()], generatedAt, revision, source: 'shared', window });
+        if (revision === 'models-0-0') throw new Error('public-release-generation-empty');
+        const events = projectVirtualAgenda([...models.values()], window);
+        const snapshot = publicReleaseGenerationSchema.parse({ etag, events, generatedAt, revision, source: 'shared', window });
         await cache.save(snapshot);
         return { snapshot, source: 'network' };
       }
-      if (body.entries.length === 0 || body.nextCursor === cursor) throw new Error('public-release-pagination-incomplete');
+      if (body.models.length === 0 || body.nextCursor === cursor) throw new Error('public-release-pagination-incomplete');
       cursor = body.nextCursor;
     }
     throw new Error('public-release-pagination-limit');

@@ -1,3 +1,4 @@
+import { isContentVisible } from '@tobirink/domain';
 import type { LibraryId, Progress, ProviderCandidate } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { libraryCataloguePageLimit, libraryCatalogueReadBatchSize, libraryFacetLimit } from './library-catalogue-contract';
@@ -138,21 +139,23 @@ async function readCatalogueSnapshot(storage: StoragePort, input: LibraryCatalog
   }
   corpus.push(...sourceProjection.pending);
   const normalizedQuery = key(input.query ?? '');
-  const filtered = corpus.filter((item) => (normalizedQuery.length === 0 || key(item.title).includes(normalizedQuery))
+  const showAdultContent = input.showAdultContent;
+  const visible = showAdultContent === undefined ? corpus : corpus.filter((item) => isContentVisible(item.candidate, showAdultContent));
+  const filtered = visible.filter((item) => (normalizedQuery.length === 0 || key(item.title).includes(normalizedQuery))
     && facetNames.every((facet) => matchesFacet(item, facet, input.facets?.[facet])));
   const sort = input.sort ?? 'ADDED_DESC';
   const popularityCohort = sort === 'POPULARITY_DESC' ? selectPopularityCohort(filtered) : undefined;
   const ordered = [...filtered].sort((left, right) => compare(left, right, sort, popularityCohort));
   const end = offset + limit;
   const snapshot: LibraryCatalogueSnapshot = {
-    facets: buildFacets(corpus),
+    facets: buildFacets(visible),
     items: Object.freeze(ordered.slice(offset, end)),
     statistics: Object.freeze({
-      completed: corpus.filter((item) => progressState(item.progress) === 'COMPLETED').length,
-      inProgress: corpus.filter((item) => progressState(item.progress) === 'IN_PROGRESS').length,
-      knownMetadata: corpus.filter((item) => item.candidate?.metadataVersion !== undefined).length,
-      notStarted: corpus.filter((item) => progressState(item.progress) === 'NOT_STARTED').length,
-      total: corpus.length,
+      completed: visible.filter((item) => progressState(item.progress) === 'COMPLETED').length,
+      inProgress: visible.filter((item) => progressState(item.progress) === 'IN_PROGRESS').length,
+      knownMetadata: visible.filter((item) => item.candidate?.metadataVersion !== undefined).length,
+      notStarted: visible.filter((item) => progressState(item.progress) === 'NOT_STARTED').length,
+      total: visible.length,
     }),
     total: ordered.length,
     truncated: false,

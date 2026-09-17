@@ -26,7 +26,7 @@ describe('offline library and automatic progress', () => {
     const background = readFileSync(new URL('./wxt-entrypoints/background.ts', import.meta.url), 'utf8');
     const surface = readFileSync(new URL('./runtime/ExtensionSurface.tsx', import.meta.url), 'utf8');
 
-    expect(background).toMatch(/readLocalLibraryCatalogueSnapshot\(privateStorage\.storage, primaryLibraryId, parsed\.data\)/);
+    expect(background).toMatch(/readLocalLibraryCatalogueSnapshot\(privateStorage\.storage, primaryLibraryId, parsed\.data,/);
     expect(background).toMatch(/readPopupContext\(\{[\s\S]*storage: privateStorage\.storage[\s\S]*\}\)/);
     expect(background).not.toMatch(/library\.page\.read[\s\S]{0,900}fetch\(/);
     expect(background).not.toMatch(/defineContentScript|browser\.scripting/);

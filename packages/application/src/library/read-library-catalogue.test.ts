@@ -4,17 +4,30 @@ import { describe, expect, it } from 'vitest';
 import { importFavoriteSources } from '../use-cases/import-favorite-sources';
 import { readLibraryBootstrapSummary, readLibraryCatalogue } from './read-library-catalogue';
 
-function work(id: string, input: { genre: string; popularity: number; status: 'COMPLETED' | 'ONGOING'; title: string; year: number }) {
+function work(id: string, input: { classification?: 'adult' | 'non-adult' | 'unknown'; genre: string; popularity: number; status: 'COMPLETED' | 'ONGOING'; title: string; year: number }) {
   return createWork({
     externalReferences: [{ externalId: id, provider: 'anilist' }], id: workId(`work_item-${id}`), mediaKind: 'anime', preferredTitle: input.title,
     hydration: {
-      candidate: { editorialStatus: input.status, externalId: id, format: 'TV', genres: [input.genre], mediaKind: 'ANIME', metadataVersion: 1, popularity: { kind: 'MEMBERS', value: input.popularity }, preSerialization: false, provider: 'anilist', startYear: input.year, titles: [input.title] },
+      candidate: { contentClassification: input.classification, editorialStatus: input.status, externalId: id, format: 'TV', genres: [input.genre], mediaKind: 'ANIME', metadataVersion: 1, popularity: { kind: 'MEMBERS', value: input.popularity }, preSerialization: false, provider: 'anilist', startYear: input.year, titles: [input.title] },
       favoriteAliasKeys: [], hydratedAt: '2026-09-09T00:00:00.000Z', matcherVersion: 'matcher-v1', providerTitleKeys: [],
     },
   });
 }
 
 describe('readLibraryCatalogue', () => {
+  it('hides only explicit adult works before statistics and keeps unknown visible', async () => {
+    const storage = new MemoryStoragePort();
+    const works = [
+      work('adult', { classification: 'adult', genre: 'Drama', popularity: 1, status: 'ONGOING', title: 'Adult', year: 2026 }),
+      work('unknown', { classification: 'unknown', genre: 'Drama', popularity: 2, status: 'ONGOING', title: 'Unknown', year: 2026 }),
+      work('safe', { classification: 'non-adult', genre: 'Drama', popularity: 3, status: 'ONGOING', title: 'Safe', year: 2026 }),
+    ];
+    await storage.putLibrary(createLibrary(libraryId('library_primary'), works.map(({ id }) => id)));
+    for (const item of works) await storage.putWork(item);
+    const snapshot = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary'), showAdultContent: false, sort: 'ADDED_DESC' });
+    expect(snapshot.items.map(({ title }) => title).sort()).toEqual(['Safe', 'Unknown']);
+    expect(snapshot.statistics.total).toBe(2);
+  });
   it('sorts and facets 1400 works with storage batches of at most 100 identifiers', async () => {
     const storage = new MemoryStoragePort();
     const works = Array.from({ length: 1400 }, (_, index) => work(String(index), { genre: index === 1399 ? 'Last Genre' : 'Drama', popularity: index, status: 'ONGOING', title: `Synthetic ${String(index).padStart(4, '0')}`, year: 2020 }));

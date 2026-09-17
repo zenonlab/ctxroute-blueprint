@@ -9,6 +9,7 @@ scope:
   - packages/adapters-cloudflare/src/releases/**
   - docs/architecture/src/adaptive-public-refresh.dataflow.json
 review: on-change
+revised: true
 ---
 
 # ADR-0058 — Agenda virtuel et opérations R2
@@ -47,7 +48,9 @@ référencés avant toute collecte des orphelins.
 
 Publier un pointeur seulement après l’écriture et la relecture de l’objet
 complet. Un échec Queue laisse le travail récupérable; un doublon ne republie
-pas un modèle identique.
+pas un modèle identique. `/v4/release-models` expose les modèles bornés et
+paginés aux nouvelles extensions, qui calculent localement leur fenêtre;
+`/v3/releases` continue de projeter côté Worker pour les anciennes versions.
 
 ## Conséquences
 

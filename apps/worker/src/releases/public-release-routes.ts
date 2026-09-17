@@ -15,7 +15,7 @@ function noStoreJson(
   return context.json({ error }, status);
 }
 
-type ReleaseCalendarRoute = Pick<PublicReleaseCalendarPort, 'query'>;
+type ReleaseCalendarRoute = Pick<PublicReleaseCalendarPort, 'query'> & Partial<Pick<PublicReleaseCalendarPort, 'queryModels'>>;
 type ReleaseServices = Pick<WorkerServices, 'policy' | 'releases'> & { releaseCalendar?: ReleaseCalendarRoute };
 const maximumReleaseWindowDays = 40;
 
@@ -122,6 +122,30 @@ export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerR
       const page = await services.releaseCalendar.query(query);
       if (!/^[A-Za-z0-9._-]{1,64}$/u.test(page.revision)) return noStoreJson(context, 'release-calendar-unavailable', 503);
       const entityTag = `"releases-v3-${page.revision}-${from}-${to}"`;
+      if (context.req.header('If-None-Match') === entityTag) return new Response(null, { status: 304, headers: { ETag: entityTag, 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600' } });
+      context.header('Cache-Control', services.policy.http.publicReadCacheControl); context.header('ETag', entityTag); context.header('X-Content-Type-Options', 'nosniff');
+      return context.json(page);
+    } catch { return noStoreJson(context, 'release-snapshot-unavailable', 503); }
+  });
+
+  app.get('/v4/release-models', async (context) => {
+    const url = new URL(context.req.url);
+    const allowed = new Set(['from', 'to', 'cursor', 'limit']);
+    for (const key of url.searchParams.keys()) if (!allowed.has(key)) return noStoreJson(context, 'unsupported-query-parameter', 400);
+    const limit = Number(url.searchParams.get('limit') ?? '100');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) return noStoreJson(context, 'invalid-limit', 400);
+    const from = url.searchParams.get('from'); const to = url.searchParams.get('to');
+    if (!from || !to || !boundedReleaseWindow(from, to)) return noStoreJson(context, 'invalid-window', 400);
+    const cursor = url.searchParams.get('cursor');
+    if (cursor && !/^[A-Za-z0-9._:-]{1,128}$/u.test(cursor)) return noStoreJson(context, 'invalid-cursor', 400);
+    try {
+      const services = routeServices(context, injected);
+      if (!services.releaseCalendar?.queryModels) return noStoreJson(context, 'release-calendar-unavailable', 503);
+      const query: PublicReleaseQuery = { from, limit, to };
+      if (cursor) query.cursor = cursor;
+      const page = await services.releaseCalendar.queryModels(query);
+      if (!/^[A-Za-z0-9._-]{1,64}$/u.test(page.revision)) return noStoreJson(context, 'release-calendar-unavailable', 503);
+      const entityTag = `"release-models-v4-${page.revision}-${from}-${to}"`;
       if (context.req.header('If-None-Match') === entityTag) return new Response(null, { status: 304, headers: { ETag: entityTag, 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600' } });
       context.header('Cache-Control', services.policy.http.publicReadCacheControl); context.header('ETag', entityTag); context.header('X-Content-Type-Options', 'nosniff');
       return context.json(page);

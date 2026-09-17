@@ -49,8 +49,9 @@ export async function readLocalLibraryCatalogueSnapshot(
   storage: StoragePort,
   libraryId: LibraryId,
   input: Omit<LibraryCatalogueRequest, 'type' | 'version'>,
+  showAdultContent = true,
 ) {
-  const query: LibraryCatalogueQuery = { libraryId, sort: input.sort };
+  const query: LibraryCatalogueQuery = { libraryId, showAdultContent, sort: input.sort };
   if (input.facets !== undefined) Object.assign(query, { facets: input.facets });
   if (input.offset !== undefined) Object.assign(query, { offset: input.offset });
   if (input.query !== undefined) Object.assign(query, { query: input.query });

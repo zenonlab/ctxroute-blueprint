@@ -120,12 +120,31 @@ describe('public release routes', () => {
     expect(v3.headers.get('ETag')).toBe(`"releases-v3-${revision}-2026-09-13-2026-09-29"`);
   });
 
+  it('serves paginated virtual models to new extensions without changing v3', async () => {
+    const fixture = releaseBindings();
+    const model = {
+      anchor: { date: '2026-09-13', sequence: '1' }, editorialStatus: 'ONGOING' as const,
+      exceptions: [], intervalDays: 7, provider: 'anilist' as const, providerWorkId: '42', releaseKind: 'episode' as const,
+      provenance: { observedAt: '2026-09-14T08:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' },
+      revision: 'a'.repeat(64), validity: { from: '2026-09-13', to: '2026-09-29' }, workId: 'work_42',
+    };
+    const page = { generatedAt: '2026-09-14T08:00:00.000Z', models: [model], revision: 'models-1-1', window: { from: '2026-09-13', to: '2026-09-29' } };
+    const app = createPublicReleaseApp({ ...fixture.services, releaseCalendar: {
+      async query() { return { entries: [], generatedAt: page.generatedAt, revision: page.revision, window: page.window }; },
+      async queryModels() { return page; },
+    } });
+    const response = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29');
+    expect(response.status).toBe(200); expect(await response.json()).toEqual(page);
+    expect(response.headers.get('ETag')).toBe('"release-models-v4-models-1-1-2026-09-13-2026-09-29"');
+  });
+
   it.each([
     'https://api.example/v3/releases?from=2026-09-01&to=2026-10-11',
     'https://api.example/v3/releases?from=2026-02-30&to=2026-03-01',
     'https://api.example/v3/releases?from=2026-09-01',
     'https://api.example/v2/releases?from=2026-09-01&to=2026-10-11',
     'https://api.example/v2/releases?from=2026-02-30&to=2026-03-01',
+    'https://api.example/v4/release-models?from=2026-09-01&to=2026-10-11',
   ])('rejects an unbounded or invalid window before querying D1', async (url) => {
     const fixture = releaseBindings(); let queried = false;
     const app = createPublicReleaseApp({ ...fixture.services, releaseCalendar: { async query() { queried = true; return { entries: [], generatedAt: '2026-09-14T08:00:00.000Z', revision, window: { from: '2026-09-01', to: '2026-10-10' } }; } } });

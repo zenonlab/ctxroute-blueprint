@@ -49,4 +49,15 @@ describe('readLocalReviewCandidates', () => {
     const snapshot = await readLocalReviewCandidates(storage, { libraryId: libraryId('library_cover_candidate'), reviewId: review.id });
     expect(snapshot.candidates[0]).toMatchObject({ candidate: { cover: { url: candidate.cover.url } } });
   });
+
+  it('hides explicit adult candidates while retaining unknown classification', async () => {
+    const storage = new MemoryStoragePort();
+    const review = createReview({ id: reviewId('review_classification'), reason: 'AMBIGUOUS', sourceLabel: 'Source', status: 'pending', title: 'Classification' });
+    await storage.putReview(review);
+    await storage.putFavoriteSource(createFavoriteSource({ bookmarkId: 'classification', folderPath: [], id: favoriteSourceId('source_classification'), importedAt: '2026-09-08T00:00:00.000Z', order: 0, resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, reviewId: review.id, title: review.title, url: 'https://reader.example/classification' }));
+    const candidate = { canonicalUrl: 'https://anilist.co/anime/1', externalId: '1', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Classification'] };
+    await storage.putFavoriteReviewCandidateSet({ candidates: [{ ...candidate, contentClassification: 'adult' }, { ...candidate, contentClassification: 'unknown', externalId: '2' }], digest: 'classification-set', recordedAt: '2026-09-08T00:00:00.000Z', reviewId: review.id });
+    const snapshot = await readLocalReviewCandidates(storage, { libraryId: libraryId('library_classification'), reviewId: review.id, showAdultContent: false });
+    expect(snapshot.candidates.map(({ candidate }) => candidate.contentClassification)).toEqual(['unknown']);
+  });
 });

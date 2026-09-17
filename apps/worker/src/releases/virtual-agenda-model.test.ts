@@ -1,6 +1,7 @@
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
+import { D1PublicReleaseCalendarAdapter } from './public-release-calendar';
 import { D1AgendaCollectionAdapter } from './public-release-collectors';
 
 describe('virtual Agenda model publication', () => {
@@ -66,6 +67,8 @@ describe('virtual Agenda model publication', () => {
     expect(await env.PUBLIC_DB.prepare("SELECT explicit_next_json AS explicitNext, exceptions_json AS exceptions FROM catalogue_release_model WHERE work_id = 'work_stale_agenda'").first())
       .toEqual({ exceptions: '[]', explicitNext: null });
     const firstModel = await env.PUBLIC_DB.prepare("SELECT model_digest AS modelDigest, observed_at AS observedAt FROM catalogue_release_model WHERE work_id = 'work_known_agenda'").first();
+    await expect(new D1PublicReleaseCalendarAdapter(env.PUBLIC_DB).queryModels({ from: '2026-09-15', limit: 100, to: '2026-10-01' }))
+      .resolves.toMatchObject({ models: expect.arrayContaining([expect.objectContaining({ workId: 'work_known_agenda' })]), revision: expect.stringMatching(/^models-\d+-2$/u) });
     const second = await run('known-b', '2026-09-24T03:23:00.000Z');
     expect(second).toMatchObject({ changed: false, revision: first?.revision });
     expect(await env.PUBLIC_DB.prepare("SELECT model_digest AS modelDigest, observed_at AS observedAt FROM catalogue_release_model WHERE work_id = 'work_known_agenda'").first()).toEqual(firstModel);

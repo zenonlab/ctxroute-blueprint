@@ -1,4 +1,4 @@
-import { createWork } from '@tobirink/domain';
+import { createWork, isContentVisible } from '@tobirink/domain';
 import type { LibraryId, ProviderCandidate, ReviewId, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { localReviewRevisionPort } from './read-review-candidates';
@@ -41,8 +41,8 @@ function providerCandidate(candidate: ProviderCandidate): LocalReviewCandidate |
   });
 }
 
-async function readLegacyCandidates(storage: StoragePort, libraryId: LibraryId, title: string): Promise<LocalReviewCandidate[]> {
-  const found = await searchLocalLibrary(storage, { libraryId, limit: 6, query: title });
+async function readLegacyCandidates(storage: StoragePort, libraryId: LibraryId, title: string, showAdultContent: boolean): Promise<LocalReviewCandidate[]> {
+  const found = await searchLocalLibrary(storage, { libraryId, limit: 6, query: title, showAdultContent });
   return (await Promise.all(found.items.map(async (work) => {
     const sources = await storage.listFavoriteSourcesByWorkId({ limit: 100, workId: work.id });
     const direct = sources.find((source) => source.presence === 'observed' && isHttpUrl(source.url));
@@ -58,7 +58,7 @@ async function readLegacyCandidates(storage: StoragePort, libraryId: LibraryId, 
 
 export async function readLocalReviewCandidates(
   storage: StoragePort,
-  input: { libraryId: LibraryId; reviewId: ReviewId },
+  input: { libraryId: LibraryId; reviewId: ReviewId; showAdultContent?: boolean },
 ): Promise<LocalReviewCandidateSnapshot> {
   const context = await storage.transaction(['favoriteSources', 'reviews'], async (session) => ({
     review: await session.getReview(input.reviewId),
@@ -69,8 +69,8 @@ export async function readLocalReviewCandidates(
 
   const persisted = await storage.getFavoriteReviewCandidateSet(context.review.id);
   const candidates = persisted !== undefined || context.review.reason !== undefined
-    ? persisted?.candidates.map(providerCandidate).filter((candidate): candidate is LocalReviewCandidate => candidate !== undefined).slice(0, 6) ?? []
-    : await readLegacyCandidates(storage, input.libraryId, context.review.title);
+    ? persisted?.candidates.map(providerCandidate).filter((candidate): candidate is LocalReviewCandidate => candidate !== undefined && (input.showAdultContent === undefined || isContentVisible(candidate.candidate, input.showAdultContent))).slice(0, 6) ?? []
+    : await readLegacyCandidates(storage, input.libraryId, context.review.title, input.showAdultContent ?? true);
   const revision = await localReviewRevisionPort.createRevision({ candidateDigest: persisted?.digest, review: context.review, source: context.source });
   return Object.freeze({
     candidates: Object.freeze(candidates),

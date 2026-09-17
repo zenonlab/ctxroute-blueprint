@@ -1,6 +1,6 @@
 import type { PageContextPort } from '../ports/capability-ports';
+import { createProgress, isContentVisible, progressId, workId } from '@tobirink/domain';
 import type { FavoriteSource, Progress, Work } from '@tobirink/domain';
-import { createProgress, progressId } from '@tobirink/domain';
 import type { StoragePort, StorageSession } from '../ports/storage-port';
 import { reconcileProgressObservation } from '../progress/progress-flow';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ export const popupContinuationTtlMs = 30 * 24 * 60 * 60 * 1000;
 export const popupLocalMatchLimit = 500;
 
 export const popupContinuationRecordSchema = z.strictObject({
+  contentClassification: z.enum(['adult', 'non-adult', 'unknown']).optional(),
   completed: z.boolean().optional(),
   coverAlt: z.string().optional(),
   coverSrc: z.string().optional(),
@@ -45,6 +46,7 @@ export interface ReadPopupContextDependencies {
   now: () => string;
   pageContext: PageContextPort;
   storage: StoragePort;
+  showAdultContent?: boolean;
 }
 
 export interface PageProgressObservation {
@@ -206,17 +208,21 @@ async function enrichActiveRecord(
   });
 }
 
-export async function readPopupContext({ cache, now, pageContext, storage }: ReadPopupContextDependencies): Promise<PopupContextSnapshot> {
+export async function readPopupContext({ cache, now, pageContext, showAdultContent = true, storage }: ReadPopupContextDependencies): Promise<PopupContextSnapshot> {
   const currentTime = now();
   const nowMs = Date.parse(currentTime);
-  const cached = (await cache.read())
+  const cached = (await Promise.all((await cache.read())
     .filter((record) => Number.isFinite(nowMs) && isFresh(record, nowMs) && isResolvedWorkRecord(record))
+    .map(async (record) => {
+      const work = await storage.getWork(workId(record.id));
+      return isContentVisible(work?.hydration?.candidate, showAdultContent) ? record : undefined;
+    }))).filter((record): record is PopupContinuationRecord => record !== undefined)
     .sort((left, right) => Date.parse(right.visitedAt) - Date.parse(left.visitedAt));
   const page = await pageContext.readActivePage();
   let active = page ? recordFromPage(page, currentTime) : undefined;
   if (active && page) {
     const enriched = await enrichActiveRecord(storage, page, active).catch(() => undefined);
-    active = enriched;
+    active = enriched && isContentVisible((await storage.getWork(workId(enriched.id)))?.hydration?.candidate, showAdultContent) ? enriched : undefined;
   }
 
   if (!active) {

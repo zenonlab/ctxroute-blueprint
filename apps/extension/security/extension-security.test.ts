@@ -110,7 +110,7 @@ describe('extension security boundary', () => {
     expect(background).toMatch(/restoreFavoriteResolutionContinuation\(browser\.alarms, privateStorage\.storage, resolutionOutbox\)/);
     expect(background).toMatch(/Promise\.all\(\[ensureReminderAlarm\(\), restoreFavoriteWake\(\)\]\)/);
     expect(background).toMatch(/alarm\.name === favoriteResolutionContinuationAlarmName/);
-    expect(background).toMatch(/readReviewQueue\(privateStorage\.storage\)/);
+    expect(background).toMatch(/readReviewQueue\(privateStorage\.storage,/);
     expect(background).toMatch(/readLocalReviewCandidateSnapshot\(privateStorage\.storage/);
     expect(background).toMatch(/writeLocalReviewDecision\(privateStorage\.storage/);
     expect(background).toMatch(/readLocalSearchSnapshot\(privateStorage\.storage/);

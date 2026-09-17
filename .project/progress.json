@@ -2648,7 +2648,7 @@
         {
           "id": "switch-readers",
           "title": "Basculer Worker et extension avec compatibilité",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Worker sert profils canoniques et modèles Agenda; anciennes extensions reçoivent encore /v3/releases compatible.",
             "L’extension projette localement les occurrences, conserve bibliothèque, progression et préférences IndexedDB.",
@@ -2681,7 +2681,11 @@
             "npm run build:extension:firefox",
             "git diff --check"
           ],
-          "evidence": []
+          "evidence": [
+            "Le Worker expose /v4/release-models paginé et lecture seule; le nouvel adaptateur valide les modèles et projette localement la fenêtre avant commit du cache IndexedDB; /v3/releases reste compatible.",
+            "La politique locale masque uniquement contentClassification=adult, conserve unknown visible et atteint bibliothèque, recherche, popup, Review, Agenda, notifications et WebBridge sans badge ni nouveau réglage.",
+            "Agenda 36/36, Worker 111/111, Extension 145/145, Application 380/380, adapters-browser 84/84; migration IndexedDB Chromium, E2E, tous les typechecks et builds Chrome/Firefox passent; Archify dataflow/workflow showcase 9/9."
+          ]
         },
         {
           "id": "certify-publish-cleanup",

@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PublicReleaseGeneration } from '@tobirink/application';
+import type { PublicReleaseGeneration, VirtualReleaseModelContract } from '@tobirink/application';
 import { HttpPublicReleaseLoader } from './http-public-release-loader';
 
 const releaseEvent = (id: string, instant: string): PublicReleaseGeneration['events'][number] => ({ expiresAt: '2026-11-12T00:00:00.000Z', id, occurrence: { kind: 'INSTANT', value: instant }, provenance: { fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist', providerWorkId: '42', releaseKind: 'episode', state: 'SCHEDULED' });
+const releaseModel = (workId: string, id: string, instant: string): VirtualReleaseModelContract => ({
+  anchor: { date: '2026-09-01', sequence: '0' }, editorialStatus: 'ONGOING', exceptions: [],
+  explicitNext: releaseEvent(id, instant), intervalDays: 7, provider: 'anilist', providerWorkId: '42',
+  provenance: { observedAt: '2026-09-12T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' },
+  releaseKind: 'episode', revision: `${workId}-revision`, validity: sourceWindow, workId,
+});
 const sourceWindow = { from: '2026-09-01', to: '2026-10-01' };
 
 describe('HttpPublicReleaseLoader', () => {
@@ -10,7 +16,7 @@ describe('HttpPublicReleaseLoader', () => {
     const window = { from: '2026-09-12', to: '2026-09-28' };
     const generation = { etag: '"calendar-verified-empty"', events: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'calendar-verified-empty', source: 'shared' as const, window };
     const cache = { load: vi.fn().mockResolvedValueOnce(undefined).mockResolvedValue(generation), save: vi.fn() };
-    const fetcher = vi.fn(async () => Response.json({ entries: [], generatedAt: generation.generatedAt, revision: generation.revision, window }, { headers: { ETag: generation.etag } }));
+    const fetcher = vi.fn(async () => Response.json({ models: [], generatedAt: generation.generatedAt, revision: generation.revision, window }, { headers: { ETag: generation.etag } }));
     const loader = new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z'));
     expect((await loader.load(cache, window)).snapshot.events).toEqual([]);
     expect(cache.save).toHaveBeenCalledWith(generation);
@@ -48,19 +54,19 @@ describe('HttpPublicReleaseLoader', () => {
 
   it('follows every cursor and commits only the complete generation', async () => {
     const responses = [
-      Response.json({ entries: [releaseEvent('anilist-episode-42-1', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', nextCursor: '2026-09-13T00:00:00.000Z|anilist-episode-42-1', revision: 'calendar-1', window: sourceWindow }, { headers: { ETag: '"release-calendar-1-window"' } }),
-      Response.json({ entries: [releaseEvent('anilist-episode-42-2', '2026-09-20T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'calendar-1', window: sourceWindow }, { headers: { ETag: '"release-calendar-1-window"' } }),
+      Response.json({ models: [releaseModel('work-1', 'anilist-episode-42-1', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', nextCursor: 'work-1', revision: 'models-1-2', window: sourceWindow }, { headers: { ETag: '"release-models-1-window"' } }),
+      Response.json({ models: [releaseModel('work-2', 'anilist-episode-42-2', '2026-09-20T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'models-1-2', window: sourceWindow }, { headers: { ETag: '"release-models-1-window"' } }),
     ];
     const cache = { load: async () => undefined, save: vi.fn() };
     const fetcher = vi.fn(async (_input: RequestInfo | URL) => responses.shift()!);
     const result = await new HttpPublicReleaseLoader('https://tobirink.com', fetcher).load(cache, { from: '2026-09-01', to: '2026-10-01' });
     expect(result.snapshot.events).toHaveLength(2);
-    expect(fetcher.mock.calls[1]?.[0].toString()).toContain('cursor=2026-09-13T00%3A00%3A00.000Z%7Canilist-episode-42-1');
+    expect(fetcher.mock.calls[1]?.[0].toString()).toContain('cursor=work-1');
     expect(cache.save).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the active generation when a later page fails', async () => {
-    const first = Response.json({ entries: [releaseEvent('anilist-episode-42-1', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', nextCursor: '2026-09-13T00:00:00.000Z|anilist-episode-42-1', revision: 'calendar-1', window: sourceWindow }, { headers: { ETag: '"release-calendar-1-window"' } });
+    const first = Response.json({ models: [releaseModel('work-1', 'anilist-episode-42-1', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', nextCursor: 'work-1', revision: 'models-1-2', window: sourceWindow }, { headers: { ETag: '"release-models-1-window"' } });
     const cache = { load: async () => undefined, save: vi.fn() };
     const fetcher = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(new Response(null, { status: 503 }));
     await expect(new HttpPublicReleaseLoader('https://tobirink.com', fetcher).load(cache, { from: '2026-09-01', to: '2026-10-01' })).rejects.toThrow('public-release-http-503');
@@ -68,7 +74,7 @@ describe('HttpPublicReleaseLoader', () => {
   });
 
   it('does not replace the active generation with an empty shared result', async () => {
-    const response = Response.json({ entries: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'd1-empty', window: sourceWindow }, { headers: { ETag: '"releases-d1-empty-window"' } });
+    const response = Response.json({ models: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'models-0-0', window: sourceWindow }, { headers: { ETag: '"release-models-empty-window"' } });
     const cache = { load: async () => undefined, save: vi.fn() };
     await expect(new HttpPublicReleaseLoader('https://tobirink.com', async () => response).load(cache, { from: '2026-09-01', to: '2026-10-01' })).rejects.toThrow('public-release-generation-empty');
     expect(cache.save).not.toHaveBeenCalled();
@@ -79,16 +85,16 @@ describe('HttpPublicReleaseLoader', () => {
     { name: 'outside source window', generatedAt: '2026-09-10T00:00:00.000Z', window: { from: '2026-09-10', to: '2026-09-20' }, error: 'public-release-generation-window-mismatch' },
   ])('rejects a $name generation without replacing the cache', async ({ generatedAt, window: publishedWindow, error }) => {
     const cache = { load: async () => undefined, save: vi.fn() };
-    const response = Response.json({ entries: [], generatedAt, revision: 'calendar-old', window: publishedWindow }, { headers: { ETag: '"calendar-old"' } });
+    const response = Response.json({ models: [], generatedAt, revision: 'models-old', window: publishedWindow }, { headers: { ETag: '"models-old"' } });
     const loader = new HttpPublicReleaseLoader('https://tobirink.com', async () => response, () => Date.parse('2026-09-12T00:00:00.000Z'));
     await expect(loader.load(cache, sourceWindow)).rejects.toThrow(error);
     expect(cache.save).not.toHaveBeenCalled();
   });
 
-  it('always requests the coverage-aware v3 route', async () => {
+  it('always requests models and projects them inside the extension', async () => {
     const cache = { load: async () => undefined, save: vi.fn() };
-    const fetcher = vi.fn(async (_input: RequestInfo | URL) => Response.json({ entries: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'calendar-v3', window: sourceWindow }, { headers: { ETag: '"calendar-v3"' } }));
+    const fetcher = vi.fn(async (_input: RequestInfo | URL) => Response.json({ models: [releaseModel('work-1', 'anilist-episode-42-1', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'models-1-1', window: sourceWindow }, { headers: { ETag: '"models-1"' } }));
     await new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, sourceWindow);
-    expect(fetcher.mock.calls[0]?.[0].toString()).toContain('/v3/releases?');
+    expect(fetcher.mock.calls[0]?.[0].toString()).toContain('/v4/release-models?');
   });
 });

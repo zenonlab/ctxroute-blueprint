@@ -13,7 +13,7 @@ export interface ReviewQueueSnapshot {
   status: 'pending';
 }
 
-export async function readReviewQueue(storage: StorageReadPort): Promise<ReviewQueueSnapshot> {
+export async function readReviewQueue(storage: StorageReadPort, showAdultContent = true): Promise<ReviewQueueSnapshot> {
   const items: ReviewQueueItem[] = [];
   const availableBefore = new Date().toISOString();
   let after: ReviewListQuery['after'];
@@ -25,6 +25,11 @@ export async function readReviewQueue(storage: StorageReadPort): Promise<ReviewQ
     for (const { review, source } of visible) {
       if (items.length === reviewQueueLimit) break;
       if (source?.presence !== 'observed' || source.resolution?.kind !== 'REVIEW_REQUIRED' || source.resolution.reason !== review.reason) continue;
+      if (!showAdultContent) {
+        const candidateSet = await storage.getFavoriteReviewCandidateSet(review.id);
+        if (candidateSet !== undefined && candidateSet.candidates.length > 0
+          && candidateSet.candidates.every((candidate) => candidate.contentClassification === 'adult')) continue;
+      }
       items.push(Object.freeze({ id: review.id, sourceLabel: review.sourceLabel, title: review.title }));
     }
     const last = reviews.at(-1);

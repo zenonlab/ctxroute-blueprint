@@ -7,6 +7,7 @@ export interface PublicReleaseQuery { from?: string; to?: string; cursor?: strin
 export interface PublicReleaseCalendarPort {
   ingest(input: PublicReleaseIngestion): Promise<{ accepted: boolean; count: number; replayed: boolean; revision: string }>;
   query(input: PublicReleaseQuery): Promise<{ entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; window: { from: string; to: string }; nextCursor?: string }>;
+  queryModels(input: PublicReleaseQuery): Promise<{ models: readonly VirtualReleaseModelContract[]; revision: string; generatedAt: string; window: { from: string; to: string }; nextCursor?: string }>;
 }
 interface CalendarPage { entries: readonly PublicReleaseEventContract[]; revision: string; generatedAt: string; window: { from: string; to: string }; nextCursor?: string }
 interface ReleaseRow { id: string; provider: string; provider_work_id: string; release_kind: string; sequence_label: string | null; occurrence_kind: string; occurrence_value: string; state: string; source: string; fetched_at: string; parser_version: string; rules_version: string; expires_at: string }
@@ -18,6 +19,19 @@ interface ReleaseModelRow {
   observedAt: string; parserVersion: string; provider: VirtualReleaseModelContract['provider']; providerWorkId: string;
   releaseKind: VirtualReleaseModelContract['releaseKind']; revision: number; rulesVersion: string; source: string;
   validFrom: string; validTo: string; workId: string;
+}
+function releaseModel(row: ReleaseModelRow): VirtualReleaseModelContract {
+  const model: VirtualReleaseModelInput = {
+    workId: row.workId, provider: row.provider, providerWorkId: row.providerWorkId, releaseKind: row.releaseKind,
+    anchor: { date: row.anchorDate }, exceptions: JSON.parse(row.exceptionsJson),
+    validity: { from: row.validFrom, to: row.validTo }, editorialStatus: row.editorialStatus,
+    provenance: { source: row.source, observedAt: row.observedAt, parserVersion: row.parserVersion, rulesVersion: row.rulesVersion },
+    revision: row.modelDigest,
+  };
+  if (row.anchorSequence !== null) model.anchor.sequence = row.anchorSequence;
+  if (row.intervalDays !== null) model.intervalDays = row.intervalDays;
+  if (row.explicitNextJson !== null) model.explicitNext = JSON.parse(row.explicitNextJson);
+  return virtualReleaseModelSchema.parse(model);
 }
 function decodeCursor(cursor: string | undefined): ReleaseCursor {
   if (cursor === undefined) return { id: null, occurrence: null };
@@ -38,6 +52,29 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
     const active = await this.db.prepare("SELECT revision FROM public_release_active_generation WHERE id = 'active'").first<{ revision: string }>();
     return { accepted: active?.revision === revision, count: events.length, replayed: previous?.revision === revision, revision };
   }
+  async queryModels(input: PublicReleaseQuery) {
+    const from = input.from ?? '0000-01-01'; const to = input.to ?? '9999-12-31';
+    const summary = await this.db.prepare(`SELECT COUNT(*) AS count, MAX(revision) AS revision,
+      MAX(observed_at) AS generatedAt FROM catalogue_release_model
+      WHERE valid_to >= ?1 AND valid_from <= ?2`).bind(from, to)
+      .first<{ count: number; generatedAt: string | null; revision: number | null }>();
+    const rows = await this.db.prepare(`SELECT work_id AS workId, provider, provider_work_id AS providerWorkId,
+      release_kind AS releaseKind, anchor_date AS anchorDate, anchor_sequence AS anchorSequence,
+      interval_days AS intervalDays, explicit_next_json AS explicitNextJson, exceptions_json AS exceptionsJson,
+      valid_from AS validFrom, valid_to AS validTo, editorial_status AS editorialStatus,
+      source, observed_at AS observedAt, parser_version AS parserVersion, rules_version AS rulesVersion,
+      model_digest AS modelDigest, revision FROM catalogue_release_model
+      WHERE valid_to >= ?1 AND valid_from <= ?2 AND work_id > ?3 ORDER BY work_id LIMIT ?4`)
+      .bind(from, to, input.cursor ?? '', input.limit + 1).all<ReleaseModelRow>();
+    const pageRows = rows.results.slice(0, input.limit);
+    const models = Object.freeze(pageRows.map(releaseModel));
+    const nextCursor = rows.results.length > input.limit ? pageRows.at(-1)?.workId : undefined;
+    const page = {
+      models, revision: `models-${summary?.revision ?? 0}-${summary?.count ?? 0}`,
+      generatedAt: summary?.generatedAt ?? '1970-01-01T00:00:00.000Z', window: { from, to },
+    };
+    return nextCursor === undefined ? page : { ...page, nextCursor };
+  }
   async query(input: { from?: string; to?: string; cursor?: string; limit: number }) {
     const cursor = decodeCursor(input.cursor);
     const lowerBound = input.from ?? '0000-01-01';
@@ -51,19 +88,7 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
       WHERE valid_to >= ?1 AND valid_from <= ?2 ORDER BY work_id LIMIT 1000`)
       .bind(lowerBound.slice(0, 10), upperBound.slice(0, 10)).all<ReleaseModelRow>();
     if (modelRows.results.length > 0) {
-      const models = modelRows.results.map((row) => {
-        const model: VirtualReleaseModelInput = {
-          workId: row.workId, provider: row.provider, providerWorkId: row.providerWorkId, releaseKind: row.releaseKind,
-          anchor: { date: row.anchorDate }, exceptions: JSON.parse(row.exceptionsJson),
-          validity: { from: row.validFrom, to: row.validTo }, editorialStatus: row.editorialStatus,
-          provenance: { source: row.source, observedAt: row.observedAt, parserVersion: row.parserVersion, rulesVersion: row.rulesVersion },
-          revision: row.modelDigest,
-        };
-        if (row.anchorSequence !== null) model.anchor.sequence = row.anchorSequence;
-        if (row.intervalDays !== null) model.intervalDays = row.intervalDays;
-        if (row.explicitNextJson !== null) model.explicitNext = JSON.parse(row.explicitNextJson);
-        return virtualReleaseModelSchema.parse(model);
-      });
+      const models = modelRows.results.map(releaseModel);
       const projected = projectVirtualAgenda(models, { from: lowerBound.slice(0, 10), to: upperBound.slice(0, 10) })
         .filter((event) => event.occurrence.value > (cursor.occurrence ?? lowerBound)
           || (event.occurrence.value === cursor.occurrence && event.id > (cursor.id ?? '')));

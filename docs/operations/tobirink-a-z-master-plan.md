@@ -16,8 +16,9 @@ Agenda maximum par œuvre sont des objets opérationnels R2 conditionnels et
 bornés à sept jours, sauf version active et deux versions de reprise.
 
 L'Agenda est virtuel : D1 conserve seulement ancre, intervalle éventuel,
-prochaine date annoncée, exceptions, validité et provenance. `/v3/releases`
-projette les occurrences à la volée pendant la transition. Une date annoncée
+prochaine date annoncée, exceptions, validité et provenance. Les nouvelles
+extensions lisent `/v4/release-models` et projettent localement; `/v3/releases`
+projette côté Worker pendant la transition. Une date annoncée
 prime, une prévision ne produit que la prochaine occurrence et aucune date ne
 fait progresser un compteur confirmé ou la progression privée.
 
