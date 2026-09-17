@@ -936,47 +936,6 @@
     },
     {
       "schemaVersion": 1,
-      "id": "goal-publish-public-collector-v3-51742d9",
-      "title": "Historique remplacé — collecteur GitHub v3, ne pas réexécuter",
-      "status": "BLOCKED",
-      "executionMode": "collaborative",
-      "modeOffered": false,
-      "steps": [
-        {
-          "id": "push-public-collector-v3",
-          "title": "Conserver la preuve historique sans relancer le collecteur GitHub",
-          "status": "BLOCKED",
-          "acceptance": [
-            "Objectif remplacé par les collecteurs natifs; critères suivants conservés comme historique non exécutable. Reprise unique via goal-controlled-d1-service-resumption.",
-            "Le push est fast-forward et public main pointe exactement sur 51742d92602d91e66a45e7a62b6d687dbd566219.",
-            "Le workflow déployé conserve schedule */10, workflow_dispatch, permissions minimales et OIDC v3 workers.dev.",
-            "npm run verify et npm ls réussissent dans le dépôt public.",
-            "Un run planifié v3 est observé sans utilisation des runners du dépôt privé.",
-            "Les endpoints claim/result v3 sont atteints avec OIDC et le run termine correctement, y compris si la file est vide.",
-            "Les routes publiques Discovery v3 et Agenda v3 restent opérationnelles; v2 reste 410."
-          ],
-          "files": [
-            "remote:tristan-monticelli/tobirink-public-discovery/refs/heads/main"
-          ],
-          "commands": [
-            "git fetch origin main",
-            "git merge-base --is-ancestor origin/main 51742d92602d91e66a45e7a62b6d687dbd566219",
-            "npm run verify && npm ls",
-            "git push origin 51742d92602d91e66a45e7a62b6d687dbd566219:refs/heads/main",
-            "git ls-remote origin refs/heads/main",
-            "gh run list --repo tristan-monticelli/tobirink-public-discovery",
-            "Observe next scheduled collect run and verify production v3 traffic"
-          ],
-          "evidence": [
-            "Commit public 51742d9 poussé et vérifié; tests locaux 51/51 et npm ls réussis.",
-            "Routes publiques vérifiées: Discovery v3 et Agenda v3 répondent 200; Discovery v2 répond 410.",
-            "external: aucun run schedule créé sur 51742d9 après plusieurs fenêtres */10; GitHub reste sans garantie de démarrage et ne satisfait pas la latence demandée."
-          ]
-        }
-      ]
-    },
-    {
-      "schemaVersion": 1,
       "id": "goal-cloudflare-native-collectors",
       "title": "Remplacer GitHub Actions par des collecteurs Cloudflare et un proxy sortant",
       "status": "DONE",
@@ -2076,80 +2035,6 @@
     },
     {
       "schemaVersion": 1,
-      "id": "goal-adaptive-public-refresh-step-7",
-      "title": "Preuves du déploiement adaptatif — reprise via objectif contrôlé",
-      "status": "ACTIVE",
-      "executionMode": "autonomous",
-      "modeOffered": false,
-      "steps": [
-        {
-          "id": "deploy-and-certify",
-          "title": "Rattacher le déploiement bloqué à la reprise contrôlée, sans deuxième exécution",
-          "status": "BLOCKED",
-          "acceptance": [
-            "Ne pas relancer directement cette ancienne étape: goal-controlled-d1-service-resumption est le point d’entrée unique, après les gates de docs/plans/d1-cost-audit-roadmap.json.",
-            "Un export D1 distant ignoré par Git est créé, non vide et vérifié par SHA-256 avant toute mutation distante.",
-            "origin/main pointe sur les six commits validés du rafraîchissement adaptatif et .codex/config.toml reste exclu.",
-            "La gate Cloudflare applique uniquement d1:tobirink-public puis worker:tobirink-public-api à partir d’un plan frais et hashé.",
-            "Les migrations additives 0017 à 0020 sont appliquées, le Worker est sain et le cron 23 3 * * 0 est déployé.",
-            "Les lectures D1 et HTTP post-déploiement confirment les nouveaux états sans exposer de données privées.",
-            "Les builds Chrome et Firefox réussissent localement sans publication d’extension."
-          ],
-          "files": [
-            "build/backups/tobirink-public-adaptive-refresh-20260916.sql",
-            "build/plans/adaptive-public-refresh-cloudflare.json",
-            ".project/project-config.json",
-            ".project/progress.json",
-            "docs/progress.md",
-            "docs/plans/adaptive-public-refresh-step-7.json",
-            "docs/plans/adaptive-public-refresh-step-7-deploy-update.json",
-            "docs/operations/cloudflare.md",
-            "docs/decisions/ADR-0053-adaptive-refresh-observability.md",
-            "docs/architecture/src/adaptive-public-refresh.dataflow.json",
-            "docs/architecture/src/adaptive-public-refresh.architecture.json"
-          ],
-          "commands": [
-            "npm exec -- wrangler d1 export PUBLIC_DB --remote --output ../../build/backups/tobirink-public-adaptive-refresh-20260916.sql",
-            "git push origin HEAD:main",
-            "npm run infra:plan -- --provider cloudflare --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation d1-migrate:PUBLIC_DB --operation worker-deploy",
-            "npm run infra:apply -- --provider cloudflare --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow d1:tobirink-public --allow worker:tobirink-public-api",
-            "npm run build:extension",
-            "npm run build:extension:firefox",
-            "npm run archify:validate -- adaptive-public-refresh.dataflow",
-            "npm run archify:validate -- architecture",
-            "Production D1 and HTTP verification"
-          ],
-          "evidence": [
-            "Historique uniquement: ne pas réexécuter cette étape; goal-controlled-d1-service-resumption et le plan maître A à Z sont l’unique parcours opérationnel.",
-            "La cible actuelle comprend les migrations 0017–0021; les anciennes preuves 0017–0020 restent historiques et ne certifient pas la production corrigée.",
-            "external: le dernier résultat fournisseur reste le refus D1 code 7500 du 2026-09-16T11:04:42Z; la disponibilité actuelle du quota n’est pas prouvée."
-          ]
-        },
-        {
-          "id": "observe-weekly-run",
-          "title": "Observer une collecte hebdomadaire complète",
-          "status": "TODO",
-          "acceptance": [
-            "Une collecte Agenda contrôlée ou le premier cron hebdomadaire termine les deux lanes ou conserve le dernier snapshot valide de la lane en échec.",
-            "Les compteurs expurgés confirment l’absence d’appel Agenda entre les collectes et une publication uniquement sur changement.",
-            "L’observation couvre sept jours calendaires après le déploiement sans publication Chrome ou Firefox."
-          ],
-          "files": [
-            ".project/progress.json",
-            "docs/progress.md",
-            "docs/plans/adaptive-public-refresh-step-7.json",
-            "docs/operations/cloudflare.md"
-          ],
-          "commands": [
-            "Read-only Cloudflare deployment, D1 and Worker log inspection",
-            "Production HTTP verification after the weekly trigger"
-          ],
-          "evidence": []
-        }
-      ]
-    },
-    {
-      "schemaVersion": 1,
       "id": "goal-emergency-provider-shutdown",
       "title": "Arrêter immédiatement tous les traitements fournisseur",
       "status": "DONE",
@@ -2214,8 +2099,8 @@
       "id": "goal-cost-audit-measured-capacity",
       "title": "Mesurer les coûts par œuvre, utilisateur simulé et Agenda",
       "status": "ACTIVE",
-      "executionMode": "collaborative",
-      "modeOffered": false,
+      "executionMode": "autonomous",
+      "modeOffered": true,
       "steps": [
         {
           "id": "measure-costs",
@@ -2243,9 +2128,14 @@
             "git diff --check"
           ],
           "evidence": [
-            "Étapes locales B/C terminées: worker.cost HTTP inclut les deltas D1, publication Agenda différentielle et rétention bornée.",
-            "Budgets locaux après amorçage: Agenda inchangé 70 écritures, un événement changé 76–77; même œuvre/nouvelle clé 19 sans révision ni réécriture de fiche.",
-            "Reste non certifié: concurrence et volume, cycle natif distant, rapprochement métriques Cloudflare et observation sept jours; aucune reprise production."
+            "Le blocage historique de quota est levé: D1 0017–0021 appliquée et Worker corrigé bfd038ea déployé le 2026-09-17.",
+            "Références locales reproduites le 2026-09-17: 36/36 tests ciblés puis Worker 104/104; première résolution 55 écritures fixture, 50 admissions concurrentes 5 écritures, batch 50 MISS 0 écriture, Agenda 1798/70/76/76/77.",
+            "Échantillon distant corrélé: HTTP 200, Worker bfd038ea, CPU 9 ms, wall 28 ms, providerRequests=0, d1RowsRead=64, d1RowsWritten=0; aucun identifiant ou payload conservé.",
+            "Snapshots natifs glissants 10:12:08Z→10:17Z: rowsRead 23567→23716, rowsWritten 5753→5753, readQueries 345→349, writeQueries 720→720; délai/fenêtre mobile interdisent une égalité instantanée avec tail.",
+            "D1 insights post-bascule 10h à 10:16:28Z: 25 formes, 32 exécutions, 4753 lectures, 0 écriture et 70.3341 ms D1; la vue 7d conserve l’ancien pipeline à 166476 écritures événement et ne certifie pas la version corrigée.",
+            "Runbook finalisé pour l’intervalle fixe 2026-09-17T00:29Z..2026-09-24T00:29Z: logs worker.cost, métriques D1 exactes, query shapes, Queue, CPU, R2 et fournisseurs séparés; tout écart natif doit être expliqué.",
+            "Workflow adaptive-public-refresh-continuation validé Archify showcase 9/9, 0 erreur, 0 avertissement; tous les workspace typechecks, docs, 56 ADR/502 scopes et git diff --check passent.",
+            "Fenêtre d’observation réelle ouverte le 2026-09-17T00:29Z; échéance minimale pour sept jours complets: 2026-09-24T00:29Z. La certification économique reste ouverte jusqu’au cycle complet et au rapprochement UTC."
           ]
         }
       ]
@@ -2254,14 +2144,14 @@
       "schemaVersion": 1,
       "id": "goal-adult-content-local-visibility",
       "title": "Collecter les contenus adultes et contrôler leur affichage dans l’extension",
-      "status": "ACTIVE",
-      "executionMode": "collaborative",
-      "modeOffered": false,
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
       "steps": [
         {
           "id": "verify-provider-contracts",
           "title": "Vérifier toutes les API : AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu Manga",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Inventorier toutes les API et tous leurs chemins actifs : AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu Manga; appliquer la même politique à tout fournisseur ajouté ultérieurement.",
             "Vérifier par API les paramètres explicites et filtres implicites de recherche, pagination, hydratation exacte, relations, jaquettes et collecte Agenda lorsqu’elle existe; ne pas inventer un paramètre adulte universel.",
@@ -2290,15 +2180,15 @@
             "npm run validate:decisions"
           ],
           "evidence": [
-            "L’étape commence seulement après la stabilisation D1 de sept jours; elle couvre tous les adaptateurs et chemins actifs, pas seulement AniList et MangaUpdates.",
-            "Le serveur doit collecter les données autorisées indépendamment du réglage local; classification adult/non-adult/unknown avec provenance avant l’UI.",
-            "Aucune recherche fournisseur, implémentation ou publication n’a été exécutée pendant l’audit documentaire."
+            "AniList, MangaUpdates, MangaDex, Kitsu Anime et Kitsu Manga exposent désormais adult/non-adult/unknown à partir de leurs signaux natifs; absence ou ambiguïté reste unknown.",
+            "Le champ optionnel contentClassification traverse ProviderCandidate, checkpoint et contrat Public Discovery sans conditionner la collecte ou le stockage.",
+            "ADR-0056, stratégie qualité et adaptive-public-refresh.dataflow mis à jour; Archify showcase 9/9, 0 erreur, 0 avertissement."
           ]
         },
         {
           "id": "implement-local-toggle",
           "title": "Ajouter le paramètre et bloquer affichage et actions lorsque désactivé",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Prérequis: verify-provider-contracts; compléter et approuver l’inventaire des fichiers de toutes les surfaces/commandes, les fichiers ci-dessous ne constituent pas un scope exhaustif.",
             "Option persistante dans les paramètres de l’extension, désactivée par défaut.",
@@ -2324,9 +2214,9 @@
             "npm run build:extension:firefox"
           ],
           "evidence": [
-            "OFF doit masquer titres, jaquettes et entrées puis bloquer commandes, anciens liens, actions et notifications sur toutes les surfaces, sans suppression ni recollecte.",
-            "ON réaffiche les données déjà reçues; Chrome et Firefox doivent couvrir adult/non-adult/unknown, redémarrage, bascule et hors-ligne.",
-            "La publication de l’extension est une étape séparée avec approbations propres."
+            "Préférence locale showAdultContent ajoutée, OFF par défaut et rétrocompatible avec les préférences persistées existantes.",
+            "OFF filtre avant pagination/facettes/statistiques la bibliothèque, recherche, page, review, popup, Agenda et WebBridge; il bloque aussi les décisions et notifications adultes/inconnues sans supprimer ni recollecter.",
+            "npm run verify vert; typechecks workspace, Application 376/376, adapters-browser 84/84, Extension 145/145, Public Discovery 59/59; builds Chrome et Firefox réussis."
           ]
         }
       ]
@@ -2335,14 +2225,14 @@
       "schemaVersion": 1,
       "id": "goal-controlled-d1-service-resumption",
       "title": "Reprendre D1 et le runtime corrigé après l’arrêt d’urgence",
-      "status": "ACTIVE",
-      "executionMode": "collaborative",
-      "modeOffered": false,
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
       "steps": [
         {
           "id": "preflight",
           "title": "Accès rétabli à la dernière inspection; vérifier quota, sauvegarde et barrières",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Inspection authentifiée du compte cible, quota D1, migrations, version Worker, routes, crons et Queue.",
             "Sauvegarde fraîche vérifiée avant migrations; maintien des barrières jusqu’à validation.",
@@ -2358,23 +2248,20 @@
             "git diff --check"
           ],
           "evidence": [
-            "Certification locale 2026-09-16: npm run verify exit 0; Worker 103/103, adaptateur Cloudflare 20/20, extension 145/145, application 376/376, tous les workspaces et builds Chrome/Firefox passent; npm audit 0 vulnérabilité.",
-            "Workflow adaptive-public-refresh-continuation showcase 9/9; artifact HTML SHA-256 0fb5133944ebea70a530f7f294b97f842f68c1aa2453462371af99d54548b7f6.",
-            "Inspection distante: Worker ancien 2267a691 à 100%, migrations 0017–0021 en attente, D1 lecture changes=0/rows_written=0; l’inventaire Wrangler ne recertifie pas delivery_paused ni le quota d’écriture.",
-            "Backup frais ignoré: 1 011 839 octets, integrity_check ok, SHA-256 da9b5db986d51b5d887f6652c5dc7fc4910ce23f4329693fd4733c0e1864dd2e.",
-            "Plan Cloudflare non appliqué: deux actions exactes d1:tobirink-public + worker:tobirink-public-api, digest acbc740b9c96fb23c1cb848c77547889106baa74008229788e4ce14accf02315, expiration 2026-09-16T17:58:43.655Z.",
-            "Restent avant mutation: approbation fournisseur exacte, plan frais après expiration, preuve routes/crons/workers.dev/Queue paused et disponibilité d’écriture; aucun déploiement ni reprise exécuté."
+            "Inspection Cloudflare réussie à 2026-09-16T19:49Z: authentification valide, Worker 2267a691-68cf-4612-9ec8-e36e3c839ef3 à 100%, routes/crons/workers_dev toujours fermés, Queue configurée et non reprise.",
+            "D1 distant tobirink-public présente encore exactement les migrations 0017–0021 en attente; le dump frais build/backups/tobirink-public-adaptive-refresh-resume.sql fait 1 011 839 octets, SHA-256 da9b5db986d51b5d887f6652c5dc7fc4910ce23f4329693fd4733c0e1864dd2e.",
+            "Plan dry-run D1 + Worker validé: digest 9db712aff496a1f2921d37eb67f7404d86963c6d5e44722b0ecf5eb7aa5c7ad9; Archify dataflow showcase 9/9, 0 erreur, 0 avertissement."
           ]
         },
         {
           "id": "resume",
           "title": "Migrer puis déployer sous barrières et réactiver progressivement",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Point d’entrée unique pour la reprise; satisfaire les gates F/G de docs/plans/d1-cost-audit-roadmap.json et approuver séparément les opérations fournisseur exactes.",
             "Avant ouverture, fixer budget canari et seuils d’arrêt chiffrés, vérifier la version corrigée sous barrières et les opérations de rollback autorisées.",
-            "Rattachement à goal-adaptive-public-refresh-step-7; ne pas déclarer son déploiement terminé sans preuve.",
-            "Gate inspect-plan-apply pour migrations 0017–0020 et Worker corrigé; aucune suppression de staging.",
+            "La reprise D1 et sa preuve de déploiement sont suivies uniquement par cet objectif; ne pas déclarer le déploiement terminé sans preuve.",
+            "Gate inspect-plan-apply pour migrations 0017–0021 et Worker corrigé; aucune suppression de staging.",
             "Routes puis cron hebdomadaire 23 3 * * 0 puis Queue en dernier; workers.dev reste désactivé.",
             "Mesurer consommation et arrêter la reprise sur dérive; ne pas rouvrir l’ancien Worker seul.",
             "Critères d’observation et rollback documentés; les coûts estimés ne sont pas présentés comme mesurés."
@@ -2391,9 +2278,13 @@
             "npm run infra:apply -- --plan <plan-verifie> --approve <digest-verifie> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow d1:tobirink-public --allow worker:tobirink-public-api"
           ],
           "evidence": [
-            "Plan maître docs/operations/tobirink-a-z-master-plan.md: release certifiée, commit/push séparés, backup frais, migrations 0017–0021, déploiement scellé, route, cron, Queue en dernier, canari puis sept jours.",
-            "Les anciens critères 0017–0020 et gates F/G sont remplacés par les références 0017–0021 et A–G du plan maître; aucune mutation fournisseur n’est autorisée par cette mise à jour.",
-            "Seuils proposés à approuver avant canari: alerte/recoupure 20k/50k UTC, Agenda 10k/500 et Discovery 0/30/100."
+            "Plan Cloudflare exact appliqué après reset et authentification rétablie: migrations D1 0017–0021 puis déploiement Worker; allowlist limitée à d1:tobirink-public et worker:tobirink-public-api.",
+            "Vérification distante: D1 répond « No migrations to apply »; Worker bfd038ea-4596-49aa-9add-7de77af5056c sert 100%.",
+            "Réactivation progressive terminée dans l’ordre route → cron → Queue: route tobirink.com/*, cron Cloudflare valide 23 3 * * SUN UTC, puis reprise tobirink-public-discovery; workers.dev reste désactivé.",
+            "Queue info confirme producteur et consommateur tobirink-public-api attachés; aucun purge, suppression, souscription payante ou ancien Worker réactivé.",
+            "Smoke tests: https://tobirink.com/ HTTP 200 et /v3/releases?from=2026-09-13&to=2026-09-29 HTTP 200; Worker 104/104.",
+            "Documentation, décisions, architecture et git diff --check passent; adaptive-public-refresh.dataflow Archify showcase 9/9, 0 erreur, 0 avertissement.",
+            "L’observation canari de sept jours reste une phase de suivi post-déploiement, sans bloquer la migration et la reprise déjà effectuées."
           ]
         }
       ]
@@ -2557,6 +2448,255 @@
             "Roadmap et continuation corrigées vers 0017–0021; ordre D1 puis audit adulte tous fournisseurs, préférence OFF locale et publication extension séparée; objectifs historiques signalés non réexécutables.",
             "Archify workflow et dataflow passent showcase sans erreur/avertissement; validate:architecture, config, docs, 55 ADR/489 scopes, anti-slop et git diff --check passent; aucune mutation fournisseur, coût, secret, suppression, commit ou push."
           ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-durable-catalogue-virtual-agenda",
+      "title": "Catalogue durable, Agenda virtuel et collecte hebdomadaire maîtrisée",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "align-docs",
+          "title": "Aligner documentation, ADR, Progress et architecture cible",
+          "status": "DONE",
+          "acceptance": [
+            "Brief, qualité, ADR-0045/0055/0056, audit et plan maître décrivent catalogue courant D1, opérations R2, Agenda virtuel et unknown visible.",
+            "Le plan retire l’exploration relationnelle tout en conservant les références de même œuvre et distingue totaux, confirmés, prévisions et progression privée.",
+            "Les diagrammes produit architecture/dataflow passent Archify showcase 9/9 sans composant control-plane.",
+            "Aucun code produit, ressource distante, dépendance ou suppression n’est modifié."
+          ],
+          "files": [
+            "docs/00-project-brief.md",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0045-public-release-calendar.md",
+            "docs/decisions/ADR-0055-d1-write-amplification-budgets.md",
+            "docs/decisions/ADR-0056-adult-content-visibility.md",
+            "docs/operations/d1-cost-audit.md",
+            "docs/operations/tobirink-a-z-master-plan.md",
+            "docs/architecture/src/adaptive-public-refresh.architecture.json",
+            "docs/architecture/src/adaptive-public-refresh.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run archify:validate -- adaptive-public-refresh.architecture",
+            "npm run archify:validate -- adaptive-public-refresh.dataflow",
+            "npm run validate:config",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run validate:architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Brief, stratégie qualité, ADR-0045/0055/0056, plan maître et audit de coûts alignés sur D1 courant, R2 opérationnel, Agenda virtuel, unknown visible et absence d’exploration relationnelle.",
+            "Archify adaptive-public-refresh architecture et dataflow passent showcase 9/9 sans erreur ni avertissement.",
+            "validate:docs, validate:decisions et git diff --check réussissent; aucun code produit ni mutation distante dans cette étape."
+          ]
+        },
+        {
+          "id": "reproduce-budgets",
+          "title": "Établir les budgets actuels reproductibles et les tailles réelles",
+          "status": "TODO",
+          "acceptance": [
+            "Ventiler admission, claim, publication, titres, index, compteurs, classification et reprises sur fixtures froides/chaudes.",
+            "Mesurer les octets avec length(CAST(... AS BLOB)) et compter les copies de profils sans appeler de fournisseur.",
+            "Conserver les métriques distantes comme mesures séparées et measure-costs ouvert jusqu’à sa fenêtre propre."
+          ],
+          "files": [
+            "apps/worker/src/cost-baseline.test.ts",
+            "apps/worker/src/operational-metrics.test.ts",
+            "docs/operations/d1-cost-audit.md",
+            "docs/operations/cloudflare.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run typecheck",
+            "npm run validate:docs -- --all",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "remove-relational-crawl",
+          "title": "Corriger la propagation et retirer l’exploration relationnelle",
+          "status": "TODO",
+          "acceptance": [
+            "Une relation fournisseur ne crée aucune demande ni signal Queue; les références de même œuvre restent dédupliquées.",
+            "contentClassification traverse API, candidat, contrats et caches; Kitsu accepte seulement les valeurs documentées.",
+            "catalogueNeedsPublication détecte compteurs et classification.",
+            "Une migration additive retire uniquement les index strictement redondants prouvés, sans modifier les migrations historiques ni supprimer les contraintes uniques."
+          ],
+          "files": [
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/public-discovery/src/contracts.ts",
+            "packages/public-discovery/src/provider-kit.ts",
+            "packages/public-discovery/src/providers/kitsu.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "packages/public-discovery/src/contracts.test.ts",
+            "packages/public-discovery/src/providers/kitsu.test.ts",
+            "apps/worker/migrations/0022_remove_redundant_discovery_indexes.sql",
+            "docs/architecture/src/adaptive-public-refresh.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:contracts",
+            "npm run test:d1",
+            "npm run typecheck",
+            "npm run archify:validate -- adaptive-public-refresh.dataflow",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "canonical-metadata",
+          "title": "Introduire la fiche canonique courante par œuvre",
+          "status": "TODO",
+          "acceptance": [
+            "Une table courante par œuvre contient statut, totaux, derniers confirmés, couverture, genres, classification et provenance minimale.",
+            "La migration backfill choisit le profil VERIFIED le plus récent et complète seulement ses champs absents; les conflits d’identité échouent fermés.",
+            "Les réponses alias reconstruisent une seule fiche commune; les réponses partielles n’effacent pas les valeurs connues.",
+            "Une modification sémantique incrémente la révision; une vérification identique n’écrit pas la fiche."
+          ],
+          "files": [
+            "apps/worker/migrations/0023_catalogue_current_metadata.sql",
+            "packages/public-discovery/src/contracts.ts",
+            "packages/application/src/public-discovery/public-discovery-contract.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-catalogue-adapter.ts",
+            "apps/worker/src/catalogue/catalogue-routes.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "packages/adapters-cloudflare/src/catalogue/d1-catalogue-adapter.test.ts",
+            "docs/decisions/ADR-0057-canonical-work-metadata.md",
+            "docs/architecture/src/adaptive-public-refresh.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:d1",
+            "npm run test --workspace @tobirink/adapters-cloudflare",
+            "npm run typecheck",
+            "npm run validate:decisions",
+            "npm run archify:validate -- adaptive-public-refresh.architecture",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "virtual-agenda-r2",
+          "title": "Implémenter Agenda virtuel et stockage opérationnel R2",
+          "status": "TODO",
+          "acceptance": [
+            "D1 conserve un modèle compact courant par œuvre, écrit uniquement si changé; aucune occurrence historique Agenda n’est ajoutée.",
+            "R2 conserve travail/checkpoints/observations bornées avec propriété conditionnelle, sept jours de temporaire et trois versions.",
+            "AniList explicite prime; sinon le prédicteur existant utilise au plus 12 observations et 8 intervalles sans chaîne infinie.",
+            "Queue échouée reste récupérable; interruption R2/D1, doublon Queue, hiatus, report, fraction et annulation sont testés.",
+            "/v3/releases reste compatible et projette à la volée avec pagination bornée."
+          ],
+          "files": [
+            "apps/worker/migrations/0024_virtual_agenda_models.sql",
+            "packages/domain/src/manga-prediction.ts",
+            "packages/domain/src/release-events.ts",
+            "packages/application/src/releases/release-contracts.ts",
+            "packages/application/src/agenda/project-local-agenda.ts",
+            "packages/adapters-cloudflare/src/releases/r2-agenda-operation-store.ts",
+            "packages/adapters-cloudflare/src/releases/index.ts",
+            "apps/worker/src/releases/public-release-collectors.ts",
+            "apps/worker/src/releases/public-release-calendar.ts",
+            "apps/worker/src/releases/public-release-routes.ts",
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/releases/public-release-collectors.test.ts",
+            "apps/worker/src/releases/public-release-routes.test.ts",
+            "apps/worker/src/native-collectors.test.ts",
+            "docs/decisions/ADR-0058-virtual-agenda-r2-operations.md",
+            "docs/architecture/src/adaptive-public-refresh.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:agenda",
+            "npm run test:worker",
+            "npm run test --workspace @tobirink/adapters-cloudflare",
+            "npm run typecheck",
+            "npm run validate:decisions",
+            "npm run archify:validate -- adaptive-public-refresh.dataflow",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "switch-readers",
+          "title": "Basculer Worker et extension avec compatibilité",
+          "status": "TODO",
+          "acceptance": [
+            "Worker sert profils canoniques et modèles Agenda; anciennes extensions reçoivent encore /v3/releases compatible.",
+            "L’extension projette localement les occurrences, conserve bibliothèque, progression et préférences IndexedDB.",
+            "Classification atteint recherche, bibliothèque, popup, Review, Agenda et notifications sans badge ni réglage supplémentaire.",
+            "Lecture/projection Agenda ne produit aucune écriture distante."
+          ],
+          "files": [
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.ts",
+            "packages/adapters-browser/src/releases/http-public-release-loader.ts",
+            "packages/adapters-indexeddb/src/database.ts",
+            "packages/adapters-indexeddb/src/migrations/index.ts",
+            "packages/adapters-indexeddb/src/releases/dexie-local-release-agenda.ts",
+            "packages/application/src/agenda/project-local-agenda.ts",
+            "apps/extension/runtime/use-local-agenda.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/runtime/local-notification-runtime.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/agenda-notifications.test.ts",
+            "apps/extension/runtime/agenda-period-model.test.ts",
+            "docs/02-quality-strategy.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:agenda",
+            "npm run test:e2e",
+            "npm run test:migrations",
+            "npm run typecheck",
+            "npm run build:extension",
+            "npm run build:extension:firefox",
+            "git diff --check"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "certify-publish-cleanup",
+          "title": "Certifier, versionner, pousser et déployer avant nettoyage séparé",
+          "status": "TODO",
+          "acceptance": [
+            "Rapport avant/après couvre D1 lectures/écritures/octet, R2, Queue, Worker et fournisseurs sur les mêmes fixtures.",
+            "Stack Audit, verify, Archify, sauvegarde fraîche et plan inspect-plan-apply réussissent.",
+            "Commits fonctionnels et push excluent .codex/config.toml et préservent les changements utilisateur.",
+            "Migration D1 additive puis Worker déployés exactement sur tobirink-public et tobirink-public-api; aucun nettoyage destructif dans cette étape.",
+            "La liste exacte des anciennes tables/pages/index à supprimer est produite avec consommateurs et rollback, puis soumise à confirmation séparée."
+          ],
+          "files": [
+            "docs/operations/d1-cost-audit.md",
+            "docs/operations/cloudflare.md",
+            "docs/operations/tobirink-a-z-master-plan.md",
+            "docs/architecture/src/adaptive-public-refresh.architecture.json",
+            "docs/architecture/src/adaptive-public-refresh.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation d1-migrate:PUBLIC_DB --operation worker-deploy",
+            "git diff --check",
+            "git push origin HEAD"
+          ],
+          "evidence": []
         }
       ]
     }

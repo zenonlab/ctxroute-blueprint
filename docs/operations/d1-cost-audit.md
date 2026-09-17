@@ -1,6 +1,6 @@
 # Audit des coûts D1 et parcours de certification
 
-Date : 16 septembre 2026. État : optimisations locales mesurées, production non certifiée.
+Date : 17 septembre 2026. État : référence 0021 mesurée; architecture cible non certifiée.
 
 Le [plan maître A à Z](./tobirink-a-z-master-plan.md) est la source de vérité
 pour l'ordre d'exécution, les seuils proposés et les frontières d'approbation.
@@ -8,7 +8,8 @@ pour l'ordre d'exécution, les seuils proposés et les frontières d'approbation
 ## Verdict
 
 Le nombre de lignes conservées n'est pas le nombre d'écritures.
-Une fiche synthétique de dix lignes catalogue coûte ici **55 écritures** pour
+Une fiche synthétique de dix lignes catalogue coûte **55 écritures dans la
+fixture 0021 uniquement** pour
 son admission, son traitement et sa publication. Aucun appel fournisseur n'est
 inclus dans ces 55 écritures.
 
@@ -18,14 +19,65 @@ crée plus de révision et ne réécrit plus sa fiche catalogue. Le rafraîchiss
 inchangé ou sans changement dans les champs matériellement persistés conserve
 12 écritures de suivi.
 
-L'Agenda utilise désormais une projection active différentielle. Après
+L'Agenda 0021 utilise une projection active différentielle. Après
 amorçage, une collecte identique coûte 70 écritures pour les deux lanes et
 leurs treize pages ; un seul événement modifié coûte 76–77 écritures, rétention
 incluse. Après cinq cycles, seules les treize pages actives restent. La première
 réconciliation locale coûte encore 1 798 écritures et doit rester un pic séparé.
 
-Ces résultats ne reconstituent pas les 100 000 écritures historiques et ne
-certifient pas le montant facturé en production.
+Ces résultats ne reconstituent pas les 100 000 écritures historiques, ne
+certifient pas le montant facturé en production et ne prédisent pas les coûts
+de la cible Agenda/R2. La projection `1 000 × 55 = 55 000` n'est pas une
+consommation observée. La taille d'une ligne ne multiplie pas son compteur
+d'écritures; les index effectivement maintenus peuvent ajouter des écritures.
+
+Les mesures de taille reproductibles utilisent exclusivement
+`length(CAST(value AS BLOB))`. `length(TEXT)` compte des caractères et ne doit
+plus être présenté comme un nombre d'octets. Le rapport cible ventile admission,
+claim, publication, titres, index, compteurs, classification et reprises, puis
+rapporte séparément lignes D1, octets, opérations R2, Queue, Worker et appels
+fournisseur.
+
+## Audit des répétitions et de l'utilité des appels
+
+Cet audit porte sur le code exécuté, pas seulement sur les lignes conservées.
+Une lecture répétée n'est supprimable que si elle ne protège ni la concurrence,
+ni l'idempotence, ni la décision de ne pas écrire.
+
+| Chemin | Appels D1 principaux | Utilité | Optimisation restante |
+|---|---|---|---|
+| Lookup unitaire | transition terminale éventuelle, puis lecture de l'état | La transition clôt un bail épuisé; la lecture retourne l'état public | Aucune suppression sûre identifiée |
+| Lookup par lot | une requête `json_each` pour jusqu'à 50 clés | Évite un appel par clé et restitue aussi les MISS | Déjà le chemin optimal exposé |
+| Admission Discovery | écriture atomique, puis lecture de l'état; reprise du signal si nécessaire | La lecture confirme saturation, conflit et état final après concurrence | Fusion possible seulement avec une nouvelle forme de retour SQL |
+| Claim Discovery | `UPDATE ... RETURNING`, plus clôture bornée des claims épuisés | Sélection, bail et retour des demandes sont atomiques | Aucune lecture séparée à retirer |
+| Publication Discovery | lecture de garde, comparaison catalogue, batch protégé par lease, relecture seulement après `changes=0` | Protège rejeu, collision, bail et publication partielle | Les gardes répétées sont le prix de l'atomicité; pas de suppression sûre |
+| Relations Discovery | lecture par relation avant admission | Évite une demande et un signal quand la référence existe déjà | Batch de relations possible, mais non nécessaire au plan actuel |
+| Claim Agenda | lecture complète de lane puis `UPDATE ... RETURNING` | La lecture distingue complete/deferred/resume; l'UPDATE arbitre le lease | **Candidate** : décision + retour d'état dans une requête atomique |
+| Page Agenda | batch de deux écritures : page et checkpoint lane | Les deux écritures doivent réussir ensemble pour reprendre sans trou | Aucune écriture inutile démontrée |
+| Fin de lane | lecture de toutes les pages, relecture de lane, mise à jour conditionnelle | Pages pour le digest; lane pour le digest actif et le lease | **Candidate** : transporter `activeDigest` depuis le claim pour éviter la relecture |
+| Publication Agenda | deux lectures de lanes en parallèle, lecture génération active, batch projection/diff/rétention | Données des deux lanes, no-op, fenêtre, concurrence temporelle et nettoyage | Aucune suppression sûre sans perdre ces garanties |
+| Lecture Agenda publique | génération active puis projection courante | Version/window et pagination sont toutes deux consommées | Pas de doublon structurel |
+| Catalogue détail | work, titres et références en parallèle | Trois projections distinctes demandées par la réponse | Parallélisme déjà correct |
+
+### Taux de répétition observé
+
+Les répétitions artificielles du banc (`100` admissions identiques et `100`
+lectures VERIFIED) mesurent la déduplication, pas un comportement normal du
+runtime. Le chemin réel répété est surtout Agenda : pour chaque lane, un claim
+lit puis écrit l'état, chaque page écrit page + checkpoint, puis la fin relit
+les pages et l'état. La relecture de lane dans `completeLane` est la seule
+répétition clairement candidate à supprimer sans changer les données produites.
+
+Les écritures de suivi ne sont pas du slop : leases, checkpoints, états
+terminaux, nonce, projection active et suppression des événements absents
+portent chacun une garantie distincte. Les compteurs locaux confirment que les
+rejeux ne réécrivent pas le catalogue (`0` écriture pour les doublons testés),
+que l'Agenda identique reste à `70`, et qu'un changement d'un événement reste à
+`76–77`, contre `1 798` au premier amorçage.
+
+Les deux optimisations candidates ne sont pas implémentées dans cette étape.
+Elles nécessitent une mesure avant/après sur mêmes fixtures et une vérification
+des baux concurrents avant d'être ajoutées au périmètre de code.
 
 ## Méthode et reproductibilité
 
@@ -272,11 +324,11 @@ suivantes ; elle n'autorise pas leur exécution ni les opérations fournisseur.
 | Ordre | Résultat attendu | Critère de passage |
 |---|---|---|
 | A — Référence locale | Ce banc et les tableaux | Mesures reproductibles, limites explicites |
-| B — Observabilité et budgets | **Local réalisé** : HTTP et Queue exposent les deltas D1 sans identité | Reste à rapprocher sept jours de logs des métriques natives distantes |
-| C — Optimisations justifiées | **Local réalisé** : œuvre/clé, projection Agenda différentielle, snapshots et pages bornées | Reste à migrer et canarier sous approbation fournisseur ; aucune purge distante incluse |
-| D — Préflight distant | Release locale certifiée, commit/push séparés, backup restaurable | Quota et scellé vérifiés, migrations 0017–0021, plan frais et approbation fournisseur exacte |
-| E — Déploiement et canari | Worker corrigé sous scellé puis route, cron et Queue en dernier | Seuils approuvés, aucun ancien Worker rouvert, métriques rapprochées |
-| F — Sept jours et décision économique | Cycle complet observé | Pannes/reprises maîtrisées, bilan UTC et mensuel, décision Free/Paid/R2 |
+| B — Observabilité et budgets | **Local réalisé** et premier échantillon distant capturé : HTTP et Queue exposent les deltas D1 sans identité | Rapprocher sept jours de logs des métriques natives distantes |
+| C — Optimisations justifiées | **Réalisé** : œuvre/clé, projection Agenda différentielle, snapshots et pages bornées | Continuer à surveiller les budgets réels ; aucune purge distante incluse |
+| D — Préflight distant | **Réalisé** : quota rétabli, backup, plan frais, migrations et Worker certifiés | Conserver les preuves de version et de rollback |
+| E — Déploiement et canari | **Réalisé** : Worker corrigé sous scellé puis route, cron et Queue en dernier | Mesurer le canari réel et fermer sur seuil |
+| F — Sept jours et décision économique | **En observation** depuis le 17/09/2026 | Cycle complet, bilan UTC et décision Free/Paid/R2 |
 | G — Contrats de tous les fournisseurs | AniList, MangaUpdates, MangaDex, Kitsu Anime et Manga, plus tout adaptateur actif | Recherche, exact lookup, pagination, relations, couvertures, Agenda où disponible ; classification adulte/non-adulte/inconnue et provenance |
 | H — Préférences et parcours client | Réception indépendante du réglage d'affichage | OFF masque et bloque actions/notifications ; ON restaure sans nouvelle collecte ; Chrome/Firefox, bibliothèque, recherche, popup, Review, Agenda, WebBridge |
 | I/J — Certification et publication extension | Candidate reproductible | Publication séparément approuvée par cible |
@@ -292,9 +344,10 @@ doit être décidé puis testé. Aucun paramètre universel « adult » n'est su
   ni le déclarer réussi artificiellement.
 - Le déploiement adaptatif ancien conserve ses preuves et son blocage ; la
   reprise contrôlée est l'unique point d'entrée opérationnel.
-- L'accès Cloudflare a refonctionné pendant l'audit préalable (ancienne version
-  2267a691 observée) ; ce constat ne prouve ni quota libre ni barrières complètes.
-  L'ancien blocage d'authentification ne doit plus être présenté comme actuel.
+- L'accès Cloudflare et le quota ont été rétablis le 17/09/2026 ; la version
+  corrigée `bfd038ea-4596-49aa-9add-7de77af5056c` sert désormais 100 % du trafic.
+  La route, le cron `23 3 * * SUN` UTC et la Queue ont été réactivés dans cet
+  ordre ; l'observation économique reste distincte de cette preuve de santé.
 - La certification distante reste ouverte : ce banc ne clôt pas l'objectif
   complet de capacité.
 - Les étapes adultes nécessitent un périmètre fichiers complet avant validation :
@@ -308,8 +361,10 @@ doit être décidé puis testé. Aucun paramètre universel « adult » n'est su
 
 ## Limites et audit de fin d'étape
 
-CONFORME : uniquement test et documentation/Progress ; aucun appel fournisseur,
-déploiement, migration distante, abonnement, secret, purge, push ou commit.
+CONFORME pour l'audit local : tests, documentation et Progress ; la reprise
+Cloudflare est documentée séparément avec ses preuves distantes. Aucun appel
+fournisseur n'a été déclenché par l'échantillon de lecture, et aucun abonnement,
+secret, purge, push ou commit n'a été effectué.
 AGENTS.md, CLAUDE.md, .codex/hooks.json et les hooks ne sont pas modifiés.
 Les modifications utilisateur .codex/config.toml et le workflow non suivi sont
 préservés. La compétence stack-audit impose de conserver les preuves manquantes
@@ -327,8 +382,9 @@ structurelles sont explicitement reportées aux étapes approuvées correspondan
 Le test monofichier déclenche un avertissement Sensor de taille AST, sans erreur ;
 le périmètre approuvé est conservé, sans désactiver de règle.
 
-Validations de cette étape : 102 tests Worker sur 13 fichiers, dont six nouveaux
-scénarios ; TypeScript Worker, Oxlint ciblé, documentation complète, 54 ADR / 478
-scopes et git diff --check réussis. La feuille de route passe la validation
-Progress sans être approuvée pour implémentation. Le verify global et les parcours
-navigateur n'ont pas été relancés : aucun code produit ou composant UI n'a changé.
+Validations : 104 tests Worker sur 13 fichiers, TypeScript et tous les workspace
+typechecks, documentation, 56 ADR / 502 scopes, `git diff --check`, `npm run
+verify`, builds Chrome/Firefox, intégration, npm audit (0 vulnérabilité) et build
+Archify réussis. Échantillon distant : `worker.cost` sur une lecture MISS avec
+`d1RowsRead=1`, `d1RowsWritten=0`, `providerRequests=0`, HTTP 200. Cette mesure
+ponctuelle ne remplace pas l'observation de sept jours.

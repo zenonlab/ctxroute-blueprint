@@ -8,6 +8,7 @@ scope:
   - apps/worker/wrangler.jsonc
   - packages/application/src/agenda/**
   - packages/adapters-browser/src/releases/**
+  - packages/adapters-cloudflare/src/releases/**
   - packages/adapters-indexeddb/src/**
   - apps/extension/wxt-entrypoints/background.ts
   - apps/extension/entrypoints/agenda/**
@@ -21,30 +22,21 @@ revised: true
 
 ## Contexte
 
-Le snapshot R2 v1 et la route D1 v2 existent, mais les dernières lectures
-publiques observées ne montrent aucune génération Agenda active (`d1-empty`).
-Cela ne constitue pas un comptage de toute la base D1, notamment du cache
-`favorite_public_cache`, distinct du catalogue exposé par `/v1/catalogue`.
-Le 13 septembre 2026, AniList a répondu normalement depuis la machine et
-l'extension, tandis que le cron Cloudflare a reçu HTTP 403 avec le message
-`You have been manually blocked`. Espacer davantage le cron ne change pas
-l'egress bloqué.
-
-Le code livré tronque aussi AniList à sa première page, laisse MangaUpdates
-vide et élimine les occurrences civiles dans la projection. Une réponse live
-MangaUpdates a renvoyé `per_page: 40` malgré une taille demandée différente;
-la pagination doit suivre l'enveloppe reçue. FavLib démontre les invariants
-utiles, mais sa formule de terminaison MangaUpdates ne constitue pas un oracle.
+La projection Agenda historique conserve des pages fournisseur, des snapshots
+fusionnés et une ligne SQL par occurrence. Son coût dépend du déplacement de la
+fenêtre même lorsque la règle de sortie n'a pas changé. Le produit possède déjà
+un prédicteur manga borné et les fournisseurs livrent soit des dates annoncées,
+soit des observations passées. Les événements futurs peuvent donc être dérivés
+sans devenir des enregistrements distants durables.
 
 ## Décision
 
 La collecte partagée s’exécute dans le consumer Queue du Worker. Le cron
-`23 3 * * 0` dépose uniquement un signal `agenda-refresh` le dimanche à
-03:23 UTC; le consumer lit
-deux lanes indépendantes, AniList pour les sorties anime officielles et
-MangaUpdates pour les sorties manga, manhwa et manhua confirmées. Aucun runtime
-GitHub ni route d’ingestion externe n’est
-nécessaire; l’ancienne route `POST /v2/releases/generations` répond 410.
+`23 3 * * SUN` dépose un signal le dimanche à 03:23 UTC. Les demandes,
+checkpoints, baux, pages de session et douze observations maximum par œuvre
+résident dans R2 sous des objets bornés, écrits conditionnellement avec un jeton
+de propriété. Un signal Queue ne constitue jamais la preuve que le travail est
+durable : l'objet est écrit avant l'envoi et un envoi échoué reste récupérable.
 
 La collecte déclenchée par `GET /v2/releases` reste supprimée : une lecture
 publique ne provoque jamais une requête fournisseur. Le cron hebdomadaire
@@ -55,14 +47,13 @@ livraison reprend après la dernière page enregistrée. Tout `403`, `429`, time
 ou échec conserve le dernier snapshot valide de la lane; `Retry-After` prime
 sur le backoff Queue dans la limite de vingt-quatre heures.
 
-Une lane terminée calcule un digest sémantique ordonné qui exclut
-`generatedAt`, `fetchedAt`, `expiresAt` et les autres données d’observation.
-Si ce digest est inchangé, seuls les champs `checked_at` sont avancés et aucun
-événement de génération n’est recopié. Si une lane change, ses pages deviennent
-son snapshot actif. La fusion utilise les derniers snapshots valides des deux
-lanes : AniList peut donc être publié avec le précédent snapshot MangaUpdates,
-et inversement. La génération active précédente reste servie jusqu’au commit
-complet de la nouvelle génération.
+Une collecte terminée produit un modèle compact par œuvre : date et numéro
+d'ancrage, intervalle prédit éventuel, prochaine date annoncée, exceptions
+connues, bornes de validité, source et version de normalisation. D1 ne reçoit ce
+modèle courant que si son digest sémantique change. La version précédente reste
+lisible tant que tous les objets de la nouvelle version ne sont pas vérifiés et
+que son pointeur n'est pas publié. La rétention garde la version active et deux
+versions précédentes; aucun objet référencé ne peut expirer.
 
 AniList et MangaUpdates sont joints uniquement via la gateway sortante signée de
 l’ADR-0051; l’adresse de sortie n’appartient donc pas à Cloudflare. La signature,
@@ -82,13 +73,9 @@ Kitsu reste un repli de résolution et ne produit aucune date Agenda. MangaDex
 conserve son rôle d'identité exacte et de sorties spécialisées sans devenir
 l'autorité générale du calendrier.
 
-D1 Agenda reçoit uniquement les événements publics bornés : fournisseur
-canonique en minuscules, identifiant public de l'œuvre, type et numéro textuel de sortie,
-occurrence `DATE` ou `INSTANT`, état, provenance, versions et expiration. Une
-migration additive conserve les tables v1. Les écritures sont préparées,
-batchées et idempotentes. Un `403`, `429`, timeout ou résultat incomplet est un
-échec technique et conserve la dernière génération valide. Les titres, URLs
-de favoris, favoris, progressions, dossiers, owners,
+D1 conserve seulement le modèle public courant attaché à l'œuvre canonique.
+Un `403`, `429`, timeout ou résultat incomplet conserve le dernier modèle
+valide. Les titres privés, URLs de favoris, progressions, dossiers, owners,
 installations, secrets et payloads fournisseurs restent exclus.
 
 AniList suit `pageInfo.hasNextPage`, au plus 50 éléments par page, une seule
@@ -100,60 +87,29 @@ minimale de 6 secondes, soit dix requêtes HTTP par minute au maximum. Son
 d'observation et ne devient jamais un horaire de sortie. Les valeurs comme
 `58.5`, `2a` et `29-29.5 (end)` restent des numéros textuels bornés.
 
-`GET /v2/releases` reste byte-compatible avec les extensions déjà publiées.
-`GET /v3/releases` ajoute la fenêtre source de la génération active. Les deux
-lectures sont paginées par occurrence puis clé sémantique stable, refusent une
-plage supérieure à quarante jours et ne reçoivent aucun identifiant personnel.
-Le curseur porte occurrence et identifiant; la révision dérive de la génération
-validée et l'ETag exact inclut version de route, révision et fenêtre demandée.
-`/v1/releases` reste intact pour compatibilité et rollback.
+`GET /v3/releases` reste compatible avec les extensions publiées, mais génère
+sa page à la volée depuis les modèles, avec les mêmes limites de fenêtre,
+pagination, curseur et ETag. Les anciennes versions restent servies pendant la
+transition. Aucune lecture ni projection ne modifie D1 ou R2.
 
-L'extension charge toutes les pages d'une même génération au plus une fois par
-24 heures, les valide puis les écrit atomiquement dans IndexedDB. Une réponse
-partagée est utilisable seulement si elle a moins de huit jours et si sa fenêtre
-source couvre intégralement la fenêtre demandée. Une réponse plus ancienne,
-hors couverture ou contenant une ligne invalide échoue fermée sans appeler de
-fournisseur. Le cache Agenda ne réside pas dans `storage.local`. Une erreur
-réseau conserve et peut servir la dernière génération partagée valide de même
-fenêtre. L'Agenda local joint ces événements aux Works résolus par
-`(provider, providerWorkId)` uniquement. Il ne cherche jamais un fournisseur
-pendant une lecture locale et ne joint jamais par titre.
+L'extension valide et conserve les modèles de ses œuvres dans IndexedDB, puis
+projette localement les occurrences utiles. Elle joint par identité fournisseur
+exacte, jamais par titre, et ne contacte aucun fournisseur lors d'une lecture.
+La progression privée et les compteurs confirmés ne sont jamais avancés par une
+date prévue.
 
-Après une promotion complète, la transaction de cycle de vie conserve la
-génération active et au plus les deux générations précédentes. Elle supprime
-d'abord leurs événements enfants puis les générations parentes; le pointeur
-actif est exclu explicitement de chaque requête de rétention. Une ingestion
-interrompue ne change pas le pointeur, et son staging éventuel sera borné par la
-prochaine promotion réussie.
-
-La collecte MangaUpdates compte les lignes reçues, acceptées et sans identité
-de série sans journaliser titre ni payload. Une lane dont plus de cinq pour cent
-des lignes reçues sont sans identité échoue entièrement afin qu'une dérive de
-schéma fournisseur ne réduise pas silencieusement le calendrier partagé.
-
-Les dates civiles ne sont pas converties en minuit UTC. Une date confirmée
-remplace une estimation. Une estimation manga demande trois intervalles
-positifs valides parmi douze observations maximum, filtre les intervalles à
-`0,5×–2×` la médiane sur huit intervalles maximum et ne produit que la
-prochaine date. Elle ne déclenche jamais de notification native et aucune heure
-n'est inventée pour MangaUpdates.
+Les dates civiles ne sont pas converties en minuit UTC. Une date AniList
+explicite prime et ne peut être compressée que si règle et exceptions la
+reproduisent exactement. Sans date future, le prédicteur existant exige trois
+intervalles positifs parmi douze observations maximum, examine huit intervalles
+maximum et filtre autour de `0,5×–2×` la médiane avant moyenne. Il ne produit
+que la prochaine occurrence. Les œuvres terminées, annulées ou en hiatus ne
+sont pas prédites; un chapitre textuel ou fractionnaire reste textuel.
 
 ## Conséquences
 
-Le calendrier reste mutualisable sans rendre l'utilisateur dépendant de
-l’egress Cloudflare vers les fournisseurs. Une collecte hebdomadaire alimente toutes les lectures;
-une recherche utilisateur ne relance pas les fournisseurs Agenda. Le site et WebBridge ne voient toujours qu'une projection
-locale. Les résultats publics restent disponibles hors ligne et les pannes
-fournisseur ne réinitialisent pas le calendrier validé. Après bascule certifiée,
-seul le consumer Worker via proxy appellera les fournisseurs Agenda. La Queue,
-le proxy, leurs secrets et le Worker restent derrière leurs gates
-opérationnelles; cette décision locale ne crée aucun secret ni ressource.
-
-Avec les volumes observés, une session représente environ cinq requêtes AniList
-et treize requêtes MangaUpdates. Les quotas et métriques comptent des requêtes
-HTTP réelles, jamais des œuvres ni des utilisateurs.
-
-L’événement `worker.cost` de la session compte ces requêtes au niveau du
-transport, le nombre de résultats acceptés, la création ou l’évitement d’une
-génération, la durée, les retries et les lignes D1 issues de `D1Result.meta`.
-Il ne contient aucun événement Agenda, titre, identifiant d’œuvre ou payload.
+Le passage du temps ne déclenche plus d'écriture distante. Les observations et
+états de reprise sortent de D1; les métadonnées publiques actuelles y restent
+requêtables. Le collecteur reste hebdomadaire, mutualisé et limité par les
+cadences existantes. Les métriques rapportent séparément D1, R2, Queue,
+fournisseurs et Worker, sans titre, identifiant d'œuvre ou payload.

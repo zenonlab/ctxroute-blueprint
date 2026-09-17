@@ -9,19 +9,19 @@
       {
         "id": "agenda-hebdomadaire",
         "label": "Agenda hebdomadaire",
-        "focus": ["weeklyCron", "admissionQueue", "agendaLanes", "catalogueD1", "privateIndexedDb"],
-        "note": "Une collecte hebdomadaire publie seulement après validation complète et conserve le dernier snapshot valide."
+        "focus": ["weeklyCron", "admissionQueue", "agendaLanes", "operationsR2", "catalogueD1", "privateIndexedDb"],
+        "note": "Une collecte hebdomadaire conserve douze observations et ne publie un modèle compact que si son contenu change."
       },
       {
         "id": "decouverte-immediate",
         "label": "Découverte immédiate",
-        "focus": ["unknownWork", "admissionQueue", "discoveryJob", "catalogueD1", "privateIndexedDb"],
+        "focus": ["unknownWork", "admissionQueue", "discoveryJob", "catalogueD1", "localContentPolicy", "privateIndexedDb"],
         "note": "Une identité inconnue est coalescée dans D1 avant tout appel fournisseur."
       },
       {
         "id": "rehydratation-ciblee",
         "label": "Réhydratation ciblée",
-        "focus": ["staleFavorite", "admissionQueue", "refreshJob", "catalogueD1", "privateIndexedDb"],
+        "focus": ["staleFavorite", "admissionQueue", "refreshJob", "catalogueD1", "localContentPolicy", "privateIndexedDb"],
         "note": "Une œuvre favorite échue est rafraîchie au plus une fois par semaine sans bloquer sa fiche VERIFIED."
       }
     ]
@@ -30,18 +30,20 @@
     { "label": "Signaux bornés" },
     { "label": "Admission et signal" },
     { "label": "Collecte indépendante" },
-    { "label": "Publication publique" },
+    { "label": "État courant" },
     { "label": "Usage privé" }
   ],
   "nodes": [
     { "id": "weeklyCron", "type": "cloud", "label": "Cron hebdomadaire", "sublabel": "dimanche 03:23 UTC", "stage": 0, "row": 0, "tag": "1 session / semaine" },
     { "id": "unknownWork", "type": "frontend", "label": "Œuvre inconnue", "sublabel": "cache miss extension", "stage": 0, "row": 2, "tag": "projection locale immédiate" },
     { "id": "staleFavorite", "type": "frontend", "label": "Favori échu", "sublabel": "lot local borné", "stage": 0, "row": 4, "tag": "20 travaux / réveil" },
-    { "id": "admissionQueue", "type": "messagebus", "label": "Admission D1 + Queue", "sublabel": "created envoie un signal opaque", "stage": 1, "row": 2, "width": 168, "tag": "déduplication globale" },
-    { "id": "agendaLanes", "type": "backend", "label": "Lanes Agenda", "sublabel": "AniList + MangaUpdates", "stage": 2, "row": 0, "tag": "baux et checkpoints" },
+    { "id": "admissionQueue", "type": "messagebus", "label": "Objet R2 + Queue", "sublabel": "écriture avant signal opaque", "stage": 1, "row": 2, "width": 168, "tag": "échec d'envoi récupérable" },
+    { "id": "agendaLanes", "type": "backend", "label": "Collecte Agenda", "sublabel": "annonces + observations", "stage": 2, "row": 0, "tag": "modèle virtuel" },
     { "id": "discoveryJob", "type": "backend", "label": "Discovery", "sublabel": "identité et titres", "stage": 2, "row": 2, "tag": "claim partagé" },
-    { "id": "refreshJob", "type": "backend", "label": "Réhydratation", "sublabel": "profil et relations", "stage": 2, "row": 4, "tag": "admission hebdo / clé" },
-    { "id": "catalogueD1", "type": "database", "label": "Catalogue D1", "sublabel": "projection active + 3 snapshots", "stage": 3, "row": 2, "width": 168, "tag": "diff atomique" },
+    { "id": "refreshJob", "type": "backend", "label": "Réhydratation", "sublabel": "profil canonique", "stage": 2, "row": 4, "tag": "sans relations" },
+    { "id": "operationsR2", "type": "database", "label": "Opérations R2", "sublabel": "baux + 12 observations", "stage": 3, "row": 0, "width": 168, "tag": "actif + 2 versions" },
+    { "id": "catalogueD1", "type": "database", "label": "Catalogue D1", "sublabel": "métadonnées + modèle courant", "stage": 3, "row": 2, "width": 168, "tag": "une ligne / œuvre" },
+    { "id": "localContentPolicy", "type": "backend", "label": "Préférence locale", "sublabel": "adult · non-adult · unknown", "stage": 4, "row": 1, "width": 176, "tag": "OFF conservateur" },
     { "id": "privateIndexedDb", "type": "database", "label": "IndexedDB privée", "sublabel": "lookup groupé par 50 clés", "stage": 4, "row": 2, "width": 154, "tag": "ETag · continuation MV3" }
   ],
   "flows": [
@@ -51,10 +53,12 @@
     { "id": "queue-agenda", "from": "admissionQueue", "to": "agendaLanes", "label": "deux lanes", "classification": "indépendantes", "variant": "emphasis" },
     { "id": "queue-discovery", "from": "admissionQueue", "to": "discoveryJob", "label": "claim(20)", "classification": "priorité exacte", "variant": "default", "labelAt": [525, 450] },
     { "id": "queue-refresh", "from": "admissionQueue", "to": "refreshJob", "label": "claim refresh", "classification": "VERIFIED reste servi", "variant": "default" },
-    { "id": "agenda-publish", "from": "agendaLanes", "to": "catalogueD1", "label": "ajouts · changements · retraits", "classification": "une transaction D1", "variant": "emphasis" },
+    { "id": "agenda-observe", "from": "agendaLanes", "to": "operationsR2", "label": "observations bornées", "classification": "écriture conditionnelle", "variant": "default", "route": "straight", "labelAt": [760, 220] },
+    { "id": "agenda-publish", "from": "agendaLanes", "to": "catalogueD1", "label": "modèle changé", "classification": "aucune occurrence matérialisée", "variant": "emphasis" },
     { "id": "discovery-publish", "from": "discoveryJob", "to": "catalogueD1", "label": "fiche VERIFIED", "classification": "publication atomique", "variant": "emphasis", "labelAt": [780, 485] },
-    { "id": "refresh-publish", "from": "refreshJob", "to": "catalogueD1", "label": "profil validé", "classification": "relations distinctes", "variant": "emphasis" },
-    { "id": "catalogue-read", "from": "catalogueD1", "to": "privateIndexedDb", "label": "HIT · MISS · version", "classification": "hit frais testé : 0 écriture", "variant": "emphasis", "labelDy": 53 }
+    { "id": "refresh-publish", "from": "refreshJob", "to": "catalogueD1", "label": "profil validé", "classification": "compteurs inclus", "variant": "emphasis" },
+    { "id": "catalogue-read", "from": "catalogueD1", "to": "privateIndexedDb", "label": "profil + modèle", "classification": "projection locale : 0 écriture distante", "variant": "emphasis", "route": "straight", "labelDy": 53 },
+    { "id": "local-filter", "from": "catalogueD1", "to": "localContentPolicy", "label": "classification", "classification": "OFF masque adult explicite", "variant": "emphasis" }
   ],
   "cards": [
     {
@@ -62,7 +66,7 @@
       "title": "Disponibilité",
       "items": [
         "Agenda, Discovery et réhydratation échouent indépendamment",
-        "Le dernier snapshot ou profil vérifié reste servi",
+        "Le dernier modèle ou profil vérifié reste servi",
         "Une publication remplace l’ancienne vue seulement après validation"
       ]
     },
@@ -70,10 +74,10 @@
       "dot": "cyan",
       "title": "Budgets",
       "items": [
-        "Un changement Agenda écrit seulement le diff après amorçage",
-        "Zéro appel fournisseur sur cache hit frais",
-        "13 pages actives au lieu d’un historique sans borne",
-        "Les transitions, clés nouvelles et refreshes peuvent écrire"
+        "Une vérification inchangée ne republie aucune fiche",
+        "Le temps projette l'Agenda sans écriture distante",
+        "D1, R2, Queue, Worker et HTTP sont comptés séparément",
+        "Les coûts historiques restent des fixtures, pas des coefficients"
       ]
     },
     {

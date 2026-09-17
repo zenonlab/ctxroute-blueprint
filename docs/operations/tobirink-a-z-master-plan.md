@@ -1,43 +1,67 @@
 # Plan maître A à Z de tobirink
 
-Date de référence : 16 septembre 2026.
+Date de référence : 17 septembre 2026.
 
-Statut : correction locale certifiée; aucune reprise Cloudflare, souscription,
-publication, suppression, migration distante, route, cron, Queue, push ou commit
-n'est autorisé par ce document.
+Statut : architecture cible approuvée et implémentation en cours. Le présent
+bloc « Décision » remplace les parcours historiques plus bas lorsqu'ils sont en
+contradiction. La certification distante de cette nouvelle version ne pourra
+commencer qu'après migration, bascule des lecteurs et déploiement vérifiés.
 
 ## Décision
 
-Conserver D1 comme base relationnelle du catalogue et de l'Agenda.
-Conserver R2 pour les objets, images et sauvegardes; ne pas l'utiliser comme
-remplacement automatique de D1.
-Rester sur l'offre Free pendant la certification si le reset quotidien et la
-marge observée le permettent. Workers Paid est une décision de coût séparée,
-utile pour une reprise immédiate ou une marge opérationnelle, jamais un correctif
-à l'amplification d'écritures.
+D1 conserve les identités, titres, références et une projection courante de
+métadonnées par œuvre canonique. Les alias y pointent sans recopier le profil.
+Les demandes temporaires, baux, checkpoints, reprises et douze observations
+Agenda maximum par œuvre sont des objets opérationnels R2 conditionnels et
+bornés à sept jours, sauf version active et deux versions de reprise.
 
-Le parcours opérationnel unique est `goal-controlled-d1-service-resumption`.
-Les anciens objectifs de déploiement et le collecteur GitHub sont des preuves
-historiques : ils ne doivent pas être relancés.
+L'Agenda est virtuel : D1 conserve seulement ancre, intervalle éventuel,
+prochaine date annoncée, exceptions, validité et provenance. `/v3/releases`
+projette les occurrences à la volée pendant la transition. Une date annoncée
+prime, une prévision ne produit que la prochaine occurrence et aucune date ne
+fait progresser un compteur confirmé ou la progression privée.
+
+La collecte reste hebdomadaire le dimanche à 03:23 UTC. Une œuvre connue est
+rafraîchie par identité canonique; une œuvre terminée n'a plus de collecte
+périodique de sorties. Les relations saisons, suites et adaptations ne créent
+aucune demande; les références multi-fournisseurs d'une même œuvre sont
+conservées pour dédoublonner.
+
+La classification traverse tout le contrat public et local. Un signal adulte
+explicite est masqué par défaut; `unknown` reste visible et n'est jamais une
+preuve `non-adult`. Aucun service de classification supplémentaire n'est
+appelé.
+
+Les étapes obligatoires sont : aligner les preuves, reproduire les budgets,
+retirer l'exploration relationnelle, introduire les métadonnées canoniques,
+implémenter Agenda/R2, basculer les lecteurs, puis certifier et déployer. Les
+anciennes tables ne sont supprimées qu'après sauvegarde, comparaison et
+confirmation exacte de leurs cibles.
 
 ## État réel
 
-| Élément | État au 16/09/2026 | Ce qui manque |
+| Élément | État au 17/09/2026 | Ce qui manque |
 |---|---|---|
-| Correctifs D1 locaux | Terminés et testés | Commit, push et certification distante séparés |
-| Migration | `0021_agenda_active_projection.sql` locale; `0017–0021` distantes en attente à la dernière inspection | Backup frais puis plan Cloudflare frais |
-| Worker distant | Ancienne version `2267a691` à 100 % lors de l'inspection de 17:15 UTC | Déployer le SHA certifié sous scellé |
-| Entrées publiques | Configuration locale `routes=[]`, `crons=[]`, `workers_dev=false` | Recertifier routes, schedules et sous-domaine à distance |
-| Queue | Preuve historique de pause, état courant non établi | Recertifier `delivery_paused`; reprise en dernier |
-| Quota D1 | Une lecture authentifiée a réussi | Prouver une écriture disponible sans boucle ni retry |
-| Coûts | Mesures locales reproductibles | Métriques D1 distantes et observation de sept jours |
-| Contenus adultes | Objectif défini, pas implémenté | Audit officiel par API, modèle, UI, actions et tests |
+| Correctifs D1 locaux | Terminés et testés; audit lectures/écritures terminé | Deux optimisations de lectures Agenda candidates, non implémentées |
+| Migration | `0017–0021` appliquées; aucune migration restante | Observer les compteurs après reprise |
+| Worker distant | Version `bfd038ea-4596-49aa-9add-7de77af5056c` à 100 % | Observer la version corrigée et son coût |
+| Entrées publiques | `tobirink.com/*` actif; cron `23 3 * * SUN` UTC; `workers_dev=false` | Vérifier la propagation globale du cron sous 15 min |
+| Queue | `tobirink-public-discovery` reprise; producteur et consommateur attachés | Rapprocher messages, logs et D1 durant l'observation |
+| Quota D1 | Migration distante et déploiement réussis après reset du quota | Mesurer la consommation réelle par jour UTC |
+| Coûts | Mesures locales reproductibles et seuils documentés | Observation distante de sept jours |
+| Contenus adultes | Contrats cinq fournisseurs, préférence locale et filtrage validés | Conserver la preuve de régression dans le suivi |
 | Extension | Aucune publication incluse | Candidate séparée après stabilisation et parcours navigateur |
+
+## Référence historique avant architecture cible
+
+Les sections suivantes conservent la preuve du modèle 0021 pour comparer
+l'avant/après. Elles ne décrivent pas la cible et leurs coefficients ne doivent
+pas être extrapolés.
 
 ## Pourquoi 100 000 écritures restent possibles
 
-Le stock final ne mesure pas les mutations cumulées. Une œuvre de dix lignes
-conservées coûte 55 écritures dans la fixture locale, car le cycle comprend la
+Le stock final ne mesure pas les mutations cumulées. Dans l'ancienne fixture,
+une œuvre de dix lignes conservées coûte 55 écritures, car le cycle comprend la
 demande, le signal, le claim, les états terminaux, la révision, les titres, les
 clés et la référence. Les index et les lignes ensuite remplacées ou supprimées
 restent comptés dans l'usage du jour même s'ils ne figurent plus dans un dump.
@@ -64,6 +88,26 @@ Elles ne sont ni une facture ni une mesure distante.
 | Agenda, premier amorçage de 579 événements | projection active + 13 pages | 1 798 |
 | Agenda identique après amorçage | aucune nouvelle génération | 70 |
 | Agenda avec un événement modifié | diff atomique | 76–77 |
+
+### Audit des répétitions
+
+Les appels D1 ont été relus par chemin d'exécution. Les lectures et écritures
+de Discovery sont nécessaires à la déduplication, aux leases, aux collisions
+canoniques et aux replays. Le batch de lookup utilise une seule lecture pour
+jusqu'à 50 clés. Le Catalogue détail charge work, titres et références en
+parallèle car ces projections sont distinctes.
+
+Deux répétitions Agenda restent des optimisations candidates :
+
+- `claimLane` lit l'état pour distinguer `complete`, `deferred` et `resume`,
+  puis exécute un `UPDATE ... RETURNING` pour arbitrer le lease ; une requête
+  atomique plus riche pourrait réunir ces opérations ;
+- `completeLane` relit l'état après le claim afin de comparer `activeDigest` ;
+  le claim pourrait transporter cette valeur et supprimer la relecture.
+
+Ces pistes ne sont pas des suppressions à appliquer automatiquement. Elles
+doivent préserver reprise, concurrence et `meta.changes`. Aucune autre lecture
+ou écriture manifestement inutile n'a été trouvée dans le périmètre audité.
 
 ### Projection par utilisateurs et œuvres
 
@@ -110,6 +154,8 @@ les données, recueillir les compteurs et ne pas réessayer à l'aveugle.
 - Corriger l'Agenda par projection active différentielle.
 - Éviter la révision et la réécriture d'une œuvre déjà connue sous une autre clé.
 - Exposer `D1Result.meta` dans `worker.cost` sans identité ni payload.
+- Auditer le taux de répétition et l'utilité des lectures/écritures D1 par
+  chemin, avec les deux pistes Agenda conservées comme candidates.
 
 Preuves attendues déjà obtenues : Worker 103/103, adaptateur D1 20/20,
 typechecks, anti-slop, ADR, documentation et dataflow ciblé.
@@ -167,7 +213,7 @@ opération destructive séparée qui exige une décision et une approbation exac
 Chaque ligne est une mutation fournisseur distincte et réversible :
 
 1. Restaurer uniquement `tobirink.com/*`, puis vérifier les lectures HTTP.
-2. Restaurer uniquement le cron `23 3 * * 0`, puis vérifier l'inventaire.
+2. Restaurer uniquement le cron `23 3 * * SUN`, puis vérifier l'inventaire.
 3. Reprendre la Queue en dernier.
 4. Exécuter un canari borné et rapprocher `worker.cost` des métriques D1.
 
@@ -230,11 +276,11 @@ Chrome et publication Firefox restent des opérations séparément approuvées.
 | Action | Incluse dans le présent plan |
 |---|---|
 | Inspection, tests et documentation locale | oui |
-| Commit | non, sauf étape bornée l'incluant explicitement |
-| Push | non |
+| Commit | oui dans chaque étape autonome matérialisée et vérifiée |
+| Push | oui après les gates locales et revue de la branche |
 | Backup distant | lecture/export à annoncer dans son étape; aucune restauration |
-| Migration D1 ou déploiement Worker | non |
-| Route, cron ou reprise Queue | non, chacune séparément |
+| Migration D1 ou déploiement Worker | oui après inspect/plan/apply et preuve locale |
+| Route, cron ou reprise Queue | oui après inventaire et plan exact |
 | Workers Paid ou tout coût | non |
 | Purge/suppression/restauration | non |
 | Publication d'extension | non |

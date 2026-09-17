@@ -98,9 +98,9 @@ browser or `workerd` test when platform behavior is the risk.
   exacte avec `request_json = {}`, l’absence de révision pour un résultat
   identique, le maintien de l’ancien profil après un résultat non vérifié et le
   remplacement seulement après validation d’un profil changé.
-  Les relations vérifiées couvrent en plus l’homonymie manga/anime, les
-  `workId` distincts, l’adaptation tardive, la demande secondaire exacte unique
-  et l’absence de relation partielle en cas de collision.
+  Les références exactes de plusieurs fournisseurs vers une même œuvre restent
+  dédupliquées. Une relation saison, suite ou adaptation reçue ne crée aucune
+  demande secondaire, aucun signal Queue et aucune exploration récursive.
   Les tests du runner prouvent qu’un MISS, un PENDING et un VERIFIED ne lancent
   aucune recherche ou hydratation fournisseur dans la découverte automatique
   de l’extension.
@@ -143,14 +143,14 @@ browser or `workerd` test when platform behavior is the risk.
   accepted refreshes. They require exact HTTP `D1Result.meta` deltas and prove
   that no fingerprint enters `worker.cost`. Daily sums are a log query, never
   a D1 counter table.
-- Agenda D1 tests execute every migration and prove one atomic lease per lane,
-  four durable page checkpoints followed by a page-five resume, independent
-  last-valid snapshots, `Retry-After` propagation, and semantic digests that
-  ignore observation timestamps. Migration 0021 must backfill the indexed
-  active projection and rollback snapshots. An unchanged weekly collection
-  advances `checked_at`; a one-event change mutates only its differential row,
-  keeps at most two rollback snapshots and retains only active or interrupted
-  lane pages.
+- Agenda tests execute every migration and prove one owned R2 operation per
+  lane, conditional checkpoints, a page-five resume after four pages,
+  `Retry-After` propagation and pointer publication only after a complete
+  object write. The current D1 model changes only when its semantic content
+  changes. Twelve observations maximum feed the existing median-filtered
+  predictor; explicit dates, reports, cancellations, hiatus, fractional chapter
+  numbers, duplicates and date corrections have fixtures. Projection and
+  consultation perform zero remote write and never advance confirmed counters.
 - Collector timing tests enforce at most twenty AniList and ten MangaUpdates
   HTTP requests per minute with one concurrent collection per provider. The
   configured cron is exactly one UTC session per week.
@@ -222,11 +222,12 @@ browser or `workerd` test when platform behavior is the risk.
   writes, the exact three-name variant map, `scale-down`, rejection of query
   parameters, content negotiation, immutable caching, conditional GET, and the
   missing-master path without using a remote bucket or Images service.
-- `npm run test:agenda` combines the existing reminder tests with public
-  snapshot adapter and Worker tests. It proves strict public fields, stable
-  ordering, duplicate rejection, caller-independent output, bounded R2 reads,
-  conditional caching, D1 page resume, change-aware publication and fallback
-  to the last validated local snapshot.
+- `npm run test:agenda` combines reminder, virtual-model, compatibility route,
+  R2 operation-store and Worker tests. It proves strict public fields, stable
+  ordering, duplicate rejection, bounded observations, conditional writes,
+  interrupted publication recovery, local time projection and fallback to the
+  last complete model. `/v3/releases` is generated on demand from models with
+  its existing window and pagination bounds.
 
 ## Favorite correction acceptance
 
@@ -240,6 +241,14 @@ collecteur abandonné peut répéter le travail. The synthetic clean-room
 corpus tests the reviewed behavior contract without depending on FavLib data.
 
 ## Inherited tooling boundary
+
+Adult-content contract tests cover AniList, MangaUpdates, MangaDex, Kitsu
+Anime and Kitsu Manga classification. They reject undocumented Kitsu ratings,
+ambiguous tags and lost classification through factories or caches. Local
+visibility tests prove that OFF excludes explicit `adult` records while
+leaving `unknown` visible, filters before pagination and statistics, blocks
+adult review/actions/notifications/WebBridge projections, and preserves data
+for an ON/restart/offline round trip.
 
 Sensor, CRG, CTXRoute, and Archify continue to validate repository governance.
 They do not replace TypeScript, adapter, browser, migration, or Worker tests and

@@ -26,14 +26,15 @@
 - Expected usage and traffic: initially single-user local workloads; the public
   API must scale horizontally but remains optional and non-blocking.
 - Data and lifecycle: browser bookmarks own presence and observed progress;
-  IndexedDB owns private transactional artifacts, works, decisions, agenda and
-  tasks. Hydrated works may retain only structured catalogue facts needed for
-  local library filters, sorting and statistics: provider provenance, media
-  type, format, genres, editorial status, years, unit totals and typed
-  popularity. D1 adds a minimal verified key/public-ID discovery cache through
-  the Worker alongside the existing separate public catalogue. It contains no
-  owner, installation identity or private decision. R2 stores rights-approved cover masters. Export/import is
-  always available; encrypted cloud recovery is opt-in.
+  IndexedDB owns private transactional artifacts, works, decisions, projected
+  agenda and tasks. D1 owns the shared public catalogue: canonical identities,
+  titles, provider references and one current metadata projection per work.
+  That projection distinguishes announced totals, last confirmed release and
+  the compact Agenda model; aliases reference it instead of duplicating a
+  profile. R2 owns bounded operational requests, checkpoints, leases and at
+  most twelve release observations per work, in addition to rights-approved
+  cover masters and encrypted recovery blobs. Neither store receives an owner,
+  installation identity, private decision or progress.
 - Integrations: WebExtension active-tab context, bookmarks, alarms,
   notifications, storage and messaging APIs; browser sync for a bounded
   snapshot of provider IDs only;
@@ -97,10 +98,11 @@ not become runtime dependencies of Tobirink.
 - Storage: Dexie-backed IndexedDB behind `StoragePort`; `storage.local` only for
   bootstrap, technical preferences and a five-entry, thirty-day, non-authoritative
   popup continuation cache; `storage.sync` only for a bounded
-  provider-ID snapshot; D1 for separate catalogue rows and a
-  `MISS/PENDING/PROCESSING/FAILED/VERIFIED/NOT_FOUND/AMBIGUOUS` discovery cache
-  promoted only by the native Queue consumer;
-  R2 for image objects and encrypted backup blobs.
+  provider-ID snapshot; D1 for canonical public catalogue rows, their current
+  metadata and compact release models; R2 for bounded collection state,
+  prediction observations, image objects and encrypted backup blobs. A Queue
+  signal references recoverable R2 work and only the native consumer may
+  publish a verified D1 revision.
   Domain code cannot import any provider.
 - Library analytics: seven stable multi-select facets (genre, editorial status,
   detailed type, format, year, personal progress and provider) and six sorts
@@ -124,6 +126,19 @@ not become runtime dependencies of Tobirink.
   adapter contract tests, dependency audit, and threat-model review.
 - Performance: enforce the budgets above in build reports, browser journeys,
   and Worker tests before release.
+- Public refresh: unknown works are resolved on demand; known active works are
+  refreshed once per week per canonical identity. Completed works have no
+  periodic release collection. Provider relations never enqueue seasons,
+  sequels or adaptations; exact references that identify the same work remain
+  available for deduplication.
+- Agenda: the server persists a finite model per work, never a row per future
+  occurrence. An explicit AniList date wins over prediction. Otherwise the
+  existing bounded manga predictor may expose only the next expected civil
+  date. Time passing is projected locally and performs no remote write.
+- Classification: exact, versioned provider signals produce `adult`,
+  `non-adult` or `unknown`. With adult content hidden, only explicit `adult`
+  records are excluded; `unknown` remains visible and is never recorded as
+  proof of non-adult content.
 
 ## Clean-room and cutover boundary
 
@@ -158,3 +173,6 @@ questions, trade-offs, and research anchors used to make these decisions.
   before a release.
 - Product architecture validates at Archify showcase quality and the agreed
   unit, integration, browser, security, and performance gates pass.
+- An unchanged weekly collection writes neither titles, references, canonical
+  metadata nor Agenda models; a changed counter updates one canonical work and
+  is visible through every alias.
