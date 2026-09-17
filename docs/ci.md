@@ -1,9 +1,10 @@
 # CI/CD du blueprint
 
 Le workflow GitHub Actions valide le template sur Linux, macOS et Windows avec
-Node.js 22.13+, npm 10+, Python 3.12 et uv 0.11.2. Les Actions d'installation
-sont épinglées par SHA. Il s'exécute sur les pushes vers `main`, sur toutes les
-pull requests et sur lancement manuel (`workflow_dispatch`).
+Node.js 24, Python 3.12 et uv 0.11.2, tout en conservant le contrat package
+Node.js 22.13+ et npm 10+. Les Actions d'installation sont épinglées par SHA.
+Il s'exécute sur les pushes vers `main`, sur toutes les pull requests et sur
+lancement manuel (`workflow_dispatch`).
 
 Le pipeline installe les dépendances depuis `package-lock.json`, synchronise
 CRG avec `uv sync --frozen`, vérifie sa version et les manifestes MCP, puis
@@ -33,7 +34,7 @@ Pendant une modification, utiliser le test ou validateur ciblé. Exécuter
 `npm run validate` une fois par chantier cohérent, puis `npm run verify` avant
 une livraison. Le job d'installation propre exécute le bootstrap réel. Dans
 Codex, l'approbation des
-neuf définitions de `/hooks` reste une action manuelle ; le dépôt ne modifie pas
+six définitions d'événements de `/hooks` reste une action manuelle ; le dépôt ne modifie pas
 les réglages globaux Codex ou Claude.
 
 Trois workflows distincts gèrent la revue CRG des PR. Le workflow non privilégié
