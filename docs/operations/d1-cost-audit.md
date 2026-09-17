@@ -19,6 +19,13 @@ crée plus de révision et ne réécrit plus sa fiche catalogue. Le rafraîchiss
 inchangé ou sans changement dans les champs matériellement persistés conserve
 12 écritures de suivi.
 
+Après retrait des quatre index strictement redondants par la migration 0022,
+la même fixture courante mesure 49 écritures pour une première résolution,
+15 pour une nouvelle clé de la même œuvre, 11 pour un rafraîchissement
+identique ou partiel et 15 pour un changement de compteur. Les valeurs 55,
+19, 12 et 16 restent ci-dessous comme référence historique 0021 ; elles ne
+décrivent plus le schéma courant après 0022.
+
 L'Agenda 0021 historique utilisait une projection active différentielle :
 1 798 écritures au premier amorçage, 70 pour une collecte identique et 76–77
 pour un événement modifié. La cible 0024 déplace lanes, pages, snapshots et
@@ -401,15 +408,25 @@ La validation showcase passe 9 contrôles sur 9, sans erreur ni avertissement,
 et le contrôle visuel passe en thèmes clair et sombre à 1440×900 et 2048×1320
 sans débordement.
 
-### Inventaire de nettoyage différé
+### Nettoyage des index et inventaire différé
 
-Aucun élément de cette liste n’est supprimé par le déploiement. Les quatre
-index strictement redondants candidats sont
-`public_discovery_v2_pending`, `public_discovery_v2_failed_retention`,
+La migration additive `0022_remove_redundant_discovery_indexes.sql` a retiré
+les quatre index strictement redondants `public_discovery_v2_pending`,
+`public_discovery_v2_failed_retention`,
 `public_discovery_v2_nonce_retention` et
-`catalogue_canonical_titles_v1_by_work`. Leur retrait exige la confirmation
-destructive exacte et un nouveau `EXPLAIN QUERY PLAN` distant immédiatement
-avant migration ; les contraintes `UNIQUE` correspondantes restent intactes.
+`catalogue_canonical_titles_v1_by_work`. La sauvegarde préalable ignorée par
+Git fait 979 651 octets et porte le SHA-256
+`6a6bde9e1f32caa7627a78d1747a165364fdca95e3ad8d00c465e20681379721`.
+La gate a appliqué uniquement `d1:tobirink-public` sous le plan
+`289eb834b55278a586cc19c12c670732d1ffb6b211b90eb59ec69e30576f488e`.
+
+Les plans distants avant et après migration utilisent
+`public_discovery_v3_pending`, `public_discovery_v3_failed_retention` et
+`public_discovery_v3_nonce_retention`. La lecture canonique par œuvre utilise
+désormais l’index automatique de la contrainte `UNIQUE`, dont les colonnes et
+l’ordre sont identiques à l’index explicite retiré. Les quatre copies sont
+absentes, aucune migration ne reste en attente et la taille D1 rapportée passe
+de 1 298 432 à 1 273 856 octets, soit 24 576 octets libérés.
 
 Les tables Agenda historiques candidates sont `public_release_event`,
 `public_release_generation`, `public_release_generation_event`,

@@ -4,7 +4,7 @@
   "meta": {
     "title": "Architecture du rafraîchissement public adaptatif",
     "quality_profile": "showcase",
-    "viewBox": [1280, 820],
+    "viewBox": [1280, 630],
     "views": [
       {
         "id": "lecture-cache",
@@ -70,14 +70,14 @@
       "sublabel": "identités + 1 fiche courante/œuvre",
       "pos": [740, 140],
       "size": [180, 66],
-      "tag": "lecture partagée"
+      "tag": "index v3 + unicité canonique"
     },
     {
       "id": "operationsR2",
       "type": "database",
       "label": "Opérations R2",
       "sublabel": "travaux + 12 observations",
-      "pos": [530, 610],
+      "pos": [530, 540],
       "size": [190, 66],
       "tag": "objets bornés conditionnels"
     },
@@ -129,8 +129,8 @@
     { "id": "cache-first", "from": "publicApi", "to": "catalogueD1", "label": "alias → même fiche canonique", "variant": "emphasis", "route": "straight", "labelAt": [590, 125] },
     { "id": "admit-created", "from": "publicApi", "to": "publicQueue", "label": "created uniquement", "fromSide": "bottom", "toSide": "left", "via": [[355, 230], [230, 230], [230, 533]], "labelAt": [215, 420] },
     { "id": "weekly-agenda", "from": "weeklyCron", "to": "collectors", "label": "Agenda hebdomadaire", "variant": "emphasis", "fromSide": "right", "toSide": "top", "via": [[480, 333], [480, 380], [670, 380]], "labelAt": [545, 365] },
-    { "id": "queued-work", "from": "publicQueue", "to": "collectors", "label": "Discovery · réhydratation", "fromSide": "right", "toSide": "left", "via": [[500, 533], [500, 440]], "labelAt": [505, 545] },
-    { "id": "operational-state", "from": "collectors", "to": "operationsR2", "label": "baux · pages · observations", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [690, 555] },
+    { "id": "queued-work", "from": "publicQueue", "to": "collectors", "label": "Discovery · réhydratation", "fromSide": "right", "toSide": "left", "via": [[500, 533], [500, 440]], "labelAt": [495, 490] },
+    { "id": "operational-state", "from": "collectors", "to": "operationsR2", "label": "baux · pages · observations", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [690, 510] },
     { "id": "validated-publish", "from": "collectors", "to": "catalogueD1", "label": "métadonnées + modèle changés", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "via": [[670, 250], [830, 250]], "labelAt": [750, 235] },
     { "id": "provider-egress", "from": "collectors", "to": "providerGateway", "label": "requêtes HTTP bornées", "variant": "security", "route": "straight", "labelAt": [815, 360] },
     { "id": "provider-http", "from": "providerGateway", "to": "providers", "label": "HTTP limité", "variant": "security", "route": "straight", "labelAt": [1040, 390] }

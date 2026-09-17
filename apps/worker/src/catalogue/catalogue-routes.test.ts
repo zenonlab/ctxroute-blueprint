@@ -163,4 +163,39 @@ describe('public D1 catalogue', () => {
     expect(measuredTitleSearch.results).toHaveLength(1);
     expect(measuredTitleSearch.meta.rows_read).toBeLessThanOrEqual(2);
   });
+
+  it('keeps only the useful discovery indexes and preserves canonical-title uniqueness', async () => {
+    const removedIndexes = [
+      'public_discovery_v2_pending',
+      'public_discovery_v2_failed_retention',
+      'public_discovery_v2_nonce_retention',
+      'catalogue_canonical_titles_v1_by_work',
+    ];
+    const remainingIndexes = [
+      'public_discovery_v3_pending',
+      'public_discovery_v3_failed_retention',
+      'public_discovery_v3_nonce_retention',
+      'sqlite_autoindex_catalogue_canonical_titles_v1_2',
+    ];
+    const indexes = await env.PUBLIC_DB.prepare(`SELECT name FROM sqlite_master
+      WHERE type = 'index' AND name IN (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`)
+      .bind(...removedIndexes, ...remainingIndexes).all<{ name: string }>();
+    const names = indexes.results.map(({ name }) => name);
+    expect(names).not.toEqual(expect.arrayContaining(removedIndexes));
+    expect(names).toEqual(expect.arrayContaining(remainingIndexes));
+
+    await env.PUBLIC_DB.prepare(`INSERT INTO catalogue_canonical_titles_v1(
+      normalization_version, normalized_title, media_kind, work_id, created_at)
+      VALUES ('favorite-title-preparation-v2', 'frieren', 'manga', 'work_frieren', '2026-09-17T00:00:00.000Z')`).run();
+    await expect(env.PUBLIC_DB.prepare(`INSERT INTO catalogue_canonical_titles_v1(
+      normalization_version, normalized_title, media_kind, work_id, created_at)
+      VALUES ('favorite-title-preparation-v2', 'frieren', 'anime', 'work_frieren', '2026-09-17T00:00:00.000Z')`).run()).rejects.toThrow();
+
+    const canonicalByWork = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN
+      SELECT normalized_title FROM catalogue_canonical_titles_v1
+      WHERE work_id = ?1 AND normalization_version = ?2 ORDER BY normalized_title LIMIT 20`)
+      .bind('work_frieren', 'favorite-title-preparation-v2').all<{ detail: string }>();
+    expect(canonicalByWork.results.map(({ detail }) => detail).join(' '))
+      .toContain('sqlite_autoindex_catalogue_canonical_titles_v1_2');
+  });
 });

@@ -67,6 +67,11 @@ demande, le signal, le claim, les états terminaux, la révision, les titres, le
 clés et la référence. Les index et les lignes ensuite remplacées ou supprimées
 restent comptés dans l'usage du jour même s'ils ne figurent plus dans un dump.
 
+Après la migration 0022, la même fixture courante coûte 49 écritures : les
+quatre index retirés étaient des copies exactes d’index v3 ou d’une contrainte
+`UNIQUE`. La valeur 55 reste la référence historique 0021 utilisée dans les
+tableaux comparatifs de coûts.
+
 L'ancien Agenda pouvait recommencer un snapshot de 579 événements. À 144 cycles
 par jour, les seules insertions représentent 83 376 mutations; le remplacement,
 les métadonnées, les checkpoints et les tentatives peuvent dépasser 100 000.

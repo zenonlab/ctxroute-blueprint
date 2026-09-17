@@ -2454,7 +2454,7 @@
       "schemaVersion": 1,
       "id": "goal-durable-catalogue-virtual-agenda",
       "title": "Catalogue durable, Agenda virtuel et collecte hebdomadaire maîtrisée",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -2528,7 +2528,7 @@
         {
           "id": "remove-relational-crawl",
           "title": "Corriger la propagation et retirer l’exploration relationnelle",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Une relation fournisseur ne crée aucune demande ni signal Queue; les références de même œuvre restent dédupliquées.",
             "contentClassification traverse API, candidat, contrats et caches; Kitsu accepte seulement les valeurs documentées.",
@@ -2557,7 +2557,12 @@
             "git diff --check"
           ],
           "evidence": [
-            "Mesures commitée sous eeb7057; démarrage du retrait des follow-ups relationnels, correction de classification et audit des index."
+            "Commit 89911a4: aucune relation fournisseur ne crée de demande, de ligne relationnelle ni de signal Queue; les références exactes de même œuvre restent conservées.",
+            "contentClassification traverse la fabrique de domaine et les contrats; Kitsu limite non-adult aux valeurs documentées G/PG/R, avec R18 adulte et valeurs inconnues couvertes.",
+            "catalogueNeedsPublication compare le profil canonique complet, incluant compteurs et classification; les tests D1 couvrent refresh partiel, alias et changement de compteur.",
+            "Migration additive 0022 appliquée uniquement à d1:tobirink-public sous le plan 289eb834; sauvegarde 979651 octets SHA-256 6a6bde9e1f32caa7627a78d1747a165364fdca95e3ad8d00c465e20681379721.",
+            "Post-migration distant: quatre index redondants absents, index v3 et contrainte UNIQUE conservés, EXPLAIN les utilise, aucune migration restante; taille D1 réduite de 24576 octets.",
+            "Worker 113/113, D1 30/30, coût 6/6, tous les typechecks et Archify architecture showcase 9/9 passent; fixture Discovery courante 49/15/11/15 écritures."
           ]
         },
         {

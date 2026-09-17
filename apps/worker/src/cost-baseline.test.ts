@@ -109,7 +109,7 @@ describe('local D1 cost baseline — no external requests', () => {
       (SELECT TOTAL(length(CAST(result_json AS BLOB))) FROM public_discovery_requests_v3 WHERE state = 'VERIFIED' AND json_extract(result_json, '$.profile.workId') = ?1) AS profileBytes`).bind(profile.workId).first();
     expect(byteStock).toMatchObject({ distinctProfiles: 2, profileCopies: 2 });
     for (const value of Object.values(byteStock ?? {})) expect(value).toEqual(expect.any(Number));
-    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([5, 4, 0, 4, 44, 0, 0, 0, 19, 12, 16, 12]);
+    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([4, 3, 0, 3, 39, 0, 0, 0, 15, 11, 15, 11]);
     console.info('d1-cost-baseline-storage-bytes', JSON.stringify({ afterAlias: aliasStorage, afterCounterChange: byteStock }));
     m.report();
   });

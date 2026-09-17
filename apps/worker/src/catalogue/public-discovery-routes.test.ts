@@ -188,7 +188,7 @@ describe('verified public discovery cache', () => {
     expect(responses.every((response) => response.status === 202)).toBe(true);
     expect((await Promise.all(responses.map((response) => response.json<{ state: string }>()))).every(({ state }) => state === 'PENDING')).toBe(true);
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ count: 1 });
-    expect(metrics.snapshot().rowsWritten).toBe(5);
+    expect(metrics.snapshot().rowsWritten).toBe(4);
   });
 
   it('reads up to fifty discovery states in one public request', async () => {
