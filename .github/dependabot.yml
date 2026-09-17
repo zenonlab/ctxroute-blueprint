@@ -7,6 +7,12 @@ updates:
     groups:
       development-dependencies:
         dependency-type: development
+    ignore:
+      - dependency-name: tree-sitter
+      - dependency-name: tree-sitter-javascript
+      - dependency-name: tree-sitter-python
+      - dependency-name: tree-sitter-ruby
+      - dependency-name: tree-sitter-typescript
   - package-ecosystem: github-actions
     directory: /
     schedule:
