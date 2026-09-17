@@ -155,8 +155,8 @@ incident has been resolved.
 
 ### État déployé le 17 septembre 2026
 
-La migration additive `0023`/`0024` et le Worker
-`95be876e-2727-4b67-b278-c2891d30ea85` sont déployés. L’inspection distante
+La migration additive `0023`/`0024` et le Worker de compatibilité
+`2e2e534b-7816-445c-992a-1576a7087ccd` sont déployés. L’inspection distante
 confirme qu’aucune migration ne reste à appliquer. En cas d’incident, garder
 les entrées scellées et privilégier un correctif en avant. L’export D1 frais
 documenté dans [`d1-cost-audit.md`](./d1-cost-audit.md) fournit le point de

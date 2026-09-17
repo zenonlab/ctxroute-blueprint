@@ -365,6 +365,9 @@ a appliqué uniquement `0023_catalogue_current_metadata.sql` et
 `95be876e-2727-4b67-b278-c2891d30ea85` à 100 %. L’inspection suivante ne
 trouve plus de migration en attente ; la route `tobirink.com/*`, le cron
 `23 3 * * SUN` et le producteur/consommateur Queue sont présents.
+Le correctif de transition `137b4b0` a ensuite été poussé et déployé seul sous
+le plan `7b5ec5f2dc2601a68f7686f4ee36dcc18f77e877ad316ac2b0b79250ddfc1cdc` ;
+le Worker courant `2e2e534b-7816-445c-992a-1576a7087ccd` sert 100 % du trafic.
 
 Lecture post-déploiement, sans mutation :
 

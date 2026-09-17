@@ -2131,11 +2131,9 @@
             "Le blocage historique de quota est levé: D1 0017–0021 appliquée et Worker corrigé bfd038ea déployé le 2026-09-17.",
             "Références locales reproduites le 2026-09-17: 36/36 tests ciblés puis Worker 104/104; première résolution 55 écritures fixture, 50 admissions concurrentes 5 écritures, batch 50 MISS 0 écriture, Agenda 1798/70/76/76/77.",
             "Échantillon distant corrélé: HTTP 200, Worker bfd038ea, CPU 9 ms, wall 28 ms, providerRequests=0, d1RowsRead=64, d1RowsWritten=0; aucun identifiant ou payload conservé.",
-            "Snapshots natifs glissants 10:12:08Z→10:17Z: rowsRead 23567→23716, rowsWritten 5753→5753, readQueries 345→349, writeQueries 720→720; délai/fenêtre mobile interdisent une égalité instantanée avec tail.",
-            "D1 insights post-bascule 10h à 10:16:28Z: 25 formes, 32 exécutions, 4753 lectures, 0 écriture et 70.3341 ms D1; la vue 7d conserve l’ancien pipeline à 166476 écritures événement et ne certifie pas la version corrigée.",
-            "Runbook finalisé pour l’intervalle fixe 2026-09-17T00:29Z..2026-09-24T00:29Z: logs worker.cost, métriques D1 exactes, query shapes, Queue, CPU, R2 et fournisseurs séparés; tout écart natif doit être expliqué.",
-            "Workflow adaptive-public-refresh-continuation validé Archify showcase 9/9, 0 erreur, 0 avertissement; tous les workspace typechecks, docs, 56 ADR/502 scopes et git diff --check passent.",
-            "Fenêtre d’observation réelle ouverte le 2026-09-17T00:29Z; échéance minimale pour sept jours complets: 2026-09-24T00:29Z. La certification économique reste ouverte jusqu’au cycle complet et au rapprochement UTC."
+            "Cible 0023/0024 déployée le 2026-09-17 avec sauvegarde vérifiée; lecture distante post-migration: 745 rows read, 0 written, changed_db=false, 5 fiches, 0 conflit, 740 événements legacy.",
+            "Worker 2e2e534b sert /v3 et /v4 en HTTP 200; R2 reste à 56 objets/15.6 MB avant premier cycle hebdomadaire.",
+            "La certification native de collecte reste ouverte jusqu'au premier cycle hebdomadaire complet et à l'observation de sept jours; aucune mesure future n'est déclarée acquise."
           ]
         }
       ]
@@ -2690,7 +2688,7 @@
         {
           "id": "certify-publish-cleanup",
           "title": "Certifier, versionner, pousser et déployer avant nettoyage séparé",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Rapport avant/après couvre D1 lectures/écritures/octet, R2, Queue, Worker et fournisseurs sur les mêmes fixtures.",
             "Stack Audit, verify, Archify, sauvegarde fraîche et plan inspect-plan-apply réussissent.",
@@ -2715,7 +2713,9 @@
             "git push origin HEAD"
           ],
           "evidence": [
-            "npm run verify réussi intégralement après bascule des lecteurs: 273 tests d’infrastructure passés, 1 ignoré attendu; toutes les suites workspace, typechecks, builds et diagrammes Archify showcase sont verts."
+            "npm run verify final réussi: Worker 112/112, toutes les suites workspace/typechecks/builds, audit 0 vulnérabilité; Archify dataflow showcase 9/9.",
+            "Backup D1 frais: 965788 octets, SHA-256 c86bfc65279464fa635da53d9014fce42661beaec37734ba92cdb24d0a7d064a; migrations additives 0023/0024 appliquées et aucune migration restante.",
+            "Branche origin/perf/adaptive-public-refresh sur 137b4b0; Worker 2e2e534b-7816-445c-992a-1576a7087ccd à 100%; /v3, /v4 et site répondent 200; inventaire de nettoyage différé documenté sans suppression."
           ]
         }
       ]
