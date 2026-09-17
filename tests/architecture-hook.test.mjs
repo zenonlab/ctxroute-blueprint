@@ -231,6 +231,22 @@ test('pre-tool ADR protection applies only to tracked accepted decisions', () =>
   assert.match(tracked.stdout, /accepted ADR cannot be rewritten/u);
 });
 
+test('pre-tool ADR protection validates reconstructed supersession patches', () => {
+  const cwd = initializedWorkspace();
+  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+  const path = 'docs/decisions/ADR-0001-fixture.md';
+  writeFileSync(join(cwd, path), '---\nscope:\n  - src/**\nreview: on-change\n---\n# ADR\n\n- Status: accepted\n\n## Decision\n\nKeep it.\n\n## Consequences\n\nStable.\n');
+  git(cwd, ['init', '-q']);
+  git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
+  git(cwd, ['config', 'user.name', 'Fixture']);
+  git(cwd, ['add', '.']);
+  git(cwd, ['commit', '-qm', 'chore: fixture']);
+  const valid = executeArchitectureHook({ patch: '*** Begin Patch\n*** Update File: docs/decisions/ADR-0001-fixture.md\n@@\n review: on-change\n+superseded-by: ADR-0002-replacement.md\n ---\n@@\n-- Status: accepted\n+- Status: superseded\n*** End Patch' }, { cwd });
+  assert.doesNotMatch(valid.stdout, /decision":"block/u);
+  const bypass = executeArchitectureHook({ patch: '*** Begin Patch\n*** Update File: docs/decisions/ADR-0001-fixture.md\n@@\n review: on-change\n+superseded-by: ADR-0002-replacement.md\n ---\n@@\n-- Status: accepted\n+- Status: superseded\n@@\n-Keep it.\n+Rewrite it.\n*** End Patch' }, { cwd });
+  assert.match(bypass.stdout, /accepted ADR cannot be rewritten/u);
+});
+
 test('blocks governed changes while an ADR is invalid or superseded', () => {
   for (const metadata of [
     '# invalid ADR\n',

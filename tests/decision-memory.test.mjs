@@ -105,6 +105,18 @@ test('revised true cannot rewrite accepted normative sections', () => {
   assert.deepEqual(validateAdrRevision(before, editorial, 'docs/decisions/ADR-0042-choice.md'), []);
 });
 
+test('supersession permits only the reverse relation and status transition', () => {
+  const before = '---\nscope:\n  - src/**\nreview: on-change\nrevised: true\n---\n# ADR\n\n- Status: accepted\n\n## Decision\n\nKeep A.\n\n## Consequences\n\nStable.\n';
+  const superseded = before
+    .replace('revised: true', 'revised: true\nsuperseded-by: ADR-0043-replacement.md')
+    .replace('- Status: accepted', '- Status: superseded');
+  assert.deepEqual(validateAdrRevision(before, superseded, 'docs/decisions/ADR-0042-choice.md'), []);
+  const metadataRewrite = superseded.replace('review: on-change', 'review: never');
+  assert.match(validateAdrRevision(before, metadataRewrite, 'docs/decisions/ADR-0042-choice.md').join('\n'), /cannot be rewritten/u);
+  const bodyRewrite = superseded.replace('Stable.', 'Changed.');
+  assert.match(validateAdrRevision(before, bodyRewrite, 'docs/decisions/ADR-0042-choice.md').join('\n'), /cannot be rewritten/u);
+});
+
 test('staged validation compares accepted ADRs against HEAD', () => {
   const root = mkdtempSync(join(tmpdir(), 'decision-staged-'));
   mkdirSync(join(root, 'docs/decisions'), { recursive: true });

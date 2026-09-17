@@ -16,7 +16,7 @@ import {
   loadProjectConfig,
   normalizePath,
 } from '../../.githooks/project-policy.mjs';
-import { decisionDiagnostics, loadAdrs, parseAdr, syncAdrRules } from './decision-memory.mjs';
+import { decisionDiagnostics, loadAdrs, parseAdr, syncAdrRules, validateAdrRevision } from './decision-memory.mjs';
 
 export function preToolArchitecture(rawInput, root = process.cwd()) {
   try { return evaluateArchitecturePolicy(rawInput, root); }
@@ -43,12 +43,21 @@ const toolName = String(input.tool_name ?? '');
 const command = commandText(toolInput);
 const mutationTool = /^(?:apply_patch|Edit|Write|exec_command|Bash|Shell)$/iu.test(toolName);
 const acceptedAdrEdits = paths.filter(path => acceptedTrackedAdr(path, root));
-if (mutationTool && acceptedAdrEdits.length && !/(?:superseded-by|editorial-correction)\s*:/u.test(addedContent(toolInput))) {
-  block([
-    'Write blocked: an accepted ADR cannot be rewritten in place.',
-    `ADRs: ${acceptedAdrEdits.join(', ')}`,
-    'Create a new ADR with supersedes metadata, or declare a non-normative editorial-correction.',
-  ]);
+if (mutationTool && acceptedAdrEdits.length) {
+  const failures = [];
+  for (const path of acceptedAdrEdits) {
+    const before = readFileSync(resolve(root, path), 'utf8');
+    const after = reconstructAdrEdit(toolName, toolInput, path, before);
+    if (after === null) failures.push(`${path}: proposed content cannot be reconstructed safely before the write`);
+    else failures.push(...validateAdrRevision(before, after, path));
+  }
+  if (failures.length) {
+    block([
+      'Write blocked: an accepted ADR cannot be rewritten in place.',
+      ...failures,
+      'Use a reconstructible Edit, Write, or apply_patch operation for an editorial correction or exact supersession.',
+    ]);
+  }
 }
 if (toolName === 'apply_refactor_tool') {
   if (toolInput.dry_run === true) {
@@ -308,6 +317,43 @@ function acceptedTrackedAdr(path, root) {
   } catch {
     return false;
   }
+}
+
+function reconstructAdrEdit(toolName, toolInput, path, before) {
+  const selectedPath = normalizePath(toolInput?.file_path ?? toolInput?.path ?? toolInput?.filename ?? '');
+  if (/^Write$/iu.test(toolName) && selectedPath === path && toolInput.content === String(toolInput.content)) return toolInput.content;
+  if (/^Edit$/iu.test(toolName) && selectedPath === path) {
+    const oldString = toolInput.old_string;
+    const newString = toolInput.new_string;
+    if (oldString !== String(oldString) || newString !== String(newString) || !oldString || !before.includes(oldString)) return null;
+    if (toolInput.replace_all === true) return before.split(oldString).join(newString);
+    if (before.indexOf(oldString) !== before.lastIndexOf(oldString)) return null;
+    return before.replace(oldString, newString);
+  }
+  if (!/^apply_patch$/iu.test(toolName)) return null;
+  const patch = toolInput.patch ?? toolInput.command;
+  if (patch !== String(patch)) return null;
+  const escaped = path.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  const match = patch.match(new RegExp(`\\*\\*\\* Update File: ${escaped}\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*\\* (?:Add|Update|Delete) File:|\\n\\*\\*\\* End Patch|$)`, 'u'));
+  return match ? applyPatchHunks(before, match[1]) : null;
+}
+
+function applyPatchHunks(source, patch) {
+  const hunks = patch.split(/^@@.*$/gmu).slice(1);
+  if (!hunks.length) return null;
+  let result = source;
+  let offset = 0;
+  for (const hunk of hunks) {
+    const lines = hunk.replace(/^\n/u, '').split('\n');
+    if (lines.at(-1) === '') lines.pop();
+    const oldText = lines.filter(line => !line.startsWith('+')).map(line => /^[ -]/u.test(line) ? line.slice(1) : line).join('\n');
+    const newText = lines.filter(line => !line.startsWith('-')).map(line => /^[ +]/u.test(line) ? line.slice(1) : line).join('\n');
+    const index = result.indexOf(oldText, offset);
+    if (index < 0 || result.indexOf(oldText, index + 1) >= 0) return null;
+    result = `${result.slice(0, index)}${newText}${result.slice(index + oldText.length)}`;
+    offset = index + newText.length;
+  }
+  return result;
 }
 
 function block(reason) {

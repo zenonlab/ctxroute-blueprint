@@ -125,16 +125,23 @@ export function validateAdrRevision(beforeSource, afterSource, file = '') {
   const statusBefore = adrStatus(before.body);
   if (statusBefore !== 'accepted') return [];
   const statusAfter = adrStatus(after.body);
-  const afterNormative = normativeRecord(after);
   const superseded = statusAfter === 'superseded'
     && after.metadata['superseded-by']
-    && normativeSections(before).every(([name, value]) => name === 'status' || value === afterNormative[name]);
+    && before.metadata['superseded-by'] === undefined
+    && sameRecord(after.metadata, { ...before.metadata, 'superseded-by': after.metadata['superseded-by'] })
+    && after.body === before.body.replace(/^(- Status:\s*)accepted(\s*)$/imu, '$1superseded$2');
   if (superseded) return [];
   if (after.metadata['editorial-correction'] === true) {
+    const afterNormative = normativeRecord(after);
     const changed = normativeSections(before).filter(([name, value]) => value !== afterNormative[name]).map(([name]) => name);
     return changed.length ? [`${file}: editorial correction changed normative fields: ${changed.join(', ')}`] : [];
   }
   return [`${file}: accepted ADR meaning cannot be rewritten; create a new ADR with supersedes metadata`];
+}
+
+function sameRecord(left, right) {
+  const ordered = value => Object.fromEntries(Object.entries(value).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey, 'en')));
+  return JSON.stringify(ordered(left)) === JSON.stringify(ordered(right));
 }
 
 function normativeSections(adr) {

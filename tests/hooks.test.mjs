@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { actionableStderr, applicableHandlers, dispatch, dispatchLifecycle, handlerPlan, isBlocking, lifecycleEvents, mergeOutputs } from '../.codex/hooks/lifecycle.mjs';
 import { stopReview } from '../.codex/hooks/stop-review.mjs';
-import { inspectGlobalCtxrouteHooks, inspectInstallation } from '../.githooks/postinstall.mjs';
+import { inspectGlobalCtxrouteHooks, inspectHookConfiguration, inspectInstallation } from '../.githooks/postinstall.mjs';
 import { isArchitectureEvidence, validateProjectConfig } from '../.githooks/project-policy.mjs';
 import { runStep } from '../.githooks/setup.mjs';
 
@@ -281,6 +281,24 @@ test('postinstall verifies the complete local installation', () => {
   assert.match(result.stdout, /open \/hooks and approve the six workspace definitions/u);
 });
 
+test('structural hook validation rejects context, matcher, parity, and async coverage drift', () => {
+  const contextRoot = hookConfigurationFixture();
+  const codexPath = join(contextRoot, '.codex/hooks.json');
+  const codex = JSON.parse(readFileSync(codexPath, 'utf8'));
+  delete codex.hooks.PreToolUse[0].hooks[0].additionalContextLimit;
+  codex.hooks.UserPromptSubmit[0].matcher = '*';
+  writeFileSync(codexPath, JSON.stringify(codex));
+  assert.match(inspectHookConfiguration(contextRoot).join('\n'), /context limit|matcher declaration/u);
+
+  const parityRoot = hookConfigurationFixture();
+  const claudePath = join(parityRoot, '.claude/settings.json');
+  const claude = JSON.parse(readFileSync(claudePath, 'utf8'));
+  claude.hookModules.manual = [];
+  claude.hooks.UserPromptSubmit[0].hooks.pop();
+  writeFileSync(claudePath, JSON.stringify(claude));
+  assert.match(inspectHookConfiguration(parityRoot).join('\n'), /module classifications|maintenance lifecycle handler|lane contracts/u);
+});
+
 test('postinstall diagnoses a missing CTXRoute installation', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'postinstall-missing-'));
   const result = spawnSync('node', [join(root, '.githooks/postinstall.mjs')], { cwd, encoding: 'utf8' });
@@ -338,6 +356,16 @@ test('both host dispatchers report an unsafe file through the real PostToolUse c
 
 function run(script, input, options = {}) {
   return spawnSync('node', [join(root, script)], { cwd: options.cwd ?? root, input: JSON.stringify(input), encoding: 'utf8' });
+}
+
+function hookConfigurationFixture() {
+  const directory = mkdtempSync(join(tmpdir(), 'hook-configuration-'));
+  mkdirSync(join(directory, '.codex/hooks'), { recursive: true });
+  mkdirSync(join(directory, '.claude'), { recursive: true });
+  copyFileSync(join(root, '.codex/hooks.json'), join(directory, '.codex/hooks.json'));
+  copyFileSync(join(root, '.claude/settings.json'), join(directory, '.claude/settings.json'));
+  for (const name of readdirSync(join(root, '.codex/hooks')).filter(name => name.endsWith('.mjs'))) writeFileSync(join(directory, '.codex/hooks', name), '');
+  return directory;
 }
 
 function stopProcessTree(pid) {

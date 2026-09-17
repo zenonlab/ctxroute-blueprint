@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +16,7 @@ import {
   validateInstructionPaths,
   validateInstructionTools,
 } from '../.codex/hooks/problem-memory.mjs';
+import { emitGovernanceEvent } from '../scripts/governance-telemetry.mjs';
 
 const decisionReceipt = { receipt_id: 'memory-receipt', selection: 'persist' };
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -88,6 +89,27 @@ test('handle emits a proposal only at the configured recurrence threshold', () =
   const telemetry = readFileSync(join(directory, 'governance-events.jsonl'), 'utf8');
   assert.match(telemetry, /"action":"memory.observe"/u);
   assert.doesNotMatch(telemetry, /failed|problemId|error/u);
+});
+
+test('governance telemetry remains bounded through rotation and concurrent writers', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'governance-telemetry-bounded-'));
+  const decision = { action: 'memory.observe', decision: 'allow', allowed: true };
+  for (let index = 0; index < 600; index += 1) assert.equal(emitGovernanceEvent(directory, decision), true);
+  const path = join(directory, 'governance-events.jsonl');
+  assert.ok(statSync(path).size <= 64 * 1024);
+  assert.ok(statSync(`${path}.1`).size <= 64 * 1024);
+
+  const moduleUrl = new URL('../scripts/governance-telemetry.mjs', import.meta.url).href;
+  const source = `import { emitGovernanceEvent } from ${JSON.stringify(moduleUrl)}; for (let index = 0; index < 150; index += 1) { if (!emitGovernanceEvent(process.argv[1], { action: 'memory.observe', decision: 'allow', allowed: true })) process.exitCode = 1; }`;
+  const results = await Promise.all(Array.from({ length: 4 }, () => runNode(['--input-type=module', '-e', source, directory])));
+  assert.ok(results.every(result => result.code === 0), results.map(result => result.stderr).join('\n'));
+  assert.ok(statSync(path).size <= 64 * 1024);
+  assert.ok(statSync(`${path}.1`).size <= 64 * 1024);
+});
+
+test('governance telemetry fails open on storage failure', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'governance-telemetry-failure-'));
+  assert.equal(emitGovernanceEvent(directory, { action: 'memory.observe', decision: 'allow', allowed: true }, {}, { now() { throw new Error('clock unavailable'); } }), false);
 });
 
 test('a recorded resolution is reused on recurrence', () => {
@@ -222,3 +244,12 @@ test('structural matching can be disabled without changing exact matching', () =
   assert.equal(handle(input, 'PostToolUse', { config, stateDirectory: directory }), null);
   assert.equal(handle(JSON.stringify({ success: false, tool_name: 'npm', error_code: 'EFAIL', error: 'failed for beta' }), 'PostToolUse', { config, stateDirectory: directory }), null);
 });
+
+function runNode(args) {
+  return new Promise(resolveRun => {
+    const child = spawn(process.execPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.on('close', code => resolveRun({ code, stderr }));
+  });
+}

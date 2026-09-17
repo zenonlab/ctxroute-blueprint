@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
-import { hookContract } from '../.codex/hooks/lifecycle-contract.mjs';
+import { declaredMaintenanceEntries, hookContract } from '../.codex/hooks/lifecycle-contract.mjs';
 import { actionableStderr, handlerPlan, lifecycleEvents } from '../.codex/hooks/lifecycle.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -78,20 +78,22 @@ try {
     const readOnlyOk = !readOnlyError && readOnlyDuration <= 100;
     failed ||= !readOnlyOk;
     results.push({ harness, event: 'PreToolUse:read-only', durationMs: readOnlyDuration, samples: readOnlySamples, latencyLimit: 100, contextChars: 0, contextLimit: hookContract(harness, 'PreToolUse', 'synchronous', root).contextLimit, handlers: [], ok: readOnlyOk, error: readOnlyError });
-    const maintenancePlan = handlerPlan(harness, 'PostToolUse', root, 'maintenance');
-    const maintenanceInput = { tool_name: 'exec_command', tool_input: { cmd: 'false' }, tool_response: { isError: true, error: 'bounded fixture' }, session_id: `maintenance-${harness}` };
+  }
+  for (const entry of declaredMaintenanceEntries(root)) {
+    const maintenancePlan = handlerPlan(entry.harness, entry.event, root, 'maintenance');
+    const maintenanceInput = { ...inputs[entry.event], session_id: `maintenance-${entry.harness}-${entry.event}` };
     const maintenanceStarted = performance.now();
-    const maintenance = spawnSync(process.execPath, [hook, harness, 'PostToolUse', 'maintenance'], {
+    const maintenance = spawnSync(process.execPath, [hook, entry.harness, entry.event, 'maintenance'], {
       cwd: root,
       env: { ...process.env, CTXROUTE_STATE_DIR: state },
       input: JSON.stringify(maintenanceInput),
       encoding: 'utf8',
-      timeout: hookContract(harness, 'PostToolUse', 'maintenance', root).timeoutMs,
+      timeout: hookContract(entry.harness, entry.event, 'maintenance', root).timeoutMs,
     });
     const maintenanceStderr = actionableStderr(maintenance.stderr);
     const maintenanceOk = maintenancePlan.length > 0 && maintenance.status === 0 && !maintenanceStderr && !maintenance.stdout.trim();
     failed ||= !maintenanceOk;
-    maintenanceResults.push({ harness, event: 'PostToolUse', lane: 'maintenance', durationMs: Math.round(performance.now() - maintenanceStarted), handlers: maintenancePlan.map(item => item.name), ok: maintenanceOk, error: maintenanceStderr || maintenance.error?.message || null });
+    maintenanceResults.push({ harness: entry.harness, event: entry.event, lane: 'maintenance', durationMs: Math.round(performance.now() - maintenanceStarted), handlers: maintenancePlan.map(item => item.name), ok: maintenanceOk, error: maintenanceStderr || maintenance.error?.message || null });
   }
 } finally {
   rmSync(fixture, { recursive: true, force: true });
@@ -99,7 +101,10 @@ try {
 
 const maximumObservedLatencyMs = Math.max(...results.flatMap(result => result.samples));
 const maximumObservedContextChars = Math.max(...results.map(result => result.contextChars));
-const maintenancePlanCovered = maintenanceResults.length === 2 && maintenanceResults.every(result => result.ok && result.handlers.length > 0);
+const declaredMaintenance = declaredMaintenanceEntries(root);
+const expectedMaintenanceKeys = declaredMaintenance.map(({ harness, event }) => `${harness}:${event}`).sort();
+const observedMaintenanceKeys = maintenanceResults.filter(result => result.ok && result.handlers.length > 0).map(({ harness, event }) => `${harness}:${event}`).sort();
+const maintenancePlanCovered = JSON.stringify(observedMaintenanceKeys) === JSON.stringify(expectedMaintenanceKeys);
 process.stdout.write(`${JSON.stringify({ ok: !failed && maintenancePlanCovered, samplesPerCase, lifecycleEvents, harnesses: ['codex', 'claude'], maintenancePlanCovered, maximumObservedLatencyMs, maximumObservedContextChars, results, maintenanceResults }, null, 2)}\n`);
 if (failed) process.exitCode = 1;
 

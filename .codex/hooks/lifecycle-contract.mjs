@@ -19,6 +19,15 @@ function readConfig(root, harness) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
+export function declaredMaintenanceEntries(root = projectRoot) {
+  return ['codex', 'claude'].flatMap(harness => {
+    const config = readConfig(root, harness);
+    return Object.entries(config.hooks ?? {}).flatMap(([event, groups]) => groups.flatMap(group => (group.hooks ?? [])
+      .filter(hook => hook.async === true)
+      .map(hook => ({ harness, event, command: hook.command, timeout: hook.timeout }))));
+  });
+}
+
 export function hookContract(harness, event, lane = 'synchronous', root = projectRoot) {
   const selected = commandHook(readConfig(root, harness), event, lane);
   // Codex declares the portable output envelope. Claude does not expose an
