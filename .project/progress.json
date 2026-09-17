@@ -2690,7 +2690,7 @@
         {
           "id": "certify-publish-cleanup",
           "title": "Certifier, versionner, pousser et déployer avant nettoyage séparé",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Rapport avant/après couvre D1 lectures/écritures/octet, R2, Queue, Worker et fournisseurs sur les mêmes fixtures.",
             "Stack Audit, verify, Archify, sauvegarde fraîche et plan inspect-plan-apply réussissent.",
@@ -2714,7 +2714,9 @@
             "git diff --check",
             "git push origin HEAD"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify réussi intégralement après bascule des lecteurs: 273 tests d’infrastructure passés, 1 ignoré attendu; toutes les suites workspace, typechecks, builds et diagrammes Archify showcase sont verts."
+          ]
         }
       ]
     }

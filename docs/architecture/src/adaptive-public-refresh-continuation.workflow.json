@@ -62,7 +62,7 @@
     { "id": "deployCorrected", "lane": "cloudflare", "col": 2, "width": 115, "type": "cloud", "label": "Déployer corrigé", "sublabel": "0017–0021 + Worker" },
     { "id": "sealedValidation", "lane": "evidence", "col": 3, "width": 110, "type": "security", "label": "Valider scellé", "sublabel": "D1 · version" },
     { "id": "restoreRoute", "lane": "cloudflare", "col": 4, "width": 105, "type": "frontend", "label": "Route publique", "sublabel": "tobirink.com/*" },
-    { "id": "restoreCron", "lane": "cloudflare", "col": 5, "width": 95, "type": "messagebus", "label": "Cron hebdo", "sublabel": "23 3 * * 0" },
+    { "id": "restoreCron", "lane": "cloudflare", "col": 5, "width": 95, "type": "messagebus", "label": "Cron hebdo", "sublabel": "23 3 * * SUN" },
     { "id": "resumeQueue", "lane": "safety", "col": 5, "width": 110, "type": "messagebus", "label": "Queue en dernier", "sublabel": "reprise contrôlée", "tag": "gate" },
     { "id": "weeklyObservation", "lane": "evidence", "col": 5, "width": 115, "type": "external", "label": "Observer 7 jours", "sublabel": "coûts · lanes · digest" },
     { "id": "shutdownAgain", "lane": "fallback", "col": 5, "width": 115, "type": "security", "label": "Recouper", "sublabel": "toutes les entrées" }

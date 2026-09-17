@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "archivedAt": "2026-09-16",
+  "reason": "Retired objectives removed from the active checklist; the controlled D1 resumption is the sole operational path.",
+  "goals": [
+    {
+      "id": "goal-publish-public-collector-v3-51742d9",
+      "title": "Historique remplacé — collecteur GitHub v3, ne pas réexécuter",
+      "replacement": "goal-cloudflare-native-collectors"
+    },
+    {
+      "id": "goal-adaptive-public-refresh-step-7",
+      "title": "Preuves du déploiement adaptatif — reprise via objectif contrôlé",
+      "replacement": "goal-controlled-d1-service-resumption"
+    }
+  ]
+}

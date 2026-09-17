@@ -6,7 +6,9 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "preview_urls": false,
-  "routes": [],
+  "routes": [
+    { "pattern": "tobirink.com/*", "zone_name": "tobirink.com" }
+  ],
   "assets": {
     "directory": "../web/out",
     "binding": "ASSETS"
@@ -54,7 +56,7 @@
     ]
   },
   "triggers": {
-    "crons": []
+    "crons": ["23 3 * * SUN"]
   },
   "vars": {
     "PROVIDER_GATEWAY_ORIGIN": "https://tobirink-provider-gateway.tobirink.deno.net",

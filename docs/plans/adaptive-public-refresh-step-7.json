@@ -13,7 +13,7 @@
         "Un export D1 distant ignoré par Git est créé, non vide et vérifié par SHA-256 avant toute mutation distante.",
         "origin/main pointe sur les six commits validés du rafraîchissement adaptatif et .codex/config.toml reste exclu.",
         "La gate Cloudflare applique uniquement d1:tobirink-public puis worker:tobirink-public-api à partir d’un plan frais et hashé.",
-        "Les migrations additives 0017 à 0020 sont appliquées, le Worker est sain et le cron 23 3 * * 0 est déployé.",
+        "Les migrations additives 0017 à 0020 sont appliquées, le Worker est sain et le cron 23 3 * * SUN est déployé.",
         "Les lectures D1 et HTTP post-déploiement confirment les nouveaux états sans exposer de données privées.",
         "Les builds Chrome et Firefox réussissent localement sans publication d’extension."
       ],

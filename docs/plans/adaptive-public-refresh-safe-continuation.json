@@ -107,7 +107,7 @@
         "Des approbations fournisseur séparées autorisent exactement la restauration de la route, puis du cron hebdomadaire, puis de la livraison Queue.",
         "workers.dev et les Preview URLs restent désactivés.",
         "La route tobirink.com/* est restaurée avant les lectures HTTP de santé.",
-        "Le cron 23 3 * * 0 est restauré sans ancien cron */10.",
+        "Le cron 23 3 * * SUN est restauré sans ancien cron */10.",
         "La Queue est reprise en dernier après validation HTTP et D1.",
         "Tout échec remet immédiatement la Queue en pause et retire routes et schedules sans supprimer de données.",
         "Le retour à l'ancien Worker après publication d'une génération 0021 n'est pas un rollback sûr: préférer le scellé, un correctif avant ou la restauration contrôlée du backup."
@@ -121,7 +121,7 @@
         "docs/operations/cloudflare.md"
       ],
       "commands": [
-        "Restore only tobirink.com/* and cron 23 3 * * 0 in the versioned Wrangler configuration",
+        "Restore only tobirink.com/* and cron 23 3 * * SUN in the versioned Wrangler configuration",
         "npm exec -- wrangler triggers deploy --dry-run",
         "npm exec -- wrangler triggers deploy",
         "Production HTTP and D1 read verification",
@@ -162,6 +162,7 @@
     "Révision documentaire du 16/09/2026: ce plan est une référence non approuvée pour exécution; dépendances dans d1-cost-audit-roadmap.json.",
     "Les formulations antérieures de certification du déploiement et d’observation décrivaient des cibles, non des résultats acquis.",
     "Benchmark local corrigé: Discovery 55/19; Agenda 70 inchangé, 76–77 pour un événement changé et 1 798 au premier amorçage; aucune certification distante.",
+    "Audit des répétitions D1 documenté dans docs/operations/d1-cost-audit.md: lectures nécessaires séparées des candidates claimLane/completeLane; aucune écriture manifestement inutile supprimée.",
     "Le document maître docs/operations/tobirink-a-z-master-plan.md fixe l'ordre et les frontières d'approbation; ce plan n'autorise aucune mutation."
   ]
 }

@@ -38,6 +38,7 @@
       "acceptance": [
         "Dépend de B; comparer avant/après sur mêmes fixtures et empêcher régression des budgets.",
         "Traiter les pages Agenda conservées, les clés multiples d’une œuvre, l’égalité sémantique des profils et le coût de republication complète.",
+        "Auditer séparément les lectures répétées; conserver claimLane et completeLane comme candidates tant qu’une mesure avant/après ne prouve pas la préservation des leases et reprises.",
         "Préserver dernier snapshot valide, concurrence et reprise après échec; choisir delta ou snapshots après comparaison, sans refonte spéculative.",
         "Toute purge distante a une cible, sauvegarde et approbation distinctes; aucune suppression autorisée par cette feuille de route."
       ],
@@ -54,14 +55,15 @@
       ],
       "evidence": [
         "Migration locale 0021: projection Agenda différentielle, trois snapshots maximum et treize pages actives.",
-        "Une nouvelle clé d’une œuvre connue ne crée plus de révision ni de réécriture de fiche."
+        "Une nouvelle clé d’une œuvre connue ne crée plus de révision ni de réécriture de fiche.",
+        "Audit des chemins D1 terminé: aucune lecture/écriture manifestement inutile; deux relectures Agenda restent candidates, dans claimLane et completeLane."
       ]
     },
     {
       "id": "preflight-deploy-sealed",
       "title": "D — Certifier la release puis préparer le déploiement sous barrières",
       "acceptance": [
-        "Point d’entrée unique: goal-controlled-d1-service-resumption; reprendre les preuves historiques goal-adaptive-public-refresh-step-7 sans exécuter un second déploiement parallèle.",
+        "Point d’entrée unique: goal-controlled-d1-service-resumption; les preuves historiques du rafraîchissement adaptatif sont archivées sans exécuter un second déploiement parallèle.",
         "Avant Cloudflare: validation locale complète, diff audité, puis commit et push sous leurs autorisations distinctes; le SHA distant à déployer doit correspondre au candidat certifié.",
         "Vérifier accès, usage réel D1, migrations, routes/crons, sous-domaine et livraison Queue; une lecture réussie ne prouve pas un quota d’écriture disponible.",
         "Sauvegarde fraîche vérifiée avant migrations; approuver séparément le plan fournisseur exact; routes/cron coupés et Queue suspendue durant la mise à niveau.",

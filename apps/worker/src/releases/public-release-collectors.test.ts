@@ -20,6 +20,13 @@ describe('public release collectors', () => {
     await expect(collector.collect({ from: '2026-09-12', to: '2026-09-20' })).rejects.toThrow('anilist-403:The AniList API has been temporarily disabled.');
   });
 
+  it('fails closed with bounded provider codes on upstream 5xx responses', async () => {
+    const anilist = new AniListReleaseCollector(async () => new Response('private upstream body', { status: 500 }));
+    const mangaupdates = new MangaUpdatesReleaseCollector(async () => new Response('private upstream body', { status: 503 }));
+    await expect(anilist.collect({ from: '2026-09-12', to: '2026-09-20' })).rejects.toThrow('anilist-500');
+    await expect(mangaupdates.collect({ from: '2026-09-12', to: '2026-09-20' })).rejects.toThrow('mangaupdates-503');
+  });
+
   it('follows AniList pageInfo and spaces every additional page', async () => {
     const pauses: number[] = [];
     const checkpoints: PublicReleasePageCheckpoint[] = [];
