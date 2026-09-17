@@ -39,7 +39,7 @@ deliberately and verify the result.
 | Code intelligence | `npm run setup` installs the official [Code Review Graph](https://github.com/tirth8205/code-review-graph) Python package at [`code-review-graph==2.3.8`](https://github.com/tirth8205/code-review-graph/releases/tag/v2.3.8) for bounded MCP context, impact analysis, and fork-safe PR risk review. |
 | Architecture evidence | Archify validates typed JSON IR and generates interactive artifacts without publishing blueprint control-plane diagrams. |
 | Static safety | The tree-sitter Sensor reports deterministic diagnostics across AST, embedded, and lexical adapters. |
-| Portable validation | Node.js 22 CI runs the complete gate on Linux and bounded hook/orchestrator MCP smokes on macOS and Windows. |
+| Portable validation | Node.js 24 CI runs the complete gate on Linux and bounded hook/orchestrator MCP smokes on macOS and Windows while the package contract remains Node.js 22.13+. |
 
 ## Quick start
 
@@ -240,7 +240,7 @@ The Sensor is independent from CRG and is the only blocking static-safety
 boundary. Its catalogue preserves every recognized extension while reporting
 four honest capability states: `PASS`, `PARTIAL`, `MISSING`, and `N/A`.
 
-- `PASS` requires a parser loaded and exercised on Node 22.
+- `PASS` requires a parser loaded and exercised on the Node.js 24 reference CI runtime while remaining compatible with the declared Node.js 22.13+ floor.
 - `PARTIAL` identifies an extractor or bounded lexical check.
 - `MISSING` identifies an expected capability without a verified parser.
 - `N/A` means the capability does not apply to that language.
@@ -309,7 +309,7 @@ package behavior, whole-program flows, or runtime enforcement.
 
 ### CI and repository protection
 
-The tracked workflow runs the complete Node.js 22 gate on Linux and bounded
+The tracked workflow runs the complete Node.js 24 gate on Linux and bounded
 hook/orchestrator MCP smokes on macOS and Windows. Linux additionally smoke-tests
 the official CRG transport. Pull requests receive a fork-safe blocking `CRG
 risk gate` at level `high`, while
