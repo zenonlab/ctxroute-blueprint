@@ -144,9 +144,9 @@
 
 - [x] **Suspendre Queue, routes et crons sans supprimer de données** — DONE _(evidence: API Cloudflare: routes=[], schedules=[], workers.dev enabled=false et previews_enabled=false pour tobirink-public-api., Queue ed005a14ec534110b350b06922100056: delivery_paused=true; producteur, consommateur et messages non purgés restent conservés., La version Worker 2267a691-68cf-4612-9ec8-e36e3c839ef3 reste servie à 100%; aucune migration ni version Worker n’a été déployée.)_
 
-## Mesurer les coûts par œuvre, utilisateur simulé et Agenda — ACTIVE
+## Mesurer les coûts par œuvre, utilisateur simulé et Agenda — BLOCKED
 
-- [ ] **Compléter la référence locale puis certifier les budgets natifs et distants** — IN_PROGRESS _(evidence: Le blocage historique de quota est levé: D1 0017–0021 appliquée et Worker corrigé bfd038ea déployé le 2026-09-17., Références locales reproduites le 2026-09-17: 36/36 tests ciblés puis Worker 104/104; première résolution 55 écritures fixture, 50 admissions concurrentes 5 écritures, batch 50 MISS 0 écriture, Agenda 1798/70/76/76/77., Échantillon distant corrélé: HTTP 200, Worker bfd038ea, CPU 9 ms, wall 28 ms, providerRequests=0, d1RowsRead=64, d1RowsWritten=0; aucun identifiant ou payload conservé.)_
+- [ ] **Compléter la référence locale puis certifier les budgets natifs et distants** — BLOCKED _(evidence: Le blocage historique de quota est levé: D1 0017–0021 appliquée et Worker corrigé bfd038ea déployé le 2026-09-17., Références locales reproduites le 2026-09-17: 36/36 tests ciblés puis Worker 104/104; première résolution 55 écritures fixture, 50 admissions concurrentes 5 écritures, batch 50 MISS 0 écriture, Agenda 1798/70/76/76/77., Échantillon distant corrélé: HTTP 200, Worker bfd038ea, CPU 9 ms, wall 28 ms, providerRequests=0, d1RowsRead=64, d1RowsWritten=0; aucun identifiant ou payload conservé.)_
 
 ## Collecter les contenus adultes et contrôler leur affichage dans l’extension — DONE
 
