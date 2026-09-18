@@ -49,13 +49,15 @@ function refreshedWork(current: Work, key: PublicDiscoveryKey, state: Extract<Aw
   if (hydration === undefined || state.nextRefreshAt === undefined || state.profile.workId !== current.id) return undefined;
   const previous = hydration.publicDiscovery;
   if (previous !== undefined && Date.parse(state.verifiedAt) < Date.parse(previous.verifiedAt)) return undefined;
-  if (previous?.verifiedAt === state.verifiedAt && previous.nextRefreshAt === state.nextRefreshAt) return undefined;
   const candidate = state.profile.candidate;
   const references = [...new Map([
     ...current.externalReferences,
     ...state.profile.references,
     { externalId: candidate.externalId, provider: candidate.provider },
   ].map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
+  if (previous?.verifiedAt === state.verifiedAt && previous.nextRefreshAt === state.nextRefreshAt
+    && JSON.stringify(hydration.candidate) === JSON.stringify(candidate)
+    && JSON.stringify(current.externalReferences) === JSON.stringify(references)) return undefined;
   return createWork({
     externalReferences: references,
     hydration: {

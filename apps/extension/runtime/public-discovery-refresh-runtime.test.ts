@@ -78,7 +78,7 @@ describe('public discovery refresh runtime', () => {
     expect(requestRefresh).toHaveBeenCalledTimes(200);
   });
 
-  it('does not rewrite a fresh unchanged local profile', async () => {
+  it.each([false, true])('compares canonical content even when alias timestamps are unchanged: changed=%s', async (changed) => {
     const item = fixture(0);
     const key = { fingerprint: '00'.repeat(32), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
     const state = { nextRefreshAt: '2026-09-23T00:00:00.000Z', profile: { candidate: item.candidate, references: [{ externalId: '1', provider: 'anilist' as const }], workId: item.work.id }, state: 'VERIFIED' as const, verifiedAt: now };
@@ -91,10 +91,10 @@ describe('public discovery refresh runtime', () => {
     const requestRefresh = vi.fn();
     const run = createPublicDiscoveryRefreshRuntime({
       checkpointStorage: { get: async () => ({}), set: async () => undefined },
-      client: { lookup: async (keys) => [{ key: keys[0]!, state }], requestRefresh, resolveOrRequest: vi.fn() }, now: () => now, storage,
+      client: { lookup: async (keys) => [{ key: keys[0]!, state: changed ? { ...state, profile: { ...state.profile, candidate: { ...state.profile.candidate, editorialStatus: 'HIATUS' as const } } } : state }], requestRefresh, resolveOrRequest: vi.fn() }, now: () => now, storage,
     });
-    await expect(run()).resolves.toMatchObject({ continuationRequired: false, refreshed: 0, updated: 0 });
-    expect(putWork).not.toHaveBeenCalled();
+    await expect(run()).resolves.toMatchObject({ continuationRequired: false, refreshed: 0, updated: changed ? 1 : 0 });
+    expect(putWork).toHaveBeenCalledTimes(changed ? 1 : 0);
     expect(requestRefresh).not.toHaveBeenCalled();
   });
 });

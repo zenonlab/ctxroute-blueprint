@@ -198,3 +198,10 @@ MV3 transmet au Worker seulement les titres bornés ou l'ID exact; URL brute,
 dossiers, progression et historique ne quittent pas le stockage privé.
 `npm run verify`, tests installés Chromium/Firefox, migrations, SQL, quotas,
 MV3, WebBridge et ZIP reproductibles sont requis avant publication séparée.
+
+La maintenance compare aussi le candidat canonique et ses références : des
+horodatages Discovery inchangés sur un alias ne masquent pas une correction
+reçue via un autre alias. Cette mise à jour conserve les clés de favoris,
+la progression et les décisions de Review. La certification du 19 septembre
+réexécute le corpus brut 1532/1400 sans modifier les règles d'extraction;
+aucune nouvelle version de parseur ni réanalyse générale n'est nécessaire.

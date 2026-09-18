@@ -80,6 +80,16 @@ class MemoryTaskStore implements TaskStorePort {
 }
 
 describe('agenda notifications', () => {
+  it('preserves a manually disabled reminder when a public period is projected again', async () => {
+    const storage = new MemoryStoragePort();
+    const tasks = new MemoryTaskStore();
+    const entry = createAgendaEntry({ availability: 'official', id: agendaEntryId('agenda_private-choice'), occursAt: '2026-09-04T08:00:00.000Z', releaseLabel: 'Épisode 20', workId: workId('work_private-choice') });
+    const reminder = createReminder({ agendaEntryId: entry.id, channel: 'native', enabled: false, id: reminderId('reminder_private-choice'), leadMinutes: 30 });
+    await storage.putReminder(reminder);
+    expect(await scheduleAgendaPeriodNotifications(storage, tasks, [entry])).toBe(0);
+    expect(await storage.getReminder(reminder.id)).toEqual(reminder);
+  });
+
   it('routes cached public Agenda periods, preferences and alarm recovery through the background', () => {
     const background = readFileSync(new URL('./wxt-entrypoints/background.ts', import.meta.url), 'utf8');
     const surface = readFileSync(new URL('./runtime/ExtensionSurface.tsx', import.meta.url), 'utf8');

@@ -106,6 +106,7 @@ export const agendaPeriodResponseSchema = z.discriminatedUnion('ok', [
       }).superRefine((item, context) => { if ((item.occursAt === undefined) === (item.occursOn === undefined)) context.addIssue({ code: 'custom', message: 'Agenda item requires exactly one occurrence.', path: ['occursAt'] }); })).max(100),
       missingWorkIds: z.array(z.string().regex(/^work_[a-z0-9][a-z0-9_-]{5,}$/u)).max(100),
       source: z.enum(['cache', 'local']),
+      freshness: z.enum(['current', 'stale']).optional(),
       updatedAt: z.string(),
     }),
   }),

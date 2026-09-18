@@ -3864,7 +3864,7 @@
         {
           "id": "extension",
           "title": "Propager mises à jour et fiabiliser parsing local",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Changement canonique transmis malgré alias inchangé",
             "Anciennes annonces invalidées sans perte privée",
@@ -3893,7 +3893,10 @@
             "git diff --check",
             "git commit -m 'fix(extension): propagate canonical updates and invalidate releases'"
           ],
-          "evidence": []
+          "evidence": [
+            "Application 399/399, contrats 14/14, extension 149/149 puis notifications 7/7, loader/cache 19/19; parser 11 passés/1 oracle externe ignoré dont corpus 1532/1400.",
+            "Contrats IndexedDB et migrations Chromium passent: report et annulation invalident la notification, historique/Work conservés. Typechecks, anti-slop, docs/ADR et Archify showcase 9/9 passent. Aucun changement de règle parser; rappel désactivé préservé."
+          ]
         },
         {
           "id": "certification",

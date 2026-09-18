@@ -40,7 +40,9 @@ function notifiableEntries(events: readonly LocalAgendaEvent[]): readonly Agenda
 export async function projectLocalReleaseAgenda(storage: StoragePort, cache: PublicReleaseGenerationCachePort, projection: LocalReleaseAgendaPort): Promise<{ entries: readonly AgendaEntry[]; generatedAt?: string; missingWorkIds: readonly WorkId[]; state: 'empty' | 'hydrated' }> {
   const generation = await cache.load();
   if (!generation) return { entries: [], missingWorkIds: [], state: 'empty' };
-  if (await projection.isCurrent(generation.revision)) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([generation.revision, generation.window])));
+  const projectionRevision = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  if (await projection.isCurrent(projectionRevision)) {
     const events = await projection.listPeriod(generation.window.from, generation.window.to, 100);
     return { entries: notifiableEntries(events), generatedAt: generation.generatedAt, missingWorkIds: [], state: 'hydrated' };
   }
@@ -56,13 +58,14 @@ export async function projectLocalReleaseAgenda(storage: StoragePort, cache: Pub
     if (work.mediaKind === 'manga') mangaWorks.set(work.id, work);
   }
   for (const [id] of mangaWorks) {
+    if (generation.models !== undefined || evidence.some(item => item.workId === id && (item.state === 'SCHEDULED' || item.state === 'CANCELLED'))) continue;
     const previous = await projection.listEvidence(id, 12);
     const observations = [...previous, ...evidence.filter((item) => item.workId === id)].flatMap((item) => { const chapter = item.releaseKind === 'chapter' ? numericSequence(item.sequence) : undefined; return chapter !== undefined && item.occurrence.kind === 'DATE' && item.state === 'CONFIRMED' ? [{ chapter, releasedOn: item.occurrence.value }] : []; });
     const prediction = predictNextMangaRelease(observations, releaseLifecycle(mangaWorks.get(id)!));
     const last = evidence.filter((item) => item.workId === id).at(-1) ?? previous.at(-1);
     if (prediction && last && !events.some((event) => event.workId === id && event.occurrence.kind === 'DATE' && event.occurrence.value === prediction.releasedOn && event.availability !== 'estimated')) events.push(localAgendaEventSchema.parse({ availability: 'estimated', evidenceId: last.id, id: `agenda_prediction_${id}`.slice(0, 128), occurrence: { kind: 'DATE', value: prediction.releasedOn }, releaseLabel: 'Prochaine sortie estimée', workId: id }));
   }
-  await projection.commit(generation.revision, evidence, events);
+  await projection.commit(projectionRevision, evidence, events);
   return { entries: notifiableEntries(events), generatedAt: generation.generatedAt, missingWorkIds: Object.freeze([]), state: 'hydrated' };
 }
 

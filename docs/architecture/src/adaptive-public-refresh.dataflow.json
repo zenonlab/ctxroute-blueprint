@@ -88,7 +88,8 @@
       "items": [
         "D1 reçoit uniquement des données publiques vérifiées",
         "Favoris, dossiers, historique et installation restent locaux",
-        "Les métriques excluent titres, URLs, IP, payloads et secrets"
+        "Les métriques excluent titres, URLs, IP, payloads et secrets",
+        "Modèles en cache; projection active et notifications invalidées ensemble"
       ]
     }
   ]

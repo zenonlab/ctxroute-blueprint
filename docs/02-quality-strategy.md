@@ -336,6 +336,15 @@ corpus tests the reviewed behavior contract without depending on FavLib data.
 
 ## Inherited tooling boundary
 
+Pipeline reliability tests cover distinct page ETags, one bounded pagination
+restart, timeout/429/503/invalid responses, preserved model caches and local
+reprojection. The Chromium IndexedDB migration harness checks postponement
+and cancellation against both the visible Agenda and notification records,
+retaining history and the Work. Alias refresh tests change canonical status
+without changing alias timestamps. Parser rules are unchanged; the existing
+1532/1400 raw synthetic corpus and its explicit resolution expectations remain
+the regression oracle, separate from personal-library certification.
+
 Adult-content contract tests cover AniList, MangaUpdates, MangaDex, Kitsu
 Anime and Kitsu Manga classification. They reject undocumented Kitsu ratings,
 ambiguous tags and lost classification through factories or caches. Local

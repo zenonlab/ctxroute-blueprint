@@ -28,6 +28,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-15
+- Revised: 2026-09-19
 
 ## Contexte
 
@@ -56,6 +57,25 @@ l’extension. Les extracteurs locaux d’identifiants présents dans les URL de
 favoris restent purs et sans réseau.
 
 ## Conséquences
+
+Le cache partagé conserve les modèles v4 et leur fenêtre de couverture, en
+plus de la projection. Naviguer dans cette couverture recalcule les dates
+localement. Chaque lecture HTTP est bornée à dix secondes et un mégaoctet;
+le réveil dispose de vingt secondes, cent pages et dix mégaoctets. Une
+génération modifiée entre pages autorise un seul redémarrage. Les ETag restent
+propres aux pages; seul celui de la première page sert à sa revalidation.
+
+Toute erreur réseau, réponse invalide ou dépassement conserve le cache valide
+de moins de huit jours et expose son état ancien. Une confirmation HTTP ou un
+cache de moins d'un jour expose l'état courant. Aucun fournisseur ne sert de
+repli. Les modèles et la couverture sont des champs optionnels du record
+IndexedDB existant; les anciennes installations restent lisibles.
+
+La projection porte sa fenêtre dans sa révision locale. Une transaction
+conserve l'historique, remplace la liste d'événements actifs et met à jour
+les entrées servant aux notifications. Un événement remplacé ou annulé devient
+indisponible dans cette dernière table; une tâche ancienne vérifie encore
+la date courante avant émission. Les preuves manuelles restent actives.
 
 La réutilisation d’une fiche locale déjà vérifiée reste permise avant D1,
 même lorsque ses métadonnées sont anciennes. Elle ne déclenche aucune

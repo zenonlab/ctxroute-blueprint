@@ -1,4 +1,5 @@
 import type { PublicReleaseEvent } from '@tobirink/domain';
+import type { PublicReleaseGeneration } from '@tobirink/application';
 
 export interface PublicReleaseStagingRecord {
   readonly id: string;
@@ -14,6 +15,8 @@ export interface PublicReleaseSyncRecord {
   readonly fallback?: unknown;
   readonly generation: number;
   readonly revision?: string;
+  readonly models?: PublicReleaseGeneration['models'];
+  readonly modelWindow?: PublicReleaseGeneration['modelWindow'];
   readonly source?: 'fallback' | 'shared';
   readonly window?: { readonly from: string; readonly to: string };
 }

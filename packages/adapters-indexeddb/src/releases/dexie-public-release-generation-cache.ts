@@ -16,7 +16,7 @@ export class DexiePublicReleaseGenerationCache implements PublicReleaseGeneratio
     const active = await this.database.publicReleaseSyncState.get('active');
     if (!active?.activeGeneration || !active.etag || !active.revision || !active.window) return undefined;
     const events = await this.database.publicReleaseEvents.toArray();
-    const parsed = publicReleaseGenerationSchema.safeParse({ etag: active.etag, events, generatedAt: active.checkedAt, revision: active.revision, source: active.source, window: active.window });
+    const parsed = publicReleaseGenerationSchema.safeParse({ etag: active.etag, events, models: active.models, modelWindow: active.modelWindow, generatedAt: active.checkedAt, revision: active.revision, source: active.source, window: active.window });
     return parsed.success ? parsed.data : undefined;
   }
 
@@ -26,7 +26,7 @@ export class DexiePublicReleaseGenerationCache implements PublicReleaseGeneratio
       await this.database.publicReleaseEvents.clear();
       await this.database.publicReleaseEvents.bulkPut(generation.events.map(storedEvent));
       const active = await this.database.publicReleaseSyncState.get('active');
-      await this.database.publicReleaseSyncState.put({ activeGeneration: generation.revision, checkedAt: generation.generatedAt, etag: generation.etag, generation: (active?.generation ?? 0) + 1, id: 'active', revision: generation.revision, source: 'shared', window: generation.window });
+      await this.database.publicReleaseSyncState.put({ activeGeneration: generation.revision, checkedAt: generation.generatedAt, etag: generation.etag, generation: (active?.generation ?? 0) + 1, id: 'active', revision: generation.revision, source: 'shared', window: generation.window, models: generation.models, modelWindow: generation.modelWindow });
       await this.database.publicReleaseSyncState.delete('fallback');
       await this.database.publicReleaseStagingEvents.clear();
     });

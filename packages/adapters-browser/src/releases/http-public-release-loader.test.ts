@@ -12,6 +12,45 @@ const releaseModel = (workId: string, id: string, instant: string): VirtualRelea
 const sourceWindow = { from: '2026-09-01', to: '2026-10-01' };
 
 describe('HttpPublicReleaseLoader', () => {
+  it('reprojects cached models for another covered window without HTTP', async () => {
+    const snapshot = { etag: '"models"', events: [], models: [releaseModel('work-1', 'later', '2026-09-20T00:00:00.000Z')], modelWindow: sourceWindow, generatedAt: '2026-09-12T00:00:00.000Z', revision: 'models-1', source: 'shared' as const, window: { from: '2026-09-12', to: '2026-09-19' } };
+    const cache = { load: async () => snapshot, save: vi.fn() };
+    const fetcher = vi.fn();
+    const result = await new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, { from: '2026-09-19', to: '2026-09-26' });
+    expect(result.snapshot.events).toMatchObject([{ id: 'later' }]);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(cache.save).toHaveBeenCalledOnce();
+  });
+
+  it('restarts once when the generation changes between pages', async () => {
+    const page = (revision: string, nextCursor?: string) => Response.json({ models: [releaseModel(revision, revision, '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', revision, window: sourceWindow, nextCursor }, { headers: { ETag: `"${revision}"` } });
+    const fetcher = vi.fn().mockResolvedValueOnce(page('old', 'old')).mockResolvedValueOnce(page('new')).mockResolvedValueOnce(page('new'));
+    const cache = { load: async () => undefined, save: vi.fn() };
+    const result = await new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, sourceWindow);
+    expect(result.snapshot.revision).toBe('new');
+    expect(result.snapshot.events).toMatchObject([{ id: 'new' }]);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(cache.save).toHaveBeenCalledOnce();
+  });
+
+  it.each(['invalid', '429', 'oversize', 'timeout'])('preserves the last valid cache after %s', async (failure) => {
+    const snapshot = { etag: '"models"', events: [], generatedAt: '2026-09-10T00:00:00.000Z', revision: 'models-1', source: 'shared' as const, window: sourceWindow };
+    const cache = { load: async () => snapshot, save: vi.fn() };
+    const fetcher = vi.fn(async () => {
+      if (failure === 'timeout') return new Promise<Response>(() => undefined);
+      if (failure === '429') return new Response(null, { status: 429 });
+      if (failure === 'oversize') return new Response('x'.repeat(1_000_001), { headers: { ETag: '"models"' } });
+      return Response.json({ invalid: true }, { headers: { ETag: '"models"' } });
+    });
+    vi.useFakeTimers();
+    try {
+      const pending = new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, sourceWindow);
+      await vi.advanceTimersByTimeAsync(10_001);
+      await expect(pending).resolves.toMatchObject({ snapshot, freshness: 'stale' });
+      expect(cache.save).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
   it('stores a published empty window and reuses it without another provider or HTTP request', async () => {
     const window = { from: '2026-09-12', to: '2026-09-28' };
     const generation = { etag: '"calendar-verified-empty"', events: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'calendar-verified-empty', source: 'shared' as const, window };
@@ -19,7 +58,7 @@ describe('HttpPublicReleaseLoader', () => {
     const fetcher = vi.fn(async () => Response.json({ models: [], generatedAt: generation.generatedAt, revision: generation.revision, window }, { headers: { ETag: generation.etag } }));
     const loader = new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z'));
     expect((await loader.load(cache, window)).snapshot.events).toEqual([]);
-    expect(cache.save).toHaveBeenCalledWith(generation);
+    expect(cache.save).toHaveBeenCalledWith({ ...generation, models: [], modelWindow: window });
     expect((await loader.load(cache, window)).source).toBe('cache');
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
@@ -48,14 +87,14 @@ describe('HttpPublicReleaseLoader', () => {
     const cache = { load: async () => snapshot, save: vi.fn() };
     const fetcher = vi.fn(async () => new Response(null, { status: 503 }));
     const loader = new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T00:00:00.000Z'));
-    await expect(loader.load(cache, sourceWindow)).resolves.toEqual({ snapshot, source: 'cache' });
+    await expect(loader.load(cache, sourceWindow)).resolves.toEqual({ snapshot, source: 'cache', freshness: 'stale' });
     expect(cache.save).not.toHaveBeenCalled();
   });
 
   it('follows every cursor and commits only the complete generation', async () => {
     const responses = [
       Response.json({ models: [releaseModel('work-1', 'anilist-episode-42-1', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', nextCursor: 'work-1', revision: 'models-1-2', window: sourceWindow }, { headers: { ETag: '"release-models-1-window"' } }),
-      Response.json({ models: [releaseModel('work-2', 'anilist-episode-42-2', '2026-09-20T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'models-1-2', window: sourceWindow }, { headers: { ETag: '"release-models-1-window"' } }),
+      Response.json({ models: [releaseModel('work-2', 'anilist-episode-42-2', '2026-09-20T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'models-1-2', window: sourceWindow }, { headers: { ETag: '"release-models-page-2"' } }),
     ];
     const cache = { load: async () => undefined, save: vi.fn() };
     const fetcher = vi.fn(async (_input: RequestInfo | URL) => responses.shift()!);
@@ -63,6 +102,8 @@ describe('HttpPublicReleaseLoader', () => {
     expect(result.snapshot.events).toHaveLength(2);
     expect(fetcher.mock.calls[1]?.[0].toString()).toContain('cursor=work-1');
     expect(cache.save).toHaveBeenCalledTimes(1);
+    expect(result.snapshot.etag).toBe('"release-models-1-window"');
+    expect(result.snapshot.models).toHaveLength(2);
   });
 
   it('keeps the active generation when a later page fails', async () => {

@@ -76,13 +76,13 @@ export default defineBackground({
       end.setUTCDate(end.getUTCDate() + 15);
       return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
     };
-    const refreshPublicReleasesOnce = async () => {
-      await new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache, releaseWindow());
-      return 'shared' as const;
+    const refreshPublicReleasesOnce = async (window = releaseWindow()) => {
+      return new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache, window);
     };
     let releaseRefreshInFlight: ReturnType<typeof refreshPublicReleasesOnce> | undefined;
-    const refreshPublicReleases = () => {
-      releaseRefreshInFlight ??= refreshPublicReleasesOnce().finally(() => { releaseRefreshInFlight = undefined; });
+    const refreshPublicReleases = async (window = releaseWindow()) => {
+      if (releaseRefreshInFlight !== undefined) await releaseRefreshInFlight;
+      releaseRefreshInFlight = refreshPublicReleasesOnce(window).finally(() => { releaseRefreshInFlight = undefined; });
       return releaseRefreshInFlight;
     };
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
@@ -345,7 +345,7 @@ export default defineBackground({
       if (parsed.data.type === 'agenda.period.read') {
         try {
           await privateStorage.ensureReady();
-          await refreshPublicReleases();
+          const refresh = await refreshPublicReleases({ from: parsed.data.from.slice(0, 10), to: parsed.data.to.slice(0, 10) });
           const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
           const quickPreferences = await preferences.read();
           const snapshot = await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, parsed.data);
@@ -372,6 +372,7 @@ export default defineBackground({
               }),
               missingWorkIds: [...snapshot.missingWorkIds, ...hydration.missingWorkIds],
               source: hydration.state === 'hydrated' ? 'cache' : 'local',
+              freshness: refresh.freshness,
               updatedAt: hydration.generatedAt ?? new Date().toISOString(),
             },
           };

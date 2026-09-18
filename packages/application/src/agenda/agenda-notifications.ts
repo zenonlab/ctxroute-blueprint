@@ -57,8 +57,9 @@ export async function scheduleAgendaPeriodNotifications(
   for (const entry of entries) {
     if (entry.availability !== 'official' && entry.availability !== 'confirmed') continue;
     const suffix = entry.id.replace(/^agenda_/u, '');
-    const reminder = createReminder({ agendaEntryId: entry.id, channel: 'native', enabled: true, id: reminderId(`reminder_${suffix}`), leadMinutes: 0 });
-    await storage.putReminder(reminder);
+    const existing = await storage.getReminder(reminderId(`reminder_${suffix}`));
+    const reminder = existing ?? createReminder({ agendaEntryId: entry.id, channel: 'native', enabled: true, id: reminderId(`reminder_${suffix}`), leadMinutes: 0 });
+    if (existing === undefined) await storage.putReminder(reminder);
     if ((await scheduleAgendaNotification(tasks, entry, reminder)).state === 'scheduled') scheduled += 1;
   }
   return scheduled;

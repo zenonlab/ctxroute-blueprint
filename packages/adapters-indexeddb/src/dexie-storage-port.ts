@@ -193,7 +193,7 @@ export class DexieStoragePort implements StoragePort {
       putReview: async (review: Review) => { requireStore('reviews'); await this.database.reviews.put(createReview(review)); },
       putWork: async (work: Work) => {
         requireStore('works');
-        await this.database.localAgendaProjectionState.delete('active');
+        await this.database.localAgendaProjectionState.update('active', { revision: 'invalidated' });
         await this.database.works.put(createWork(work));
       },
     };

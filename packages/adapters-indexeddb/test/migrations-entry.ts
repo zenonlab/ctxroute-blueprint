@@ -148,6 +148,17 @@ async function verifySharedReleasePromotion(name: string): Promise<void> {
   const storage = new DexieStoragePort(name);
   await storage.putWork(createWork({ externalReferences: [{ externalId: '77', provider: 'mangaupdates' }], id: localWorkId, mediaKind: 'manga', preferredTitle: 'Release fixture' }));
   if (await agenda.isCurrent('shared-1')) throw new Error('Writing a Work did not invalidate the local Agenda identity projection.');
+  const instant = { ...evidence, id: 'evidence_instant-one', publicReleaseId: 'instant-one', occurrence: { kind: 'INSTANT' as const, value: '2026-09-20T12:00:00.000Z' } };
+  const announcement = { availability: 'official' as const, evidenceId: instant.id, id: 'agenda_instant-one', occurrence: instant.occurrence, releaseLabel: 'episode 1', workId: localWorkId };
+  await agenda.commit('scheduled', [instant], [announcement]);
+  const original = await database.agenda.get('agenda_agenda_instant-one');
+  if (original?.availability !== 'official' || original.occursAt !== instant.occurrence.value) throw new Error('Notification projection was not committed with Agenda.');
+  const postponed = { ...announcement, occurrence: { kind: 'INSTANT' as const, value: '2026-09-27T12:00:00.000Z' } };
+  await agenda.commit('postponed', [{ ...instant, occurrence: postponed.occurrence }], [postponed]);
+  if ((await database.agenda.get(original.id))?.occursAt !== postponed.occurrence.value) throw new Error('Postponed date did not invalidate the old notification effect.');
+  await agenda.commit('cancelled', [{ ...instant, state: 'CANCELLED' }], []);
+  if ((await database.agenda.get(original.id))?.availability !== 'unavailable' || (await agenda.listPeriod('2026-09-01', '2026-10-01', 100)).length !== 0) throw new Error('Cancelled release remained active or notifiable.');
+  if (await database.localAgendaEvents.get(announcement.id) === undefined || await database.works.get(localWorkId) === undefined) throw new Error('Logical invalidation removed history or a private Work.');
   storage.close();
   database.close();
 }

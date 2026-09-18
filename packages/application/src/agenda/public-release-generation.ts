@@ -2,12 +2,14 @@ import { z } from 'zod';
 import { agendaEntryId, createAgendaEntry, workId } from '@tobirink/domain';
 import type { AgendaEntry, Work, WorkId } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
-import { publicReleaseEventSchema } from '../releases/release-contracts';
+import { publicReleaseEventSchema, virtualReleaseModelSchema } from '../releases/release-contracts';
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
 export const publicReleaseGenerationSchema = z.strictObject({
   etag: z.string().min(3).max(160),
   events: z.array(publicReleaseEventSchema).max(10_000),
+  models: z.array(virtualReleaseModelSchema).max(10_000).optional(),
+  modelWindow: z.strictObject({ from: dateSchema, to: dateSchema }).optional(),
   generatedAt: z.iso.datetime({ offset: false }),
   revision: z.string().regex(/^[A-Za-z0-9._-]{1,64}$/u),
   source: z.enum(['fallback', 'shared']),
