@@ -6,7 +6,7 @@ remain independent of this operational path.
 
 ## Inspect
 
-### Préparation 1.0.38
+### Publication 1.0.38
 
 Publication autonome autorisée le 19 septembre 2026. La version de repli
 inspectée est `ee48b6be-752e-4e1e-a681-8ea0eb43a3dc` à 100 %, sans migration
@@ -23,8 +23,11 @@ installe le ZIP intact dans un profil temporaire, simule un MISS et retarde
 la prélecture de six secondes. Seules les routes Discovery du Worker sont
 autorisées; les réponses vérifiées restent réelles. Les favoris de test sont
 publics et fixes. La gate attend les alarmes natives sans forcer la reprise.
-Le pointeur public reste `1.0.37` jusqu’à validation puis téléchargement vérifié
-des deux nouvelles archives. Aucun secret, schéma, quota ou gateway ne change.
+Les deux archives ont été publiées via le plan
+`44cb31c0ade93b0084c1fff348586d49aedb229b074807782dc3b7d6c9ade8a0`,
+puis téléchargées publiquement avec les tailles et empreintes ci-dessus avant
+avancement du pointeur vers `1.0.38`. Aucun secret, schéma, quota ou gateway
+ne change.
 La gate installée a réussi : deux POST du service worker, deux prélectures
 ralenties, une admission `PENDING` et une admission déjà `VERIFIED`, puis deux
 sources résolues après alarmes natives. Le lot Queue observé a accepté un
