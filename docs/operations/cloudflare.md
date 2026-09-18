@@ -35,24 +35,29 @@ Le plan R2 appliqué porte le digest
 `6adeddad01fc48c98692f27c6c57ef03917eb77cf5319528dfd9b5968ee520db`.
 Les deux ZIP téléchargés publiquement correspondent aux tailles et SHA-256
 ci-dessus avant avancement du pointeur vers `1.0.37`.
+Le déploiement final `ee48b6be-752e-4e1e-a681-8ea0eb43a3dc` publie ce
+pointeur, via le plan
+`45308dc106f81947b46cb8412ddd07860e56ff4009678ba12db0696b02f0eb7c`.
+Après déploiement, `/download` répond 200 avec les deux liens `1.0.37`;
+les ZIP conservent leurs empreintes et les deux canaries restent `VERIFIED`.
 
-### Candidat de récupération des favoris du 18 septembre 2026
+### Garde-fous de récupération des favoris du 18 septembre 2026
 
 Le correctif local conserve les routes v3, le schéma D1, les secrets et les
-quotas existants. Ressources concernées par une promotion future : Worker
+quotas existants. Ressources du parcours publié : Worker
 `tobirink-public-api`, D1 `tobirink-public`, Queue `tobirink-public-discovery`
 et sa DLQ `tobirink-public-discovery-dlq`. Aucun changement de gateway n’est
 prévu. L’admission reste limitée à 10/minute, le claim à 20 et la concurrence
 Queue à 1; les continuations attendent 1–900 secondes et les appels extension
 15 secondes maximum. Une admission répétée ne réarme jamais `FAILED`.
 
-Après approbation distincte, réinspecter via la gate le déploiement actif et
-matérialiser un plan frais limité au Worker. La version historique de repli
-compatible connue est `2e2e534b-7816-445c-992a-1576a7087ccd`; elle doit être
-reconfirmée avant toute promotion. Aucun rollback de données ni migration
+Pour toute nouvelle opération, réinspecter via la gate le déploiement actif et
+matérialiser un plan frais limité aux ressources autorisées. La version de repli
+confirmée pour cette publication est `a80014e6-05b4-42f5-b682-1d51677b1048`.
+Aucun rollback de données ni migration
 destructive n’accompagne le retour au code précédent.
 
-Canary proposé : deux demandes synthétiques seulement, une par titre et une
+Canary exécuté : deux demandes synthétiques seulement, une par titre et une
 par référence exacte, plafond de 100 écritures D1 chacune et arrêt à la première
 résolution sans preuve, au premier conflit ou à la première boucle de reprises.
 Conserver les seuils journaliers 20 000/50 000 documentés ci-dessous. Mesurer

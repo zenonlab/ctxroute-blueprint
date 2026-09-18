@@ -3642,9 +3642,10 @@
             "git commit -m 'fix(discovery): resume durable admissions and queue processing'"
           ],
           "evidence": [
-            "Implémentation locale validée: npm run verify réussi; Archify public-discovery/all, docs et ADR passent; tests Queue additionnels 7/7 et typecheck Worker passent.",
-            "Corpus 1532/1400 convergent; archives finales reproductibles testées sur Chromium 153 et Firefox 155 sans faux résultat. Audit privé: 204 nouvelles requêtes possibles, identités installées non certifiées.",
-            "Promotion et certification personnelle restent soumises à autorisation distincte. Incident: un premier harness Firefox setOffline a laissé atteindre l’API par des requêtes synthétiques; impact distant non établi, proxy fermé désormais vérifié. Aucun déploiement ni nettoyage effectué."
+            "npm run verify, Archify all/public-discovery, docs et ADR passent; corpus 1532 dont 1400 médias et archives 1.0.37 installées Chromium/Firefox validés.",
+            "Promotion autorisée et réalisée via goal-publish-favorite-recovery-1037: Worker, archives immuables et deux canaries VERIFIED; aucune suppression ni reconfiguration gateway.",
+            "external: certification de la bibliothèque personnelle indisponible dans le profil de test; nécessite chargement de 1.0.37 dans le profil utilisateur puis comparaison agrégée. Les 204 nouvelles requêtes possibles ne prouvent pas une identité résolue.",
+            "Incident historique du premier harness Firefox setOffline: requêtes synthétiques publiques possibles, impact non établi; proxy fermé vérifié depuis, aucun nettoyage serveur."
           ]
         }
       ]
@@ -3653,14 +3654,14 @@
       "schemaVersion": 1,
       "id": "goal-publish-favorite-recovery-1037",
       "title": "Fusionner et publier la récupération des favoris 1.0.37",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
         {
           "id": "release",
           "title": "Valider fusionner pousser et déployer 1.0.37",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Tests locaux et archives installées passent",
             "main distant correspond au commit livré",
@@ -3690,7 +3691,11 @@
             "git commit",
             "git push origin"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify réussi; archives reproductibles 1.0.37 testées installées sur Chromium 153 et Firefox 155; lint, Archify all, docs/ADR et 14 tests web passent.",
+            "Fusion fast-forward et push main 7c33e9e réalisés. Worker final ee48b6be-752e-4e1e-a681-8ea0eb43a3dc déployé via plan 45308dc106f81947b46cb8412ddd07860e56ff4009678ba12db0696b02f0eb7c.",
+            "Deux canaries MISS puis VERIFIED, admissions serveur 177/176 ms et lectures 29/33 ms. Liens /download 1.0.37 et SHA-256 des deux archives publiques vérifiés après déploiement; détails docs/operations/cloudflare.md."
+          ]
         }
       ]
     }
