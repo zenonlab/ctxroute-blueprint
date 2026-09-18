@@ -3943,7 +3943,7 @@
       "schemaVersion": 1,
       "id": "goal-deliver-pipeline-1039",
       "title": "Livrer la pipeline fiabilisée en version 1.0.39",
-      "status": "BLOCKED",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -3979,7 +3979,7 @@
         {
           "id": "delivery",
           "title": "Déployer les archives immuables 1.0.39 et le Worker vérifié",
-          "status": "BLOCKED",
+          "status": "DONE",
           "acceptance": [
             "Plan fournisseur frais limité aux deux archives 1.0.39 et Worker",
             "SHA-256 des archives publiques et routes v3/v4 vérifiés",
@@ -4000,8 +4000,10 @@
             "git commit -m 'docs(release): record pipeline 1.0.39 deployment'"
           ],
           "evidence": [
-            "Inspection Cloudflare refusée avant toute mutation: wrangler queues list retourne No API token found. Authentification locale demandée; aucun plan appliqué, upload ou déploiement 1.0.39. Pointeur public 1.0.38 conservé.",
-            "Après authentification: réinspection et plans frais, uploads immuables vérifiés puis Worker; vérifier la limite documentée du lecteur historique v4 multipage."
+            "Plan uploads ea8571dd appliqué aux deux archives 1.0.39; SHA-256 publics identiques aux builds installés reproductibles. Pointeur avancé après vérification.",
+            "Plan Worker f4527afd appliqué; inspection confirme d0ee8131-fae9-4078-80e9-2e61be7ee847 à 100 %, aucune migration en attente. Cinq pages 200, routes Agenda v3/v4 200; pagination v3 génération stable/ETags distincts/304 vérifiée.",
+            "Canary installé 1.0.39: deux POST réels, deux admissions VERIFIED, trois lectures vérifiées, deux œuvres résolues. Pas de nouvelle collecte fournisseur prouvée; v4 sans modèle courant en attente du cycle hebdomadaire. Limite du lecteur 1.0.38 multipage documentée.",
+            "Web 14/14, docs/ADR et Archify publication showcase 9/9 passent. Archives historiques, données D1/R2, secrets, quotas et gateway conservés; aucun push."
           ]
         }
       ]

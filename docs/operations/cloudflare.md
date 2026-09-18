@@ -6,12 +6,12 @@ remain independent of this operational path.
 
 ## Inspect
 
-### Candidate pipeline 1.0.39
+### Publication pipeline 1.0.39
 
-La candidate locale du 19 septembre 2026 corrige les reprises R2/Queue,
+La version du 19 septembre 2026 corrige les reprises R2/Queue,
 la publication D1 et la propagation des modèles dans l'extension. Aucune
-migration D1 n'est nécessaire. Le pointeur public reste `1.0.38` tant que les
-deux nouvelles archives n'ont pas été publiées et relues avec leur SHA-256.
+migration D1 n'est nécessaire. Les deux nouvelles archives ont été publiées
+et relues avec leur SHA-256 avant avancement du pointeur vers `1.0.39`.
 
 Archives reproductibles par deux builds isolés, conservées sous
 `apps/extension/.output/packages/` :
@@ -27,14 +27,32 @@ reconstruit l'Agenda INSTANT/DATE et traite les 1532 fixtures plus ses quatre
 favoris initiaux, sans résolution inventée ni blocage. Ces profils synthétiques
 ne certifient pas la bibliothèque personnelle.
 
-L'inspection distante a échoué sur `wrangler queues list` avec
-`No API token found`, avant tout plan appliqué. Aucun upload ni déploiement
-1.0.39 n'a été effectué dans cette session. La lecture publique v4 testée pour
-le 19 septembre au 4 octobre retourne zéro modèle (`models-0-0`); elle ne
-prouve pas une collecte réussie. Après rétablissement de l'authentification,
-réinspecter les ressources, publier les deux ZIP via un plan frais, vérifier
-leurs empreintes publiques, puis avancer le pointeur et préparer le plan Worker.
-Conserver toutes les archives et données pour le rollback.
+Après un premier échec d'authentification, l'inspection a réussi : Worker
+`a66e751f-6a83-4757-bff6-2778bfb361bf` à 100 %, aucune migration en attente.
+Les deux uploads utilisent le plan
+`ea8571dd37142bef1cab97027a4ad29840fa6db2d399206654e3154b673f160c`.
+Leurs téléchargements publics correspondent aux empreintes ci-dessus.
+Le plan Worker, limité à `worker:tobirink-public-api`, est
+`f4527afdc4a59044f3b244d28c78e0abf97b8b1d4208c4ca4a6f38d6f8e5652c`.
+Toutes les anciennes archives et données restent conservées pour le rollback.
+
+Le Worker `d0ee8131-fae9-4078-80e9-2e61be7ee847` est confirmé à 100 %.
+Les cinq pages publiques répondent 200; `/download` contient les deux liens
+1.0.39. Agenda v3 et v4 répondent 200. Deux pages v3 partagent la même
+génération et possèdent des ETags différents; la requête conditionnelle de
+la même page répond 304. La route v4 n'a pas encore de modèles courants
+(`generatedAt` à l'époque Unix); v3 sert les annonces historiques. Aucune
+collecte supplémentaire n'a été forcée pour masquer cet état : la collecte
+hebdomadaire conserve sa cadence et une date nouvelle attend sa publication.
+
+Le canary installé 1.0.39 a réussi sur Chromium 153 : deux prélectures
+retardées de six secondes, deux POST réels du service worker, deux admissions
+déjà `VERIFIED`, trois lectures vérifiées et deux œuvres résolues après alarmes
+natives. Il prouve la lecture/admission et la propagation vers l'extension;
+il ne prouve pas une nouvelle collecte fournisseur ni une publication Agenda
+en production. Les tests locaux couvrent ces interruptions. Les compteurs
+D1/R2/fournisseurs/Queue restent séparés dans les diagnostics; aucune mesure
+de facturation distante n'est déduite de ce canary de cache.
 
 La correction d'ETag paginé requiert le lecteur 1.0.39 pour les réponses v4
 de plusieurs pages : le lecteur 1.0.38 compare encore leurs ETags entre eux.
