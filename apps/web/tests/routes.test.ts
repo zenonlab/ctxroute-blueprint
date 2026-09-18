@@ -5,6 +5,16 @@ import { publicDownloads } from '../app/download/page';
 import extensionPackage from '../../extension/package.json';
 import publishedExtension from '../published-extension.json';
 
+function compareVersions(left: string, right: string): number {
+  const leftParts = left.split('.').map(Number);
+  const rightParts = right.split('.').map(Number);
+  for (let index = 0; index < Math.max(leftParts.length, rightParts.length); index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
 describe('Workbench web routes', () => {
   it('bounds the home preview to four local works', () => {
     expect(webLibraryQuerySchema.parse({ facet: 'all', limit: 4 })).toEqual({ facet: 'all', limit: 4, sort: 'ADDED_DESC' });
@@ -28,12 +38,11 @@ describe('Workbench web routes', () => {
     ]);
   });
 
-  it('publishes only the provider-free candidate version', () => {
-    expect(extensionPackage.version).toBe('1.0.31');
-    expect(publishedExtension.version).toBe('1.0.31');
+  it('publishes only the archives selected by the public pointer', () => {
+    expect(compareVersions(extensionPackage.version, publishedExtension.version)).toBeGreaterThanOrEqual(0);
     expect(publicDownloads(publishedExtension.version)).toEqual([
-      { browser: 'Chrome', href: '/downloads/tobirink-chrome-mv3-1.0.31.zip' },
-      { browser: 'Firefox', href: '/downloads/tobirink-firefox-mv3-1.0.31.zip' },
+      { browser: 'Chrome', href: `/downloads/tobirink-chrome-mv3-${publishedExtension.version}.zip` },
+      { browser: 'Firefox', href: `/downloads/tobirink-firefox-mv3-${publishedExtension.version}.zip` },
     ]);
   });
 });

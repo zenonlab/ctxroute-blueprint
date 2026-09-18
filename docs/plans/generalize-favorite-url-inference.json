@@ -1,0 +1,37 @@
+{
+  "goalId": "goal-generalize-favorite-url-inference",
+  "title": "Généraliser l’inférence des titres et sorties depuis les URLs",
+  "approved": true,
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Déduire le titre et la progression depuis le titre et le slug",
+      "status": "TODO",
+      "acceptance": [
+        "Les segments URL reconnaissent les marqueurs chapter, chapitre, chap, ch, episode, ep et volume avec séparateurs courants.",
+        "Les identifiants et locales sont retirés uniquement quand le titre du favori corrobore le slug humain.",
+        "Les cas Bato et les cas existants restent propres et conservent leur progression.",
+        "Les tests du parseur et de l’évidence générique passent."
+      ],
+      "files": [
+        "packages/application/src/favorites/source-evidence.ts",
+        "packages/application/src/favorites/source-evidence.test.ts",
+        "packages/application/src/favorites/favorite-parser.test.ts",
+        "docs/decisions/ADR-0039-extension-release-versioning.md",
+        "docs/plans/generalize-favorite-url-inference.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm test --workspace @tobirink/application -- src/favorites/source-evidence.test.ts src/favorites/favorite-parser.test.ts",
+        "npm run typecheck",
+        "git diff --check"
+      ]
+    }
+  ],
+  "validationEvidence": [
+    "Tests ciblés du parseur et de l’évidence générique",
+    "Typecheck des workspaces",
+    "Diff vérifié sans whitespace errors"
+  ]
+}

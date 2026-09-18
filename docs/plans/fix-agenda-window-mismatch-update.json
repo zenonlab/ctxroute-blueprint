@@ -1,0 +1,10 @@
+{
+  "goalId": "goal-fix-agenda-window-mismatch",
+  "stepId": "step-1",
+  "status": "DONE",
+  "evidence": [
+    "npm run typecheck passe pour tous les workspaces.",
+    "npm test --workspace @tobirink/extension passe : 32 fichiers, 145 tests.",
+    "git diff --check passe; le listener onInstalled ne laisse plus de rejet non géré."
+  ]
+}

@@ -1,0 +1,217 @@
+{
+  "goalId": "goal-certify-and-consolidate-production",
+  "title": "Consolider et publier TobiRink 1.0.34",
+  "approved": true,
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Construire une candidate 1.0.34 cohérente",
+      "status": "TODO",
+      "acceptance": [
+        "Le listener onInstalled ne laisse échapper aucun rejet asynchrone.",
+        "Bato conserve le titre humain et la progression ch_67 malgré les préfixes numériques et la locale.",
+        "Comix retombe sur le titre humain au passage générique puis obtient son identité précise par la règle de site.",
+        "Un slug générique non corroboré ne devient pas l’identité retenue.",
+        "La source extension vaut 1.0.34 tandis que le pointeur publié reste 1.0.33.",
+        "Les tests ciblés, le typecheck, les validations documentaires et le dataflow showcase passent.",
+        "Le commit vérifié est fix(extension): prepare release 1.0.34."
+      ],
+      "files": [
+        "apps/extension/package.json",
+        "apps/extension/wxt-entrypoints/background.ts",
+        "apps/web/published-extension.json",
+        "apps/web/tests/routes.test.ts",
+        "package-lock.json",
+        "packages/application/src/favorites/source-evidence.ts",
+        "packages/application/src/favorites/source-evidence.test.ts",
+        "packages/application/src/favorites/favorite-parser.test.ts",
+        "packages/application/src/use-cases/import-favorite-sources.test.ts",
+        "docs/decisions/ADR-0039-extension-release-versioning.md",
+        "docs/release.md",
+        "docs/architecture/src/extension-delivery-validation.dataflow.json",
+        "docs/plans/fix-agenda-window-mismatch.json",
+        "docs/plans/fix-agenda-window-mismatch-update.json",
+        "docs/plans/generalize-favorite-url-inference.json",
+        "docs/plans/generalize-favorite-url-inference-update.json",
+        "docs/plans/certify-and-consolidate-production.json",
+        "docs/plans/certify-and-consolidate-production-update.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm test --workspace @tobirink/application -- src/favorites/source-evidence.test.ts src/favorites/favorite-parser.test.ts src/use-cases/import-favorite-sources.test.ts",
+        "npm test --workspace @tobirink/extension",
+        "npm test --workspace @tobirink/web -- tests/routes.test.ts",
+        "npm run typecheck",
+        "npm run validate:decisions",
+        "npm run validate:docs -- --all",
+        "npm run archify:validate -- extension-delivery-validation.dataflow",
+        "git diff --check",
+        "git commit -m fix(extension): prepare release 1.0.34"
+      ]
+    },
+    {
+      "id": "step-2",
+      "title": "Supprimer les anciens chemins d’exécution",
+      "status": "TODO",
+      "acceptance": [
+        "Aucun workflow GitHub Actions suivi ne subsiste dans le dépôt.",
+        "Les anciens entrypoints src/run.ts et src/agenda/cli.ts restent absents.",
+        "La documentation et le pipeline ne présentent que les gates locaux et le Worker Cloudflare.",
+        "Le remote Git local public-discovery est supprimé après approbation exacte de cette suppression.",
+        "Le commit vérifié est chore(pipeline): remove retired GitHub collectors."
+      ],
+      "files": [
+        "packages/public-discovery/.github/workflows/collect.yml",
+        "packages/public-discovery/.github/workflows/agenda.yml",
+        "scripts/ci-security-check.mjs",
+        "tests/ci-security.test.mjs",
+        "packages/public-discovery/README.md",
+        "docs/operations/cloudflare.md",
+        "docs/architecture/src/public-collector-pipeline.workflow.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "git ls-files",
+        "npm run test:ci-security",
+        "npm run validate:docs -- --all",
+        "npm run archify:validate -- public-collector-pipeline.workflow",
+        "git diff --check",
+        "git remote remove public-discovery",
+        "git commit -m chore(pipeline): remove retired GitHub collectors"
+      ]
+    },
+    {
+      "id": "step-3",
+      "title": "Corriger les métriques et rendre la DLQ exploitable",
+      "status": "TODO",
+      "acceptance": [
+        "providerRequests compte tous les appels HTTP fournisseur reconnus.",
+        "pagesRequested compte seulement les pages Agenda paginées réellement demandées et vaut zéro pour Discovery.",
+        "Un test prouve que les deux compteurs divergent.",
+        "La DLQ sans consumer est documentée avec rétention quatre jours, alerte avant vingt-quatre heures et opérations manuelles approuvées.",
+        "Aucun consumer, replay ou purge automatique de DLQ n’est créé.",
+        "Le commit vérifié est fix(observability): report collector pages truthfully."
+      ],
+      "files": [
+        "packages/public-discovery/src",
+        "apps/worker/src",
+        "docs/decisions/ADR-0053-collector-cost-observability.md",
+        "docs/operations/cloudflare.md",
+        "docs/architecture/src/public-discovery.dataflow.json",
+        "docs/architecture/src/virtual-agenda.dataflow.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run test:worker",
+        "npm run typecheck",
+        "npm run validate:docs -- --all",
+        "npm run archify:validate -- public-discovery.dataflow",
+        "npm run archify:validate -- virtual-agenda.dataflow",
+        "git diff --check",
+        "git commit -m fix(observability): report collector pages truthfully"
+      ]
+    },
+    {
+      "id": "step-4",
+      "title": "Sécuriser Deno et obtenir zéro avertissement",
+      "status": "TODO",
+      "acceptance": [
+        "La rotation Deno n’emploie pas --replace et conserve la clé précédente.",
+        "Le driver utilise la configuration canonique apps/provider-gateway/deno.jsonc.",
+        "Le deno.jsonc racine dupliqué est supprimé après confirmation explicite de la suppression.",
+        "Les symboles inutilisés et les trois avertissements regex sont supprimés sans changer les contrats.",
+        "ESLint, Oxlint et typecheck passent sans erreur ni avertissement.",
+        "Le commit vérifié est fix(infra): preserve gateway secret rotation."
+      ],
+      "files": [
+        "deno.jsonc",
+        "apps/provider-gateway/deno.jsonc",
+        "scripts/infra/provider-gateway-driver.mjs",
+        "tests/infra",
+        "packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run test:infra",
+        "npm run lint",
+        "npm run typecheck",
+        "git diff --check",
+        "git commit -m fix(infra): preserve gateway secret rotation"
+      ]
+    },
+    {
+      "id": "step-5",
+      "title": "Certifier et publier 1.0.34",
+      "status": "TODO",
+      "acceptance": [
+        "npm run verify et npm ls --all passent.",
+        "Deux productions successives des archives Chrome et Firefox ont des SHA-256 identiques.",
+        "Le plan fournisseur ne contient que les deux objets R2 versionnés et le Worker requis.",
+        "Après approbation fournisseur explicite, R2 est publié avant le Worker avec le digest exact.",
+        "Les archives distantes répondent 200 avec le bon type et le SHA-256 local.",
+        "La page /download annonce uniquement 1.0.34 et les preuves réelles sont documentées.",
+        "Le commit vérifié est chore(release): publish extension 1.0.34."
+      ],
+      "files": [
+        "apps/web/published-extension.json",
+        "docs/release.md",
+        "docs/decisions/ADR-0039-extension-release-versioning.md",
+        "docs/architecture/src/extension-delivery-validation.dataflow.json",
+        "docs/architecture/src/production-publication.dataflow.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run verify",
+        "npm ls --all",
+        "deterministic Chrome and Firefox package comparison",
+        "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+        "npm run infra:plan",
+        "npm run infra:apply with exact digest and allowlist after explicit approval",
+        "remote HTTP and SHA-256 verification",
+        "npm run archify:validate -- extension-delivery-validation.dataflow",
+        "npm run archify:validate -- production-publication.dataflow",
+        "git commit -m chore(release): publish extension 1.0.34"
+      ]
+    },
+    {
+      "id": "step-6",
+      "title": "Rétablir une source de vérité unique",
+      "status": "TODO",
+      "acceptance": [
+        "Le diff complet et les fichiers de gouvernance sont audités.",
+        ".codex/config.toml n’apparaît dans aucun commit.",
+        "npm run verify passe une dernière fois.",
+        "origin/main est toujours ancêtre du HEAD après fetch.",
+        "Après approbation explicite du push, la branche et main avancent sans force et pointent sur le même commit.",
+        "Les preuves finales sont enregistrées avec le commit docs(progress): record production certification."
+      ],
+      "files": [
+        ".project/progress.json",
+        "docs/progress.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".codex/hooks.json"
+      ],
+      "commands": [
+        "npm run verify",
+        "git fetch origin",
+        "git merge-base --is-ancestor origin/main HEAD",
+        "git commit -m docs(progress): record production certification",
+        "git push origin perf/adaptive-public-refresh after explicit approval",
+        "git push origin HEAD:main after explicit approval",
+        "git ls-remote origin"
+      ]
+    }
+  ],
+  "validationEvidence": [
+    "Plan validé en lecture seule sous l’identifiant goal-certify-and-consolidate-production.",
+    "Chaque étape reste bornée et produit un commit vérifié.",
+    "Suppressions, opérations fournisseur, déploiements et push requièrent leurs approbations explicites séparées.",
+    "La modification utilisateur .codex/config.toml reste exclue de tous les commits."
+  ]
+}

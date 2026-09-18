@@ -68,6 +68,32 @@ describe('favorite source evidence U-01…U-10', () => {
       title: 'Unrelated page',
     });
   });
+  it('infers a clean title from an identifier slug followed by a generic release marker', () => {
+    expect(extractFavoriteSourceEvidence({
+      sourceKey: 'bookmark-bato',
+      title: 'A Wannabe Golden Gangster | Special Episode 2 [END] | Read Free Manga Online',
+      url: 'https://bato.si/title/141645-en-a-wannabe-golden-gangster/3083720-ch_67',
+    })).toMatchObject({
+      canonicalUrl: 'https://bato.si/title/141645-en-a-wannabe-golden-gangster',
+      identityTransformations: ['numeric-routing-prefix'],
+      mediaKind: 'UNKNOWN',
+      release: { kind: 'chapter', value: 67 },
+      stableSlug: 'a-wannabe-golden-gangster',
+      title: 'a wannabe golden gangster',
+    });
+  });
+  it('falls back to the human title when a routing-prefixed slug is not corroborated', () => {
+    expect(extractFavoriteSourceEvidence({
+      sourceKey: 'bookmark-uncorroborated-routing-prefix',
+      title: 'Synthetic Journey Chapter 101',
+      url: 'https://reader.example/title/141645-en-another-series/3083720-ch_101',
+    })).toMatchObject({
+      mediaKind: 'UNKNOWN',
+      release: { kind: 'chapter', value: 101 },
+      sourceAdapter: 'generic-bookmark-release-v1',
+      title: 'Synthetic Journey',
+    });
+  });
   it.each([
     ['not a URL', 'INVALID_URL'],
     ['ftp://fixtures.tobirink.invalid/anime/frieren', 'NON_WEB_URL'],

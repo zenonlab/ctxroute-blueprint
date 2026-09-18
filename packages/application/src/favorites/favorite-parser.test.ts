@@ -1,8 +1,9 @@
 import { createFavoriteObservation, createSourceEvidence } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
 import { parseFavoriteObservation } from './favorite-parser';
+import { extractFavoriteSourceEvidence } from './source-evidence';
 
-const observation = (title: string) => createFavoriteObservation({ bookmarkId: 'parser', folderPath: [], observationRevision: 'r1', observationSequence: 1, observedAt: '2026-09-07T10:00:00.000Z', presence: 'observed', siblingOrder: 0, title, url: 'https://fixtures.tobirink.invalid/anime/work' });
+const observation = (title: string, url = 'https://fixtures.tobirink.invalid/anime/work') => createFavoriteObservation({ bookmarkId: 'parser', folderPath: [], observationRevision: 'r1', observationSequence: 1, observedAt: '2026-09-07T10:00:00.000Z', presence: 'observed', siblingOrder: 0, title, url });
 const evidence = (values = {}) => createSourceEvidence({ aliases: [], diagnostics: [], key: 'parser', mediaKind: 'ANIME', origin: 'https://fixtures.tobirink.invalid', path: '/anime/work', proofs: ['TITLE_SLUG'], sourceAdapter: 'fixture', strategy: 'generic', ...values });
 
 describe('favorite identity parser I-01…I-07', () => {
@@ -36,6 +37,12 @@ describe('favorite identity parser I-01…I-07', () => {
     observation('1674484774 Skeleton Soldier Couldnt Protect the Dungeon'),
     evidence({ identityTransformations: ['numeric-routing-prefix'], mediaKind: 'MANGA', rawSlug: '1674484774-skeleton-soldier-couldnt-protect-the-dungeon', release: { kind: 'chapter', provenance: 'URL_PATH', raw: 'chapter-51', value: 51 }, stableSlug: 'skeleton-soldier-couldnt-protect-the-dungeon' }),
   )).toMatchObject({ displayTitle: 'Skeleton Soldier Couldnt Protect the Dungeon', identityKey: 'skeleton soldier couldnt protect the dungeon', progress: { kind: 'chapter', value: 51 } }));
+  it('keeps the inferred URL title clean in the complete Bato flow', () => {
+    const title = 'A Wannabe Golden Gangster | Special Episode 2 [END] | Read Free Manga Online';
+    const url = 'https://bato.si/title/141645-en-a-wannabe-golden-gangster/3083720-ch_67';
+    const artifact = parseFavoriteObservation(observation(title, url), extractFavoriteSourceEvidence({ sourceKey: 'parser', title, url }));
+    expect(artifact).toMatchObject({ displayTitle: 'A Wannabe Golden Gangster', identityKey: 'a wannabe golden gangster', status: 'parsed' });
+  });
   it('preserves a complete parenthesized title and records bounded alias provenance', () => expect(parseFavoriteObservation(
     observation('Existence (Wangho)'), evidence({ mediaKind: 'MANGA', rawSlug: 'existence-wangho', stableSlug: 'existence-wangho' }),
   )).toMatchObject({

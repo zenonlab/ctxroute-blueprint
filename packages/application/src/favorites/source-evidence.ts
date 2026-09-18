@@ -27,6 +27,7 @@ const structuralSegments = new Set([
 ]);
 const releasePattern = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
 const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
+const numericReleasePattern = /^(\d{3,12})[-_.](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
 const localizedReleaseSuffixPattern = /(?:^|[-_.])(\d+(?:[.,]\d+)?)[-_.](?:vostfr|vf|vo|sub|dub)$/iu;
 
 interface StructuralIdentity { readonly slug: string; readonly transformed: boolean }
@@ -47,13 +48,16 @@ function stripLeadingRoutingIdentifier(slug: string, release: SourceEvidence['re
   const match = /^(\d{6,12})[-_.]+(.+)$/u.exec(slug);
   const prefix = match?.[1];
   const remainder = match?.[2];
-  const remainderKey = comparableIdentity(remainder ?? '');
-  const corroborated = prefix !== undefined && remainder !== undefined && segmentFavoriteTitle(observedTitle).segments
+  if (prefix === undefined || remainder === undefined) return { slug, transformed: false };
+  const candidates = [remainder, remainder.replace(/^[a-z]{2}[-_.]+/iu, '')];
+  const humanKeys = segmentFavoriteTitle(observedTitle).segments
     .filter((segment) => !segment.excluded)
-    .some((segment) => comparableIdentity(segment.cleaned).replace(new RegExp(`^${prefix}\\s+`, 'u'), '') === remainderKey);
-  return corroborated && /\p{L}/u.test(remainder ?? '')
-    ? { slug: remainder, transformed: true }
-    : { slug, transformed: false };
+    .flatMap((segment) => {
+      const value = segment.cleaned;
+      return [comparableIdentity(value), comparableIdentity(value.replace(new RegExp(`^${prefix}[-_. ]+`, 'u'), ''))];
+    });
+  const corroborated = candidates.find((candidate) => humanKeys.includes(comparableIdentity(candidate)) && /\p{L}/u.test(candidate));
+  return corroborated === undefined ? { slug, transformed: false } : { slug: corroborated, transformed: true };
 }
 
 function releaseKind(value: string): 'chapter' | 'episode' | 'volume' {
@@ -103,6 +107,14 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(',', '.')) };
     identityIndex -= 2;
   }
+  const numericRelease = numericReleasePattern.exec(decoded[identityIndex] ?? '');
+  if (numericRelease !== null) {
+    const label = numericRelease[2] ?? '';
+    const rawNumber = numericRelease[3] ?? '';
+    releaseSuffix = numericRelease[0];
+    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(',', '.')) };
+    identityIndex -= 1;
+  }
   const separated = releasePattern.exec(decoded[identityIndex] ?? '');
   if (separated !== null) {
     identityIndex -= 1;
@@ -138,6 +150,12 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     ? { slug: '', transformed: false }
     : stripLeadingRoutingIdentifier(stableSlug, release, input.title);
   stableSlug = structuralIdentity.slug || stableSlug;
+  const hasUnverifiedRoutingPrefix = stableSlug !== undefined
+    && /^(?:\d{7,12}|\d{6}[-_.]+[a-z]{2}|[a-z]{2}\d{3,12})[-_.]+/iu.test(stableSlug)
+    && !structuralIdentity.transformed;
+  if (release !== undefined && hasUnverifiedRoutingPrefix) {
+    return bookmarkTitleReleaseEvidence(input, url, release) ?? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED');
+  }
   const normalizedSlug = stableSlug?.toLowerCase();
   if (stableSlug === undefined || observedSlug === undefined || normalizedSlug === undefined || /^\d+$/u.test(normalizedSlug) || structuralSegments.has(normalizedSlug)) {
     return release === undefined ? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED')

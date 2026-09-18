@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-certify-and-consolidate-production",
+  "stepId": "step-1",
+  "status": "DONE",
+  "evidence": [
+    "Application 81/81, Extension 145/145 et Web 5/5 passent; Bato conserve A Wannabe Golden Gangster/chapter 67, Comix produit Synthetic Journey au passage générique puis synthetic journey/MANGA avec site-rules-v3.",
+    "La source extension vaut 1.0.34 et le pointeur publié reste 1.0.33; le test Web dérive les liens du pointeur et impose source >= publiée sans version codée en dur.",
+    "Tous les typechecks workspace, validate:decisions, validate:docs -- --all et git diff --check passent.",
+    "Archify extension-delivery-validation passe showcase 9/9 avec 0 erreur et 0 avertissement."
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-generalize-favorite-url-inference",
+  "stepId": "step-1",
+  "status": "DONE",
+  "evidence": [
+    "L’évidence générique reconnaît les releases préfixées par un identifiant, dont le format bato.si numeric-id-ch_67.",
+    "Les préfixes numériques et locales sont retirés uniquement après corroboration par un segment humain du titre du favori.",
+    "Le cas Bato produit stableSlug a-wannabe-golden-gangster et le titre affiché A Wannabe Golden Gangster; les formats Asura et routes existants restent couverts.",
+    "Tests source-evidence et favorite-parser: 61/61; tous les typechecks workspace passent; git diff --check passe."
+  ]
+}

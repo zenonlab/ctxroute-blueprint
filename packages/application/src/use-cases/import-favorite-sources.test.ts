@@ -42,8 +42,10 @@ describe('importFavoriteSources', () => {
     expect(genericArtifact?.artifact).toMatchObject({ displayTitle: 'Synthetic Journey', mediaKind: 'UNKNOWN', sourceAdapterVersion: 'source-adapter-v3:generic-bookmark-release-v1' });
     await importFavoriteSources([input], storage, importedAt, createFavoriteSiteAdapters(bundledFavoriteSiteRules));
     const [after] = await storage.listFavoriteSources({ limit: 1 });
+    const siteArtifact = after === undefined ? undefined : await storage.getFavoriteParseArtifact(after.id);
     expect(after?.id).toBe(before?.id);
     expect(after?.resolution).toBeUndefined();
+    expect(siteArtifact?.artifact).toMatchObject({ displayTitle: 'synthetic journey', mediaKind: 'MANGA', sourceAdapterVersion: 'source-adapter-v3:site-rules-v3:comix-title-true' });
     expect((await storage.getFavoriteResolutionTask('favorite-resolution_4_3432'))?.state).toBe('READY');
     expect((await storage.listReviews({ status: 'pending', limit: 20 })).length).toBe(0);
   });

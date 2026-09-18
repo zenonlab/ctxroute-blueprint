@@ -122,14 +122,16 @@ export default defineBackground({
       }
       await runFavoriteResolution(inventoryRequested);
     };
-    browser.runtime.onInstalled.addListener(async () => {
-      await ensureReminderAlarm();
-      await ensureFavoriteInventoryAuditAlarm();
-      await diagnostics.initializeEnabled().catch(() => undefined);
-      await privateStorage.ensureReady();
-      await reconcileFavorites(true);
-      await repairLibraryProjection();
-      await resumeNotifications();
+    browser.runtime.onInstalled.addListener(() => {
+      void (async () => {
+        await ensureReminderAlarm();
+        await ensureFavoriteInventoryAuditAlarm();
+        await diagnostics.initializeEnabled().catch(() => undefined);
+        await privateStorage.ensureReady();
+        await reconcileFavorites(true);
+        await repairLibraryProjection();
+        await resumeNotifications();
+      })().catch(() => undefined);
     });
     const restoreFavoriteWake = async () => {
       if (await resolutionPaused()) {

@@ -185,3 +185,20 @@
 - [x] **Découpler la version publiée de la version source et verrouiller le contrat** — DONE _(evidence: Web 14/14 et npm run verify complets réussis; build statique /download contient seulement 1.0.30., Archify production-publication: showcase 9/9, 0 erreur/avertissement; visual-check sans overflow aux quatre résolutions en clair/sombre., Le pointeur apps/web/published-extension.json reste 1.0.30 tandis que la candidate source est 1.0.31; ADR-0036/0039 et release.md alignés.)_
 - [x] **Supprimer uniquement la table relationnelle et la Queue orphelines** — DONE _(evidence: Backup D1 frais ignoré: 978242 octets, SHA-256 16261b340b2e1118e3a5f9b6a7f59fbc10a20a2b957e7bbdf1500aee31c23f76; plan borné b3a217a0561d3174499527b46dc21732ebd565981b5c7ee1937c38e9b03bae38., Migration 0025 appliquée et Queue tobirink-jobs-production supprimée via la gate; table catalogue_work_relations absente, aucune migration restante, Queues Discovery principale/DLQ intactes., Agenda préservé à 740 événements courants et 3 générations; D1 réduit de 1273856 à 1257472 octets; tests infra 38/38 et D1 30/30 passent.)_
 - [x] **Déployer, pousser et certifier le résultat** — DONE _(evidence: Publication corrigée: apps/web/published-extension.json pointe 1.0.31; /download, ZIP Chrome et ZIP Firefox répondent 200 et les hashes distants correspondent exactement aux archives locales., Chrome 1.0.31 installé: smoke Review hors ligne, convergence automatique des favoris et Agenda virtuel sans requête fournisseur réussissent; manifest uniquement https://tobirink.com/*, sans DNR ni origines fournisseur., R2 promotion df8f2d8beaa37dd01095338998d3962de924bc30b3b875c27acfe109f33d715b puis Worker plan a63179af88b96eae46f3a57a56863f9a6209f283c0642f37c5f73cf1a7a0dbea appliqués; Worker 25589148-ce66-43ab-9634-ed6a6a635f10 sert 100 %, cron dimanche 03:23 UTC conservé.)_
+
+## Empêcher les erreurs Agenda non gérées dans le service worker — DONE
+
+- [x] **Sécuriser le listener d’installation et valider l’extension** — DONE _(evidence: npm run typecheck passe pour tous les workspaces., npm test --workspace @tobirink/extension passe : 32 fichiers, 145 tests., git diff --check passe; le listener onInstalled ne laisse plus de rejet non géré.)_
+
+## Généraliser l’inférence des titres et sorties depuis les URLs — DONE
+
+- [x] **Déduire le titre et la progression depuis le titre et le slug** — DONE _(evidence: L’évidence générique reconnaît les releases préfixées par un identifiant, dont le format bato.si numeric-id-ch_67., Les préfixes numériques et locales sont retirés uniquement après corroboration par un segment humain du titre du favori., Le cas Bato produit stableSlug a-wannabe-golden-gangster et le titre affiché A Wannabe Golden Gangster; les formats Asura et routes existants restent couverts.)_
+
+## Consolider et publier TobiRink 1.0.34 — ACTIVE
+
+- [x] **Construire une candidate 1.0.34 cohérente** — DONE _(evidence: Application 81/81, Extension 145/145 et Web 5/5 passent; Bato conserve A Wannabe Golden Gangster/chapter 67, Comix produit Synthetic Journey au passage générique puis synthetic journey/MANGA avec site-rules-v3., La source extension vaut 1.0.34 et le pointeur publié reste 1.0.33; le test Web dérive les liens du pointeur et impose source >= publiée sans version codée en dur., Tous les typechecks workspace, validate:decisions, validate:docs -- --all et git diff --check passent.)_
+- [ ] **Supprimer les anciens chemins d’exécution** — PENDING
+- [ ] **Corriger les métriques et rendre la DLQ exploitable** — PENDING
+- [ ] **Sécuriser Deno et obtenir zéro avertissement** — PENDING
+- [ ] **Certifier et publier 1.0.34** — PENDING
+- [ ] **Rétablir une source de vérité unique** — PENDING

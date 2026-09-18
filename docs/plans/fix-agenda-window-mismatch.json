@@ -1,0 +1,32 @@
+{
+  "goalId": "goal-fix-agenda-window-mismatch",
+  "title": "Empêcher les erreurs Agenda non gérées dans le service worker",
+  "approved": true,
+  "steps": [
+    {
+      "id": "step-1",
+      "title": "Sécuriser le listener d’installation et valider l’extension",
+      "status": "TODO",
+      "acceptance": [
+        "Une erreur de rafraîchissement Agenda ne produit plus de promesse non gérée dans le service worker.",
+        "Le comportement de cache et les autres traitements d’installation restent inchangés.",
+        "Le typecheck et les tests ciblés de l’extension passent."
+      ],
+      "files": [
+        "apps/extension/wxt-entrypoints/background.ts",
+        "docs/plans/fix-agenda-window-mismatch.json",
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "npm run typecheck",
+        "npm test --workspace @tobirink/extension",
+        "git diff --check"
+      ]
+    }
+  ],
+  "validationEvidence": [
+    "Typecheck et tests ciblés de l’extension",
+    "Diff vérifié sans whitespace errors"
+  ]
+}

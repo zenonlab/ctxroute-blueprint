@@ -82,6 +82,13 @@ au workflow GitHub public vérifié.
 règle DNR MangaUpdates et la restauration directe d’identité. Les parcours
 automatiques comme manuels passent désormais exclusivement par Public
 Discovery v3 et le cache Agenda partagé.
+`1.0.33` est la version publiée immuable. La candidate `1.0.34` absorbe les
+rejets du rafraîchissement Agenda dans le service worker afin qu’une génération
+publique invalide ne produise pas de promesse non gérée. Son inférence générique
+reconnaît les marqueurs de sortie avec leurs séparateurs courants et ne retire
+les identifiants de routage ou les locales que lorsque le slug humain est
+corroboré par le titre du favori. En l’absence de corroboration, elle revient au
+titre humain avant l’application éventuelle d’une règle de site plus précise.
 The version in `apps/extension/package.json` remains the single WXT and archive
 candidate source. The static download page follows the separately versioned
 `apps/web/published-extension.json` publication pointer, which is advanced only

@@ -77,9 +77,11 @@ Cloudflare et sa propre étape destructive.
 
 ## Build a release candidate
 
-The current production archives are `1.0.31`, published after the
+The current production archives are `1.0.33`, published after the
 provider-free candidate passed the installed Chrome and Agenda smoke tests.
-The repository source and public pointer now agree on `1.0.31`.
+The repository source is the `1.0.34` candidate while the public pointer remains
+on the immutable `1.0.33` archives until both replacement packages are uploaded
+and verified.
 `apps/extension/package.json` is the candidate version source: WXT reads it for
 both manifests and the packager reads it for ZIP names. The download page reads
 `apps/web/published-extension.json`; advance that pointer only with both
