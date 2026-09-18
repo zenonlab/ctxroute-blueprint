@@ -3934,6 +3934,70 @@
           "evidence": []
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-deliver-pipeline-1039",
+      "title": "Livrer la pipeline fiabilisée en version 1.0.39",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "candidate",
+          "title": "Versionner la candidate immuable 1.0.39",
+          "status": "DONE",
+          "acceptance": [
+            "Source 1.0.39; pointeur 1.0.38 conservé jusqu'aux uploads vérifiés",
+            "Archives existantes conservées; aucune dépendance changée"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "apps/web/published-extension.json",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/architecture/src/production-publication.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run typecheck",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- production-publication.dataflow",
+            "git diff --check",
+            "git commit -m 'chore(release): prepare pipeline reliability 1.0.39'"
+          ],
+          "evidence": [
+            "Source et lockfile 1.0.39; pointeur public 1.0.38 inchangé conformément ADR-0039. Typechecks complets, docs/ADR et Archify publication showcase 9/9 passent."
+          ]
+        },
+        {
+          "id": "delivery",
+          "title": "Déployer les archives immuables 1.0.39 et le Worker vérifié",
+          "status": "TODO",
+          "acceptance": [
+            "Plan fournisseur frais limité aux deux archives 1.0.39 et Worker",
+            "SHA-256 des archives publiques et routes v3/v4 vérifiés",
+            "Rollback conserve objets R2 et données D1; aucun secret quota gateway dépendance modifié"
+          ],
+          "files": [
+            "docs/operations/cloudflare.md",
+            "apps/web/published-extension.json",
+            "docs/architecture/src/production-publication.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "node scripts/infra/installed-discovery-canary.mjs <archive>",
+            "git commit -m 'docs(release): record pipeline 1.0.39 deployment'"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

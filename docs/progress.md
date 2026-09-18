@@ -250,3 +250,8 @@
 - [x] **Aligner modèles D1 dates et contrats publics** — DONE _(evidence: Worker 132/132, Agenda applicatif 14/14 et adaptateurs R2 20/20 passent; hiatus puis reprise via alias inchangé, report, absence et annulation explicite couverts., Typechecks complets, anti-slop, docs/ADR et Archify showcase 9/9 sans diagnostic passent. Génération commune v3/v4, ETag par page, données confirmées textuelles et observations distinctes des annonces; aucune migration nécessaire.)_
 - [x] **Propager mises à jour et fiabiliser parsing local** — DONE _(evidence: Application 399/399, contrats 14/14, extension 149/149 puis notifications 7/7, loader/cache 19/19; parser 11 passés/1 oracle externe ignoré dont corpus 1532/1400., Contrats IndexedDB et migrations Chromium passent: report et annulation invalident la notification, historique/Work conservés. Typechecks, anti-slop, docs/ADR et Archify showcase 9/9 passent. Aucun changement de règle parser; rappel désactivé préservé.)_
 - [ ] **Certifier parcours et préparer livraison** — PENDING
+
+## Livrer la pipeline fiabilisée en version 1.0.39 — ACTIVE
+
+- [x] **Versionner la candidate immuable 1.0.39** — DONE _(evidence: Source et lockfile 1.0.39; pointeur public 1.0.38 inchangé conformément ADR-0039. Typechecks complets, docs/ADR et Archify publication showcase 9/9 passent.)_
+- [ ] **Déployer les archives immuables 1.0.39 et le Worker vérifié** — PENDING
