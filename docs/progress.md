@@ -197,7 +197,7 @@
 ## Consolider et publier TobiRink 1.0.34 — ACTIVE
 
 - [x] **Construire une candidate 1.0.34 cohérente** — DONE _(evidence: Application 81/81, Extension 145/145 et Web 5/5 passent; Bato conserve A Wannabe Golden Gangster/chapter 67, Comix produit Synthetic Journey au passage générique puis synthetic journey/MANGA avec site-rules-v3., La source extension vaut 1.0.34 et le pointeur publié reste 1.0.33; le test Web dérive les liens du pointeur et impose source >= publiée sans version codée en dur., Tous les typechecks workspace, validate:decisions, validate:docs -- --all et git diff --check passent.)_
-- [ ] **Supprimer les anciens chemins d’exécution** — PENDING
+- [x] **Supprimer les anciens chemins d’exécution** — DONE _(evidence: Les workflows suivis packages/public-discovery/.github/workflows/collect.yml et agenda.yml sont supprimés; le gate inspecte maintenant tous les chemins suivis avec git ls-files et interdit aussi src/run.ts et src/agenda/cli.ts., Le remote Git local public-discovery a été retiré; aucun dépôt distant ni workflow distant n’a été modifié., Le README du package et le diagramme public-pipeline décrivaient déjà le runtime local + Worker sans workflow; production-publication.dataflow passe showcase 9/9 avec 0 erreur et 0 avertissement.)_
 - [ ] **Corriger les métriques et rendre la DLQ exploitable** — PENDING
 - [ ] **Sécuriser Deno et obtenir zéro avertissement** — PENDING
 - [ ] **Certifier et publier 1.0.34** — PENDING

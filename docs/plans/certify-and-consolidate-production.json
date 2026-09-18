@@ -69,6 +69,7 @@
         "packages/public-discovery/README.md",
         "docs/operations/cloudflare.md",
         "docs/architecture/src/public-collector-pipeline.workflow.json",
+        "docs/plans/certify-and-consolidate-production-step-2-update.json",
         ".project/progress.json",
         "docs/progress.md"
       ],

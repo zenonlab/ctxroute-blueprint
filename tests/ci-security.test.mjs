@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,11 +9,13 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const read = path => readFileSync(join(root, path), 'utf8');
 
 test('GitHub Actions runtime remains retired', () => {
-  const workflowDirectory = join(root, '.github/workflows');
+  const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
   assert.equal(
-    !existsSync(workflowDirectory) || readdirSync(workflowDirectory).length === 0,
-    true,
+    tracked.some((path) => /(^|\/)\.github\/workflows\//u.test(path)),
+    false,
   );
+  assert.equal(tracked.includes('src/run.ts'), false);
+  assert.equal(tracked.includes('src/agenda/cli.ts'), false);
 });
 
 test('local verification retains the complete quality boundary', () => {

@@ -2962,7 +2962,7 @@
         {
           "id": "step-2",
           "title": "Supprimer les anciens chemins d’exécution",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Aucun workflow GitHub Actions suivi ne subsiste dans le dépôt.",
             "Les anciens entrypoints src/run.ts et src/agenda/cli.ts restent absents.",
@@ -2990,7 +2990,12 @@
             "git remote remove public-discovery",
             "git commit -m chore(pipeline): remove retired GitHub collectors"
           ],
-          "evidence": []
+          "evidence": [
+            "Les workflows suivis packages/public-discovery/.github/workflows/collect.yml et agenda.yml sont supprimés; le gate inspecte maintenant tous les chemins suivis avec git ls-files et interdit aussi src/run.ts et src/agenda/cli.ts.",
+            "Le remote Git local public-discovery a été retiré; aucun dépôt distant ni workflow distant n’a été modifié.",
+            "Le README du package et le diagramme public-pipeline décrivaient déjà le runtime local + Worker sans workflow; production-publication.dataflow passe showcase 9/9 avec 0 erreur et 0 avertissement.",
+            "git diff --check et les validations documentaires passent; commit vérifié chore(pipeline): remove retired GitHub collectors."
+          ]
         },
         {
           "id": "step-3",
