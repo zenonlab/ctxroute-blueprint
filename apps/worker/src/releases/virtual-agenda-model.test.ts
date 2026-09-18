@@ -5,6 +5,61 @@ import { D1PublicReleaseCalendarAdapter } from './public-release-calendar';
 import { D1AgendaCollectionAdapter } from './public-release-collectors';
 
 describe('virtual Agenda model publication', () => {
+  const laneInput = {
+    provider: 'anilist' as const, scheduledFor: '2026-09-20T03:23:00.000Z',
+    window: { from: '2026-09-20', to: '2026-10-20' },
+    now: '2026-09-20T03:23:00.000Z', leaseUntil: '2026-09-20T03:24:00.000Z',
+    tokenDigest: 'a'.repeat(64), collectionId: 'resume-regression',
+  };
+  const checkpoint = {
+    complete: false, events: [], page: 1, nextPage: 2,
+    provider: 'anilist' as const, received: 0, skippedUnidentified: 0,
+  };
+
+  it('returns null on real R2 precondition failures and leaves the original object intact', async () => {
+    const key = 'regressions/conditional.json';
+    const first = await env.RELEASE_SNAPSHOTS.put(key, 'original', { onlyIf: { etagDoesNotMatch: '*' } });
+    expect(first).not.toBeNull();
+    await expect(env.RELEASE_SNAPSHOTS.put(key, 'replacement', { onlyIf: { etagDoesNotMatch: '*' } })).resolves.toBeNull();
+    await expect(env.RELEASE_SNAPSHOTS.put(key, 'replacement', { onlyIf: { etagMatches: 'wrong-etag' } })).resolves.toBeNull();
+    expect(await (await env.RELEASE_SNAPSHOTS.get(key))?.text()).toBe('original');
+  });
+
+  // These executable regression contracts must pass normally after the recovery step.
+  it.fails('grants exactly one concurrent lane claim under real R2 preconditions', async () => {
+    const store = new R2AgendaOperationStore(env.RELEASE_SNAPSHOTS, 'regressions/concurrent');
+    const results = await Promise.all([
+      store.claimLane(laneInput),
+      store.claimLane({ ...laneInput, tokenDigest: 'b'.repeat(64) }),
+    ]);
+    expect(results.filter(result => result.status === 'claimed')).toHaveLength(1);
+  });
+
+  it.fails('assembles validated pages written under an earlier lease after resume', async () => {
+    const store = new R2AgendaOperationStore(env.RELEASE_SNAPSHOTS, 'regressions/resume');
+    const state = new D1AgendaCollectionAdapter(env.PUBLIC_DB, store);
+    const first = await state.claimLane(laneInput);
+    if (first.status !== 'claimed') throw new Error('Expected initial claim.');
+    await state.savePage(first.claim, checkpoint, laneInput.now);
+    const resumed = await state.claimLane({ ...laneInput, now: laneInput.leaseUntil, leaseUntil: '2026-09-20T03:25:00.000Z', tokenDigest: 'b'.repeat(64) });
+    if (resumed.status !== 'claimed') throw new Error('Expected resumed claim.');
+    expect(resumed.claim).toMatchObject({ collectionId: first.claim.collectionId, nextPage: 2 });
+    await state.savePage(resumed.claim, { complete: true, events: [], page: 2, provider: 'anilist', received: 0, skippedUnidentified: 0 }, laneInput.leaseUntil);
+    await expect(state.completeLane({ checkedAt: laneInput.leaseUntil, claim: resumed.claim, provider: 'anilist', scheduledFor: laneInput.scheduledFor }))
+      .resolves.toMatchObject({ events: [] });
+  });
+
+  it.fails('does not overwrite an accepted page when a stale owner attempts another save', async () => {
+    const store = new R2AgendaOperationStore(env.RELEASE_SNAPSHOTS, 'regressions/stale-page');
+    const state = new D1AgendaCollectionAdapter(env.PUBLIC_DB, store);
+    const first = await state.claimLane(laneInput);
+    if (first.status !== 'claimed') throw new Error('Expected initial claim.');
+    await state.savePage(first.claim, checkpoint, laneInput.now);
+    await state.claimLane({ ...laneInput, now: laneInput.leaseUntil, leaseUntil: '2026-09-20T03:25:00.000Z', tokenDigest: 'b'.repeat(64) });
+    await expect(state.savePage(first.claim, { ...checkpoint, received: 999 }, laneInput.leaseUntil)).rejects.toThrow();
+    expect(await store.readPageVersion(`pages/anilist/${first.claim.collectionId}/1`)).toEqual(checkpoint);
+  });
+
   it('stores complete multi-page checkpoints in R2 before completing the D1 pointer', async () => {
     await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS);
     const state = new D1AgendaCollectionAdapter(env.PUBLIC_DB, new R2AgendaOperationStore(env.RELEASE_SNAPSHOTS));

@@ -10,7 +10,7 @@
         "id": "agenda-hebdomadaire",
         "label": "Agenda hebdomadaire",
         "focus": ["weeklyCron", "admissionQueue", "agendaLanes", "operationsR2", "catalogueD1", "privateIndexedDb"],
-        "note": "Une collecte hebdomadaire conserve douze observations et ne publie un modèle compact que si son contenu change."
+        "note": "Frontières de reprise : précondition R2, expiration du bail, pages validées, snapshot complet et publication D1."
       },
       {
         "id": "decouverte-immediate",
@@ -67,7 +67,7 @@
       "items": [
         "Agenda, Discovery et réhydratation échouent indépendamment",
         "Le dernier modèle ou profil vérifié reste servi",
-        "Une publication remplace l’ancienne vue seulement après validation",
+        "La reprise après interruption R2 ou D1 reste à certifier",
         "v3 lit les snapshots R2 et complète une lane absente depuis la projection legacy"
       ]
     },

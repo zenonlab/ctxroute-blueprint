@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { R2AgendaOperationStore } from './r2-agenda-operation-store';
 
 class MemoryBucket {
@@ -19,6 +19,46 @@ class MemoryBucket {
 }
 
 describe('R2AgendaOperationStore', () => {
+  const laneInput = {
+    provider: 'anilist' as const, scheduledFor: '2026-09-20T03:23:00.000Z',
+    window: { from: '2026-09-20', to: '2026-10-20' },
+    now: '2026-09-20T03:23:00.000Z', leaseUntil: '2026-09-20T03:24:00.000Z',
+    tokenDigest: 'a'.repeat(64), collectionId: 'resume-regression',
+  };
+
+  // Expected failures are removed by the following recovery step.
+  it.fails('propagates R2 transport failure instead of reporting a live lease', async () => {
+    const bucket = new MemoryBucket();
+    vi.spyOn(bucket, 'put').mockRejectedValueOnce(new Error('r2-transport-unavailable'));
+    await expect(new R2AgendaOperationStore(bucket).claimLane(laneInput)).rejects.toThrow('r2-transport-unavailable');
+  });
+
+  it('retains collection identity and checkpoint when another owner resumes an expired lease', async () => {
+    const store = new R2AgendaOperationStore(new MemoryBucket());
+    await expect(store.claimLane(laneInput)).resolves.toMatchObject({ status: 'claimed' });
+    await store.advanceLane({ ...laneInput, checkpoint: {
+      complete: false, events: [], page: 1, nextPage: 2, provider: 'anilist', received: 3, skippedUnidentified: 1,
+    } });
+    await expect(store.claimLane({ ...laneInput, tokenDigest: 'b'.repeat(64) })).resolves.toMatchObject({ status: 'leased' });
+    await expect(store.claimLane({ ...laneInput, now: laneInput.leaseUntil, leaseUntil: '2026-09-20T03:25:00.000Z', tokenDigest: 'b'.repeat(64), collectionId: 'replacement' }))
+      .resolves.toMatchObject({ status: 'claimed', claim: { collectionId: laneInput.collectionId, nextPage: 2, received: 3, skippedUnidentified: 1, tokenDigest: 'b'.repeat(64) } });
+    await expect(store.advanceLane({ ...laneInput, now: laneInput.leaseUntil, checkpoint: {
+      complete: true, events: [], page: 2, provider: 'anilist', received: 4, skippedUnidentified: 1,
+    } })).rejects.toThrow('agenda-lane-lease-lost');
+  });
+
+  it('rejects checkpoint and active pointer changes at the exact lease expiry', async () => {
+    const store = new R2AgendaOperationStore(new MemoryBucket());
+    await store.claimLane(laneInput);
+    const before = await store.readLane('anilist');
+    await expect(store.advanceLane({ ...laneInput, now: laneInput.leaseUntil, checkpoint: {
+      complete: true, events: [], page: 1, provider: 'anilist', received: 0, skippedUnidentified: 0,
+    } })).rejects.toThrow('agenda-lane-lease-lost');
+    await expect(store.completeLane({ ...laneInput, checkedAt: laneInput.leaseUntil, digest: 'd'.repeat(64), changed: true }))
+      .rejects.toThrow('agenda-lane-lease-lost');
+    expect(await store.readLane('anilist')).toEqual(before);
+  });
+
   it('deduplicates and retains only twelve observations with ownership verification', async () => {
     const store = new R2AgendaOperationStore(new MemoryBucket());
     const observations = Array.from({ length: 14 }, (_, index) => ({ chapter: index + 1, releasedOn: `2026-09-${String(index + 1).padStart(2, '0')}` }));

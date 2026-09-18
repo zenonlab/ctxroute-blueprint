@@ -242,3 +242,11 @@
 ## Publier en autonomie le correctif d’émission 1.0.38 — DONE
 
 - [x] **Certifier les archives et publier 1.0.38** — DONE _(evidence: npm run verify réussi; builds 1.0.38 reproductibles; corpus 1532/1400 installé sur Chromium 153 et Firefox 155 validé., Archive installée: deux POST réels après prélecture de 6 s, PENDING puis VERIFIED avec un appel fournisseur; deux résolutions par alarmes natives. Nouvelle exécution après déploiement: deux POST VERIFIED et deux résolutions., Fusion et push main bdb7eea réalisés; archives R2 publiques aux SHA-256 attendus, /download 1.0.38 vérifié. Worker a66e751f-6a83-4757-bff6-2778bfb361bf actif à 100 %, aucune migration. Preuves docs/operations/cloudflare.md.)_
+
+## Fiabiliser la pipeline avec D1 canonique et R2 opérationnel — ACTIVE
+
+- [x] **Reproduire les frontières défaillantes** — DONE _(evidence: 13 tests ciblés exécutés: 9 succès et 4 défauts reproduits par it.fails (réseau, concurrence R2, ancien bail, écrasement)., Typechecks Worker/Cloudflare et validate:docs passent; Archify showcase 9/9, 0 erreur/avertissement; diff audité. Aucun état privé ni déploiement certifié.)_
+- [ ] **Fiabiliser reprise R2 Queue et publication durable** — PENDING
+- [ ] **Aligner modèles D1 dates et contrats publics** — PENDING
+- [ ] **Propager mises à jour et fiabiliser parsing local** — PENDING
+- [ ] **Certifier parcours et préparer livraison** — PENDING

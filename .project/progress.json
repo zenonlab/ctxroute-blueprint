@@ -3751,6 +3751,176 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-pipeline-d1-r2-reliability",
+      "title": "Fiabiliser la pipeline avec D1 canonique et R2 opérationnel",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "regressions",
+          "title": "Reproduire les frontières défaillantes",
+          "status": "DONE",
+          "acceptance": [
+            "Régressions R2 conditionnelles et reprise sous nouveau bail reproduites explicitement",
+            "Contrôles expiration et concurrence couverts sur R2 workerd",
+            "Diff audité et limites de certification documentées"
+          ],
+          "files": [
+            "packages/adapters-cloudflare/src/releases/r2-agenda-operation-store.test.ts",
+            "apps/worker/src/releases/virtual-agenda-model.test.ts",
+            "docs/architecture/src/adaptive-public-refresh.dataflow.json",
+            "docs/02-quality-strategy.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "git switch -c fix/pipeline-reliability",
+            "npm test --workspace @tobirink/adapters-cloudflare -- src/releases/r2-agenda-operation-store.test.ts",
+            "npm test --workspace @tobirink/worker -- src/releases/virtual-agenda-model.test.ts",
+            "npm run typecheck --workspace @tobirink/adapters-cloudflare",
+            "npm run typecheck --workspace @tobirink/worker",
+            "npm run validate:docs -- --all",
+            "git diff --check",
+            "git commit -m 'test(agenda): reproduce R2 ownership and resume failures'"
+          ],
+          "evidence": [
+            "13 tests ciblés exécutés: 9 succès et 4 défauts reproduits par it.fails (réseau, concurrence R2, ancien bail, écrasement).",
+            "Typechecks Worker/Cloudflare et validate:docs passent; Archify showcase 9/9, 0 erreur/avertissement; diff audité. Aucun état privé ni déploiement certifié."
+          ]
+        },
+        {
+          "id": "recovery",
+          "title": "Fiabiliser reprise R2 Queue et publication durable",
+          "status": "TODO",
+          "acceptance": [
+            "Pages immuables réutilisables et bail expiré inopérant",
+            "Publication D1 rejouable sans fournisseurs",
+            "Signal stable et reprise bornée sans nouveau cron"
+          ],
+          "files": [
+            "packages/adapters-cloudflare/src/releases/**",
+            "apps/worker/src/**",
+            "packages/public-discovery/src/**",
+            "docs/architecture/src/**",
+            "docs/decisions/ADR-0058-virtual-agenda-r2-operations.md",
+            "docs/operations/**",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:agenda",
+            "npm run test:worker",
+            "npm run typecheck",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m 'fix(agenda): resume durable R2 and Queue publication'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "canonical",
+          "title": "Aligner modèles D1 dates et contrats publics",
+          "status": "TODO",
+          "acceptance": [
+            "Hiatus reprise report et annulation reflétés dans profil courant",
+            "Contenu inchangé sans réécriture métier",
+            "Révisions pagination ETag cohérents et migrations seulement additives"
+          ],
+          "files": [
+            "apps/worker/**",
+            "packages/public-discovery/**",
+            "packages/domain/**",
+            "docs/architecture/src/**",
+            "docs/decisions/ADR-0057-canonical-work-metadata.md",
+            "docs/decisions/ADR-0058-virtual-agenda-r2-operations.md",
+            "docs/operations/**",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:d1",
+            "npm run test:agenda",
+            "npm run typecheck",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m 'fix(catalogue): align canonical profiles and release validity'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "extension",
+          "title": "Propager mises à jour et fiabiliser parsing local",
+          "status": "TODO",
+          "acceptance": [
+            "Changement canonique transmis malgré alias inchangé",
+            "Anciennes annonces invalidées sans perte privée",
+            "Requêtes bornées cache valide conservé et corpus explicite"
+          ],
+          "files": [
+            "apps/extension/**",
+            "packages/application/**",
+            "packages/adapters-browser/**",
+            "packages/adapters-indexeddb/**",
+            "scripts/parser-equivalence/**",
+            "docs/architecture/src/**",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/decisions/ADR-0050-retire-extension-provider-fallbacks.md",
+            "docs/02-quality-strategy.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test:parser-equivalence",
+            "npm run test:e2e",
+            "npm run typecheck",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m 'fix(extension): propagate canonical updates and invalidate releases'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "certification",
+          "title": "Certifier parcours et préparer livraison",
+          "status": "TODO",
+          "acceptance": [
+            "Frontières interruption vérifiées et archives installées testées",
+            "1532 favoris dont 1400 médias avec attentes explicites",
+            "Limite certification personnelle séparée et préparation livraison sans mutation distante"
+          ],
+          "files": [
+            "apps/extension/scripts/**",
+            "scripts/agenda-certification/**",
+            "scripts/parser-equivalence/**",
+            "docs/architecture/src/**",
+            "docs/operations/**",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/decisions/ADR-0050-retire-extension-provider-fallbacks.md",
+            "docs/decisions/ADR-0057-canonical-work-metadata.md",
+            "docs/decisions/ADR-0058-virtual-agenda-r2-operations.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run archify:validate -- public-discovery.dataflow",
+            "npm run archify:validate -- all",
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions",
+            "npm run package:extension -- --verify-isolated",
+            "git diff --check",
+            "git commit -m 'test(pipeline): certify recovery and delivery readiness'"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

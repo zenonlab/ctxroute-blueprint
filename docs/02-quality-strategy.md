@@ -35,6 +35,17 @@ GitHub Actions workflow is an active source of release evidence.
 
 ## Decision rule
 
+La campagne de fiabilisation D1/R2 commence par des régressions exécutables.
+`r2-agenda-operation-store.test.ts` reproduit une panne de transport transformée
+en bail occupé et contrôle la reprise du checkpoint ainsi que l'expiration exacte.
+`virtual-agenda-model.test.ts` vérifie dans workerd que les préconditions R2
+échouent avec `null`, puis reproduit la double attribution concurrente,
+le refus de pages validées sous un ancien bail et leur écrasement par un ancien
+traitement. Les quatre contrats `it.fails` constatent des défauts connus;
+ils doivent devenir des tests ordinaires dans l'étape de correction suivante.
+Ces preuves synthétiques ne certifient ni la bibliothèque personnelle ni la
+reprise de publication D1, qui nécessitent leurs parcours dédiés.
+
 Pure domain behavior uses fast deterministic unit tests. Every boundary adds a
 contract test. Browser semantics add a real extension journey. Persistence
 changes add forward migration, export/import, and failure recovery fixtures.
