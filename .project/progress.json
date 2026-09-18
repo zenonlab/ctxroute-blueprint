@@ -3215,7 +3215,7 @@
       "schemaVersion": 1,
       "id": "goal-release-1-0-35-adult-visibility",
       "title": "Publier le correctif de visibilité adulte de l’extension",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
@@ -3251,7 +3251,7 @@
         {
           "id": "publish-1-0-35",
           "title": "Publish immutable archives and advance download pointer",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "A fresh bounded Cloudflare plan contains only the two 1.0.35 R2 objects and required Worker update.",
             "Archives are uploaded before the Worker pointer update and remote hashes match.",
@@ -3267,7 +3267,12 @@
             "Apply only after explicit provider approval with the exact plan digest.",
             "Verify remote HTTP, hashes, and /download, then commit and push documentation."
           ],
-          "evidence": []
+          "evidence": [
+            "Fresh Cloudflare plan ad369fa04811869892d34123b68199369bd9c52e24ddd7998d25619dd917753a contained only the two 1.0.35 R2 archives and worker:tobirink-public-api; apply completed with Worker version 2290749c-6da7-4bec-a091-f85297749f0c at 100%.",
+            "Production /download announces only 1.0.35; both versioned downloads return HTTP 200 application/zip with immutable caching.",
+            "Remote SHA-256 matches local archives: Chrome aff248dbe625d35491817783e91e3d7c1f7a2e4a801a67730f4ce22136b9992a; Firefox d29db3d098cde07bad1ec35c54a8d9524b3a5ae6c80bf6473597b0efe51b25b.",
+            "Archify architecture validation, documentation validation, decision validation and git diff --check pass; D1 reports no migrations to apply."
+          ]
         }
       ]
     }
