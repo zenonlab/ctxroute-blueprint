@@ -225,6 +225,6 @@
 
 - [x] **Corriger les rejets reproductibles et les diagnostics de reprise** — DONE _(evidence: npm run verify exit 0: application 389/389, extension 146/146, Worker 114/114, builds Chrome/Firefox et audit npm sans vulnérabilité., Réimportation synthétique UNSUPPORTED vers READY couverte; version de nouvel adaptateur sans invalidation des clés existantes., Archify lifecycle showcase 9/9, zéro erreur/avertissement. Aucun déploiement; cause des 585 attentes réelles et erreur interne non établie sans diagnostics locaux.)_
 
-## Publier la correction favoris 1.0.36 — ACTIVE
+## Publier la correction favoris 1.0.36 — DONE
 
-- [ ] **Publier la correction de classification des favoris** — IN_PROGRESS _(evidence: Déploiement explicitement demandé par l'utilisateur; rollback prévu par repointage vers 1.0.35 et redeploiement de la version Worker précédente.)_
+- [x] **Publier la correction de classification des favoris** — DONE _(evidence: Commit bcf7c4e fix(extension): recover valid favorite links vérifié et poussé sur origin/perf/adaptive-public-refresh et origin/main; .codex/config.toml exclu., npm run verify passe: application 389/389, extension 146/146, Worker 114/114, gateway 11/11, builds Chrome/Firefox, audit npm 0 vulnérabilité; Archify lifecycle 9/9 et validations docs/décisions passent., Cloudflare plan f04e2ddfec1463372ded88ab94edc4f63326a0b2b692de1b7dbc074a046d52fc appliqué avec seulement deux R2 publish et worker-deploy; aucun D1/Queue/secret/gateway.)_

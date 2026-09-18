@@ -3472,14 +3472,14 @@
       "schemaVersion": 1,
       "id": "goal-publish-favorite-classification-1-0-36",
       "title": "Publier la correction favoris 1.0.36",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
         {
           "id": "publish-1-0-36",
           "title": "Publier la correction de classification des favoris",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Version 1.0.36 est cohérente dans la source, le pointeur public et le package.",
             "npm run verify, validations docs/décisions et Archify passent.",
@@ -3517,7 +3517,11 @@
             "curl -fsS https://tobirink.com/download"
           ],
           "evidence": [
-            "Déploiement explicitement demandé par l'utilisateur; rollback prévu par repointage vers 1.0.35 et redeploiement de la version Worker précédente."
+            "Commit bcf7c4e fix(extension): recover valid favorite links vérifié et poussé sur origin/perf/adaptive-public-refresh et origin/main; .codex/config.toml exclu.",
+            "npm run verify passe: application 389/389, extension 146/146, Worker 114/114, gateway 11/11, builds Chrome/Firefox, audit npm 0 vulnérabilité; Archify lifecycle 9/9 et validations docs/décisions passent.",
+            "Cloudflare plan f04e2ddfec1463372ded88ab94edc4f63326a0b2b692de1b7dbc074a046d52fc appliqué avec seulement deux R2 publish et worker-deploy; aucun D1/Queue/secret/gateway.",
+            "Production Worker a80014e6-05b4-42f5-b682-1d51677b1048 à 100%; /download et les deux ZIP 1.0.36 répondent HTTP 200; hashes distants identiques aux archives locales.",
+            "Chrome SHA-256 a483c718ba539f466580cc23403f01c32ada4fb656bac61eaba98dc5c90f79f2; Firefox SHA-256 a96cde540f4319d1706eeedb2633a8307b7a80ea004789a2a335ab7f8908ab27."
           ]
         }
       ]

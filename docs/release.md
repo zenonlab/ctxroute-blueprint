@@ -118,10 +118,18 @@ corroborated by the bookmark title remains an `UNKNOWN` candidate on an
 otherwise unknown route, while utility and root routes remain excluded. The
 resolution status also distinguishes public-cache waiting from local errors.
 
-The candidate is pending the bounded Cloudflare publication gate. Its release
-plan must contain only the two immutable R2 archives and the Worker download
-pointer update; no D1, Queue, provider secret, or provider gateway mutation is
-part of this release.
+The bounded Cloudflare plan `f04e2ddfec1463372ded88ab94edc4f63326a0b2b692de1b7dbc074a046d52fc`
+published only the two immutable R2 archives and the Worker download pointer;
+no D1, Queue, provider secret, or provider gateway mutation was included.
+
+- Chrome: 294859 bytes, SHA-256
+  `a483c718ba539f466580cc23403f01c32ada4fb656bac61eaba98dc5c90f79f2`.
+- Firefox: 294899 bytes, SHA-256
+  `a96cde540f4319d1706eeedb2633a8307b7a80ea004789a2a335ab7f8908ab27`.
+
+Worker version `a80014e6-05b4-42f5-b682-1d51677b1048` serves 100 percent.
+Production verification returned HTTP 200 for `/download` and both versioned
+ZIPs, with `application/zip`, immutable caching, and matching remote hashes.
 
 Run `npm run package:extension` from the repository root. The command rebuilds
 both browser targets and writes these ignored, reproducible artifacts:
