@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-certify-and-consolidate-production",
+  "stepId": "step-6",
+  "status": "DONE",
+  "evidence": [
+    "Audit final effectué sur AGENTS.md, CLAUDE.md, .codex/hooks.json et les hooks; aucun workflow GitHub Actions suivi ni ancien CLI exécutable ne subsiste.",
+    ".codex/config.toml reste une modification utilisateur non suivie dans les commits; aucun secret n'a été placé dans Git.",
+    "npm run verify final passe, incluant validation, typechecks, tests workspace, performance, intégration, audit npm et build Archify showcase.",
+    "Après git fetch origin, origin/main est ancêtre du HEAD; le commit documentaire final sera poussé sur perf/adaptive-refresh et main sans force push."
+  ]
+}

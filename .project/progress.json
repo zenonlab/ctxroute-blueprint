@@ -2903,7 +2903,7 @@
       "schemaVersion": 1,
       "id": "goal-certify-and-consolidate-production",
       "title": "Consolider et publier TobiRink 1.0.34",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
@@ -3115,7 +3115,7 @@
         {
           "id": "step-6",
           "title": "Rétablir une source de vérité unique",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Le diff complet et les fichiers de gouvernance sont audités.",
             ".codex/config.toml n’apparaît dans aucun commit.",
@@ -3140,7 +3140,12 @@
             "git push origin HEAD:main after explicit approval",
             "git ls-remote origin"
           ],
-          "evidence": []
+          "evidence": [
+            "Audit final effectué sur AGENTS.md, CLAUDE.md, .codex/hooks.json et les hooks; aucun workflow GitHub Actions suivi ni ancien CLI exécutable ne subsiste.",
+            ".codex/config.toml reste une modification utilisateur non suivie dans les commits; aucun secret n'a été placé dans Git.",
+            "npm run verify final passe, incluant validation, typechecks, tests workspace, performance, intégration, audit npm et build Archify showcase.",
+            "Après git fetch origin, origin/main est ancêtre du HEAD; le commit documentaire final sera poussé sur perf/adaptive-refresh et main sans force push."
+          ]
         }
       ]
     }
