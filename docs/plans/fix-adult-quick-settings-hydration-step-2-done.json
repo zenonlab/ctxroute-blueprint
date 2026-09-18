@@ -1,0 +1,10 @@
+{
+  "goalId": "goal-fix-adult-quick-settings-hydration",
+  "stepId": "audit-hydration-path",
+  "status": "DONE",
+  "evidence": [
+    "Worker hydration tests pass 114/114; the queue has one producer and one consumer, both attached to tobirink-public-api, and the DLQ remains without a consumer.",
+    "Read-only Deno inspection confirms the production gateway app, production Deno KV database, and secret classification; GET /healthz returns HTTP 200 {status: healthy}.",
+    "Production Public Discovery GET responds HTTP 200 with a valid MISS for a well-formed key, proving the route is reachable; no direct provider networking was restored. The signed provider result path remains unproven without creating a new remote discovery request."
+  ]
+}
