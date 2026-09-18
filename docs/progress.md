@@ -234,3 +234,7 @@
 - [x] **Établir la référence brute et les régressions** — DONE _(evidence: Oracle brut 10/10; extraction 46 succès et 4 échecs attendus reproduits; nombre intrinsèque classé amélioration., Archify showcase 9/9 sans diagnostic; ADR validés, diff audité. Trois profils lus: 1562 liens; états privés IndexedDB non certifiés.)_
 - [x] **Corriger extraction, résolution locale et récupération versionnée** — DONE _(evidence: Application 393/393 et contrats 14/14; quatre régressions corrigées; identité locale ancienne sans D1 et reçu de récupération unique testés., Contrat IndexedDB Chromium et migrations passent; tous les typechecks et Archify all passent; ADR-0037/0050 mis à jour.)_
 - [ ] **Réparer les reprises publiques et certifier les parcours** — BLOCKED _(evidence: Implémentation locale validée: npm run verify réussi; Archify public-discovery/all, docs et ADR passent; tests Queue additionnels 7/7 et typecheck Worker passent., Corpus 1532/1400 convergent; archives finales reproductibles testées sur Chromium 153 et Firefox 155 sans faux résultat. Audit privé: 204 nouvelles requêtes possibles, identités installées non certifiées., Promotion et certification personnelle restent soumises à autorisation distincte. Incident: un premier harness Firefox setOffline a laissé atteindre l’API par des requêtes synthétiques; impact distant non établi, proxy fermé désormais vérifié. Aucun déploiement ni nettoyage effectué.)_
+
+## Fusionner et publier la récupération des favoris 1.0.37 — ACTIVE
+
+- [ ] **Valider fusionner pousser et déployer 1.0.37** — IN_PROGRESS

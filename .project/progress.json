@@ -3648,6 +3648,51 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-favorite-recovery-1037",
+      "title": "Fusionner et publier la récupération des favoris 1.0.37",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "release",
+          "title": "Valider fusionner pousser et déployer 1.0.37",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Tests locaux et archives installées passent",
+            "main distant correspond au commit livré",
+            "Worker et archives publiés via plans exacts; canaries vérifiés"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "apps/web/published-extension.json",
+            "docs/operations/cloudflare.md",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            ".project/progress.json",
+            "docs/progress.md",
+            "build/releases/**"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run package:extension -- --verify-isolated",
+            "npm run package:extension",
+            "node apps/extension/scripts/installed-review.mjs <archive>",
+            "node apps/extension/scripts/installed-firefox.mjs <archive>",
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "git fetch origin",
+            "git merge --ff-only",
+            "git commit",
+            "git push origin"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

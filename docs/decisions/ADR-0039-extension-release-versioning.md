@@ -96,6 +96,9 @@ corroboré par le titre du favori. En l’absence de corroboration, elle revient
 titre humain avant l’application éventuelle d’une règle de site plus précise.
 La candidate corrective suivante est `1.0.36`; elle ne réécrit aucun objet
 `1.0.35` et ne peut avancer le pointeur public qu’après publication vérifiée.
+`1.0.37` corrige l’extraction comparative, la récupération
+locale versionnée et les reprises durables Public Discovery. Ses archives
+immuables doivent être vérifiées avant de remplacer le pointeur `1.0.36`.
 The version in `apps/extension/package.json` remains the single WXT and archive
 candidate source. The static download page follows the separately versioned
 `apps/web/published-extension.json` publication pointer, which is advanced only

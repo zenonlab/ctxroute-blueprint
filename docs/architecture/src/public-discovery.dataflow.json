@@ -17,7 +17,7 @@
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "Admission cadencée; un signal perdu est réparable. Chaque lot conserve une continuation tant que D1 attend du travail."
+        "note": "Admission cadencée et continuation durable; la livraison vérifie ce parcours par deux requêtes publiques bornées."
       },
       {
         "id": "verified-refresh",

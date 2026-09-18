@@ -6,6 +6,23 @@ remain independent of this operational path.
 
 ## Inspect
 
+### Préparation 1.0.37
+
+Autorisation utilisateur de fusion, push et déploiement reçue le 18 septembre.
+La version active inspectée est `a80014e6-05b4-42f5-b682-1d51677b1048`
+à 100 %, avec le pointeur `1.0.36` et aucune migration en attente.
+Les archives candidates `1.0.37` sont reproductibles et leurs parcours
+installés passent sur Chromium 153 et Firefox 155 (1 532 fixtures dont
+1 400 médias, aucun résultat inventé hors ligne).
+Chrome : 297360 octets, SHA-256
+`eac0126c034a58b5b3a17ae3ded4d855f770949bc4912174523c300cce018142`.
+Firefox : 297401 octets, SHA-256
+`908018a490293d4bc24ab516922f8a6eec9cc64fd1e4d6c4b9277c16b9a6105d`.
+La gate `node scripts/infra/recovery-1037-canary.mjs read|submit` est bornée
+aux deux fixtures publiques de cette version, par titre et référence exacte.
+`read` utilise uniquement le lookup; `submit` admet deux demandes espacées
+de sept secondes. Les sorties contiennent seulement état, statut et durée.
+
 ### Candidat de récupération des favoris du 18 septembre 2026
 
 Le correctif local conserve les routes v3, le schéma D1, les secrets et les
