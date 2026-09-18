@@ -443,9 +443,16 @@ describe('verified public discovery cache', () => {
     const revisionBeforeChanged = await env.PUBLIC_DB.prepare('SELECT revision FROM catalogue_works WHERE work_id = ?1')
       .bind('work_refresh').first<{ revision: number }>();
     const changedBase = verifiedResult(key, request.requestDigest, 'refresh', '754321', 'Refresh Work');
+    await env.PUBLIC_DB.prepare(`INSERT INTO catalogue_release_model (
+      work_id, provider, provider_work_id, release_kind, anchor_date, anchor_sequence,
+      interval_days, exceptions_json, valid_from, valid_to, editorial_status, source,
+      observed_at, parser_version, rules_version, model_digest, revision)
+      VALUES ('work_refresh', 'anilist', '754321', 'episode', '2026-09-01', '1',
+        7, '[]', '2026-09-01', '2026-12-01', 'ONGOING', 'anilist', ?1, '2', '2', ?2, ?3)`)
+      .bind(admittedAt, 'a'.repeat(64), revisionBeforeChanged!.revision).run();
     const changed = { ...changedBase, resolution: { ...changedBase.resolution, profile: {
       ...changedBase.resolution.profile,
-      candidate: { ...changedBase.resolution.profile.candidate, contentClassification: 'adult' as const, episodeCount: 24 },
+      candidate: { ...changedBase.resolution.profile.candidate, contentClassification: 'adult' as const, episodeCount: 24, editorialStatus: 'HIATUS' as const },
     } } };
     await expect(adapter.publishBatch({
       claimToken: changedClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440073',
@@ -457,6 +464,16 @@ describe('verified public discovery cache', () => {
     const revisionAfterChanged = await env.PUBLIC_DB.prepare('SELECT revision FROM catalogue_works WHERE work_id = ?1')
       .bind('work_refresh').first<{ revision: number }>();
     expect(revisionAfterChanged?.revision).toBeGreaterThan(revisionBeforeChanged?.revision ?? 0);
+    expect(await env.PUBLIC_DB.prepare("SELECT editorial_status AS status, interval_days AS interval FROM catalogue_release_model WHERE work_id = 'work_refresh'").first())
+      .toEqual({ status: 'HIATUS', interval: 7 });
+    const aliasKey = { ...key, fingerprint: '71'.repeat(32) };
+    const resumedAt = new Date(Date.parse(changedAt) + 60_000).toISOString();
+    await adapter.request({ ...request, key: aliasKey }, resumedAt);
+    const aliasClaim = await adapter.claimBatch({ claimToken: 'u'.repeat(48), tokenDigest: 'u'.repeat(64), now: resumedAt, leaseUntil: new Date(Date.parse(resumedAt) + 900_000).toISOString(), limit: 20 });
+    const resumed = { ...changed, key: aliasKey, resolution: { ...changed.resolution, profile: { ...changed.resolution.profile, candidate: { ...changed.resolution.profile.candidate, editorialStatus: 'ONGOING' as const } } } };
+    await adapter.publishBatch({ claimToken: aliasClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440074', results: [resumed], schemaVersion: 3, verifiedAt: resumedAt }, 'u'.repeat(64), 'b'.repeat(64), resumedAt);
+    await expect(adapter.read(key, resumedAt)).resolves.toMatchObject({ state: 'VERIFIED', verifiedAt: changedAt, profile: { candidate: { editorialStatus: 'ONGOING' } } });
+    expect(await env.PUBLIC_DB.prepare("SELECT editorial_status AS status FROM catalogue_release_model WHERE work_id = 'work_refresh'").first()).toEqual({ status: 'ONGOING' });
     await env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3 SET
       refresh_state = 'PROCESSING', refresh_attempt_count = 8, claim_token_hash = ?1, lease_until = ?2
       WHERE fingerprint = ?3`).bind('e'.repeat(64), '2000-01-01T00:00:00.000Z', key.fingerprint).run();

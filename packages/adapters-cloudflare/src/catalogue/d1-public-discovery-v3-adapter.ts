@@ -530,6 +530,11 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           candidate.provider, candidate.externalId, verifiedAt, candidate.metadataVersion ?? 1, revision,
           ...guardValues,
         ),
+      this.database.prepare(`UPDATE catalogue_release_model SET editorial_status = ?1, revision = ?2
+        WHERE work_id = ?3 AND editorial_status IS NOT ?1
+          AND EXISTS (SELECT 1 FROM catalogue_current_metadata
+            WHERE work_id = ?3 AND profile_json = ?4 AND revision = ?2)`)
+        .bind(candidate.editorialStatus ?? 'UNKNOWN', revision, profile.workId, JSON.stringify(profile)),
     ];
   }
 

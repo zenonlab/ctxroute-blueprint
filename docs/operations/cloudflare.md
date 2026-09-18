@@ -29,10 +29,12 @@ déclenchement hebdomadaire. Cette procédure n'est pas une nouvelle cadence.
 
 Les diagnostics de collecte séparent `d1RowsRead`, `d1RowsWritten`,
 `r2Reads`, `r2Writes`, `r2Lists`, `r2Conflicts`, `providerRequests` et `retries`.
-La fixture locale de 579 événements mesure 805 lectures/393 écritures R2 à
+La fixture locale de 579 événements annoncés mesure 446 lectures/34 écritures R2 à
 la première collecte, puis 444/34 pour une collecte identique; cette dernière
 ne produit aucune écriture métier D1. Ces nombres sont des mesures de fixture,
-pas une estimation de facture ni une certification de production.
+pas une estimation de facture ni une certification de production. Les annonces
+ne produisent plus d'observations confirmées; les anciennes mesures 805/393
+incluaient cette promotion incorrecte.
 
 ### Publication 1.0.38
 

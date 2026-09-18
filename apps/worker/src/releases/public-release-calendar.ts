@@ -15,7 +15,7 @@ interface ReleaseGenerationRow { revision: string; checked_at: string | null; ge
 interface ReleaseCursor { id: string | null; occurrence: string | null }
 interface AgendaSnapshotReader {
   readLane(provider: 'anilist' | 'mangaupdates'): Promise<{
-    activeDigest: string | null; activeSnapshotId: string | null; checkedAt: string | null;
+    activeDigest: string | null; activeSnapshotId: string | null; checkedAt: string | null; publishedCheckedAt?: string | null | undefined;
   }>;
   readPageVersion(key: string): Promise<{ complete: boolean; events: readonly PublicReleaseEventContract[] } | undefined>;
 }
@@ -32,7 +32,7 @@ function releaseModel(row: ReleaseModelRow): VirtualReleaseModelContract {
     anchor: { date: row.anchorDate }, exceptions: JSON.parse(row.exceptionsJson),
     validity: { from: row.validFrom, to: row.validTo }, editorialStatus: row.editorialStatus,
     provenance: { source: row.source, observedAt: row.observedAt, parserVersion: row.parserVersion, rulesVersion: row.rulesVersion },
-    revision: row.modelDigest,
+    revision: `${row.modelDigest}-${row.editorialStatus}`,
   };
   if (row.anchorSequence !== null) model.anchor.sequence = row.anchorSequence;
   if (row.intervalDays !== null) model.intervalDays = row.intervalDays;
@@ -48,6 +48,20 @@ function decodeCursor(cursor: string | undefined): ReleaseCursor {
 
 export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort {
   constructor(private readonly db: D1Database, private readonly snapshots?: AgendaSnapshotReader) {}
+  private async modelGeneration() {
+    const summary = await this.db.prepare(`SELECT group_concat(work_id || ':' || model_digest || ':' || editorial_status, '|') AS digest,
+      MAX(observed_at) AS generatedAt FROM (SELECT work_id, model_digest, editorial_status, observed_at FROM catalogue_release_model ORDER BY work_id)`)
+      .first<{ digest: string | null; generatedAt: string | null }>();
+    const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(summary?.digest ?? ''));
+    const digest = Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
+    let generatedAt = summary?.generatedAt ?? '1970-01-01T00:00:00.000Z';
+    if (this.snapshots !== undefined) {
+      const lanes = await Promise.all((['anilist', 'mangaupdates'] as const).map(provider => this.snapshots!.readLane(provider)));
+      const checked = lanes.map(lane => lane.publishedCheckedAt === undefined ? lane.checkedAt : lane.publishedCheckedAt).filter((value): value is string => value !== null).sort()[0];
+      if (checked !== undefined && checked > generatedAt) generatedAt = checked;
+    }
+    return { revision: `models-${digest.slice(0, 48)}`, generatedAt };
+  }
   async ingest(input: PublicReleaseIngestion) {
     const events = [...input.events].sort((left, right) => left.id.localeCompare(right.id));
     const digestInput = JSON.stringify({ events, generatedAt: input.generatedAt, schemaVersion: input.schemaVersion, window: input.window });
@@ -60,10 +74,7 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
   }
   async queryModels(input: PublicReleaseQuery) {
     const from = input.from ?? '0000-01-01'; const to = input.to ?? '9999-12-31';
-    const summary = await this.db.prepare(`SELECT COUNT(*) AS count, MAX(revision) AS revision,
-      MAX(observed_at) AS generatedAt FROM catalogue_release_model
-      WHERE valid_to >= ?1 AND valid_from <= ?2`).bind(from, to)
-      .first<{ count: number; generatedAt: string | null; revision: number | null }>();
+    const summary = await this.modelGeneration();
     const rows = await this.db.prepare(`SELECT work_id AS workId, provider, provider_work_id AS providerWorkId,
       release_kind AS releaseKind, anchor_date AS anchorDate, anchor_sequence AS anchorSequence,
       interval_days AS intervalDays, explicit_next_json AS explicitNextJson, exceptions_json AS exceptionsJson,
@@ -74,10 +85,10 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
       .bind(from, to, input.cursor ?? '', input.limit + 1).all<ReleaseModelRow>();
     const pageRows = rows.results.slice(0, input.limit);
     const models = Object.freeze(pageRows.map(releaseModel));
+    if ((await this.modelGeneration()).revision !== summary.revision) throw new Error('agenda-generation-changed');
     const nextCursor = rows.results.length > input.limit ? pageRows.at(-1)?.workId : undefined;
     const page = {
-      models, revision: `models-${summary?.revision ?? 0}-${summary?.count ?? 0}`,
-      generatedAt: summary?.generatedAt ?? '1970-01-01T00:00:00.000Z', window: { from, to },
+      models, ...summary, window: { from, to },
     };
     return nextCursor === undefined ? page : { ...page, nextCursor };
   }
@@ -85,29 +96,31 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
     const cursor = decodeCursor(input.cursor);
     const lowerBound = input.from ?? '0000-01-01';
     const upperBound = input.to ? `${input.to}T23:59:59.999Z` : '9999-12-31T23:59:59.999Z';
-    const snapshotPage = await this.queryCompatibilitySnapshots(input, cursor, lowerBound, upperBound);
-    if (snapshotPage !== null) return snapshotPage;
+    const summary = await this.modelGeneration();
     const modelRows = await this.db.prepare(`SELECT work_id AS workId, provider, provider_work_id AS providerWorkId,
       release_kind AS releaseKind, anchor_date AS anchorDate, anchor_sequence AS anchorSequence,
       interval_days AS intervalDays, explicit_next_json AS explicitNextJson, exceptions_json AS exceptionsJson,
       valid_from AS validFrom, valid_to AS validTo, editorial_status AS editorialStatus,
       source, observed_at AS observedAt, parser_version AS parserVersion, rules_version AS rulesVersion,
       model_digest AS modelDigest, revision FROM catalogue_release_model
-      WHERE valid_to >= ?1 AND valid_from <= ?2 ORDER BY work_id LIMIT 1000`)
+      WHERE valid_to >= ?1 AND valid_from <= ?2 ORDER BY work_id LIMIT 1001`)
       .bind(lowerBound.slice(0, 10), upperBound.slice(0, 10)).all<ReleaseModelRow>();
     if (modelRows.results.length > 0) {
+      if (modelRows.results.length > 1000) throw new Error('agenda-compatibility-model-limit');
+      if ((await this.modelGeneration()).revision !== summary.revision) throw new Error('agenda-generation-changed');
       const models = modelRows.results.map(releaseModel);
       const projected = projectVirtualAgenda(models, { from: lowerBound.slice(0, 10), to: upperBound.slice(0, 10) })
-        .filter((event) => event.occurrence.value > (cursor.occurrence ?? lowerBound)
+        .filter((event) => cursor.occurrence === null || event.occurrence.value > cursor.occurrence
           || (event.occurrence.value === cursor.occurrence && event.id > (cursor.id ?? '')));
       const entries = projected.slice(0, input.limit);
       const last = entries.at(-1);
       const nextCursor = projected.length > input.limit && last ? `${last.occurrence.value}|${last.id}` : undefined;
-      const revision = `models-${Math.max(...modelRows.results.map((row) => row.revision))}-${modelRows.results.length}`;
-      const page: CalendarPage = { entries, revision, generatedAt: modelRows.results.map((row) => row.observedAt).sort().at(-1)!, window: { from: lowerBound.slice(0, 10), to: upperBound.slice(0, 10) } };
+      const page: CalendarPage = { entries, ...summary, window: { from: lowerBound.slice(0, 10), to: upperBound.slice(0, 10) } };
       if (nextCursor !== undefined) page.nextCursor = nextCursor;
       return page;
     }
+    const snapshotPage = await this.queryCompatibilitySnapshots(input, cursor, lowerBound, upperBound);
+    if (snapshotPage !== null) return snapshotPage;
     const generation = await this.db.prepare("SELECT generation.revision, generation.checked_at, generation.generated_at, generation.window_from, generation.window_to FROM public_release_generation AS generation JOIN public_release_active_generation AS active ON active.revision = generation.revision AND active.id = 'active' LIMIT 1").first<ReleaseGenerationRow>();
     const emptyRows: ReleaseRow[] = [];
     const rows = generation === null
@@ -154,15 +167,16 @@ export class D1PublicReleaseCalendarAdapter implements PublicReleaseCalendarPort
     }
     const filtered = events
       .filter((event) => event.occurrence.value >= lowerBound && event.occurrence.value <= upperBound)
-      .filter((event) => event.occurrence.value > (cursor.occurrence ?? lowerBound)
+      .filter((event) => cursor.occurrence === null || event.occurrence.value > cursor.occurrence
         || (event.occurrence.value === cursor.occurrence && event.id > (cursor.id ?? '')))
       .sort((left, right) => left.occurrence.value.localeCompare(right.occurrence.value) || left.id.localeCompare(right.id));
     const entries = Object.freeze(filtered.slice(0, input.limit));
     const last = entries.at(-1);
     const nextCursor = filtered.length > input.limit && last ? `${last.occurrence.value}|${last.id}` : undefined;
-    const checkedAt = lanes.flatMap(({ lane }) => lane.checkedAt === null ? [] : [lane.checkedAt]).sort().at(-1)
+    const checkedAt = lanes.flatMap(({ lane }) => (lane.publishedCheckedAt ?? lane.checkedAt) === null ? [] : [lane.publishedCheckedAt ?? lane.checkedAt!]).sort()[0]
       ?? '1970-01-01T00:00:00.000Z';
-    const digest = lanes.map(({ provider, lane }) => `${provider}:${lane.activeDigest ?? 'legacy'}`).join('|');
+    const digestBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(events)));
+    const digest = Array.from(new Uint8Array(digestBytes), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 48);
     const page: CalendarPage = {
       entries, revision: `r2-compat-${digest}`, generatedAt: checkedAt,
       window: { from: lowerBound.slice(0, 10), to: upperBound.slice(0, 10) },

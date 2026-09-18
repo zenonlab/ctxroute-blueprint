@@ -3827,7 +3827,7 @@
         {
           "id": "canonical",
           "title": "Aligner modèles D1 dates et contrats publics",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Hiatus reprise report et annulation reflétés dans profil courant",
             "Contenu inchangé sans réécriture métier",
@@ -3835,6 +3835,10 @@
           ],
           "files": [
             "apps/worker/**",
+            "packages/adapters-cloudflare/src/catalogue/**",
+            "packages/adapters-cloudflare/src/releases/**",
+            "packages/application/src/agenda/**",
+            "packages/application/src/releases/**",
             "packages/public-discovery/**",
             "packages/domain/**",
             "docs/architecture/src/**",
@@ -3852,7 +3856,10 @@
             "git diff --check",
             "git commit -m 'fix(catalogue): align canonical profiles and release validity'"
           ],
-          "evidence": []
+          "evidence": [
+            "Worker 132/132, Agenda applicatif 14/14 et adaptateurs R2 20/20 passent; hiatus puis reprise via alias inchangé, report, absence et annulation explicite couverts.",
+            "Typechecks complets, anti-slop, docs/ADR et Archify showcase 9/9 sans diagnostic passent. Génération commune v3/v4, ETag par page, données confirmées textuelles et observations distinctes des annonces; aucune migration nécessaire."
+          ]
         },
         {
           "id": "extension",

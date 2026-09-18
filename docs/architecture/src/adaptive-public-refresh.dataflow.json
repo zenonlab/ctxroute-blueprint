@@ -68,7 +68,8 @@
         "Agenda, Discovery et réhydratation échouent indépendamment",
         "Le dernier modèle ou profil vérifié reste servi",
         "Collecte, snapshot prêt, D1 validé, puis confirmation R2",
-        "v3 lit les snapshots R2 et complète une lane absente depuis la projection legacy"
+        "D1 fournit les modèles courants; R2 conserve les annonces historiques",
+        "Statut canonique, génération commune et ETag propre à chaque page"
       ]
     },
     {

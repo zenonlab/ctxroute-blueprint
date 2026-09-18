@@ -19,6 +19,12 @@ type ReleaseCalendarRoute = Pick<PublicReleaseCalendarPort, 'query'> & Partial<P
 type ReleaseServices = Pick<WorkerServices, 'policy' | 'releases'> & { releaseCalendar?: ReleaseCalendarRoute };
 const maximumReleaseWindowDays = 40;
 
+type ReleaseRepresentation = Awaited<ReturnType<PublicReleaseCalendarPort['query'] | PublicReleaseCalendarPort['queryModels']>>;
+async function representationTag(version: string, page: ReleaseRepresentation, query: PublicReleaseQuery): Promise<string> {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ version, query, page })));
+  return `"${version}-${Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('')}"`;
+}
+
 function canonicalDate(value: string): boolean {
   const parsed = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
@@ -96,7 +102,7 @@ export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerR
       if (cursor) query.cursor = cursor;
       const page = await services.releaseCalendar.query(query);
       if (!/^[A-Za-z0-9._-]{1,64}$/u.test(page.revision)) return noStoreJson(context, 'release-calendar-unavailable', 503);
-      const entityTag = `"releases-${page.revision}-${from ?? ''}-${to ?? ''}"`;
+      const entityTag = await representationTag('releases-v2', page, query);
       if (context.req.header('If-None-Match') === entityTag) return new Response(null, { status: 304, headers: { ETag: entityTag, 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600' } });
       context.header('Cache-Control', services.policy.http.publicReadCacheControl); context.header('ETag', entityTag); context.header('X-Content-Type-Options', 'nosniff');
       const { window: _sourceWindow, ...v2Page } = page;
@@ -121,7 +127,7 @@ export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerR
       if (cursor) query.cursor = cursor;
       const page = await services.releaseCalendar.query(query);
       if (!/^[A-Za-z0-9._-]{1,64}$/u.test(page.revision)) return noStoreJson(context, 'release-calendar-unavailable', 503);
-      const entityTag = `"releases-v3-${page.revision}-${from}-${to}"`;
+      const entityTag = await representationTag('releases-v3', page, query);
       if (context.req.header('If-None-Match') === entityTag) return new Response(null, { status: 304, headers: { ETag: entityTag, 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600' } });
       context.header('Cache-Control', services.policy.http.publicReadCacheControl); context.header('ETag', entityTag); context.header('X-Content-Type-Options', 'nosniff');
       return context.json(page);
@@ -145,7 +151,7 @@ export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerR
       if (cursor) query.cursor = cursor;
       const page = await services.releaseCalendar.queryModels(query);
       if (!/^[A-Za-z0-9._-]{1,64}$/u.test(page.revision)) return noStoreJson(context, 'release-calendar-unavailable', 503);
-      const entityTag = `"release-models-v4-${page.revision}-${from}-${to}"`;
+      const entityTag = await representationTag('release-models-v4', page, query);
       if (context.req.header('If-None-Match') === entityTag) return new Response(null, { status: 304, headers: { ETag: entityTag, 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600' } });
       context.header('Cache-Control', services.policy.http.publicReadCacheControl); context.header('ETag', entityTag); context.header('X-Content-Type-Options', 'nosniff');
       return context.json(page);

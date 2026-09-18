@@ -1,7 +1,7 @@
 import { publicReleaseEventSchema, type PublicReleaseEventContract } from '@tobirink/application';
 import { predictNextMangaRelease } from '@tobirink/domain';
 import type { R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
-import { publicAgendaReleaseEventSchema, type PublicAgendaPageCheckpoint, type PublicAgendaReleaseEvent } from '@tobirink/public-discovery/agenda';
+import { publicAgendaPageCheckpointSchema, publicAgendaReleaseEventSchema, type PublicAgendaPageCheckpoint, type PublicAgendaReleaseEvent } from '@tobirink/public-discovery/agenda';
 
 export {
   AniListAgendaCollector as AniListReleaseCollector,
@@ -58,8 +58,7 @@ interface AgendaGenerationEventRow {
   state: string;
 }
 interface AgendaWorkMappingRow { editorialStatus: 'UPCOMING' | 'ONGOING' | 'HIATUS' | 'COMPLETED' | 'CANCELLED' | 'UNKNOWN' | null; externalId: string; provider: string; workId: string }
-interface AgendaModelDigestRow { modelDigest: string; revision: number; workId: string }
-interface ExpiredAgendaModelRow extends AgendaModelDigestRow { explicitNextJson: string | null; exceptionsJson: string }
+interface AgendaModelDigestRow { modelDigest: string; revision: number; workId: string; exceptionsJson: string }
 export interface AgendaLaneClaim {
   readonly collectionId: string;
   readonly nextPage: number;
@@ -312,7 +311,7 @@ export class D1AgendaCollectionAdapter {
       current.events.push(event); grouped.set(resolved.workId, current);
     }
     if (grouped.size === 0) return null;
-    const existing = (await this.db.prepare(`SELECT work_id AS workId, model_digest AS modelDigest, revision
+    const existing = (await this.db.prepare(`SELECT work_id AS workId, model_digest AS modelDigest, revision, exceptions_json AS exceptionsJson
       FROM catalogue_release_model WHERE work_id IN (SELECT value FROM json_each(?1))`)
       .bind(JSON.stringify([...grouped.keys()])).all<AgendaModelDigestRow>()).results;
     const digests = new Map(existing.map((row) => [row.workId, row.modelDigest]));
@@ -320,27 +319,36 @@ export class D1AgendaCollectionAdapter {
     const statements: D1PreparedStatement[] = [];
     const changedWorkIds: string[] = [];
     for (const [workId, group] of grouped) {
-      const ordered = group.events.sort((left, right) => left.occurrence.value.localeCompare(right.occurrence.value) || left.id.localeCompare(right.id));
+      const previousJson = existing.find(row => row.workId === workId)?.exceptionsJson;
+      const previous = previousJson === undefined ? [] : publicAgendaPageCheckpointSchema.parse({ complete: true, events: JSON.parse(previousJson), page: 1, provider: group.events[0]!.provider, received: 0, skippedUnidentified: 0 }).events;
+      const current = new Map<string, PublicReleaseEventContract>();
+      for (const event of [...previous, ...group.events].sort((a, b) => a.provenance.fetchedAt.localeCompare(b.provenance.fetchedAt))) {
+        const key = JSON.stringify([event.provider, event.providerWorkId, event.releaseKind, event.sequence ?? event.id]);
+        current.set(key, publicReleaseEventSchema.parse(event));
+      }
+      const ordered = [...current.values()].sort((left, right) => left.occurrence.value.localeCompare(right.occurrence.value) || left.id.localeCompare(right.id));
       const provider = ordered.some((event) => event.provider === 'anilist') ? 'anilist' as const : 'mangaupdates' as const;
       const selected = ordered.filter((event) => event.provider === provider).slice(-32);
       const last = selected.at(-1);
       if (last === undefined) continue;
+      const observedAt = selected.map(event => event.provenance.fetchedAt).sort().at(-1)!;
       let intervalDays: number | undefined;
       let anchorDate = last.occurrence.value.slice(0, 10);
       let anchorSequence = last.sequence;
       if (provider === 'mangaupdates' && this.operations !== undefined) {
         const observations = selected.flatMap((event) => {
           const chapter = Number(event.sequence);
-          return event.occurrence.kind === 'DATE' && Number.isFinite(chapter) ? [{ chapter, releasedOn: event.occurrence.value }] : [];
+          return event.state === 'CONFIRMED' && event.occurrence.kind === 'DATE' && event.sequence !== undefined && Number.isFinite(chapter) ? [{ chapter, releasedOn: event.occurrence.value }] : [];
         });
         const history = await this.operations.mergeObservations({ workId, observations, ownerToken: crypto.randomUUID(), now: checkedAt });
         const lifecycle = group.mapping.editorialStatus === 'UPCOMING' ? 'UNKNOWN' : group.mapping.editorialStatus ?? 'UNKNOWN';
         const prediction = predictNextMangaRelease(history, lifecycle);
         const latest = history.at(-1);
-        if (latest !== undefined) { anchorDate = latest.releasedOn; anchorSequence = String(latest.chapter); }
+        const confirmed = selected.filter(event => event.state === 'CONFIRMED').at(-1);
+        if (confirmed !== undefined) { anchorDate = confirmed.occurrence.value.slice(0, 10); anchorSequence = confirmed.sequence; }
         if (prediction !== undefined && latest !== undefined) intervalDays = (Date.parse(prediction.releasedOn) - Date.parse(latest.releasedOn)) / 86_400_000;
       }
-      const explicitNext = provider === 'anilist' ? selected.find((event) => event.state === 'SCHEDULED') : undefined;
+      const explicitNext = selected.find((event) => event.state === 'SCHEDULED');
       const validity = {
         from: selected.map((event) => event.occurrence.value.slice(0, 10)).sort()[0] ?? window.from,
         to: selected.map((event) => event.expiresAt.slice(0, 10)).sort().at(-1) ?? window.to,
@@ -362,10 +370,11 @@ export class D1AgendaCollectionAdapter {
         editorial_status=excluded.editorial_status, source=excluded.source, observed_at=excluded.observed_at,
         parser_version=excluded.parser_version, rules_version=excluded.rules_version,
         model_digest=excluded.model_digest, revision=excluded.revision
-        WHERE catalogue_release_model.model_digest <> excluded.model_digest`)
+        WHERE catalogue_release_model.model_digest <> excluded.model_digest
+          AND catalogue_release_model.observed_at <= excluded.observed_at`)
         .bind(workId, provider, last.providerWorkId, last.releaseKind, anchorDate, anchorSequence ?? null,
           intervalDays ?? null, explicitNext === undefined ? null : JSON.stringify(explicitNext), JSON.stringify(selected),
-          validity.from, validity.to, group.mapping.editorialStatus ?? 'UNKNOWN', last.provenance.source, checkedAt,
+          validity.from, validity.to, group.mapping.editorialStatus ?? 'UNKNOWN', last.provenance.source, observedAt,
           last.provenance.parserVersion, last.provenance.rulesVersion, modelDigest, revision));
       const lastConfirmed = selected.filter((event) => event.state === 'CONFIRMED' && event.releaseKind !== 'special').at(-1);
       if (lastConfirmed !== undefined) {
@@ -374,21 +383,6 @@ export class D1AgendaCollectionAdapter {
           WHERE work_id = ?5 AND (last_confirmed_on IS NULL OR last_confirmed_on <= ?3)`)
           .bind(lastConfirmed.releaseKind, lastConfirmed.sequence ?? null, lastConfirmed.occurrence.value.slice(0, 10), revision, workId));
       }
-    }
-    const expired = (await this.db.prepare(`SELECT work_id AS workId, model_digest AS modelDigest, revision,
-      explicit_next_json AS explicitNextJson, exceptions_json AS exceptionsJson
-      FROM catalogue_release_model
-      WHERE valid_to < ?1 AND (explicit_next_json IS NOT NULL OR exceptions_json <> '[]')
-      LIMIT 1000`).bind(checkedAt.slice(0, 10)).all<ExpiredAgendaModelRow>()).results;
-    for (const stale of expired) {
-      if (grouped.has(stale.workId) || changedWorkIds.includes(stale.workId)) continue;
-      const modelDigest = await sha256(`${stale.modelDigest}|expired|${checkedAt.slice(0, 10)}`);
-      if (statements.length === 0) statements.push(this.db.prepare('INSERT OR IGNORE INTO catalogue_revisions(revision, published_at) VALUES (?1, ?2)').bind(revision, checkedAt));
-      statements.push(this.db.prepare(`UPDATE catalogue_release_model SET explicit_next_json = NULL,
-        exceptions_json = '[]', model_digest = ?1, observed_at = ?2, revision = ?3
-        WHERE work_id = ?4 AND model_digest = ?5`)
-        .bind(modelDigest, checkedAt, revision, stale.workId, stale.modelDigest));
-      changedWorkIds.push(stale.workId);
     }
     if (changedWorkIds.length > 0) statements.push(this.db.prepare(`UPDATE catalogue_works SET revision = ?1
       WHERE work_id IN (SELECT value FROM json_each(?2)) AND revision <> ?1`).bind(revision, JSON.stringify(changedWorkIds)));

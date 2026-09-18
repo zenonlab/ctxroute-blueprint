@@ -96,7 +96,9 @@ describe('public release contract migration', () => {
     ]);
     const metrics = instrumentD1(env.PUBLIC_DB);
     const page = await new D1PublicReleaseCalendarAdapter(metrics.database).query({ from: '2026-09-14', limit: 10, to: '2026-10-01' });
-    expect(page).toMatchObject({ entries: [{ occurrence: { kind: 'DATE', value: '2026-09-21' }, state: 'ESTIMATED' }], revision: 'models-4242424242-1' });
+    expect(page).toMatchObject({ entries: [{ occurrence: { kind: 'DATE', value: '2026-09-21' }, state: 'ESTIMATED' }], revision: expect.stringMatching(/^models-[a-f0-9]{48}$/u) });
+    const models = await new D1PublicReleaseCalendarAdapter(metrics.database).queryModels({ from: '2026-09-14', limit: 10, to: '2026-10-01' });
+    expect(models.revision).toBe(page.revision);
     expect(metrics.snapshot().rowsWritten).toBe(0);
     expect(await env.PUBLIC_DB.prepare("SELECT episode_total AS episodeTotal, chapter_total AS chapterTotal FROM catalogue_current_metadata WHERE work_id = 'work_virtual_agenda'").first()).toBeNull();
     await env.PUBLIC_DB.prepare("DELETE FROM catalogue_release_model WHERE work_id = 'work_virtual_agenda'").run();
@@ -137,6 +139,7 @@ describe('public release contract migration', () => {
     const calendar = new D1PublicReleaseCalendarAdapter(metrics.database, snapshots);
     const first = await calendar.query({ from: '2026-09-12', limit: 1, to: '2026-09-30' });
     expect(first).toMatchObject({ entries: [{ id: 'r2-anime' }], nextCursor: '2026-09-13T00:00:00.000Z|r2-anime', revision: expect.stringMatching(/^r2-compat-/u) });
+    expect(first.revision).toMatch(/^[A-Za-z0-9._-]{1,64}$/u);
     await expect(calendar.query({ cursor: first.nextCursor!, from: '2026-09-12', limit: 1, to: '2026-09-30' }))
       .resolves.toMatchObject({ entries: [{ id: 'legacy-manga' }] });
     expect(metrics.snapshot().rowsWritten).toBe(0);

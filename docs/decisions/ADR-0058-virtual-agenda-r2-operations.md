@@ -81,6 +81,22 @@ paginés aux nouvelles extensions, qui calculent localement leur fenêtre;
 
 ## Conséquences
 
+Une annonce corrigée remplace l'occurrence de même fournisseur, œuvre, type
+et séquence; sans séquence, seul l'identifiant explicite permet ce remplacement.
+L'ancienne version reste dans les snapshots R2. Une absence ne retire pas une
+annonce du modèle. Seul `CONFIRMED` alimente les observations; une correction
+de date pour un même chapitre remplace l'observation précédente. Une séquence
+fractionnaire ou suffixée reste textuelle dans l'ancre et le dernier confirmé.
+
+Les lectures v3 privilégient les modèles D1 et gardent le repli historique
+lorsqu'aucun modèle ne couvre la fenêtre. v3 et v4 partagent un digest de
+génération sur tous les modèles; une modification durant la lecture fait échouer
+la page pour permettre une reprise bornée. Chaque ETag dépend de la page et
+de ses paramètres, y compris sa fraîcheur. La date de confirmation R2 publiée
+reste séparée de la préparation du snapshot suivant et de la modification métier.
+La révision du lecteur historique est un SHA-256 borné compatible avec la route.
+Les clients doivent comparer les générations entre pages, pas leurs ETag.
+
 La lecture et le passage du temps ne produisent aucune écriture distante. D1
 porte la donnée publique courante; R2 porte la reprise et l’historique borné
 nécessaire au calcul. Les anciennes générations et pages ne pourront être

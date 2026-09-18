@@ -247,6 +247,6 @@
 
 - [x] **Reproduire les frontières défaillantes** — DONE _(evidence: 13 tests ciblés exécutés: 9 succès et 4 défauts reproduits par it.fails (réseau, concurrence R2, ancien bail, écrasement)., Typechecks Worker/Cloudflare et validate:docs passent; Archify showcase 9/9, 0 erreur/avertissement; diff audité. Aucun état privé ni déploiement certifié.)_
 - [x] **Fiabiliser reprise R2 Queue et publication durable** — DONE _(evidence: Worker 131/131, adaptateur Cloudflare releases 20/20 et collecteurs 8/8 passent: CAS null, bail expiré, pages immuables, commit D1 puis confirmation R2 interrompue, reprise sans fournisseur et 25 signaux par lots de 20., Typechecks complets, validations décisions/docs et Archify all passent; diff audité, pas de suppression de données ni de dépendance. Namespace R2 v2 avec lecture v1 pour rollback.)_
-- [ ] **Aligner modèles D1 dates et contrats publics** — PENDING
+- [x] **Aligner modèles D1 dates et contrats publics** — DONE _(evidence: Worker 132/132, Agenda applicatif 14/14 et adaptateurs R2 20/20 passent; hiatus puis reprise via alias inchangé, report, absence et annulation explicite couverts., Typechecks complets, anti-slop, docs/ADR et Archify showcase 9/9 sans diagnostic passent. Génération commune v3/v4, ETag par page, données confirmées textuelles et observations distinctes des annonces; aucune migration nécessaire.)_
 - [ ] **Propager mises à jour et fiabiliser parsing local** — PENDING
 - [ ] **Certifier parcours et préparer livraison** — PENDING

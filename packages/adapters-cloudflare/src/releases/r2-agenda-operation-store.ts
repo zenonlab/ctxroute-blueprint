@@ -31,6 +31,7 @@ const laneStateSchema = z.strictObject({
   nextPage: z.number().int().positive().max(1024), received: z.number().int().nonnegative(), skipped: z.number().int().nonnegative(),
   notBefore: z.iso.datetime({ offset: false }).nullable(), ownerToken: z.string().min(32).max(256).nullable(),
   leaseUntil: z.iso.datetime({ offset: false }).nullable(), checkedAt: z.iso.datetime({ offset: false }).nullable(),
+  publishedCheckedAt: z.iso.datetime({ offset: false }).nullable().optional(),
   pages: z.array(pageReferenceSchema).max(1024).default([]),
   collectionComplete: z.boolean().default(false),
   publication: z.enum(['collecting', 'ready', 'published']).default('collecting'),
@@ -208,7 +209,7 @@ export class R2AgendaOperationStore {
     if (object === null) throw new Error('agenda-lane-lease-lost');
     const current = laneStateSchema.parse(await object.json<unknown>());
     if (current.collectionId !== input.collectionId || current.ownerToken !== input.tokenDigest || current.leaseUntil === null || current.leaseUntil <= (this.clock?.() ?? input.checkedAt)) throw new Error('agenda-lane-lease-lost');
-    const next = laneStateSchema.parse({ ...current, publication: 'ready', pendingSnapshotId: input.collectionId, pendingDigest: input.digest, checkedAt: input.checkedAt, collectionId: null, nextPage: 1, received: 0, skipped: 0, notBefore: null, ownerToken: null, leaseUntil: null });
+    const next = laneStateSchema.parse({ ...current, publishedCheckedAt: current.publishedCheckedAt ?? current.checkedAt, publication: 'ready', pendingSnapshotId: input.collectionId, pendingDigest: input.digest, checkedAt: input.checkedAt, collectionId: null, nextPage: 1, received: 0, skipped: 0, notBefore: null, ownerToken: null, leaseUntil: null });
     await this.put(objectKey, JSON.stringify(next), { httpMetadata: { contentType: 'application/json' }, onlyIf: { etagMatches: etag(object)! } });
   }
 
@@ -220,7 +221,7 @@ export class R2AgendaOperationStore {
     if (current.publication === 'published' && current.activeDigest === digest && current.activeSnapshotId === snapshotId) return;
     if (current.publication !== 'ready' || current.pendingDigest !== digest || current.pendingSnapshotId !== snapshotId) throw new Error('agenda-publication-changed');
     const previousSnapshotIds = current.activeSnapshotId === null ? current.previousSnapshotIds : [...new Set([current.activeSnapshotId, ...current.previousSnapshotIds])].slice(0, 2);
-    await this.put(key, JSON.stringify({ ...current, publication: 'published', completedFor: current.scheduledFor, activeSnapshotId: current.pendingSnapshotId, activeDigest: digest, pendingSnapshotId: null, pendingDigest: null, previousSnapshotIds }), {
+    await this.put(key, JSON.stringify({ ...current, publication: 'published', publishedCheckedAt: current.checkedAt, completedFor: current.scheduledFor, activeSnapshotId: current.pendingSnapshotId, activeDigest: digest, pendingSnapshotId: null, pendingDigest: null, previousSnapshotIds }), {
       httpMetadata: { contentType: 'application/json' }, onlyIf: { etagMatches: etag(object)! },
     });
   }
@@ -254,7 +255,7 @@ export class R2AgendaOperationStore {
     const current = await this.bucket.get([this.prefix, 'observations', `${encodeURIComponent(input.workId)}.json`].join('/'));
     let previous: readonly AgendaObservation[] = current === null ? [] : observationObjectSchema.parse(await current.json<unknown>()).observations;
     if (current === null && this.prefix === 'agenda-operations/v2') previous = await this.readObservations(input.workId);
-    const merged = [...new Map([...previous, ...input.observations].map((item) => [`${item.chapter}|${item.releasedOn}`, observationSchema.parse(item)])).values()]
+    const merged = [...new Map([...previous, ...input.observations].map((item) => [item.chapter, observationSchema.parse(item)])).values()]
       .sort((left, right) => left.releasedOn.localeCompare(right.releasedOn) || left.chapter - right.chapter).slice(-12);
     if (JSON.stringify(previous) === JSON.stringify(merged)) return previous;
     const body = observationObjectSchema.parse({ schemaVersion: 1, workId: input.workId, ownerToken: input.ownerToken, observedAt: input.now, expiresAt: expiresAt(input.now), observations: merged });

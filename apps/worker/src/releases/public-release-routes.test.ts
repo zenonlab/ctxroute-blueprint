@@ -103,10 +103,11 @@ describe('public release routes', () => {
     const first = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1');
     // SAFETY: the route contract returns a JSON object with an optional cursor.
     expect((await first.json() as { nextCursor?: string }).nextCursor).toBe('2026-09-05T18:00:00.000Z|release_1');
-    expect(first.headers.get('ETag')).toBe(`"releases-${revision}-2026-09-05-2026-09-06"`);
+    expect(first.headers.get('ETag')).toMatch(/^"releases-v2-[a-f0-9]{64}"$/u);
     const second = await app.request('https://api.example/v2/releases?from=2026-09-05&to=2026-09-06&limit=1&cursor=2026-09-05T18%3A00%3A00.000Z%7Crelease_1');
     // SAFETY: the route contract returns an entries array for every successful page.
     expect((await second.json() as { entries: unknown[] }).entries).toHaveLength(1);
+    expect(second.headers.get('ETag')).not.toBe(first.headers.get('ETag'));
   });
 
   it('keeps v2 byte-compatible and exposes source coverage only on v3', async () => {
@@ -117,7 +118,7 @@ describe('public release routes', () => {
     const v3 = await app.request('https://api.example/v3/releases?from=2026-09-13&to=2026-09-29');
     expect(await v2.json()).toEqual({ entries: [], generatedAt: page.generatedAt, revision });
     expect(await v3.json()).toEqual(page);
-    expect(v3.headers.get('ETag')).toBe(`"releases-v3-${revision}-2026-09-13-2026-09-29"`);
+    expect(v3.headers.get('ETag')).toMatch(/^"releases-v3-[a-f0-9]{64}"$/u);
   });
 
   it('serves paginated virtual models to new extensions without changing v3', async () => {
@@ -135,7 +136,11 @@ describe('public release routes', () => {
     } });
     const response = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29');
     expect(response.status).toBe(200); expect(await response.json()).toEqual(page);
-    expect(response.headers.get('ETag')).toBe('"release-models-v4-models-1-1-2026-09-13-2026-09-29"');
+    expect(response.headers.get('ETag')).toMatch(/^"release-models-v4-[a-f0-9]{64}"$/u);
+    const conditional = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29', { headers: { 'If-None-Match': response.headers.get('ETag')! } });
+    expect(conditional.status).toBe(304);
+    const otherPage = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29&cursor=work_42', { headers: { 'If-None-Match': response.headers.get('ETag')! } });
+    expect(otherPage.status).toBe(200);
   });
 
   it.each([

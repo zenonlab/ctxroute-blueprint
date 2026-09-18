@@ -13,9 +13,14 @@ export function projectVirtualAgenda(
 ): readonly PublicReleaseEventContract[] {
   const events = new Map<string, PublicReleaseEventContract>();
   for (const model of models) {
-    for (const event of model.exceptions) if (inWindow(event, window.from, window.to)) events.set(event.id, event);
-    if (model.explicitNext !== undefined && inWindow(model.explicitNext, window.from, window.to)) events.set(model.explicitNext.id, model.explicitNext);
-    if (model.explicitNext !== undefined || model.intervalDays === undefined || suspended.has(model.editorialStatus)) continue;
+    const occurrences = new Map<string, PublicReleaseEventContract>();
+    const explicit = model.explicitNext === undefined ? model.exceptions : [...model.exceptions, model.explicitNext];
+    for (const event of [...explicit].sort((a, b) => a.provenance.fetchedAt.localeCompare(b.provenance.fetchedAt))) {
+      const key = JSON.stringify([event.provider, event.providerWorkId, event.releaseKind, event.sequence ?? event.id]);
+      occurrences.set(key, event);
+    }
+    for (const event of occurrences.values()) if (inWindow(event, window.from, window.to)) events.set(event.id, event);
+    if ([...occurrences.values()].some(event => (event.state === 'SCHEDULED' || event.state === 'CANCELLED') && event.occurrence.value.slice(0, 10) >= model.anchor.date) || model.intervalDays === undefined || suspended.has(model.editorialStatus)) continue;
     const nextTime = Date.parse(`${model.anchor.date}T00:00:00.000Z`) + Math.round(model.intervalDays * 86_400_000);
     const nextDate = new Date(nextTime).toISOString().slice(0, 10);
     if (nextDate < window.from || nextDate > window.to || nextDate < model.validity.from || nextDate > model.validity.to) continue;

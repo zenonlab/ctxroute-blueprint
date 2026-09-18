@@ -7,12 +7,14 @@ scope:
   - packages/public-discovery/src/**
   - docs/architecture/src/adaptive-public-refresh.architecture.json
 review: on-change
+revised: true
 ---
 
 # ADR-0057 — Métadonnées courantes par œuvre canonique
 
 - Status: accepted
 - Date: 2026-09-17
+- Revised: 2026-09-19
 
 ## Contexte
 
@@ -52,3 +54,9 @@ non destructives et les filtres disposent de colonnes stables. Le backfill
 signale les contradictions de type dans une table dédiée au lieu de fusionner
 silencieusement les identités. La migration est additive; aucun ancien objet
 n'est supprimé.
+
+La publication d'un statut met aussi à jour le modèle Agenda existant dans
+le même batch D1, même sans nouvelle sortie. L'intervalle historique reste
+conservé pendant un hiatus; la projection suspend les estimations. Les
+compteurs annoncés du profil v3 ne sont jamais remplacés par une séquence
+confirmée, qui conserve sa colonne textuelle distincte.

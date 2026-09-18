@@ -3,8 +3,41 @@ import { describe, expect, it } from 'vitest';
 import { R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
 import { D1PublicReleaseCalendarAdapter } from './public-release-calendar';
 import { D1AgendaCollectionAdapter } from './public-release-collectors';
+import type { PublicReleaseEventContract } from '@tobirink/application';
 
 describe('virtual Agenda model publication', () => {
+  it('replaces one announcement on postponement, retains absence, and publishes an explicit cancellation', async () => {
+    await applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS);
+    await env.PUBLIC_DB.batch([
+      env.PUBLIC_DB.prepare("INSERT OR IGNORE INTO catalogue_revisions(revision, published_at) VALUES (91919191, '2026-09-01T00:00:00.000Z')"),
+      env.PUBLIC_DB.prepare("INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES ('work_postponed', 'anime', 'Postponed', 91919191)"),
+      env.PUBLIC_DB.prepare("INSERT INTO catalogue_external_references(provider, external_id, work_id) VALUES ('anilist', 'postponed', 'work_postponed')"),
+    ]);
+    const operations = new R2AgendaOperationStore(env.RELEASE_SNAPSHOTS, 'canonical/postponed');
+    const writer = new D1AgendaCollectionAdapter(env.PUBLIC_DB, operations);
+    const reader = new D1PublicReleaseCalendarAdapter(env.PUBLIC_DB, operations);
+    const event: PublicReleaseEventContract = { id: 'announce-old', provider: 'anilist', providerWorkId: 'postponed', releaseKind: 'episode', sequence: '12.5-special', state: 'SCHEDULED', occurrence: { kind: 'DATE', value: '2026-10-01' }, expiresAt: '2026-11-01T00:00:00.000Z', provenance: { source: 'anilist', fetchedAt: '2026-09-01T00:00:00.000Z', parserVersion: '2', rulesVersion: '2' } };
+    const publish = async (day: string, events: readonly PublicReleaseEventContract[]) => {
+      const now = `2026-09-${day}T00:00:00.000Z`;
+      const admitted = await writer.claimLane({ provider: 'anilist', collectionId: `postponed-${day}`, scheduledFor: now, now, leaseUntil: `2026-09-${day}T01:00:00.000Z`, tokenDigest: day.repeat(32), window: { from: '2026-09-01', to: '2026-11-01' } });
+      if (admitted.status !== 'claimed') throw new Error('Expected canonical lane.');
+      await writer.savePage(admitted.claim, { provider: 'anilist', complete: true, page: 1, received: events.length, skippedUnidentified: 0, events: events.map(value => ({ ...value, provenance: { ...value.provenance, fetchedAt: now } })) }, now);
+      await writer.completeLane({ claim: admitted.claim, provider: 'anilist', scheduledFor: now, checkedAt: now });
+      return writer.publishMergedGeneration(now);
+    };
+    await publish('01', [event]);
+    const postponed = { ...event, id: 'announce-new', occurrence: { kind: 'DATE' as const, value: '2026-10-08' } };
+    await publish('08', [postponed]);
+    const query = { from: '2026-10-01', to: '2026-10-20', limit: 100 };
+    expect((await reader.query(query)).entries.filter(value => value.providerWorkId === 'postponed')).toMatchObject([{ id: 'announce-new', occurrence: { kind: 'DATE', value: '2026-10-08' }, sequence: '12.5-special' }]);
+    await publish('15', []);
+    expect((await reader.query(query)).entries.filter(value => value.providerWorkId === 'postponed')).toHaveLength(1);
+    await publish('22', [{ ...postponed, state: 'CANCELLED' }]);
+    expect((await reader.query(query)).entries.filter(value => value.providerWorkId === 'postponed')).toMatchObject([{ state: 'CANCELLED' }]);
+    expect((await reader.queryModels(query)).revision).toBe((await reader.query(query)).revision);
+    expect(await operations.readPageVersion('snapshots/anilist/postponed-01')).toMatchObject({ events: [{ id: 'announce-old' }] });
+  });
+
   const laneInput = {
     provider: 'anilist' as const, scheduledFor: '2026-09-20T03:23:00.000Z',
     window: { from: '2026-09-20', to: '2026-10-20' },
@@ -120,10 +153,12 @@ describe('virtual Agenda model publication', () => {
     const first = await run('known-a', '2026-09-17T03:23:00.000Z');
     expect(first).toMatchObject({ changed: true, revision: expect.stringMatching(/^models-\d+-1$/u) });
     expect(await env.PUBLIC_DB.prepare("SELECT explicit_next_json AS explicitNext, exceptions_json AS exceptions FROM catalogue_release_model WHERE work_id = 'work_stale_agenda'").first())
-      .toEqual({ exceptions: '[]', explicitNext: null });
+      .toEqual({ exceptions: '[{"id":"stale"}]', explicitNext: '{"id":"stale"}' });
     const firstModel = await env.PUBLIC_DB.prepare("SELECT model_digest AS modelDigest, observed_at AS observedAt FROM catalogue_release_model WHERE work_id = 'work_known_agenda'").first();
     await expect(new D1PublicReleaseCalendarAdapter(env.PUBLIC_DB).queryModels({ from: '2026-09-15', limit: 100, to: '2026-10-01' }))
-      .resolves.toMatchObject({ models: expect.arrayContaining([expect.objectContaining({ workId: 'work_known_agenda' })]), revision: expect.stringMatching(/^models-\d+-2$/u) });
+      .rejects.toThrow();
+    await expect(new D1PublicReleaseCalendarAdapter(env.PUBLIC_DB).queryModels({ from: '2026-09-17', limit: 100, to: '2026-10-01' }))
+      .resolves.toMatchObject({ models: expect.arrayContaining([expect.objectContaining({ workId: 'work_known_agenda' })]), revision: expect.stringMatching(/^models-[a-f0-9]{48}$/u) });
     const second = await run('known-b', '2026-09-24T03:23:00.000Z');
     expect(second).toMatchObject({ changed: false, revision: first?.revision });
     expect(await env.PUBLIC_DB.prepare("SELECT model_digest AS modelDigest, observed_at AS observedAt FROM catalogue_release_model WHERE work_id = 'work_known_agenda'").first()).toEqual(firstModel);
