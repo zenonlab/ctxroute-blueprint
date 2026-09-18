@@ -43,12 +43,13 @@ export class HttpPublicReleaseLoader {
   async load(cache: PublicReleaseGenerationCachePort, window: { from: string; to: string }): Promise<{ snapshot: PublicReleaseGeneration; source: 'network' | 'cache'; freshness: 'current' | 'stale' }> {
     const cached = await cache.load();
     const sameWindow = cached?.window.from === window.from && cached.window.to === window.to;
+    const legacyCovered = cached?.models === undefined && cached !== undefined && cached.window.from <= window.from && cached.window.to >= window.to;
     const covered = cached?.models !== undefined && cached.modelWindow !== undefined && cached.modelWindow.from <= window.from && cached.modelWindow.to >= window.to;
-    const matchingCache = cached?.source === 'shared' && cached.revision !== 'd1-empty' && (sameWindow || covered)
+    const matchingCache = cached?.source === 'shared' && cached.revision !== 'd1-empty' && (sameWindow || covered || legacyCovered)
       ? publicReleaseGenerationSchema.parse(covered ? { ...cached, events: projectVirtualAgenda(cached.models!, window), window } : cached) : undefined;
     const matchingCacheAge = matchingCache ? this.clock() - Date.parse(matchingCache.generatedAt) : undefined;
     if (matchingCache && matchingCacheAge !== undefined && matchingCacheAge >= 0 && matchingCacheAge < 86_400_000) {
-      if (!sameWindow) await cache.save(matchingCache);
+      if (!sameWindow && covered) await cache.save(matchingCache);
       return { snapshot: matchingCache, source: 'cache', freshness: 'current' };
     }
     const deadline = this.clock() + 20_000;
@@ -60,7 +61,7 @@ export class HttpPublicReleaseLoader {
       throw new Error('public-release-generation-mismatch');
     } catch (error) {
       if (matchingCache && matchingCacheAge !== undefined && matchingCacheAge >= 0 && matchingCacheAge < maximumSharedGenerationAgeMs) {
-        if (!sameWindow) await cache.save(matchingCache);
+        if (!sameWindow && covered) await cache.save(matchingCache);
         return { snapshot: matchingCache, source: 'cache', freshness: 'stale' };
       }
       throw error;

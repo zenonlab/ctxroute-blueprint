@@ -3894,14 +3894,14 @@
             "git commit -m 'fix(extension): propagate canonical updates and invalidate releases'"
           ],
           "evidence": [
-            "Application 399/399, contrats 14/14, extension 149/149 puis notifications 7/7, loader/cache 19/19; parser 11 passés/1 oracle externe ignoré dont corpus 1532/1400.",
-            "Contrats IndexedDB et migrations Chromium passent: report et annulation invalident la notification, historique/Work conservés. Typechecks, anti-slop, docs/ADR et Archify showcase 9/9 passent. Aucun changement de règle parser; rappel désactivé préservé."
+            "Application 399/399, contrats 14/14, extension 150/150 et loader 19/19; corpus parser 1532/1400 explicite, oracle externe non exécuté.",
+            "Correction de compatibilité cache historique confirmée dans Firefox 155 installé; Chromium 153 conserve 1532 sources et 1400 médias lors de la mise à jour 1.0.38 vers 1.0.39 hors ligne. Typecheck, lint et docs passent."
           ]
         },
         {
           "id": "certification",
           "title": "Certifier parcours et préparer livraison",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Frontières interruption vérifiées et archives installées testées",
             "1532 favoris dont 1400 médias avec attentes explicites",
@@ -3931,7 +3931,9 @@
             "git diff --check",
             "git commit -m 'test(pipeline): certify recovery and delivery readiness'"
           ],
-          "evidence": []
+          "evidence": [
+            "Candidate 1.0.39 committée 023c51a; certification complète en cours."
+          ]
         }
       ]
     },

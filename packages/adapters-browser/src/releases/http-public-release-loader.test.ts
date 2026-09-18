@@ -51,6 +51,18 @@ describe('HttpPublicReleaseLoader', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it('retains a legacy event cache covering a smaller offline period after upgrade', async () => {
+    const snapshot = { etag: '"legacy"', events: [releaseEvent('anilist-episode-42-1', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-10T00:00:00.000Z', revision: 'legacy', source: 'shared' as const, window: sourceWindow };
+    const cache = { load: async () => snapshot, save: vi.fn() };
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      expect(init?.headers).toBeUndefined();
+      throw new Error('offline');
+    });
+    const result = await new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, { from: '2026-09-13', to: '2026-09-14' });
+    expect(result).toEqual({ snapshot, source: 'cache', freshness: 'stale' });
+    expect(cache.save).not.toHaveBeenCalled();
+  });
+
   it('stores a published empty window and reuses it without another provider or HTTP request', async () => {
     const window = { from: '2026-09-12', to: '2026-09-28' };
     const generation = { etag: '"calendar-verified-empty"', events: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'calendar-verified-empty', source: 'shared' as const, window };

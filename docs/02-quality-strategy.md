@@ -345,6 +345,13 @@ without changing alias timestamps. Parser rules are unchanged; the existing
 1532/1400 raw synthetic corpus and its explicit resolution expectations remain
 the regression oracle, separate from personal-library certification.
 
+The installed 1.0.39 certification also upgrades the existing Chromium 1.0.38
+profile without changing its extension ID: 1532 sources and 1400 offline media
+must survive. A legacy event cache remains usable for a contained day window
+without models, without narrowing its stored coverage or reusing its ETag for
+another HTTP representation. The Firefox installed smoke caught this boundary;
+the loader regression now checks it explicitly. No parser rule changed.
+
 Adult-content contract tests cover AniList, MangaUpdates, MangaDex, Kitsu
 Anime and Kitsu Manga classification. They reject undocumented Kitsu ratings,
 ambiguous tags and lost classification through factories or caches. Local
