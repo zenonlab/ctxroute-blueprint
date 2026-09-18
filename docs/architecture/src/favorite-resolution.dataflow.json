@@ -34,7 +34,7 @@
           "reviewGate",
           "privateStore"
         ],
-        "note": "La preuve d’identité est conservée avant D1; une fiche terminale revient du cache public sans appel fournisseur MV3."
+        "note": "Fiche locale vérifiée avant D1, même ancienne; un ID seul demande une vérification publique sans fournisseur MV3."
       },
       {
         "id": "bounded-convergence",

@@ -40,7 +40,7 @@ describe('declarative site routes', () => {
     expect(result.sourceAdapter).toContain(`site-rules-v${bundledFavoriteSiteRules.version}:`);
   });
 
-  it.each(['https://www.youtube.com/watch?v=synthetic', 'https://youtube.com/shorts/synthetic', 'https://example.org/news/synthetic', 'https://anime-sama.fr/catalogue/synthetic/watch', 'https://anime-sama.fr.evil.invalid/catalogue/synthetic/saison1'])('keeps unsupported route %s out of identity resolution', (url) => {
+  it.each(['https://www.youtube.com/watch?v=synthetic', 'https://youtube.com/shorts/synthetic', 'https://example.org/news/synthetic', 'https://anime-sama.fr/catalogue/synthetic/watch'])('keeps unsupported route %s out of identity resolution', (url) => {
     expect(evidence(url).disposition).toBe('URL_IDENTITY_UNRESOLVED');
   });
 

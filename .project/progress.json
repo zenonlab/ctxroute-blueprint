@@ -3570,7 +3570,7 @@
         {
           "id": "extraction",
           "title": "Corriger extraction, résolution locale et récupération versionnée",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Régressions extraction corrigées sans faux positif",
             "Décisions humaines préservées et récupération idempotente",
@@ -3599,7 +3599,10 @@
             "git diff --check",
             "git commit -m 'fix(favorites): recover comparative extraction and local identities'"
           ],
-          "evidence": []
+          "evidence": [
+            "Application 393/393 et contrats 14/14; quatre régressions corrigées; identité locale ancienne sans D1 et reçu de récupération unique testés.",
+            "Contrat IndexedDB Chromium et migrations passent; tous les typechecks et Archify all passent; ADR-0037/0050 mis à jour."
+          ]
         },
         {
           "id": "resume",

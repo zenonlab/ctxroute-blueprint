@@ -232,5 +232,5 @@
 ## Rétablir la reconnaissance et le traitement des favoris — ACTIVE
 
 - [x] **Établir la référence brute et les régressions** — DONE _(evidence: Oracle brut 10/10; extraction 46 succès et 4 échecs attendus reproduits; nombre intrinsèque classé amélioration., Archify showcase 9/9 sans diagnostic; ADR validés, diff audité. Trois profils lus: 1562 liens; états privés IndexedDB non certifiés.)_
-- [ ] **Corriger extraction, résolution locale et récupération versionnée** — PENDING
+- [x] **Corriger extraction, résolution locale et récupération versionnée** — DONE _(evidence: Application 393/393 et contrats 14/14; quatre régressions corrigées; identité locale ancienne sans D1 et reçu de récupération unique testés., Contrat IndexedDB Chromium et migrations passent; tous les typechecks et Archify all passent; ADR-0037/0050 mis à jour.)_
 - [ ] **Réparer les reprises publiques et certifier les parcours** — PENDING

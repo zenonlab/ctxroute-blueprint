@@ -55,6 +55,34 @@ async function fixture() {
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('resolves a stale verified local identity while D1 and providers are unavailable', async () => {
+    const { storage, outbox } = await fixture();
+    const id = favoriteCandidateWorkId(candidate);
+    await storage.putWork(createWork({ id, externalReferences: [{ provider: candidate.provider, externalId: candidate.externalId }], preferredTitle: 'Frieren', mediaKind: 'anime', hydration: {
+      candidate, hydratedAt: '2020-01-01T00:00:00.000Z', matcherVersion: 'favorite-matcher-v4', favoriteAliasKeys: [], providerTitleKeys: ['frieren'],
+    } }));
+    const resolveOrRequest = vi.fn(async () => { throw new Error('D1 unavailable'); });
+    const hydrate = vi.fn(async () => { throw new Error('MV3 provider forbidden'); });
+    const result = await runFavoriteResolutionSlice({ storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts({ hydrate }), libraryId: libraryId('library_primary'), now: () => now, token: () => 'local', publicDiscovery: { resolveOrRequest } });
+    expect(result.completed).toBe(1);
+    expect(resolveOrRequest).not.toHaveBeenCalled();
+    expect(hydrate).not.toHaveBeenCalled();
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]).toMatchObject({ matchedWorkId: id, resolution: { kind: 'RESOLVED' } });
+  });
+  it('requeues blocked automatic errors only once per recovery version', async () => {
+    const { storage, task } = await fixture();
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (!source) throw new Error('Missing source');
+    await storage.putFavoriteSource({ ...source, resolution: { kind: 'RETRYABLE', reason: 'AUTOMATIC_ATTEMPT_LIMIT' } });
+    const blocked = blockTask(claimTask(task, 'old', now, '2026-09-07T12:01:00.000Z'), 'old', 'AUTOMATIC_ATTEMPT_LIMIT');
+    await storage.putFavoriteResolutionTask(blocked);
+    await importFavoriteSources([favorite], storage, now);
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'READY', attempt: 0 });
+    await storage.putFavoriteResolutionTask(blocked);
+    await importFavoriteSources([favorite], storage, now);
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'BLOCKED' });
+    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-v3`)).toBeDefined();
+  });
   it('sends a structurally cleaned Manhwaz identity to MangaUpdates', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([{

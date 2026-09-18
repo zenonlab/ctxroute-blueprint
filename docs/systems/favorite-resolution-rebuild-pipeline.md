@@ -29,6 +29,22 @@ l’extension.
 
 ## État implémenté vérifié
 
+### Récupération comparative locale
+
+Les adaptateurs `generic-url-comparative-v1` et `generic-bookmark-query-v1`
+distinguent les chemins nouvellement reconnus sans changer les versions des
+autres clés publiques. L’inventaire existant, déclenché à la mise à jour puis
+repris avec curseur durable par lots de 100, réimporte ces sources. Une
+empreinte modifiée réenfile seulement les décisions automatiques concernées.
+Le reçu `queue-recovery-v3` reprend une fois les blocages automatiques et les
+erreurs internes en attente; les décisions humaines restent prioritaires.
+Les états serveur `FAILED` ne sont pas modifiés par cette récupération locale.
+
+Avec Public Discovery composé, le runner peut terminer à partir d’une fiche
+locale vérifiée, même ancienne, sans appeler D1 ni un fournisseur. Les hints
+sync sans fiche vérifiée et les URL fournisseur sans slug passent par une
+clé publique dédiée fournisseur + ID. Le rafraîchissement reste séparé.
+
 ### Correctif de livraison 1.0.9
 
 Le contrôle dans Chrome a montré que MangaDex renvoie une image promotionnelle

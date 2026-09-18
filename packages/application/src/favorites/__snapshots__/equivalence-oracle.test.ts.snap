@@ -1823,7 +1823,7 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
       "artifact": {
         "aliases": [
           {
-            "provenance": "stable-url-slug",
+            "provenance": "aligned-bookmark-segment",
             "value": "Fixture U 04",
           },
         ],
@@ -5219,14 +5219,36 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
     "caseId": "R-08",
     "snapshot": {
       "artifact": {
-        "aliases": [],
-        "contractVersion": 2,
-        "diagnostics": [
-          "URL_IDENTITY_MISSING",
+        "aliases": [
+          {
+            "provenance": "stable-url-slug",
+            "value": "fixture r 08",
+          },
         ],
+        "contractVersion": 2,
+        "diagnostics": [],
+        "displayTitle": "fixture r 08",
+        "identityKey": "fixture r 08",
         "matcherVersion": "favorite-matcher-v4",
-        "mediaKind": "UNKNOWN",
+        "mediaKind": "MANGA",
         "parserVersion": "favorite-parser-v5",
+        "progress": {
+          "candidates": [
+            {
+              "kind": "chapter",
+              "position": 14,
+              "proof": "numeric-url-segment-after-source-identity",
+              "quality": 1,
+              "raw": "12",
+              "value": 12,
+            },
+          ],
+          "kind": "chapter",
+          "proof": "numeric-url-segment-after-source-identity",
+          "raw": "12",
+          "rejections": [],
+          "value": 12,
+        },
         "progressionParserVersion": "favorite-progression-v2",
         "raw": {
           "title": "Fixture R-08",
@@ -5243,19 +5265,32 @@ exports[`favorite equivalence oracle > runs parser, matcher and projection for e
             "raw": "Fixture R-08",
           },
         ],
-        "semanticFingerprint": "fnv1a32:66988443",
-        "sourceAdapterVersion": "source-adapter-v3:generic-url",
+        "semanticFingerprint": "fnv1a32:7c21a1d4",
+        "sourceAdapterVersion": "source-adapter-v3:generic-url-comparative-v1",
         "sourceEvidence": {
-          "aliases": [],
+          "aliases": [
+            {
+              "provenance": "stable-url-slug",
+              "value": "fixture r 08",
+            },
+          ],
+          "canonicalUrl": "https://fixtures.tobirink.invalid/manga/fixture-r-08",
           "diagnostics": [],
-          "disposition": "URL_IDENTITY_UNRESOLVED",
           "key": "oracle-R-08",
-          "mediaKind": "UNKNOWN",
-          "proofs": [],
-          "sourceAdapter": "generic-url",
+          "mediaKind": "MANGA",
+          "origin": "https://fixtures.tobirink.invalid",
+          "path": "/manga/fixture-r-08/12",
+          "proofs": [
+            "CATEGORY_PATH",
+            "TITLE_SLUG",
+          ],
+          "rawSlug": "fixture-r-08",
+          "sourceAdapter": "generic-url-comparative-v1",
+          "stableSlug": "fixture-r-08",
           "strategy": "generic",
+          "title": "fixture r 08",
         },
-        "status": "identity-missing",
+        "status": "parsed",
         "transformations": [],
       },
       "decision": {

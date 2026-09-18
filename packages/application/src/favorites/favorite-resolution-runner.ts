@@ -1,7 +1,7 @@
 import { createFavoriteSource, createProviderCandidate, createWork, workId } from '@tobirink/domain';
 import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
-import { favoriteIdentityKey, favoritePublicReferenceSchema, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
+import { favoriteIdentityKey, favoriteManualIdentityKey, favoritePublicReferenceSchema, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
 import type { FavoriteIdentityLookupPort } from './favorite-identity-lookup';
 import { blockTask, parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
@@ -240,9 +240,40 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
   }
   const explicit = artifact.sourceEvidence.explicitProviderReference;
   if (dependencies.publicDiscovery !== undefined) {
-    const identityKey = await favoriteIdentityKey(artifact);
+    const titles = providerTitles(artifact);
+    const query: MutableFavoriteTitleMatchQuery = { sourceTitles: titles, sourceFormat: hasFavoriteOvaMarker(titles) ? 'OVA' : 'NON_OVA', preSerialization: hasFavoritePreSerializationMarker(titles) };
+    if (artifact.mediaKind !== 'UNKNOWN') query.mediaKind = artifact.mediaKind;
+    if (artifact.season !== undefined && artifact.seasonEvidence?.conflict !== true) query.explicitSeason = artifact.season;
+    let reference = explicit;
+    if (reference === undefined && dependencies.synchronized !== undefined && artifact.identityKey !== undefined) {
+      const syncKey = await favoriteIdentityKey(artifact);
+      try {
+        const results = await dependencies.synchronized.lookup([syncKey]);
+        const result = results.length === 1 ? results[0] : undefined;
+        if (result?.kind === 'FOUND' && result.fingerprint === syncKey.fingerprint && result.references.length === 1
+          && (artifact.mediaKind === 'UNKNOWN' || artifact.mediaKind === result.mediaKind)) reference = favoritePublicReferenceSchema.parse(result.references[0]);
+      } catch { /* Sync is a hint; unavailable hints do not block local proof. */ }
+    }
+    const cached = reference === undefined ? undefined : await dependencies.storage.getWork(favoriteCandidateWorkId(reference));
+    const exactCandidate = cached?.hydration?.candidate;
+    const exact = reference !== undefined && exactCandidate?.provider === reference.provider && exactCandidate.externalId === reference.externalId;
+    const local = reference === undefined ? await readLocalFavoriteIdentity(dependencies.storage, artifact, query) : { kind: 'MISS' as const };
+    const work = exact ? cached : local.kind === 'MATCH' ? local.work : undefined;
+    const candidate = work?.hydration?.candidate;
+    if (candidate !== undefined && work !== undefined) {
+      const outcome = hasExactBlockedProviderTaxonomy(candidate) ? { kind: 'UNSUPPORTED' as const, reason: 'BLOCKED_CONTENT_TAXONOMY' as const } : { kind: 'RESOLVED' as const };
+      await persistFavoriteResolutionCompletion(dependencies, task, token, outcome, 'resolved:verified-local', candidate, undefined, { workId: work.id, hydratedAt: work.hydration?.hydratedAt });
+      return 'completed';
+    }
+    if (local.kind === 'AMBIGUOUS') {
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:verified-local', undefined, {
+        candidates: local.candidates.slice(0, 6), digest: `local:${artifact.semanticFingerprint}`, provenance: local.provenance, totalCandidates: local.candidates.length, recordedAt: dependencies.now(),
+      });
+      return 'completed';
+    }
+    const identityKey = reference === undefined ? await favoriteIdentityKey(artifact) : await favoriteManualIdentityKey(artifact, reference);
     let discovery;
-    try { discovery = await requestPublicFavoriteDiscovery(dependencies.publicDiscovery, identityKey, artifact); }
+    try { discovery = await requestPublicFavoriteDiscovery(dependencies.publicDiscovery, identityKey, artifact, reference === undefined ? undefined : { explicitProviderReference: reference }); }
     catch { return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING'); }
     if (discovery.state === 'MISS') return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING');
     if (discovery.state === 'PENDING') return deferClaimWithoutAttempt(dependencies, task, token, discovery.retryAt);
@@ -255,8 +286,9 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:d1-ambiguous');
       return 'completed';
     }
-    const candidate = providerCandidateSchema.parse(discovery.profile.candidate);
-    if (hasExactBlockedProviderTaxonomy(candidate)) {
+    const discoveredCandidate = providerCandidateSchema.parse(discovery.profile.candidate);
+    if (reference !== undefined && (discoveredCandidate.provider !== reference.provider || discoveredCandidate.externalId !== reference.externalId)) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+    if (hasExactBlockedProviderTaxonomy(discoveredCandidate)) {
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
       return 'completed';
     }
@@ -267,7 +299,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     const identity = discovery.nextRefreshAt === undefined
       ? { hydratedAt: discovery.verifiedAt, references, workId: workId(discovery.profile.workId) }
       : { hydratedAt: discovery.verifiedAt, publicDiscovery: { ...identityKey, nextRefreshAt: discovery.nextRefreshAt, verifiedAt: discovery.verifiedAt }, references, workId: workId(discovery.profile.workId) };
-    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-verified-discovery', candidate, undefined, identity);
+    await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-verified-discovery', discoveredCandidate, undefined, identity);
     return 'completed';
   }
   if (explicit !== undefined) {

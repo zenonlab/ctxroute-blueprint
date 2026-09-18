@@ -57,6 +57,12 @@ favoris restent purs et sans réseau.
 
 ## Conséquences
 
+La réutilisation d’une fiche locale déjà vérifiée reste permise avant D1,
+même lorsque ses métadonnées sont anciennes. Elle ne déclenche aucune
+hydratation fournisseur MV3. Une référence sync seule exige une vérification
+publique; elle ne constitue pas une fiche vérifiée. Le rafraîchissement des
+métadonnées est indépendant de la validité de l’identité locale.
+
 Les archives Chrome et Firefox ne contiennent plus la règle DNR orpheline et
 leur nombre de fichiers diminue d’une unité. La première candidate qui
 matérialise cette frontière exhaustive est `1.0.31`; elle est maintenant

@@ -137,6 +137,12 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     };
     identityIndex -= 1;
   }
+  const corroborated = decoded.slice(0, identityIndex + 1)
+    .map((slug, index) => ({ slug, index }))
+    .filter(({ slug }) => !structuralSegments.has(slug.toLowerCase()) && /\p{L}{2}/u.test(slug) && bookmarkCorroboratesSlug(input.title, slug));
+  const compared = corroborated.length === 1 ? corroborated[0] : undefined;
+  const comparativeRoute = compared !== undefined && compared.index < identityIndex;
+  if (comparativeRoute) identityIndex = compared.index;
   const observedSlug = decoded[identityIndex];
   let stableSlug = observedSlug;
   const attached = attachedReleasePattern.exec(stableSlug ?? '');
@@ -171,6 +177,11 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
   const corroboratedUnknownRoute = bookmarkCorroboratesSlug(input.title, stableSlug)
     && /\p{L}{2}/u.test(stableSlug) && !hasUnverifiedRoutingPrefix;
   if (!categoryRoute && !rootReleaseRoute && !boundedNumericReleaseRoute && !corroboratedUnknownRoute) {
+    const segments = segmentFavoriteTitle(input.title, new URL(url.origin).hostname).segments.filter(segment => !segment.excluded);
+    if (release === undefined && segments.length === 1 && /\p{L}{2}/u.test(segments[0]?.cleaned ?? '')) {
+      const title = segments[0]?.cleaned ?? '';
+      return createSourceEvidence({ ...common(input, url), aliases: [{ provenance: 'aligned-bookmark-segment', value: title }], diagnostics: [], mediaKind: 'UNKNOWN', proofs: [], sourceAdapter: 'generic-bookmark-query-v1', strategy: 'generic', title });
+    }
     return release === undefined ? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED')
       : (bookmarkTitleReleaseEvidence(input, url, release) ?? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED'));
   }
@@ -191,7 +202,7 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     mediaKind,
     proofs,
     rawSlug: observedSlug,
-    sourceAdapter: structuralIdentity.transformed ? 'generic-url-structural-v1'
+    sourceAdapter: comparativeRoute ? 'generic-url-comparative-v1' : structuralIdentity.transformed ? 'generic-url-structural-v1'
       : !categoryRoute && !rootReleaseRoute && !boundedNumericReleaseRoute ? 'generic-url-corroborated-v1' : 'generic-url',
     stableSlug,
     strategy: 'generic',

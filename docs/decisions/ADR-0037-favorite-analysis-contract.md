@@ -167,6 +167,13 @@ aux routes utilitaires et aux identités numériques sans titre exploitable.
 
 ## Conséquences
 
+La comparaison parcourt les segments humains de l’URL avant de conclure à
+une identité manquante. Les queues numériques isolées restent du routage,
+jamais une saison implicite. Une route inconnue peut produire une requête
+issue du titre avec provenance et sans preuve URL. Les exclusions utilitaires
+restent prioritaires. Les adaptateurs nouveaux versionnent seulement les
+artefacts affectés; les clés publiques inchangées sont conservées.
+
 L’adaptateur generic-url-corroborated-v1 accepte un slug humain exactement corroboré par le titre même
 sur une route générique inconnue, avec type UNKNOWN et vérification publique
 inchangée. Les exclusions racine/utilitaire restent prioritaires. La version

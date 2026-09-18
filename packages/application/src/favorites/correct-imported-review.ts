@@ -14,10 +14,10 @@ export async function correctImportedReview(session: StorageSession, source: Fav
     && (['favorite-parser-v1', 'favorite-parser-v2'].includes(versions.parser)
       || ['favorite-matcher-v1', 'favorite-matcher-v2'].includes(versions.matcher));
   const task = await session.getFavoriteResolutionTask(taskId);
-  const blocked = task?.state === 'BLOCKED' && review === undefined && source.matchedWorkId === undefined
+  const blocked = (task?.state === 'BLOCKED' || task?.state === 'RETRY_AT' && source.resolution?.kind === 'RETRYABLE' && source.resolution.reason === 'INTERNAL_FAILURE') && review === undefined && source.matchedWorkId === undefined
     && (source.resolution === undefined || source.resolution.kind === 'RETRYABLE');
   if (!artificial && !faultyAutomatic && !blocked) return source;
-  const id = `${source.id}:${blocked ? 'queue-recovery-v2' : 'correction-v1'}`;
+  const id = `${source.id}:${blocked ? 'queue-recovery-v3' : 'correction-v1'}`;
   const previous = await session.getFavoriteResolutionReceipt(id);
   if (previous) return source;
   const base = { schemaVersion: 1 as const, source };

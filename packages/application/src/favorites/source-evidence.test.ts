@@ -22,14 +22,14 @@ const anilistAdapter: FavoriteSourceAdapter = {
 };
 
 describe('favorite source evidence U-01…U-10', () => {
-  it.fails.each([
+  it.each([
     ['/manga/synthetic-harbor/42', 'MANGA'],
     ['/anime/synthetic-harbor/vostfr', 'ANIME'],
     ['/library/synthetic-harbor/reader', 'UNKNOWN'],
   ])('recovers a corroborated identity before a routing tail: %s', (path, mediaKind) => {
     expect(extractFavoriteSourceEvidence({ sourceKey: 'raw-recovery', title: 'Synthetic Harbor', url: `https://reader.invalid${path}` })).toMatchObject({ stableSlug: 'synthetic-harbor', mediaKind });
   });
-  it.fails('keeps a usable title on an unknown route as an unverified query', () => {
+  it('keeps a usable title on an unknown route as an unverified query', () => {
     expect(extractFavoriteSourceEvidence({ sourceKey: 'raw-query', title: 'Synthetic Harbor', url: 'https://reader.invalid/library/zx731904' })).toMatchObject({ title: 'Synthetic Harbor', mediaKind: 'UNKNOWN', proofs: [] });
   });
   it('requeues a previously rejected source after corroborated route recognition', async () => {
@@ -71,7 +71,7 @@ describe('favorite source evidence U-01…U-10', () => {
       release: { kind: 'chapter', value: 51 },
       stableSlug: 'skeleton-soldier-couldnt-protect-the-dungeon',
     });
-    expect(extractFavoriteSourceEvidence(input('unproven-numeric-title', 'https://reader.invalid/1674484774-skeleton-soldier-couldnt-protect-the-dungeon'))).toMatchObject({ disposition: 'URL_IDENTITY_UNRESOLVED' });
+    expect(extractFavoriteSourceEvidence(input('unproven-numeric-title', 'https://reader.invalid/1674484774-skeleton-soldier-couldnt-protect-the-dungeon'))).toMatchObject({ proofs: [], mediaKind: 'UNKNOWN', sourceAdapter: 'generic-bookmark-query-v1' });
   });
 
   it.each(['86-eighty-six', '91-days', 'area-88', '100000-money-game'])('preserves an intrinsic numeric work identity: %s', (slug) => {
@@ -81,7 +81,7 @@ describe('favorite source evidence U-01…U-10', () => {
   it.each(['synthetic-series/chapter-12', 'synthetic-series-chapter-12', 'synthetic-series/chapter/12'])('recognizes root release evidence without inventing a media type: %s', path => {
     expect(extractFavoriteSourceEvidence(input('root-release', `https://fixtures.tobirink.invalid/${path}`))).toMatchObject({ mediaKind: 'UNKNOWN', stableSlug: 'synthetic-series', release: { value: 12, kind: 'chapter' } });
   });
-  it.each(['ordinary-link', 'watch?v=synthetic', 'blog/ordinary-link'])('still rejects ordinary links: %s', path => {
+  it.each(['watch?v=synthetic', 'blog/ordinary-link'])('still rejects explicitly excluded links: %s', path => {
     expect(extractFavoriteSourceEvidence(input('ordinary', `https://fixtures.tobirink.invalid/${path}`)).disposition).toBe('URL_IDENTITY_UNRESOLVED');
   });
   it('uses a cleaned bookmark title only when a generic route proves a media release', () => {

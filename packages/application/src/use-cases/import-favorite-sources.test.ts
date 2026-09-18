@@ -62,10 +62,10 @@ describe('importFavoriteSources', () => {
     await storage.putFavoriteResolutionReceipt(oldReceipt);
     await importFavoriteSources([favorite], storage, importedAt);
     expect(await storage.getFavoriteResolutionTask(taskId)).toMatchObject({ state: 'READY', attempt: 0 });
-    const receipt = await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-v2`);
+    const receipt = await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-v3`);
     expect(receipt).toMatchObject({ correction: { task: { state: 'BLOCKED', blockedReason: 'AUTOMATIC_ATTEMPT_LIMIT' } } });
     await importFavoriteSources([favorite], storage, importedAt);
-    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-v2`)).toEqual(receipt);
+    expect(await storage.getFavoriteResolutionReceipt(`${source.id}:queue-recovery-v3`)).toEqual(receipt);
     expect(await storage.getFavoriteResolutionReceipt(oldReceipt.id)).toEqual(oldReceipt);
   });
   it('archives an artificial import Review with a before-image and resumes resolution once', async () => {

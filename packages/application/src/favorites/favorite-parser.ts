@@ -98,7 +98,7 @@ export function parseFavoriteObservation(observation: FavoriteObservation, evide
     : identity;
   const diagnostics = [...evidence.diagnostics];
   if (identity === undefined) diagnostics.push(evidence.rawSlug === undefined ? 'URL_IDENTITY_MISSING' : 'OPAQUE_IDENTITY_UNCORROBORATED');
-  const aliases: MutableFavoriteAlias[] = identity === undefined || containsRelease(identity) ? [] : [{ provenance: 'stable-url-slug', value: identity }];
+  const aliases: MutableFavoriteAlias[] = identity === undefined || containsRelease(identity) ? [] : [{ provenance: evidence.stableSlug === undefined ? 'aligned-bookmark-segment' : 'stable-url-slug', value: identity }];
   const cleanedTitle = titleAnalysis.cleanedTitle.trim();
   const structuredTitle = structuredCleanedTitle;
   if (identity !== undefined && !containsRelease(cleanedTitle) && !containsRoutingIdentifier(cleanedTitle, evidence)

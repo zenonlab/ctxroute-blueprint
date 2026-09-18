@@ -237,9 +237,11 @@ l’extracteur URL FavLib épinglé calcule sa propre source dans le sandbox du
 harness, sans slug fourni par la fixture. Catégorie, chapitre et identifiant
 opaque conservent leur comportement. `Area 51` devient historiquement `Area` :
 la conservation du nombre par TobiRink est une amélioration intentionnelle.
-Quatre tests de régression attendue (`it.fails`) capturent avant correction
-les queues numériques, langues, segments lecteur et requêtes sur route inconnue.
-Ils doivent devenir des tests ordinaires après correction.
+Quatre tests capturent les queues numériques, langues, segments lecteur et
+requêtes sur route inconnue. Le commit de référence prouve leur échec avant
+correction; ils sont maintenant des tests ordinaires. Le runner vérifie aussi
+la résolution locale avec métadonnées anciennes et D1 indisponible, et la
+reprise unique des erreurs automatiques avec reçu `queue-recovery-v3`.
 
 Inspection privée locale en lecture seule : trois fichiers de favoris lisibles,
 1 562 liens, 189 terminaisons numériques et 51 terminaisons de langue.
