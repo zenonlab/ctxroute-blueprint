@@ -1,0 +1,10 @@
+{
+  "goalId": "goal-release-1-0-35-adult-visibility",
+  "stepId": "prepare-1-0-35",
+  "status": "DONE",
+  "evidence": [
+    "Source and download pointer are now 1.0.35; ADR-0039 explicitly preserves immutable 1.0.34 archives.",
+    "Two package:extension runs produced identical Chrome SHA-256 aff248dbe625d35491817783e91e3d7c1f7a2e4a801a67730f4ce22136b9992a (294650 bytes) and Firefox SHA-256 d29db3d098c0de07bad1ec35c54a8d9524b3a5ae6c80bf6473597b0efe51b25b (294691 bytes).",
+    "npm run verify passes completely, including extension/Worker tests, typechecks, npm audit and Archify build; no provider mutation occurred."
+  ]
+}

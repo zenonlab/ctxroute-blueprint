@@ -3210,6 +3210,66 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-release-1-0-35-adult-visibility",
+      "title": "Publier le correctif de visibilité adulte de l’extension",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "prepare-1-0-35",
+          "title": "Prepare deterministic 1.0.35 candidate",
+          "status": "DONE",
+          "acceptance": [
+            "Source version and package archives are 1.0.35.",
+            "Chrome and Firefox archives are deterministic across two builds.",
+            "Extension, Web, Worker and documentation contracts pass."
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "apps/web/published-extension.json",
+            "apps/web/tests/routes.test.ts",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/release.md",
+            "docs/architecture/src/extension-delivery-validation.dataflow.json",
+            "docs/architecture/src/production-publication.dataflow.json"
+          ],
+          "commands": [
+            "Update only the listed version and release evidence files with apply_patch.",
+            "Run npm run verify, package:extension twice, compare SHA-256 values, and validate Archify.",
+            "Review and commit the candidate without publishing provider resources."
+          ],
+          "evidence": [
+            "Source and download pointer are now 1.0.35; ADR-0039 explicitly preserves immutable 1.0.34 archives.",
+            "Two package:extension runs produced identical Chrome SHA-256 aff248dbe625d35491817783e91e3d7c1f7a2e4a801a67730f4ce22136b9992a (294650 bytes) and Firefox SHA-256 d29db3d098c0de07bad1ec35c54a8d9524b3a5ae6c80bf6473597b0efe51b25b (294691 bytes).",
+            "npm run verify passes completely, including extension/Worker tests, typechecks, npm audit and Archify build; no provider mutation occurred."
+          ]
+        },
+        {
+          "id": "publish-1-0-35",
+          "title": "Publish immutable archives and advance download pointer",
+          "status": "TODO",
+          "acceptance": [
+            "A fresh bounded Cloudflare plan contains only the two 1.0.35 R2 objects and required Worker update.",
+            "Archives are uploaded before the Worker pointer update and remote hashes match.",
+            "Production /download announces only 1.0.35."
+          ],
+          "files": [
+            "apps/web/published-extension.json",
+            "docs/release.md",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Inspect account and generate a fresh plan.",
+            "Apply only after explicit provider approval with the exact plan digest.",
+            "Verify remote HTTP, hashes, and /download, then commit and push documentation."
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }
