@@ -10,7 +10,7 @@
         "id": "shared-calendar",
         "label": "Calendrier partagé",
         "focus": ["scheduledTrigger", "queue", "collector", "transportPort", "providerApis", "releaseD1", "releaseApi"],
-        "note": "Le cron hebdomadaire dépose un signal; AniList et MangaUpdates avancent avec des baux et checkpoints indépendants avant la fusion."
+        "note": "Le cron hebdomadaire dépose un signal; chaque page Agenda réellement demandée est comptée séparément des appels HTTP fournisseur."
       },
       {
         "id": "offline-cache",
@@ -70,7 +70,7 @@
       "dot": "cyan",
       "title": "Diagnostic expurgé",
       "items": [
-        "Tâche, fournisseur, pages, résultats, issue, durée et retries uniquement",
+        "Tâche, fournisseur, pages réellement demandées, résultats, issue, durée et retries uniquement",
         "Lignes lues et écrites issues de D1Result.meta",
         "Aucun titre, URL favorite, payload, secret ou identité d’installation"
       ]

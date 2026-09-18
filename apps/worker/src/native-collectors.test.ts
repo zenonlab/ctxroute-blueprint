@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AgendaCollectionRetryError, agendaCollectionFailureCode, handleNativeCollectorQueue, type NativeCollectorSignal } from './native-collectors';
+import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, handleNativeCollectorQueue, type NativeCollectorSignal } from './native-collectors';
 
 function message(body: NativeCollectorSignal | null, attempts = 1) {
   return { ack: vi.fn(), attempts, body, retry: vi.fn() };
@@ -82,5 +82,10 @@ describe('native collector queue', () => {
     expect(agendaCollectionFailureCode(['mangaupdates:timeout'])).toBe('agenda-mangaupdates-unavailable');
     expect(agendaCollectionFailureCode(['anilist:HTTP 403', 'mangaupdates:timeout'])).toBe('agenda-anilist-mangaupdates-unavailable');
     expect(agendaCollectionFailureCode(['unknown:raw upstream payload'])).toBe('agenda-provider-unavailable');
+  });
+
+  it('keeps paginated pages distinct from provider HTTP requests', () => {
+    expect(collectorCost({ rowsRead: 0, rowsWritten: 0 }, { anilist: 3, kitsu: 0, mangadex: 0, mangaupdates: 0 }, 2, 'changed', 2))
+      .toMatchObject({ pagesRequested: 2, providerRequests: 3, provider: 'anilist' });
   });
 });

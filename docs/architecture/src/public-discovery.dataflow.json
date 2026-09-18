@@ -17,7 +17,7 @@
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "Seule la transition D1 MISS vers PENDING émet un signal; le consumer réclame ensuite un lot borné."
+        "note": "Seule la transition D1 MISS vers PENDING émet un signal; le consumer réclame ensuite un lot borné et publie pagesRequested=0."
       },
       {
         "id": "verified-refresh",

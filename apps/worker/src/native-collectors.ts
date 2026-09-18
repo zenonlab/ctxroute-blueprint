@@ -67,9 +67,9 @@ function providerCost(totals: ProviderMetricTotals): ProviderCost {
   return { provider, providerRequests: active.reduce((sum, entry) => sum + entry.requests, 0) };
 }
 
-function collectorCost(d1: D1MetricTotals, providers: ProviderMetricTotals, acceptedResults: number, result: WorkerCostResult): CollectorCostMetrics {
+export function collectorCost(d1: D1MetricTotals, providers: ProviderMetricTotals, acceptedResults: number, result: WorkerCostResult, pagesRequested = 0): CollectorCostMetrics {
   const provider = providerCost(providers);
-  return { ...d1, acceptedResults, pagesRequested: provider.providerRequests, ...provider, result };
+  return { ...d1, acceptedResults, pagesRequested, ...provider, result };
 }
 
 function emptyCollectorCost(result: WorkerCostResult): CollectorCostMetrics {
@@ -209,7 +209,9 @@ function calendarWindow(scheduledFor: string): CalendarWindow {
 export async function processAgendaQueue(bindings: NativeCollectorBindings, scheduledFor: string): Promise<AgendaProcessingReceipt> {
   const d1 = instrumentD1(bindings.PUBLIC_DB);
   const providers = instrumentProviderFetch(providerFetch(bindings));
-  const transport = providers.fetch; const window = calendarWindow(scheduledFor);
+  let pagesRequested = 0;
+  const transport = async (input: string, init: RequestInit) => { pagesRequested += 1; return providers.fetch(input, init); };
+  const window = calendarWindow(scheduledFor);
   const state = new D1AgendaCollectionAdapter(d1.database, new R2AgendaOperationStore(bindings.RELEASE_SNAPSHOTS));
   const attempts = await Promise.allSettled((['anilist', 'mangaupdates'] as const).map(async (provider) => {
     const startedAt = new Date();
@@ -249,11 +251,11 @@ export async function processAgendaQueue(bindings: NativeCollectorBindings, sche
     const failureNames = failures.map((failure) => failure.reason instanceof Error ? failure.reason.message : 'agenda-provider-unavailable');
     const delay = Math.max(...failures.map((failure) => failure.reason instanceof AgendaCollectionRetryError ? failure.reason.retryDelaySeconds : 60));
     const accepted = completed.reduce((sum, attempt) => sum + attempt.value.accepted, 0);
-    throw new AgendaCollectionRetryError(agendaCollectionFailureCode(failureNames), delay, collectorCost(d1.snapshot(), providers.snapshot(), accepted, 'backoff'));
+    throw new AgendaCollectionRetryError(agendaCollectionFailureCode(failureNames), delay, collectorCost(d1.snapshot(), providers.snapshot(), accepted, 'backoff', pagesRequested));
   }
   const receipt = generation ?? { changed: false, count: 0, revision: 'd1-empty' };
   const result: WorkerCostResult = generation === null ? 'deduplicated' : receipt.changed ? 'changed' : 'unchanged';
-  return { ...receipt, metrics: collectorCost(d1.snapshot(), providers.snapshot(), receipt.count, result) };
+  return { ...receipt, metrics: collectorCost(d1.snapshot(), providers.snapshot(), receipt.count, result, pagesRequested) };
 }
 
 export async function handleNativeCollectorQueue(

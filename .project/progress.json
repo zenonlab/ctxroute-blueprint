@@ -3000,7 +3000,7 @@
         {
           "id": "step-3",
           "title": "Corriger les métriques et rendre la DLQ exploitable",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "providerRequests compte tous les appels HTTP fournisseur reconnus.",
             "pagesRequested compte seulement les pages Agenda paginées réellement demandées et vaut zéro pour Discovery.",
@@ -3028,7 +3028,12 @@
             "git diff --check",
             "git commit -m fix(observability): report collector pages truthfully"
           ],
-          "evidence": []
+          "evidence": [
+            "Worker 33/33 passe; collectorCost sépare providerRequests des pages Agenda réellement demandées et Discovery publie pagesRequested=0.",
+            "Le scénario métrique prouve providerRequests=3 et pagesRequested=2; typecheck Worker, validate:docs -- --all et validate:decisions passent.",
+            "Les dataflows Agenda et Discovery passent Archify showcase 9/9 avec 0 erreur et 0 avertissement.",
+            "La DLQ reste sans consumer, replay ou purge automatique; sa rétention quatre jours et ses opérations manuelles approuvées sont documentées."
+          ]
         },
         {
           "id": "step-4",

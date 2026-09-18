@@ -43,7 +43,10 @@ lignes D1 lues ou écrites. Les admissions et lectures publiques ajoutent
 seulement leurs compteurs agrégés de HIT, MISS, déduplication ou réhydratation.
 
 Compter les appels au point où le transport reçoit l’URL fournisseur, avant la
-sélection du chemin direct ou gateway. Compter D1 uniquement depuis
+sélection du chemin direct ou gateway. Pour Agenda, incrémenter séparément
+`pagesRequested` à chaque page effectivement demandée; Discovery publie zéro
+page tant qu’il n’expose pas de pagination. Ne jamais dériver un compteur de
+l’autre. Compter D1 uniquement depuis
 `D1Result.meta.rows_read` et `rows_written`; l’adaptateur d’observation délègue
 la requête originale et n’inspecte ni SQL lié, ni paramètres, ni résultats.
 

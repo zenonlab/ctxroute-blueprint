@@ -290,7 +290,8 @@ fallback.
 Filter Worker logs on `type=worker.cost` and aggregate by UTC day. Sum only the
 closed numeric fields below:
 
-- `providerRequests` for real supplier calls, grouped by `provider`;
+- `providerRequests` for every recognized supplier HTTP call, grouped by `provider`;
+- `pagesRequested` only for Agenda pagination pages actually requested; Discovery reports zero;
 - `d1Hits` and `d1Misses` for public cache effectiveness;
 - `deduplicated` for admissions that emitted no Queue message;
 - `generationsCreated` and `generationsAvoided` for Agenda publication;
@@ -298,7 +299,9 @@ closed numeric fields below:
 - `d1RowsRead` and `d1RowsWritten`, sourced from `D1Result.meta` by Queue
   processing and by Discovery HTTP routes.
 
-The other allowed dimensions are `task`, `pagesRequested`, `acceptedResults`,
+`providerRequests` and `pagesRequested` are independent counters: a provider
+may issue more than one HTTP call for a page, and a Discovery event has no
+pagination pages. The other allowed dimensions are `task`, `acceptedResults`,
 `result`, `durationMs` and `retries`. Do not add titles, fingerprints, work or
 provider IDs, request URLs, IP addresses, payloads, secrets or installation
 identifiers to a dashboard or export. A regular lookup reports HIT/MISS but

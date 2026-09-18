@@ -102,6 +102,7 @@
         "docs/operations/cloudflare.md",
         "docs/architecture/src/public-discovery.dataflow.json",
         "docs/architecture/src/virtual-agenda.dataflow.json",
+        "docs/plans/certify-and-consolidate-production-step-3-update.json",
         ".project/progress.json",
         "docs/progress.md"
       ],
