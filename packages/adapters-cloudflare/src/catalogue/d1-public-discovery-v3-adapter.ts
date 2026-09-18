@@ -53,13 +53,6 @@ interface DiscoveryRow {
   state: 'PENDING' | 'PROCESSING' | 'FAILED' | 'VERIFIED' | 'NOT_FOUND' | 'AMBIGUOUS';
   verifiedAt: string | null;
 }
-interface DiscoveryRowWithKey extends DiscoveryRow {
-  fingerprint: string;
-  mediaKind: PublicDiscoveryKeyV3['mediaKind'];
-  parserVersion: string;
-  profileJson: string | null;
-  siteRulesVersion: string;
-}
 export type PublicDiscoveryAdmission =
   | { outcome: 'created' | 'existing'; state: PublicDiscoveryReadState }
   | { outcome: 'saturated' };
@@ -154,31 +147,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     if (keys.length < 1 || keys.length > 50) throw new RangeError('public-discovery-lookup-limit-out-of-range');
     const parsed = keys.map((key) => publicDiscoveryKeyV3Schema.parse(key));
     if (new Set(parsed.map((key) => JSON.stringify(key))).size !== parsed.length) throw new Error('duplicate-public-discovery-key');
-    const rows = (await this.database.prepare(`SELECT fingerprint, media_kind AS mediaKind,
-      parser_version AS parserVersion, rules_version AS siteRulesVersion,
-      attempt_count AS attemptCount, claim_token_hash AS claimTokenHash,
-      failure_reason AS failureReason, lease_until AS leaseUntil, request_digest AS requestDigest,
-      request_json AS requestJson, refresh_attempt_count AS refreshAttemptCount,
-      refresh_state AS refreshState, next_refresh_at AS nextRefreshAt,
-      result_expires_at AS resultExpiresAt, result_json AS resultJson,
-      retry_at AS retryAt, state, verified_at AS verifiedAt,
-      metadata.profile_json AS profileJson
-      FROM public_discovery_requests_v3 AS discovery
-      JOIN json_each(?1) AS requested
-        ON discovery.fingerprint = json_extract(requested.value, '$.fingerprint')
-       AND discovery.media_kind = json_extract(requested.value, '$.mediaKind')
-       AND discovery.parser_version = json_extract(requested.value, '$.parserVersion')
-       AND discovery.rules_version = json_extract(requested.value, '$.siteRulesVersion')
-      LEFT JOIN catalogue_current_metadata AS metadata
-        ON metadata.work_id = json_extract(discovery.result_json, '$.profile.workId')`)
-      .bind(JSON.stringify(parsed)).all<DiscoveryRowWithKey>()).results;
-    const byKey = new Map(rows.map((row) => [JSON.stringify({ fingerprint: row.fingerprint, mediaKind: row.mediaKind, parserVersion: row.parserVersion, siteRulesVersion: row.siteRulesVersion }), row]));
-    return parsed.map((key) => {
-      const row = byKey.get(JSON.stringify(key));
-      const state = stateFromRow(row ?? null, now);
-      if (state.state !== 'VERIFIED' || row?.profileJson === null || row?.profileJson === undefined) return { key, state };
-      return { key, state: { ...state, profile: publicDiscoveryVerifiedProfileSchema.parse(JSON.parse(row.profileJson)) } };
-    });
+    const states = await Promise.all(parsed.map(async (key) => ({ key, state: await this.read(key, now) })));
+    return states;
   }
 
   private async failExhaustedKey(key: PublicDiscoveryKeyV3, now: string): Promise<void> {
@@ -246,6 +216,12 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     RETURNING state`)
       .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now, this.pendingLimit, priority, signalLeaseUntil)
       .first<{ state: string }>();
+    if (created !== null) {
+      return {
+        outcome: 'created',
+        state: { retryAt: now, state: 'PENDING' },
+      };
+    }
     const row = await this.row(request.key);
     if (!row) return { outcome: 'saturated' };
     if (row.requestDigest !== request.requestDigest) throw new Error('public-discovery-request-conflict');

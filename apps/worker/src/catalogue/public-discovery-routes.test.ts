@@ -194,7 +194,6 @@ describe('verified public discovery cache', () => {
   it('reads up to fifty discovery states in one public request', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const keys = Array.from({ length: 50 }, (_, index) => ({ ...discoveryKey('8'), fingerprint: `${'8'.repeat(62)}${index.toString(16).padStart(2, '0')}` }));
-    const existingRows = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first<{ count: number }>();
     const response = await SELF.fetch('https://tobirink.test/v3/catalogue/discoveries/lookup', {
       body: JSON.stringify({ keys, schemaVersion: 3 }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
@@ -212,7 +211,7 @@ describe('verified public discovery cache', () => {
     });
     info.mockRestore();
     expect(events).toContainEqual(expect.objectContaining({ d1RowsWritten: 0, task: 'discovery-lookup', type: 'worker.cost' }));
-    expect(events.find(({ task }) => task === 'discovery-lookup')?.d1RowsRead).toBe(51 * (existingRows?.count ?? 0));
+    expect(events.find(({ task }) => task === 'discovery-lookup')?.d1RowsRead).toBe(keys.length);
     expect(JSON.stringify(events)).not.toContain(keys[0]?.fingerprint);
   });
 

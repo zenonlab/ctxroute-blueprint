@@ -132,6 +132,9 @@ test('rotation operations keep both secrets redacted and deletion value-free', a
     { PROVIDER_GATEWAY_HMAC_KEY: secret },
     undefined,
   ]);
+  assert.equal(calls[0].args.includes('--replace'), false);
+  assert.equal(calls[0].args.includes('PROVIDER_GATEWAY_HMAC_KEY_PREVIOUS'), false);
+  assert.equal(calls.some(call => call.args.includes('PROVIDER_GATEWAY_HMAC_KEY') && call.args.includes('delete')), false);
   assert.equal(result.every(item => !item.output.includes(secret) && !item.output.includes(previousSecret)), true);
   assert.equal(calls.every(call => !call.args.includes(secret) && !call.args.includes(previousSecret)), true);
 });

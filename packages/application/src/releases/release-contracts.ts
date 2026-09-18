@@ -1,10 +1,14 @@
 import { z } from 'zod';
+const containsAsciiControlCharacter = (value: string) => [...value].some(character => {
+  const code = character.codePointAt(0) ?? 0;
+  return code <= 0x1f || code === 0x7f;
+});
 const dateSchema = z.iso.date();
 const instantSchema = z.iso.datetime({ offset: false });
 export const releaseOccurrenceSchema = z.discriminatedUnion('kind', [z.strictObject({ kind: z.literal('DATE'), value: dateSchema }), z.strictObject({ kind: z.literal('INSTANT'), value: instantSchema })]);
 const releaseSequenceSchema = z.union([
   z.number().int().nonnegative(),
-  z.string().trim().min(1).max(64).regex(/^[^\u0000-\u001f\u007f]+$/u),
+  z.string().trim().min(1).max(64).refine(value => !containsAsciiControlCharacter(value), 'must contain printable characters'),
 ]);
 const publicReleaseFields = { id: z.string().min(1).max(128), providerWorkId: z.string().min(1).max(128), releaseKind: z.enum(['episode', 'chapter', 'volume', 'special']), occurrence: releaseOccurrenceSchema, state: z.enum(['SCHEDULED', 'CONFIRMED', 'ESTIMATED', 'CANCELLED']), provenance: z.strictObject({ source: z.string().min(1).max(128), fetchedAt: z.iso.datetime({ offset: false }), parserVersion: z.string().min(1).max(32), rulesVersion: z.string().min(1).max(32) }), expiresAt: z.iso.datetime({ offset: false }) } as const;
 const canonicalPublicReleaseEventSchema = z.strictObject({ ...publicReleaseFields, provider: z.enum(['anilist', 'mangaupdates']), sequence: z.string().min(1).max(64).optional() });

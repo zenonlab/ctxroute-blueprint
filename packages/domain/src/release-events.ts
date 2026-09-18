@@ -11,6 +11,13 @@ export interface LocalReleaseEvidence { readonly id: string; readonly publicRele
 export interface LocalAgendaEvent { readonly id: string; readonly workId: string; readonly evidenceId: string; readonly occurrence: ReleaseOccurrence; readonly availability: 'confirmed' | 'estimated' | 'official' | 'unavailable'; readonly releaseLabel: string; }
 export interface LocalNotificationDelivery { readonly id: string; readonly agendaEventId: string; readonly deduplicationKey: string; readonly channel: 'native'; readonly status: 'pending' | 'claimed' | 'delivered' | 'dismissed'; readonly availableAt: string; readonly claimedAt?: string; readonly deliveredAt?: string; }
 
+function containsAsciiControlCharacter(value: string): boolean {
+  return [...value].some(character => {
+    const code = character.codePointAt(0) ?? 0;
+    return code <= 0x1f || code === 0x7f;
+  });
+}
+
 export function createReleaseOccurrence(input: ReleaseOccurrence): ReleaseOccurrence {
   if (input.kind === 'DATE') {
     invariant(/^\d{4}-\d{2}-\d{2}$/u.test(input.value) && new Date(`${input.value}T00:00:00.000Z`).toISOString().slice(0, 10) === input.value, 'invalid-agenda-date', 'DATE occurrence must be a real YYYY-MM-DD civil date.');
@@ -22,7 +29,7 @@ export function createPublicReleaseEvent(input: PublicReleaseEvent): PublicRelea
   invariant(input.id.trim().length > 0, 'invalid-id', 'Public release id must not be empty.');
   invariant(input.providerWorkId.trim().length > 0, 'invalid-id', 'Provider work id must not be empty.');
   const sequence = input.sequence === undefined ? undefined : requiredText(input.sequence, 'sequence');
-  invariant(sequence === undefined || (sequence.length <= 64 && !/[\u0000-\u001f\u007f]/u.test(sequence)), 'invalid-text', 'sequence must contain at most 64 printable characters.');
+  invariant(sequence === undefined || (sequence.length <= 64 && !containsAsciiControlCharacter(sequence)), 'invalid-text', 'sequence must contain at most 64 printable characters.');
   const normalized = { ...input, id: requiredText(input.id, 'id'), providerWorkId: requiredText(input.providerWorkId, 'providerWorkId'), occurrence: createReleaseOccurrence(input.occurrence), expiresAt: canonicalDateTime(input.expiresAt, 'expiresAt'), provenance: Object.freeze({ ...input.provenance, fetchedAt: canonicalDateTime(input.provenance.fetchedAt, 'provenance.fetchedAt') }) };
   return Object.freeze(sequence === undefined ? normalized : { ...normalized, sequence });
 }

@@ -1,8 +1,13 @@
 import { z } from 'zod';
 
+const containsAsciiControlCharacter = (value: string) => [...value].some(character => {
+  const code = character.codePointAt(0) ?? 0;
+  return code <= 0x1f || code === 0x7f;
+});
+
 const releaseSequenceSchema = z.union([
   z.number().int().nonnegative(),
-  z.string().trim().min(1).max(64).regex(/^[^\u0000-\u001f\u007f]+$/u),
+  z.string().trim().min(1).max(64).refine(value => !containsAsciiControlCharacter(value), 'must contain printable characters'),
 ]);
 const releaseOccurrenceSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('DATE'), value: z.iso.date() }),

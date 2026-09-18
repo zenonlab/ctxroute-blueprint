@@ -1,0 +1,11 @@
+{
+  "goalId": "goal-certify-and-consolidate-production",
+  "stepId": "step-4",
+  "status": "DONE",
+  "evidence": [
+    "Le driver Deno charge les secrets sans --replace, conserve la clé précédente et le test de rotation vérifie l'absence de suppression de la clé courante.",
+    "deno.jsonc racine, identique à la configuration canonique hors ligne vide finale, est supprimé; le driver reste ancré dans apps/provider-gateway.",
+    "DiscoveryRowWithKey et existingRows inutilisés sont supprimés; les trois contrôles regex de caractères de contrôle sont remplacés par des contrôles explicites des code points ASCII 0x00-0x1f et 0x7f.",
+    "test:infra 38/38, oxlint, ESLint, tous les typechecks et git diff --check passent sans erreur ni avertissement; production-publication.dataflow passe showcase 9/9 avec 0 erreur et 0 avertissement."
+  ]
+}
