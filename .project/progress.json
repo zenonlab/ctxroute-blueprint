@@ -3642,9 +3642,9 @@
             "git commit -m 'fix(discovery): resume durable admissions and queue processing'"
           ],
           "evidence": [
-            "Régression 1.0.37 reproduite avec vrai runtime/client HTTP: après 6 s de préparation, zéro admission sur 3 réveils. Correctif local: timeout min(15 s, budget restant), prélecture unique de 50.",
-            "npm run verify réussi après correction; extension 148, Worker 120, adaptateurs navigateur 92 tests passent. Parcours HTTP→routes→D1→Queue→AniList simulé→VERIFIED par titre et ID; annulation au budget de 4 s vérifiée.",
-            "external: version installée et compteurs du profil utilisateur non reçus; impossible de certifier la cause réelle ou la récupération personnelle. Correctif local non publié; production conserve 1.0.37."
+            "Régression de budget corrigée et publiée en 1.0.38 via goal-publish-discovery-egress-1038; suite complète et archives installées validées.",
+            "Envoi réel depuis ZIP Chromium intact après préparation lente: deux POST, traitement Queue/fournisseur pour une demande neuve, puis deux sources résolues par alarmes. Vérification après déploiement réussie.",
+            "external: certification du profil personnel indisponible; les tests installés portent sur des profils temporaires, pas sur la bibliothèque utilisateur. Une installation manuelle existante doit charger 1.0.38 en conservant son profil."
           ]
         }
       ]
@@ -3702,14 +3702,14 @@
       "schemaVersion": 1,
       "id": "goal-publish-discovery-egress-1038",
       "title": "Publier en autonomie le correctif d’émission 1.0.38",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
         {
           "id": "release",
           "title": "Certifier les archives et publier 1.0.38",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Archives installées Chrome/Firefox passent et builds reproductibles",
             "Émission de découverte vérifiée depuis l’archive candidate avec fixtures publiques bornées",
@@ -3745,7 +3745,9 @@
             "git push origin"
           ],
           "evidence": [
-            "Main distant inspecté; correctif local 25bfc2e à publier sous version immuable 1.0.38."
+            "npm run verify réussi; builds 1.0.38 reproductibles; corpus 1532/1400 installé sur Chromium 153 et Firefox 155 validé.",
+            "Archive installée: deux POST réels après prélecture de 6 s, PENDING puis VERIFIED avec un appel fournisseur; deux résolutions par alarmes natives. Nouvelle exécution après déploiement: deux POST VERIFIED et deux résolutions.",
+            "Fusion et push main bdb7eea réalisés; archives R2 publiques aux SHA-256 attendus, /download 1.0.38 vérifié. Worker a66e751f-6a83-4757-bff6-2778bfb361bf actif à 100 %, aucune migration. Preuves docs/operations/cloudflare.md."
           ]
         }
       ]

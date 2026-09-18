@@ -39,6 +39,18 @@ Un garde-fou du harness rejetait initialement le titre de secours numérique
 de l’URL fournisseur sans slug; il accepte désormais uniquement l’ID exact
 attendu. Les demandes refusées par ce garde-fou n’ont pas été transmises.
 
+Le Worker final est `a66e751f-6a83-4757-bff6-2778bfb361bf`, déployé via le plan
+`723a2ee2231fecb9c30c320e01cf40e53c53420af81a27b1df9d77bab28bf997`.
+Le premier plan Worker a été refusé pour changement d’état de l’inspection,
+avant mutation; une nouvelle inspection et un nouveau plan ont permis la
+publication. `/download` répond 200 et expose les deux liens `1.0.38` dont
+les SHA-256 ont été revérifiés après déploiement.
+La gate installée repasse contre ce déploiement : deux POST du service worker,
+deux réponses VERIFIED et deux favoris résolus avec le même ZIP, après les
+prélectures de six secondes et la reprise par alarme. Le Worker est actif
+à 100 % et aucune migration D1 n’est en attente. La bibliothèque personnelle
+reste distincte de cette preuve en profil temporaire.
+
 ### Publication 1.0.37
 
 Autorisation utilisateur de fusion, push et déploiement reçue le 18 septembre.
