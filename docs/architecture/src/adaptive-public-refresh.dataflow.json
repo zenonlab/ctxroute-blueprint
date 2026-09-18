@@ -10,7 +10,7 @@
         "id": "agenda-hebdomadaire",
         "label": "Agenda hebdomadaire",
         "focus": ["weeklyCron", "admissionQueue", "agendaLanes", "operationsR2", "catalogueD1", "privateIndexedDb"],
-        "note": "Frontières de reprise : précondition R2, expiration du bail, pages validées, snapshot complet et publication D1."
+        "note": "Pages immuables et empreintes, snapshot prêt, publication D1 idempotente puis confirmation R2."
       },
       {
         "id": "decouverte-immediate",
@@ -37,7 +37,7 @@
     { "id": "weeklyCron", "type": "cloud", "label": "Cron hebdomadaire", "sublabel": "dimanche 03:23 UTC", "stage": 0, "row": 0, "tag": "1 session / semaine" },
     { "id": "unknownWork", "type": "frontend", "label": "Œuvre inconnue", "sublabel": "cache miss extension", "stage": 0, "row": 2, "tag": "projection locale immédiate" },
     { "id": "staleFavorite", "type": "frontend", "label": "Favori échu", "sublabel": "lot local borné", "stage": 0, "row": 4, "tag": "20 travaux / réveil" },
-    { "id": "admissionQueue", "type": "messagebus", "label": "Objet R2 + Queue", "sublabel": "écriture avant signal opaque", "stage": 1, "row": 2, "width": 168, "tag": "échec d'envoi récupérable" },
+    { "id": "admissionQueue", "type": "messagebus", "label": "Objet R2 + Queue", "sublabel": "pointeur du travail restant", "stage": 1, "row": 2, "width": 168, "tag": "reprise Queue / dimanche" },
     { "id": "agendaLanes", "type": "backend", "label": "Collecte Agenda", "sublabel": "annonces + observations", "stage": 2, "row": 0, "tag": "modèle virtuel" },
     { "id": "discoveryJob", "type": "backend", "label": "Discovery", "sublabel": "identité et titres", "stage": 2, "row": 2, "tag": "claim partagé" },
     { "id": "refreshJob", "type": "backend", "label": "Réhydratation", "sublabel": "profil canonique", "stage": 2, "row": 4, "tag": "sans relations" },
@@ -67,7 +67,7 @@
       "items": [
         "Agenda, Discovery et réhydratation échouent indépendamment",
         "Le dernier modèle ou profil vérifié reste servi",
-        "La reprise après interruption R2 ou D1 reste à certifier",
+        "Collecte, snapshot prêt, D1 validé, puis confirmation R2",
         "v3 lit les snapshots R2 et complète une lane absente depuis la projection legacy"
       ]
     },

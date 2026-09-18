@@ -8,6 +8,17 @@ function message(body: NativeCollectorSignal | null, attempts = 1) {
 describe('native collector queue', () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it('routes an operational recovery signal without invoking collectors or resetting requests', async () => {
+    const item = message({ type: 'agenda-recovery', version: 1 });
+    const processors = { agenda: vi.fn(), discovery: vi.fn(), recovery: vi.fn(async () => undefined) };
+    await handleNativeCollectorQueue([item], processors);
+    expect(processors.recovery).toHaveBeenCalledOnce();
+    expect(processors.agenda).not.toHaveBeenCalled();
+    expect(processors.discovery).not.toHaveBeenCalled();
+    expect(item.ack).toHaveBeenCalledOnce();
+    expect(item.retry).not.toHaveBeenCalled();
+  });
+
   it('acknowledges a malformed signal without invoking a processor', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const item = message(null);
@@ -27,6 +38,7 @@ describe('native collector queue', () => {
     expect(JSON.parse(String(info.mock.calls[0]?.[0]))).toEqual({
       acceptedResults: 0, d1RowsRead: 0, d1RowsWritten: 0, durationMs: expect.any(Number),
       pagesRequested: 0, provider: 'none', providerRequests: 0, result: 'unchanged', retries: 0,
+      r2Reads: 0, r2Writes: 0, r2Lists: 0, r2Conflicts: 0,
       schemaVersion: 1, task: 'discovery', type: 'worker.cost',
     });
   });

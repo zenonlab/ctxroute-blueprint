@@ -6,6 +6,34 @@ remain independent of this operational path.
 
 ## Inspect
 
+### Reprise Agenda après interruption
+
+Le Worker corrigé conserve le travail sous `agenda-operations/v2/pending.json`
+dans `tobirink-public-releases`; la lecture de repli et l'import checkpointé
+des anciens signaux conservent tous les objets `agenda-operations/v1`.
+Une lane `ready` doit être republiée dans D1, puis confirmée `published`.
+Ne pas vider la Queue, supprimer un checkpoint, changer une date de session
+ou remettre à zéro une tentative pour débloquer une publication.
+
+La reprise contrôlée consiste à soumettre une seule enveloppe JSON
+`{"type":"agenda-recovery","version":1}` à la Queue existante
+`tobirink-public-discovery`, via une session Cloudflare authentifiée autorisée
+à publier des messages. Vérifier le compte et cette ressource exacte avant
+envoi; l'opération ne passe par aucune route HTTP publique TobiRink.
+Attendre au moins une minute depuis une tentative d'envoi échouée, puis
+observer le diagnostic `native-collector.queue` pour ce type et le traitement
+`agenda-refresh` suivant. La reprise sélectionne elle-même la plus ancienne
+session restante; elle ne réinitialise ni les essais Discovery ni les données.
+En cas d'indisponibilité persistante, conserver les objets et attendre le
+déclenchement hebdomadaire. Cette procédure n'est pas une nouvelle cadence.
+
+Les diagnostics de collecte séparent `d1RowsRead`, `d1RowsWritten`,
+`r2Reads`, `r2Writes`, `r2Lists`, `r2Conflicts`, `providerRequests` et `retries`.
+La fixture locale de 579 événements mesure 805 lectures/393 écritures R2 à
+la première collecte, puis 444/34 pour une collecte identique; cette dernière
+ne produit aucune écriture métier D1. Ces nombres sont des mesures de fixture,
+pas une estimation de facture ni une certification de production.
+
 ### Publication 1.0.38
 
 Publication autonome autorisée le 19 septembre 2026. La version de repli

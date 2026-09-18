@@ -16,6 +16,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-17
+- Revised: 2026-09-19
 
 ## Contexte
 
@@ -45,6 +46,32 @@ Chaque objet porte un jeton propriétaire, une échéance et une version; les
 et limitées aux douze plus récentes par œuvre. Les objets temporaires expirent
 logiquement après sept jours; l’actif et deux versions précédentes restent
 référencés avant toute collecte des orphelins.
+
+La reprise utilise `agenda-operations/v2` avec lecture de repli vers `v1`;
+aucun objet historique n'est modifié ni supprimé pendant cette transition.
+L'identité de collecte survit au remplacement du jeton de bail. Chaque page
+est immuable et son numéro, sa clé et son SHA-256 sont référencés dans le
+checkpoint conditionnel. Une page écrite avant interruption sans checkpoint
+reste sans référence et peut être recollectée; une page validée se relit
+indépendamment de son ancien jeton. L'horloge est revérifiée avant avancement.
+Un retour R2 `null` est un conflit, jamais un succès. Une panne réseau reste
+une erreur; un bail vivant impose une reprise à son échéance.
+
+La lane distingue `collecting`, `ready` et `published`. Le snapshot prêt et
+son digest restent durables avant D1; seul le succès D1 autorise la confirmation
+R2 et le changement du pointeur actif. Une interruption après commit D1 rejoue
+la comparaison sémantique puis confirme R2 sans réécrire le contenu métier.
+Le contrôle de qualité MangaUpdates précède le checkpoint terminal, pour
+qu'une réponse rejetée ne devienne jamais publiable lors d'une reprise.
+
+Le pointeur `pending.json` conserve au plus 104 sessions non terminées, sans
+éviction silencieuse. Les anciens signaux sont raccordés par lots de vingt
+avec curseur durable. Le cron hebdomadaire et le consumer Queue vérifient ce
+pointeur; une réservation conditionnelle limite la réémission à une fois par
+minute. Aucun cron supplémentaire n'est créé. Si tout envoi échoue sans aucun
+traitement ultérieur, la reprise attend le dimanche suivant ou le signal
+opérationnel authentifié `agenda-recovery`. Cette opération ne réarme aucune
+demande Discovery et ne purge aucune donnée.
 
 Publier un pointeur seulement après l’écriture et la relecture de l’objet
 complet. Un échec Queue laisse le travail récupérable; un doublon ne republie

@@ -206,7 +206,8 @@ describe('local D1 cost baseline — no external requests', () => {
     expect(pages).toEqual({ count: 0 });
     expect(await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM catalogue_release_model WHERE work_id LIKE 'work_cost_%'").first()).toEqual({ count: 579 });
     expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([2895, 0, 5, 5, 5]);
-    expect(r2Records.map(({ reads, writes }) => [reads, writes])).toEqual([[786, 391], [425, 32], [425, 32], [425, 32], [425, 32]]);
+    // Ownership reads, pending publication and two durable confirmations are measured separately from D1 business writes.
+    expect(r2Records.map(({ reads, writes }) => [reads, writes])).toEqual([[805, 393], [444, 34], [444, 34], [444, 34], [444, 34]]);
     console.info('r2-cost-baseline', JSON.stringify(r2Records));
     console.info('d1-cost-baseline-agenda-stock', JSON.stringify(pages));
     m.report();

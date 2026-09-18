@@ -115,9 +115,9 @@ export class MangaUpdatesAgendaCollector implements PublicAgendaCollector {
       }
       for (const event of pageEvents) events.set(event.id, event);
       const hasNextPage = body.page * body.per_page < body.total_hits;
+      if (!hasNextPage && received > 0 && skippedUnidentified / received > 0.05) throw new Error(`mangaupdates-unidentified-ratio:${skippedUnidentified}/${received}`);
       await this.saveCheckpoint(hasNextPage ? { complete: false, events: Object.freeze(pageEvents), nextPage: body.page + 1, notBefore: this.clock() + mangaUpdatesPageDelayMilliseconds, page: body.page, provider: this.provider, received, skippedUnidentified } : { complete: true, events: Object.freeze(pageEvents), page: body.page, provider: this.provider, received, skippedUnidentified });
       if (!hasNextPage) {
-        if (received > 0 && skippedUnidentified / received > 0.05) throw new Error(`mangaupdates-unidentified-ratio:${skippedUnidentified}/${received}`);
         return { events: Object.freeze([...events.values()]), received, skippedUnidentified };
       }
       if (requestedPage === mangaUpdatesPageLimit) throw new Error('mangaupdates-pagination-limit');

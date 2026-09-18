@@ -66,11 +66,13 @@ export interface AgendaLaneClaim {
   readonly received: number;
   readonly skippedUnidentified: number;
   readonly tokenDigest: string;
+  readonly collectionComplete?: boolean;
 }
 export type AgendaLaneAdmission =
   | { readonly status: 'claimed'; readonly claim: AgendaLaneClaim }
   | { readonly status: 'complete' }
-  | { readonly status: 'leased' }
+  | { readonly status: 'ready' }
+  | { readonly status: 'leased'; readonly retryAt?: string }
   | { readonly status: 'deferred'; readonly retryAt: string };
 export interface AgendaLaneCompletion { readonly changed: boolean; readonly digest: string; readonly events: readonly PublicAgendaReleaseEvent[] }
 export interface AgendaGenerationReceipt { readonly changed: boolean; readonly count: number; readonly revision: string }
@@ -179,11 +181,7 @@ export class D1AgendaCollectionAdapter {
   async savePage(claim: AgendaLaneClaim, checkpoint: PublicAgendaPageCheckpoint, savedAt: string): Promise<void> {
     const nextPage = checkpoint.nextPage ?? checkpoint.page;
     if (this.operations !== undefined) {
-      await this.operations.writePageVersion({
-        key: ['pages', checkpoint.provider, claim.collectionId, String(checkpoint.page)].join('/'),
-        payload: checkpoint, ownerToken: claim.tokenDigest, now: savedAt,
-      });
-      await this.operations.advanceLane({ provider: checkpoint.provider, collectionId: claim.collectionId, tokenDigest: claim.tokenDigest, checkpoint, now: savedAt });
+      await this.operations.saveLanePage(claim, checkpoint, savedAt);
       return;
     }
     const results = await this.db.batch([
@@ -226,12 +224,7 @@ export class D1AgendaCollectionAdapter {
         FROM public_release_agenda_page WHERE provider = ?1 AND collection_id = ?2 ORDER BY page`)
         .bind(input.provider, input.claim.collectionId).all<AgendaPageRow>()).results;
     } else {
-      const pages: Array<PublicAgendaPageCheckpoint | undefined> = [];
-      for (let index = 0; index < state.nextPage; index += 1) {
-        pages.push(await this.operations.readPageVersion(
-          ['pages', input.provider, input.claim.collectionId, String(index + 1)].join('/'), input.claim.tokenDigest,
-        ));
-      }
+      const pages = await this.operations.readLanePages(input.provider, input.claim.collectionId);
       pageRows = pages.map((page, index) => {
         if (page === undefined) throw new Error('agenda-staging-page-gap');
         return { complete: page.complete ? 1 : 0, eventsJson: JSON.stringify(page.events), page: index + 1 };
@@ -264,6 +257,15 @@ export class D1AgendaCollectionAdapter {
   }
 
   async publishMergedGeneration(checkedAt: string): Promise<AgendaGenerationReceipt | null> {
+    const pending = this.operations === undefined ? [] : await Promise.all((['anilist', 'mangaupdates'] as const).map(provider => this.operations!.readLane(provider)));
+    const receipt = await this.publishGeneration(checkedAt);
+    for (const lane of pending) {
+      if (lane.publication === 'ready' && lane.pendingDigest !== null && lane.pendingSnapshotId !== null) await this.operations!.confirmPublication(lane.provider, lane.pendingDigest, lane.pendingSnapshotId);
+    }
+    return receipt;
+  }
+
+  private async publishGeneration(checkedAt: string): Promise<AgendaGenerationReceipt | null> {
     const [anilist, mangaupdates] = await Promise.all([this.readLaneEvents('anilist'), this.readLaneEvents('mangaupdates')]);
     const events = [...anilist.events, ...mangaupdates.events];
     if (events.length === 0) return null;
@@ -405,6 +407,16 @@ export class D1AgendaCollectionAdapter {
   }
 
   private async readLaneEvents(provider: AgendaProvider): Promise<AgendaLaneEvents> {
+    if (this.operations !== undefined) {
+      const pending = await this.operations.readLane(provider);
+      if (pending.publication === 'ready' && pending.pendingSnapshotId !== null) {
+        const snapshot = await this.operations.readPageVersion(['snapshots', provider, pending.pendingSnapshotId].join('/'));
+        if (snapshot === undefined || !snapshot.complete || await digestPublicAgendaEvents(snapshot.events) !== pending.pendingDigest) throw new Error('agenda-staging-incomplete');
+        const result: AgendaLaneEvents = { events: snapshot.events };
+        if (pending.windowFrom !== null && pending.windowTo !== null) result.window = { from: pending.windowFrom, to: pending.windowTo };
+        return result;
+      }
+    }
     const state = await this.readLaneState(provider);
     if (state?.activeSnapshotId !== null && state?.activeSnapshotId !== undefined) {
       if (this.operations !== undefined) {

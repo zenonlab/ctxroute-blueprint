@@ -41,10 +41,14 @@ en bail occupé et contrôle la reprise du checkpoint ainsi que l'expiration exa
 `virtual-agenda-model.test.ts` vérifie dans workerd que les préconditions R2
 échouent avec `null`, puis reproduit la double attribution concurrente,
 le refus de pages validées sous un ancien bail et leur écrasement par un ancien
-traitement. Les quatre contrats `it.fails` constatent des défauts connus;
-ils doivent devenir des tests ordinaires dans l'étape de correction suivante.
+traitement. Les quatre défauts d'abord constatés par `it.fails` sont désormais
+couverts par des tests ordinaires. `agenda-publication-recovery.test.ts` coupe
+la publication avant D1 puis après le commit et avant confirmation R2; le
+consumer réel reprend sans appel fournisseur. Le backlog et l'import des
+signaux historiques couvrent vingt-cinq sessions en lots bornés, et une
+migration R2 v1 vers v2 prouve la conservation des objets de rollback.
 Ces preuves synthétiques ne certifient ni la bibliothèque personnelle ni la
-reprise de publication D1, qui nécessitent leurs parcours dédiés.
+mise à jour installée de l'extension, qui nécessite son parcours dédié.
 
 Pure domain behavior uses fast deterministic unit tests. Every boundary adds a
 contract test. Browser semantics add a real extension journey. Persistence

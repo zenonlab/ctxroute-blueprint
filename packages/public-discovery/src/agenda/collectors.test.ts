@@ -78,6 +78,8 @@ describe('public Agenda collectors', () => {
 
   it('fails the MangaUpdates lane when more than five percent of rows lack a series identity', async () => {
     const fetcher = vi.fn(async () => Response.json({ page: 1, per_page: 40, total_hits: 1, results: [{ record: { chapter: '1', id: 10, release_date: '2026-09-13' } }] }));
-    await expect(new MangaUpdatesAgendaCollector(fetcher, async () => undefined).collect({ from: '2026-09-12', to: '2026-09-28' })).rejects.toThrow('mangaupdates-unidentified-ratio:1/1');
+    const checkpoint = vi.fn(async () => undefined);
+    await expect(new MangaUpdatesAgendaCollector(fetcher, async () => undefined, checkpoint).collect({ from: '2026-09-12', to: '2026-09-28' })).rejects.toThrow('mangaupdates-unidentified-ratio:1/1');
+    expect(checkpoint).not.toHaveBeenCalled();
   });
 });

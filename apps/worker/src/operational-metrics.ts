@@ -1,3 +1,27 @@
+import type { R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
+
+export interface R2MetricTotals {
+  readonly r2Reads: number;
+  readonly r2Writes: number;
+  readonly r2Lists: number;
+  readonly r2Conflicts: number;
+}
+
+export function instrumentAgendaR2(bucket: R2Bucket) {
+  const totals = { r2Reads: 0, r2Writes: 0, r2Lists: 0, r2Conflicts: 0 };
+  const measured: ConstructorParameters<typeof R2AgendaOperationStore>[0] = {
+    get: async key => { totals.r2Reads += 1; return bucket.get(key); },
+    put: async (key, value, options) => {
+      totals.r2Writes += 1;
+      const result = await bucket.put(key, value, options);
+      if (result === null) totals.r2Conflicts += 1;
+      return result;
+    },
+    list: async options => { totals.r2Lists += 1; return bucket.list(options); },
+  };
+  return { bucket: measured, snapshot: (): R2MetricTotals => Object.freeze({ ...totals }) };
+}
+
 export interface D1MetricTotals {
   readonly rowsRead: number;
   readonly rowsWritten: number;

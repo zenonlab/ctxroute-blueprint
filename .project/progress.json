@@ -3795,7 +3795,7 @@
         {
           "id": "recovery",
           "title": "Fiabiliser reprise R2 Queue et publication durable",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Pages immuables réutilisables et bail expiré inopérant",
             "Publication D1 rejouable sans fournisseurs",
@@ -3819,7 +3819,10 @@
             "git diff --check",
             "git commit -m 'fix(agenda): resume durable R2 and Queue publication'"
           ],
-          "evidence": []
+          "evidence": [
+            "Worker 131/131, adaptateur Cloudflare releases 20/20 et collecteurs 8/8 passent: CAS null, bail expiré, pages immuables, commit D1 puis confirmation R2 interrompue, reprise sans fournisseur et 25 signaux par lots de 20.",
+            "Typechecks complets, validations décisions/docs et Archify all passent; diff audité, pas de suppression de données ni de dépendance. Namespace R2 v2 avec lecture v1 pour rollback."
+          ]
         },
         {
           "id": "canonical",

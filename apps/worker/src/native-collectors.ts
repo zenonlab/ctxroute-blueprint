@@ -13,11 +13,12 @@ import {
 import { D1AgendaCollectionAdapter, type AgendaLaneClaim } from './releases/public-release-collectors';
 import { createProviderTransportAdapter, type ProviderTransportBindings } from './provider-transport-adapter';
 import { boundedDuration, emitWorkerCostDiagnostic, workerDiagnosticsLockValue, type WorkerCostDiagnosticEvent, type WorkerCostProvider, type WorkerCostResult } from './diagnostics';
-import { instrumentD1, instrumentProviderFetch, type D1MetricTotals, type ProviderMetricTotals } from './operational-metrics';
+import { instrumentAgendaR2, instrumentD1, instrumentProviderFetch, type D1MetricTotals, type ProviderMetricTotals, type R2MetricTotals } from './operational-metrics';
 import { z } from 'zod';
 
 export const nativeCollectorSignalSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('public-discovery-ready'), version: z.literal(1) }),
+  z.strictObject({ type: z.literal('agenda-recovery'), version: z.literal(1) }),
   z.strictObject({ scheduledFor: z.iso.datetime({ offset: false }), type: z.literal('agenda-refresh'), version: z.literal(1) }),
 ]);
 export type NativeCollectorSignal = z.infer<typeof nativeCollectorSignalSchema>;
@@ -46,7 +47,7 @@ interface AgendaProcessingReceipt {
 }
 
 type DiscoveryProcessingReport = PublicDiscoveryBatchReport & { readonly metrics?: CollectorCostMetrics; readonly continuationScheduled?: boolean };
-interface CollectorCostMetrics extends D1MetricTotals {
+interface CollectorCostMetrics extends D1MetricTotals, Partial<R2MetricTotals> {
   readonly acceptedResults: number;
   readonly pagesRequested: number;
   readonly provider: WorkerCostProvider;
@@ -213,21 +214,30 @@ function calendarWindow(scheduledFor: string): CalendarWindow {
 
 export async function processAgendaQueue(bindings: NativeCollectorBindings, scheduledFor: string): Promise<AgendaProcessingReceipt> {
   const d1 = instrumentD1(bindings.PUBLIC_DB);
-  const providers = instrumentProviderFetch(providerFetch(bindings));
+  let lazyProvider: ReturnType<typeof providerFetch> | undefined;
+  const providers = instrumentProviderFetch((input, init) => {
+    lazyProvider ??= providerFetch(bindings);
+    return lazyProvider(input, init);
+  });
   let pagesRequested = 0;
   const transport = async (input: string, init: RequestInit) => { pagesRequested += 1; return providers.fetch(input, init); };
-  const window = calendarWindow(scheduledFor);
-  const state = new D1AgendaCollectionAdapter(d1.database, new R2AgendaOperationStore(bindings.RELEASE_SNAPSHOTS));
+  const r2 = instrumentAgendaR2(bindings.RELEASE_SNAPSHOTS);
+  const operations = new R2AgendaOperationStore(r2.bucket, undefined, () => new Date().toISOString());
+  await operations.recoverLegacySignals();
+  const effectiveSchedule = await operations.pendingSignal() ?? scheduledFor;
+  const window = calendarWindow(effectiveSchedule);
+  const state = new D1AgendaCollectionAdapter(d1.database, operations);
   const attempts = await Promise.allSettled((['anilist', 'mangaupdates'] as const).map(async (provider) => {
     const startedAt = new Date();
     const tokenDigest = await digest(randomToken());
     const admission = await state.claimLane({
       collectionId: crypto.randomUUID(), leaseUntil: new Date(startedAt.valueOf() + 15 * 60_000).toISOString(),
-      now: startedAt.toISOString(), provider, scheduledFor, tokenDigest, window,
+      now: startedAt.toISOString(), provider, scheduledFor: effectiveSchedule, tokenDigest, window,
     });
-    if (admission.status === 'complete' || admission.status === 'leased') return { accepted: 0, changed: false, collected: false, provider };
-    if (admission.status === 'deferred') {
-      const delay = Math.max(1, Math.ceil((Date.parse(admission.retryAt) - startedAt.valueOf()) / 1_000));
+    if (admission.status === 'complete') return { accepted: 0, changed: false, collected: false, provider };
+    if (admission.status === 'ready') return { accepted: 0, changed: true, collected: true, provider };
+    if (admission.status === 'deferred' || admission.status === 'leased') {
+      const delay = Math.max(1, Math.ceil((Date.parse(admission.retryAt ?? new Date(startedAt.valueOf() + 60_000).toISOString()) - startedAt.valueOf()) / 1_000));
       throw new AgendaCollectionRetryError(`agenda-${provider}-unavailable`, Math.min(delay, 86_400));
     }
     const claim: AgendaLaneClaim = admission.claim;
@@ -236,8 +246,8 @@ export async function processAgendaQueue(bindings: NativeCollectorBindings, sche
       ? new AniListAgendaCollector(transport, undefined, checkpoint)
       : new MangaUpdatesAgendaCollector(transport, undefined, checkpoint);
     try {
-      await collector.collect(window, { nextPage: claim.nextPage, received: claim.received, skippedUnidentified: claim.skippedUnidentified });
-      const completed = await state.completeLane({ checkedAt: new Date().toISOString(), claim, provider, scheduledFor });
+      if (claim.collectionComplete !== true) await collector.collect(window, { nextPage: claim.nextPage, received: claim.received, skippedUnidentified: claim.skippedUnidentified });
+      const completed = await state.completeLane({ checkedAt: new Date().toISOString(), claim, provider, scheduledFor: effectiveSchedule });
       return { accepted: completed.events.length, changed: completed.changed, collected: true, provider };
     } catch (error) {
       const now = Date.now();
@@ -251,21 +261,28 @@ export async function processAgendaQueue(bindings: NativeCollectorBindings, sche
   const completed = attempts.filter((attempt): attempt is PromiseFulfilledResult<{ accepted: number; changed: boolean; collected: boolean; provider: 'anilist' | 'mangaupdates' }> => attempt.status === 'fulfilled');
   const shouldPublish = completed.some((attempt) => attempt.value.collected)
     && (failures.length === 0 || completed.some((attempt) => attempt.value.changed));
-  const generation = shouldPublish ? await state.publishMergedGeneration(new Date().toISOString()) : null;
+  let generation: Awaited<ReturnType<D1AgendaCollectionAdapter['publishMergedGeneration']>> = null;
+  try {
+    generation = shouldPublish ? await state.publishMergedGeneration(new Date().toISOString()) : null;
+  } catch {
+    throw new AgendaCollectionRetryError('agenda-publication-unavailable', 60, { ...collectorCost(d1.snapshot(), providers.snapshot(), 0, 'failed', pagesRequested), ...r2.snapshot() });
+  }
   if (failures.length > 0) {
     const failureNames = failures.map((failure) => failure.reason instanceof Error ? failure.reason.message : 'agenda-provider-unavailable');
     const delay = Math.max(...failures.map((failure) => failure.reason instanceof AgendaCollectionRetryError ? failure.reason.retryDelaySeconds : 60));
     const accepted = completed.reduce((sum, attempt) => sum + attempt.value.accepted, 0);
-    throw new AgendaCollectionRetryError(agendaCollectionFailureCode(failureNames), delay, collectorCost(d1.snapshot(), providers.snapshot(), accepted, 'backoff', pagesRequested));
+    throw new AgendaCollectionRetryError(agendaCollectionFailureCode(failureNames), delay, { ...collectorCost(d1.snapshot(), providers.snapshot(), accepted, 'backoff', pagesRequested), ...r2.snapshot() });
   }
   const receipt = generation ?? { changed: false, count: 0, revision: 'd1-empty' };
+  await operations.finishSignal(effectiveSchedule);
+  await recoverPendingAgenda(bindings);
   const result: WorkerCostResult = generation === null ? 'deduplicated' : receipt.changed ? 'changed' : 'unchanged';
-  return { ...receipt, metrics: collectorCost(d1.snapshot(), providers.snapshot(), receipt.count, result, pagesRequested) };
+  return { ...receipt, metrics: { ...collectorCost(d1.snapshot(), providers.snapshot(), receipt.count, result, pagesRequested), ...r2.snapshot() } };
 }
 
 export async function handleNativeCollectorQueue(
   messages: readonly QueueMessagePort[],
-  processors: { readonly agenda: (scheduledFor: string) => Promise<AgendaProcessingReceipt>; readonly discovery: () => Promise<DiscoveryProcessingReport> },
+  processors: { readonly agenda: (scheduledFor: string) => Promise<AgendaProcessingReceipt>; readonly discovery: () => Promise<DiscoveryProcessingReport>; readonly recovery?: () => Promise<void> },
 ): Promise<void> {
   const discoveryMessages: QueueMessagePort[] = [];
   for (const message of messages) {
@@ -282,8 +299,13 @@ export async function handleNativeCollectorQueue(
     }
     const startedAt = Date.now();
     try {
-      const receipt = await processors.agenda(signal.scheduledFor);
-      emitCollectorCost('agenda', receipt.metrics ?? emptyCollectorCost(receipt.changed ? 'changed' : 'unchanged'), startedAt, message.attempts);
+      if (signal.type === 'agenda-recovery') {
+        if (processors.recovery === undefined) throw new Error('agenda-recovery-unavailable');
+        await processors.recovery();
+      } else {
+        const receipt = await processors.agenda(signal.scheduledFor);
+        emitCollectorCost('agenda', receipt.metrics ?? emptyCollectorCost(receipt.changed ? 'changed' : 'unchanged'), startedAt, message.attempts);
+      }
       emitNativeCollectorDiagnostic({ attempt: Math.max(1, message.attempts), disposition: 'ack-success', messageType: signal.type });
       message.ack();
     } catch (error) {
@@ -350,6 +372,10 @@ function emitCollectorCost(task: 'agenda' | 'discovery', metrics: CollectorCostM
     providerRequests: metrics.providerRequests,
     result: metrics.result,
     retries: Math.max(0, attempt - 1),
+    r2Reads: metrics.r2Reads ?? 0,
+    r2Writes: metrics.r2Writes ?? 0,
+    r2Lists: metrics.r2Lists ?? 0,
+    r2Conflicts: metrics.r2Conflicts ?? 0,
     schemaVersion: 1,
     task,
     type: 'worker.cost',
@@ -362,5 +388,12 @@ export async function enqueueAgendaRefresh(controller: ScheduledController, bind
   const scheduledFor = new Date(controller.scheduledTime).toISOString();
   const now = new Date().toISOString();
   await new R2AgendaOperationStore(bindings.RELEASE_SNAPSHOTS).writePendingSignal({ scheduledFor, ownerToken: randomToken(), now });
-  await bindings.PUBLIC_DISCOVERY_QUEUE.send({ scheduledFor, type: 'agenda-refresh', version: 1 }, { contentType: 'json' });
+  await recoverPendingAgenda(bindings);
+}
+
+export async function recoverPendingAgenda(bindings: NativeCollectorBindings): Promise<void> {
+  const operations = new R2AgendaOperationStore(bindings.RELEASE_SNAPSHOTS);
+  await operations.recoverLegacySignals();
+  const scheduledFor = await operations.reserveSignalDelivery(new Date().toISOString());
+  if (scheduledFor !== undefined) await bindings.PUBLIC_DISCOVERY_QUEUE.send({ scheduledFor, type: 'agenda-refresh', version: 1 }, { contentType: 'json', delaySeconds: 60 });
 }

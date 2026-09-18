@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { instrumentD1, instrumentProviderFetch } from './operational-metrics';
+import { instrumentAgendaR2, instrumentD1, instrumentProviderFetch } from './operational-metrics';
+import { env } from 'cloudflare:test';
 
 describe('operational metrics', () => {
+  it('counts R2 operations and conditional conflicts without exposing object keys', async () => {
+    const metrics = instrumentAgendaR2(env.RELEASE_SNAPSHOTS);
+    const options = { httpMetadata: { contentType: 'application/json' }, onlyIf: { etagDoesNotMatch: '*' } };
+    await metrics.bucket.put('metrics/r2-counter', '{}', options);
+    await expect(metrics.bucket.put('metrics/r2-counter', '{}', options)).resolves.toBeNull();
+    await metrics.bucket.get('metrics/r2-counter');
+    await metrics.bucket.list?.({ prefix: 'metrics/', limit: 1 });
+    expect(metrics.snapshot()).toEqual({ r2Reads: 1, r2Writes: 2, r2Lists: 1, r2Conflicts: 1 });
+  });
   it('sums only D1Result meta without inspecting query values', async () => {
     const statement = {
       all: vi.fn(async () => ({ meta: { rows_read: 3, rows_written: 0 }, results: [{ value: 1 }], success: true })),

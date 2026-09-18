@@ -25,8 +25,7 @@ describe('virtual Agenda model publication', () => {
     expect(await (await env.RELEASE_SNAPSHOTS.get(key))?.text()).toBe('original');
   });
 
-  // These executable regression contracts must pass normally after the recovery step.
-  it.fails('grants exactly one concurrent lane claim under real R2 preconditions', async () => {
+  it('grants exactly one concurrent lane claim under real R2 preconditions', async () => {
     const store = new R2AgendaOperationStore(env.RELEASE_SNAPSHOTS, 'regressions/concurrent');
     const results = await Promise.all([
       store.claimLane(laneInput),
@@ -35,7 +34,7 @@ describe('virtual Agenda model publication', () => {
     expect(results.filter(result => result.status === 'claimed')).toHaveLength(1);
   });
 
-  it.fails('assembles validated pages written under an earlier lease after resume', async () => {
+  it('assembles validated pages written under an earlier lease after resume', async () => {
     const store = new R2AgendaOperationStore(env.RELEASE_SNAPSHOTS, 'regressions/resume');
     const state = new D1AgendaCollectionAdapter(env.PUBLIC_DB, store);
     const first = await state.claimLane(laneInput);
@@ -49,15 +48,16 @@ describe('virtual Agenda model publication', () => {
       .resolves.toMatchObject({ events: [] });
   });
 
-  it.fails('does not overwrite an accepted page when a stale owner attempts another save', async () => {
+  it('does not overwrite an accepted page when a stale owner attempts another save', async () => {
     const store = new R2AgendaOperationStore(env.RELEASE_SNAPSHOTS, 'regressions/stale-page');
     const state = new D1AgendaCollectionAdapter(env.PUBLIC_DB, store);
     const first = await state.claimLane(laneInput);
     if (first.status !== 'claimed') throw new Error('Expected initial claim.');
     await state.savePage(first.claim, checkpoint, laneInput.now);
+    const accepted = (await store.readLane('anilist')).pages[0]!;
     await state.claimLane({ ...laneInput, now: laneInput.leaseUntil, leaseUntil: '2026-09-20T03:25:00.000Z', tokenDigest: 'b'.repeat(64) });
     await expect(state.savePage(first.claim, { ...checkpoint, received: 999 }, laneInput.leaseUntil)).rejects.toThrow();
-    expect(await store.readPageVersion(`pages/anilist/${first.claim.collectionId}/1`)).toEqual(checkpoint);
+    expect(await store.readPageVersion(accepted.key)).toEqual(checkpoint);
   });
 
   it('stores complete multi-page checkpoints in R2 before completing the D1 pointer', async () => {

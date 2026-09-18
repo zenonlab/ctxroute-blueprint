@@ -39,6 +39,10 @@ export interface WorkerCostDiagnosticEvent {
   readonly generationsCreated?: number;
   readonly generationsAvoided?: number;
   readonly rehydrations?: number;
+  readonly r2Reads?: number;
+  readonly r2Writes?: number;
+  readonly r2Lists?: number;
+  readonly r2Conflicts?: number;
 }
 
 export function classifyWorkerRoute(pathname: string): WorkerRouteFamily {
