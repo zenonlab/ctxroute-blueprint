@@ -6,22 +6,35 @@ remain independent of this operational path.
 
 ## Inspect
 
-### Préparation 1.0.37
+### Publication 1.0.37
 
 Autorisation utilisateur de fusion, push et déploiement reçue le 18 septembre.
-La version active inspectée est `a80014e6-05b4-42f5-b682-1d51677b1048`
+La version de repli inspectée est `a80014e6-05b4-42f5-b682-1d51677b1048`
 à 100 %, avec le pointeur `1.0.36` et aucune migration en attente.
-Les archives candidates `1.0.37` sont reproductibles et leurs parcours
+Les archives publiées `1.0.37` sont reproductibles et leurs parcours
 installés passent sur Chromium 153 et Firefox 155 (1 532 fixtures dont
 1 400 médias, aucun résultat inventé hors ligne).
 Chrome : 297360 octets, SHA-256
 `eac0126c034a58b5b3a17ae3ded4d855f770949bc4912174523c300cce018142`.
 Firefox : 297401 octets, SHA-256
 `908018a490293d4bc24ab516922f8a6eec9cc64fd1e4d6c4b9277c16b9a6105d`.
-La gate `node scripts/infra/recovery-1037-canary.mjs read|submit` est bornée
+La gate `node scripts/infra/recovery-1037-canary.mjs read|submit|observe` est bornée
 aux deux fixtures publiques de cette version, par titre et référence exacte.
 `read` utilise uniquement le lookup; `submit` admet deux demandes espacées
 de sept secondes. Les sorties contiennent seulement état, statut et durée.
+`observe` filtre pendant 55 secondes les compteurs de coût, sans contenu privé.
+Le Worker correctif `a1b5e440-8703-468a-86d4-383c31898e37` a été déployé
+avant publication des archives. Les deux canaries initialement `MISS` ont
+atteint `VERIFIED`, avec vérification du titre et de la référence AniList 1.
+Admissions serveur : 177/176 ms; lectures vérifiées : 29/33 ms.
+Les deux lots fournisseur ont écrit 16/10 lignes, sans retry; les admissions
+ont écrit 7 lignes chacune. Ces mesures bornées ne certifient pas la bibliothèque
+personnelle. Le plan Worker appliqué porte le digest
+`59385fc33cfde1197161930b103f1cc3391cdc8fd9649970beb553e7bec73ed8`.
+Le plan R2 appliqué porte le digest
+`6adeddad01fc48c98692f27c6c57ef03917eb77cf5319528dfd9b5968ee520db`.
+Les deux ZIP téléchargés publiquement correspondent aux tailles et SHA-256
+ci-dessus avant avancement du pointeur vers `1.0.37`.
 
 ### Candidat de récupération des favoris du 18 septembre 2026
 

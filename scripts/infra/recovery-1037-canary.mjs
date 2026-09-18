@@ -1,13 +1,46 @@
 /* global AbortSignal, fetch, performance */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { setTimeout } from 'node:timers/promises';
 import { publicDiscoverySubmissionSchema, publicDiscoveryTerminalResolutionSchema } from '../../packages/public-discovery/src/contracts.ts';
 
 // This operational gate admits only the two public release fixtures below.
 const mode = process.argv[2];
-assert.ok(['read', 'submit'].includes(mode));
-for (const kind of ['title', 'exact']) {
+assert.ok(['read', 'submit', 'observe'].includes(mode));
+if (mode === 'observe') {
+  const child = spawn('npm', ['exec', '--', 'wrangler', 'tail', 'tobirink-public-api', '--format', 'json'], { cwd: new URL('../../apps/worker', import.meta.url), stdio: ['ignore', 'pipe', 'pipe'] });
+  let buffer = '';
+  let events = 0;
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', chunk => {
+    buffer += chunk;
+    assert.ok(buffer.length < 1024 * 1024, 'observer-buffer-limit');
+    let end;
+    while ((end = buffer.indexOf('\n}\n')) !== -1) {
+      const frame = buffer.slice(0, end + 2); buffer = buffer.slice(end + 3);
+      try {
+        const event = JSON.parse(frame);
+        for (const log of event.logs ?? []) for (const message of log.message ?? []) {
+          let parsed;
+          try { parsed = JSON.parse(message); } catch { continue; }
+          if (parsed.type !== 'worker.cost') continue;
+          const output = { type: parsed.type, task: parsed.task, result: parsed.result };
+          for (const key of ['d1RowsRead', 'd1RowsWritten', 'providerRequests', 'acceptedResults', 'retries', 'durationMs']) {
+            if (Number.isFinite(parsed[key])) output[key] = parsed[key];
+          }
+          events += 1; process.stdout.write(JSON.stringify(output) + '\n');
+        }
+      } catch { /* Ignore non-event CLI frames; never expose raw log content. */ }
+    }
+  });
+  child.stderr.resume();
+  child.on('error', () => { process.exitCode = 1; });
+  await setTimeout(55_000);
+  child.kill('SIGTERM');
+  process.stdout.write(JSON.stringify({ observedCostEvents: events }) + '\n');
+}
+for (const kind of mode === 'observe' ? [] : ['title', 'exact']) {
   const key = { fingerprint: createHash('sha256').update(`tobirink-release-1.0.37:${kind}`).digest('hex'), mediaKind: 'ANIME', parserVersion: 'release-canary-1.0.37', siteRulesVersion: 'canary-v1' };
   const query = { discoveryTitles: ['Cowboy Bebop'], sourceTitles: ['Cowboy Bebop'], mediaKind: 'ANIME', sourceFormat: 'NON_OVA', preSerialization: false };
   if (kind === 'exact') query.explicitProviderReference = { provider: 'anilist', externalId: '1' };
