@@ -77,7 +77,7 @@ Cloudflare et sa propre étape destructive.
 
 ## Build a release candidate
 
-The current production archives are `1.0.34`, published after deterministic
+The previous production archives were `1.0.34`, published after deterministic
 Chrome and Firefox packaging and the exact Cloudflare gate plan. The immutable
 archives are Chrome (294587 bytes, SHA-256
 `264a48e9e292baeb082474e7ceb6c499f9bc3ba0f9e6e8031951c5a98cf0ac6b`) and
@@ -85,12 +85,31 @@ Firefox (294628 bytes, SHA-256
 `201f633c0a2d02ed60dc9f02e101f74a941a832f66854064f8238841ed24d79d`).
 Two local packaging passes were byte-identical; both remote downloads returned
 HTTP 200 with `application/zip` and matched these hashes. The Worker deployment
-version was `2905a076-d107-4a29-8408-f24f86c97555`, and `/download` advertises
-only `1.0.34`.
+version was `2905a076-d107-4a29-8408-f24f86c97555`, and `/download` advertised
+only `1.0.34` before the corrective 1.0.35 publication below.
 `apps/extension/package.json` is the candidate version source: WXT reads it for
 both manifests and the packager reads it for ZIP names. The download page reads
-`apps/web/published-extension.json`; the pointer is now `1.0.34` after both
-matching ZIPs and the verified Worker deployment.
+`apps/web/published-extension.json`; the pointer was `1.0.34` after both
+matching ZIPs and the verified Worker deployment, then advanced to 1.0.35 in
+the corrective publication below.
+
+### Corrective adult-visibility release — 1.0.35 — 2026-09-18
+
+The 1.0.35 candidate was published through Cloudflare gate plan
+`ad369fa04811869892d34123b68199369bd9c52e24ddd7998d25619dd917753a`.
+The exact allowlist contained only the two immutable R2 archives and
+`worker:tobirink-public-api`; no D1 migration or Queue operation was included.
+
+- Chrome: 294650 bytes, SHA-256
+  `aff248dbe625d35491817783e91e3d7c1f7a2e4a801a67730f4ce22136b9992a`.
+- Firefox: 294691 bytes, SHA-256
+  `d29db3d098c0de07bad1ec35c54a8d9524b3a5ae6c80bf6473597b0efe51b25b`.
+
+Worker version `2290749c-6da7-4bec-a091-f85297749f0c` serves 100 percent.
+Production verification on 2026-09-18 returned HTTP 200, `application/zip`,
+immutable caching and matching hashes for both archives. The production
+`/download` page announces only 1.0.35. Archify architecture validation passed
+with zero errors and warnings, and D1 reported no migrations to apply.
 
 Run `npm run package:extension` from the repository root. The command rebuilds
 both browser targets and writes these ignored, reproducible artifacts:
