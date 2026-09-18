@@ -238,3 +238,7 @@
 ## Fusionner et publier la récupération des favoris 1.0.37 — DONE
 
 - [x] **Valider fusionner pousser et déployer 1.0.37** — DONE _(evidence: npm run verify réussi; archives reproductibles 1.0.37 testées installées sur Chromium 153 et Firefox 155; lint, Archify all, docs/ADR et 14 tests web passent., Fusion fast-forward et push main 7c33e9e réalisés. Worker final ee48b6be-752e-4e1e-a681-8ea0eb43a3dc déployé via plan 45308dc106f81947b46cb8412ddd07860e56ff4009678ba12db0696b02f0eb7c., Deux canaries MISS puis VERIFIED, admissions serveur 177/176 ms et lectures 29/33 ms. Liens /download 1.0.37 et SHA-256 des deux archives publiques vérifiés après déploiement; détails docs/operations/cloudflare.md.)_
+
+## Publier en autonomie le correctif d’émission 1.0.38 — ACTIVE
+
+- [ ] **Certifier les archives et publier 1.0.38** — IN_PROGRESS _(evidence: Main distant inspecté; correctif local 25bfc2e à publier sous version immuable 1.0.38.)_

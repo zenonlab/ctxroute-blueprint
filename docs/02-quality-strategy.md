@@ -276,6 +276,14 @@ restant. Le test workerd compose le client HTTP, les routes, D1 et le consumer
 Queue avec une réponse AniList simulée; il exige PENDING puis VERIFIED.
 Ces preuves locales ne remplacent pas les compteurs du profil utilisateur.
 
+La candidate 1.0.38 ajoute une gate Chromium installée à réseau borné : ZIP
+inchangé, deux favoris publics, prélecture retardée de six secondes et MISS
+simulé pour forcer l’admission. Les POST du service worker et les réponses
+Worker sont réels. Le contrôle attend les alarmes natives, sans clic de reprise.
+Preuve obtenue : deux POST, une réponse PENDING et une VERIFIED, puis deux
+sources résolues; la nouvelle demande a été publiée après un appel fournisseur.
+Cette preuve complète le corpus hors ligne et ne certifie pas un profil privé.
+
 Les archives installées sont testées dans des profils temporaires avec les
 1 400 vrais candidats média, jamais remplacés par des exclusions ordinaires.
 Le parcours hors ligne doit donner zéro résolution inventée et zéro blocage.

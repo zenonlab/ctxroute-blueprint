@@ -3697,6 +3697,58 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-discovery-egress-1038",
+      "title": "Publier en autonomie le correctif d’émission 1.0.38",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "release",
+          "title": "Certifier les archives et publier 1.0.38",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Archives installées Chrome/Firefox passent et builds reproductibles",
+            "Émission de découverte vérifiée depuis l’archive candidate avec fixtures publiques bornées",
+            "ZIP publics identiques; liens 1.0.38 et Worker vérifiés",
+            "Fusion et main distant synchronisés; preuves documentées sans certification personnelle inventée"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "apps/web/published-extension.json",
+            "apps/extension/scripts/**",
+            "scripts/infra/**",
+            "docs/operations/cloudflare.md",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/public-discovery.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md",
+            "build/releases/**"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run package:extension -- --verify-isolated",
+            "npm run package:extension",
+            "node apps/extension/scripts/installed-review.mjs <archive>",
+            "node apps/extension/scripts/installed-firefox.mjs <archive>",
+            "node scripts/infra/installed-discovery-canary.mjs <archive>",
+            "npm run infra:inspect",
+            "npm run infra:plan",
+            "npm run infra:apply",
+            "git merge --ff-only",
+            "git commit",
+            "git push origin"
+          ],
+          "evidence": [
+            "Main distant inspecté; correctif local 25bfc2e à publier sous version immuable 1.0.38."
+          ]
+        }
+      ]
     }
   ]
 }

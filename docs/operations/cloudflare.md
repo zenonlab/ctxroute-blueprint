@@ -6,6 +6,36 @@ remain independent of this operational path.
 
 ## Inspect
 
+### Préparation 1.0.38
+
+Publication autonome autorisée le 19 septembre 2026. La version de repli
+inspectée est `ee48b6be-752e-4e1e-a681-8ea0eb43a3dc` à 100 %, sans migration
+D1 en attente. Le correctif `25bfc2e` adapte le timeout au temps restant et
+limite la prélecture à cinquante sources pour éviter une famine d’admission.
+`npm run verify` passe après passage à `1.0.38`; les archives reproductibles
+sont installées et vérifiées hors ligne sur Chromium 153 et Firefox 155.
+Chrome : 297370 octets, SHA-256
+`b5f1943e54fff91d605b6e0d1df850a95865f548daf630d9152fbb45ff6589f3`.
+Firefox : 297411 octets, SHA-256
+`8ab230140d469d20b2ad5b8e45471e96ecbbf72a9908d4bd55c0233e57845b86`.
+La gate `node scripts/infra/installed-discovery-canary.mjs <chrome.zip>`
+installe le ZIP intact dans un profil temporaire, simule un MISS et retarde
+la prélecture de six secondes. Seules les routes Discovery du Worker sont
+autorisées; les réponses vérifiées restent réelles. Les favoris de test sont
+publics et fixes. La gate attend les alarmes natives sans forcer la reprise.
+Le pointeur public reste `1.0.37` jusqu’à validation puis téléchargement vérifié
+des deux nouvelles archives. Aucun secret, schéma, quota ou gateway ne change.
+La gate installée a réussi : deux POST du service worker, deux prélectures
+ralenties, une admission `PENDING` et une admission déjà `VERIFIED`, puis deux
+sources résolues après alarmes natives. Le lot Queue observé a accepté un
+résultat avec un appel fournisseur, 44 lignes écrites et zéro retry.
+Le premier essai utilisait deux favoris de la même œuvre : une seule admission
+suivie de réutilisation locale était correcte. Les fixtures finales distinctes
+vérifient séparément le titre Cowboy Bebop et la référence AniList 205.
+Un garde-fou du harness rejetait initialement le titre de secours numérique
+de l’URL fournisseur sans slug; il accepte désormais uniquement l’ID exact
+attendu. Les demandes refusées par ce garde-fou n’ont pas été transmises.
+
 ### Publication 1.0.37
 
 Autorisation utilisateur de fusion, push et déploiement reçue le 18 septembre.

@@ -100,6 +100,10 @@ La candidate corrective suivante est `1.0.36`; elle ne réécrit aucun objet
 locale versionnée et les reprises durables Public Discovery. Ses archives
 immuables ont été téléchargées et vérifiées avant de remplacer le pointeur
 `1.0.36`; les deux canaries publics ont atteint `VERIFIED` sur le Worker corrigé.
+`1.0.38` corrige la famine d’admission dans le budget MV3.
+Sa gate installée retarde la prélecture de six secondes et simule seulement
+un cache froid; deux demandes publiques réelles au plus par clé contrôlent
+l’émission vers le Worker puis l’affichage local vérifié, sans modifier le ZIP.
 The version in `apps/extension/package.json` remains the single WXT and archive
 candidate source. The static download page follows the separately versioned
 `apps/web/published-extension.json` publication pointer, which is advanced only
