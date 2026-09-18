@@ -26,6 +26,7 @@ const context = await chromium.launchPersistentContext(profile, {
 });
 
 try {
+  await context.setOffline(true);
   process.stdout.write(`Installed-test browser: ${context.browser()?.version()}\n`);
   let page = await context.newPage();
   const debugging = await context.browser().newBrowserCDPSession();
@@ -38,8 +39,11 @@ try {
   await page.waitForFunction(() => globalThis.fixtureReady === true);
   await page.evaluate(async () => {
     const folder = await globalThis.chrome.bookmarks.create({ title: 'Synthetic large library' });
-    for (let index = 0; index < 1401; index += 1) {
-      await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: `Synthetic ordinary video ${index}`, url: `https://www.youtube.com/watch?v=synthetic-${index}` });
+    for (let index = 0; index < 1393; index += 1) {
+      await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: `Synthetic corpus ${index}`, url: `https://reader.invalid/manga/synthetic-corpus-${index}/42` });
+    }
+    for (let index = 0; index < 132; index += 1) {
+      await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: `Synthetic utility ${index}`, url: `https://reader.invalid/search/synthetic-${index}` });
     }
     await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Synthetic anime reference', url: 'https://anilist.co/anime/1233' });
     await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: 'Synthetic pending manga', url: 'https://www.mangaupdates.com/series/abc123/synthetic-pending-manga' });
@@ -57,23 +61,21 @@ try {
   for (let pass = 0; pass < 750; pass += 1) {
     status = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }));
     if (status.ok && status.inventory.status === 'complete' && status.counts.processing === 0) break;
+    await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'favorite.reconcile', version: 1 }));
     await new Promise((resolve) => { setTimeout(resolve, 200); });
   }
   assert.equal(status?.ok, true);
   assert.equal(status.inventory.status, 'complete');
-  assert.equal(status.counts.observed, 1408);
-  assert.equal(status.counts.unsupported, 1401);
+  assert.equal(status.counts.observed, 1532);
+  assert.equal(status.counts.unsupported, 132);
   process.stdout.write(`Installed offline diagnostics: counts=${JSON.stringify(status.counts)}\n`);
   const catalogue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
   assert.equal(catalogue.ok, true);
-  assert.equal(catalogue.snapshot.statistics.total, 7, JSON.stringify(catalogue.snapshot.items));
-  assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic pending manga' && item.mediaType === 'manga' && item.state === 'retryable'));
-  assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic pending manhwa' && item.mediaType === 'manga' && item.state === 'retryable'), JSON.stringify(catalogue.snapshot.items));
-  assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic cache anime' && item.state === 'retryable'));
-  assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'synthetic rescued manga' && item.mediaType === 'unknown' && item.state === 'retryable'));
-  assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'genius of the unique lineage' && item.state === 'retryable'), JSON.stringify(catalogue.snapshot.items));
-  assert.ok(catalogue.snapshot.items.some((item) => item.title.toLocaleLowerCase() === 'artifact reading appraiser' && item.state === 'retryable'), JSON.stringify(catalogue.snapshot.items));
-  assert.equal(status.counts.retryable, 7);
+  assert.equal(catalogue.snapshot.statistics.total, 1400);
+  assert.ok(catalogue.snapshot.items.every((item) => item.state === 'retryable'));
+  assert.equal(status.counts.retryable, 1400);
+  assert.equal(status.counts.resolved, 0);
+  assert.equal(status.counts.blocked, 0);
   const queue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'review.queue.read', version: 1 }));
   assert.deepEqual(queue, { ok: true, snapshot: { items: [], status: 'pending' } });
   const reviewCount = await page.evaluate(() => new Promise((resolve, reject) => {
@@ -89,7 +91,7 @@ try {
     };
   }));
   assert.equal(reviewCount, 0);
-  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: health, automatic 1408-bookmark convergence, fail-closed offline state and zero imported Review passed.\n`);
+  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: 1532 bookmarks including 1400 media, offline retry without false resolution, zero blocked tasks and zero imported Review passed.\n`);
 } finally {
   await context.close();
 }

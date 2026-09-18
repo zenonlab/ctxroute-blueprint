@@ -47,6 +47,12 @@ function resolutionCounts(sources: RecordMap<FavoriteSource>) {
   const publicDiscoveryPending = observed.filter(source => source.resolution?.kind === 'RETRYABLE' && source.resolution.reason === 'PUBLIC_DISCOVERY_PENDING').length;
   if (internalErrors) result.internalErrors = internalErrors;
   if (publicDiscoveryPending) result.publicDiscoveryPending = publicDiscoveryPending;
+  const groups = { admissionWaiting: ['ADMISSION_WAIT'], rateLimited: ['RATE_LIMITED'], networkErrors: ['NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE'], actionRequired: ['CONTRACT_CONFLICT', 'INVALID_RESPONSE'], providerPaused: ['PROVIDER_UNAVAILABLE'] } as const;
+  for (const key of ['admissionWaiting', 'rateLimited', 'networkErrors', 'actionRequired', 'providerPaused'] as const) {
+    const reasons: readonly string[] = groups[key];
+    const count = observed.filter(source => source.resolution?.kind === 'RETRYABLE' && reasons.includes(source.resolution.reason)).length;
+    if (count > 0) result[key] = count;
+  }
   return result;
 }
 

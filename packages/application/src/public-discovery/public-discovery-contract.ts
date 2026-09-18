@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { PublicDiscoveryQuery, PublicDiscoveryReadState } from '@tobirink/public-discovery';
+import { publicDiscoveryKeyV3Schema } from '@tobirink/public-discovery';
 
 const fingerprintSchema = z.string().regex(/^[a-f0-9]{64}$/u);
-const versionSchema = z.string().min(1).max(32).regex(/^[A-Za-z0-9._-]+$/u);
 const publicIdSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/u);
 const providerSchema = z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']);
 const titleSchema = z.string().min(1).max(200).refine((title) => ![...title].some((character) => {
@@ -10,12 +10,14 @@ const titleSchema = z.string().min(1).max(200).refine((title) => ![...title].som
   return codePoint !== undefined && (codePoint < 0x20 || codePoint === 0x7f);
 }));
 
-export const publicDiscoveryKeySchema = z.strictObject({
-  fingerprint: fingerprintSchema,
-  mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA', 'UNKNOWN']),
-  parserVersion: versionSchema,
-  siteRulesVersion: versionSchema,
-});
+export const publicDiscoveryKeySchema = publicDiscoveryKeyV3Schema;
+
+export type PublicDiscoveryErrorCode = 'ADMISSION_WAIT' | 'RATE_LIMITED' | 'NETWORK' | 'TIMEOUT' | 'SERVICE_UNAVAILABLE' | 'CONTRACT_CONFLICT' | 'INVALID_RESPONSE';
+export class PublicDiscoveryError extends Error {
+  constructor(readonly code: PublicDiscoveryErrorCode, readonly httpStatus?: number, readonly retryAt?: string) {
+    super(code); this.name = 'PublicDiscoveryError';
+  }
+}
 
 export const publicDiscoveryReferenceSchema = z.strictObject({
   externalId: publicIdSchema,
@@ -91,6 +93,7 @@ export interface PublicDiscoveryClientPort {
 }
 
 export interface PublicDiscoveryRequestClientPort {
+  setDeadline?(deadline: number): void;
   lookup?(keys: readonly PublicDiscoveryKey[]): Promise<readonly { key: PublicDiscoveryKey; state: PublicDiscoveryReadState }[]>;
   requestRefresh?(key: PublicDiscoveryKey): Promise<Extract<PublicDiscoveryReadState, { state: 'VERIFIED' }>>;
   resolveOrRequest(key: PublicDiscoveryKey, query: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState>;

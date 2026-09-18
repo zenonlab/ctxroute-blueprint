@@ -17,7 +17,7 @@
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "Seule la transition D1 MISS vers PENDING émet un signal; le consumer réclame ensuite un lot borné et publie pagesRequested=0."
+        "note": "Admission cadencée; un signal perdu est réparable. Chaque lot conserve une continuation tant que D1 attend du travail."
       },
       {
         "id": "verified-refresh",
@@ -136,7 +136,7 @@
     {
       "from": "extension",
       "to": "worker",
-      "label": "requête ou reprise explicite",
+      "label": "requête ou reprise cadencée",
       "classification": "HTTPS · digest identique",
       "variant": "emphasis",
       "route": "straight",

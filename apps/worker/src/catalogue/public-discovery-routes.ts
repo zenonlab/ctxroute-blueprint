@@ -32,7 +32,9 @@ function v3Port(services: DiscoveryServices): PublicDiscoveryV3Port {
 }
 
 function noStore<TBody>(body: TBody, status = 200): Response {
-  return Response.json(body, { headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }, status });
+  const headers = new Headers({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+  if (status === 429) headers.set('Retry-After', '60');
+  return Response.json(body, { headers, status });
 }
 
 function retiredV2(): Response {
@@ -130,9 +132,11 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
       }
       emitPublicCost(context.env, services, before, 'discovery-admission', admission.outcome === 'created' ? 'changed' : 'deduplicated', startedAt, admission.outcome === 'existing' ? { deduplicated: 1 } : {});
       return noStore(admission.state, 202);
-    } catch {
+    } catch (error) {
       emitPublicCost(context.env, services, before, 'discovery-admission', 'failed', startedAt);
-      return noStore({ error: 'request-conflict' }, 409);
+      return error instanceof Error && error.message === 'public-discovery-request-conflict'
+        ? noStore({ error: 'request-conflict' }, 409)
+        : noStore({ error: 'discovery-unavailable' }, 503);
     }
   });
 

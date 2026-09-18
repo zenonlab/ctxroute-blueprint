@@ -103,6 +103,8 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
   };
   const runOnce = (runId: string, inventoryRequested: boolean) => dependencies.ensureReady()
     .then(async () => {
+        const wakeDeadline = Date.parse(dependencies.now()) + 20_000;
+        dependencies.publicDiscovery?.setDeadline?.(wakeDeadline);
         let inventoryFailure: Error | undefined;
         let inventoryBatches = 0;
         let observed = 0;
@@ -147,11 +149,14 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           await recordDiagnostic({ counts: { batches: inventoryBatches, observed }, errorCode: 'INVENTORY_UNAVAILABLE', outcome: 'failed', runId, stage: 'inventory' });
         }
         await prepareResolutionCaches();
-        const result = await runFavoriteResolutionSlice(dependencies);
+        const result = await runFavoriteResolutionSlice({ ...dependencies, wakeDeadline });
         const refresh = inventoryComplete && result.completed === 0
-          ? await dependencies.refreshPublicDiscovery?.()
+          ? await dependencies.refreshPublicDiscovery?.().catch(() => ({ continuationRequired: true }))
           : undefined;
-        const counts = { blocked: result.blocked, completed: result.completed, retried: result.retried };
+        const status = await dependencies.storage.readFavoriteResolutionCounts();
+        const counts = { blocked: result.blocked, completed: result.completed, retried: result.retried,
+          admissionWaiting: status.admissionWaiting, rateLimited: status.rateLimited,
+          networkErrors: status.networkErrors, actionRequired: status.actionRequired, providerPaused: status.providerPaused };
         await recordDiagnostic({ counts, outcome: result.retried > 0 || result.blocked > 0 || result.continuationRequired ? 'retryable' : 'complete', runId, stage: 'resolution' });
         if (inventoryFailure !== undefined) throw inventoryFailure;
         if (!inventoryComplete || result.continuationRequired || refresh?.continuationRequired === true) return dependencies.now();
@@ -178,13 +183,14 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           pass += 1;
         } while (inventoryQueued && pass < 2);
         await dependencies.updateContinuation?.(continuationAt);
-        await recordDiagnostic({ outcome: continuationAt === undefined ? 'complete' : 'retryable', runId, stage: 'run' });
+        await recordDiagnostic({ nextAttemptAt: continuationAt, outcome: continuationAt === undefined ? 'complete' : 'retryable', runId, stage: 'run' });
       } catch (error) {
         await dependencies.updateContinuation?.(dependencies.now()).catch(() => undefined);
         await recordDiagnostic({ errorCode: diagnosticFailureCode, outcome: 'failed', runId, stage: 'run' });
         throw error;
       }
     })().finally(() => {
+      dependencies.publicDiscovery?.setDeadline?.(Infinity);
       active = undefined;
       if (inventoryQueued) queueMicrotask(() => { void reconcileFavorites(true).catch(() => undefined); });
     });

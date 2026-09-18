@@ -12,6 +12,7 @@ const dayMilliseconds = 86_400_000;
 const checkpointSchema = z.strictObject({
   afterSourceId: z.string().regex(/^source_[a-z0-9][a-z0-9_-]{5,}$/u).optional(),
   nextCycleAt: z.iso.datetime({ offset: false }).optional(),
+  retryRequired: z.boolean().optional(),
   version: z.literal(1),
 });
 type Checkpoint = z.output<typeof checkpointSchema>;
@@ -95,12 +96,19 @@ export function createPublicDiscoveryRefreshRuntime(dependencies: {
     for (const [index, source] of selected.entries()) {
       const artifact = artifacts[index]?.artifact;
       const work = works[index];
-      if (artifact?.identityKey === undefined || work === undefined || source.matchedWorkId !== work.id) continue;
-      const key = await favoriteIdentityKey(artifact);
+      if (artifact === undefined || work === undefined || source.matchedWorkId !== work.id) continue;
+      if (artifact.identityKey === undefined && work.hydration?.publicDiscovery === undefined) continue;
+      const key = work.hydration?.publicDiscovery === undefined ? await favoriteIdentityKey(artifact) : {
+        fingerprint: work.hydration.publicDiscovery.fingerprint,
+        mediaKind: work.hydration.publicDiscovery.mediaKind,
+        parserVersion: work.hydration.publicDiscovery.parserVersion,
+        siteRulesVersion: work.hydration.publicDiscovery.siteRulesVersion,
+      };
       entries.set(keyId(key), { key, work });
     }
     let refreshed = 0;
     let updated = 0;
+    let failed = checkpoint.retryRequired === true;
     if (entries.size > 0) {
       const results = await dependencies.client.lookup([...entries.values()].map(({ key }) => key));
       for (const { key, state } of results) {
@@ -113,16 +121,16 @@ export function createPublicDiscoveryRefreshRuntime(dependencies: {
           updated += 1;
         }
         if (state.nextRefreshAt !== undefined && refreshed < publicDiscoveryRefreshWakeLimit && publicDiscoveryRefreshDue(key, state.nextRefreshAt, now)) {
-          await dependencies.client.requestRefresh(key);
-          refreshed += 1;
+          try { await dependencies.client.requestRefresh(key); refreshed += 1; }
+          catch { failed = true; }
         }
       }
     }
     const continuationRequired = sources.length === publicDiscoveryLookupBatchLimit;
     const nextCheckpoint: Checkpoint = continuationRequired
-      ? { afterSourceId: sources.at(-1)?.id, version: 1 }
-      : { nextCycleAt: new Date(Date.parse(now) + dayMilliseconds).toISOString(), version: 1 };
+      ? { afterSourceId: sources.at(-1)?.id, retryRequired: failed, version: 1 }
+      : { nextCycleAt: new Date(Date.parse(now) + (failed ? 60_000 : dayMilliseconds)).toISOString(), version: 1 };
     await dependencies.checkpointStorage.set({ [publicDiscoveryRefreshCheckpointKey]: nextCheckpoint });
-    return { continuationRequired, inspected: sources.length, refreshed, updated };
+    return { continuationRequired: continuationRequired || failed, inspected: sources.length, refreshed, updated };
   };
 }

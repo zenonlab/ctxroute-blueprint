@@ -16,6 +16,15 @@ const claims: PublicDiscoveryClaimBatch = {
 };
 
 describe('runPublicDiscoveryBatch', () => {
+  it('publishes the first verified result before resolving the next request', async () => {
+    const order: string[] = [];
+    await runPublicDiscoveryBatch({
+      gateway: { claim: async () => ({ ...claims, requests: [...claims.requests, { ...claims.requests[0]!, key: { ...key, fingerprint: 'd'.repeat(64) } }] }), publish: async () => { order.push('published'); return { published: 1, replayed: 0 }; } },
+      limit: 20, nonce: () => crypto.randomUUID(), now: () => '2026-09-18T12:00:00.000Z',
+      resolver: { resolve: async () => { order.push('resolved'); return { state: 'NOT_FOUND', reason: 'synthetic-no-match' }; } },
+    });
+    expect(order).toEqual(['resolved', 'published', 'resolved', 'published']);
+  });
   it('closes the portable contract over every configured provider family', () => {
     expect(publicDiscoveryProviderSchema.options).toEqual(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']);
   });

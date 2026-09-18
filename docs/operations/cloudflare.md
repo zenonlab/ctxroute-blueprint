@@ -6,6 +6,44 @@ remain independent of this operational path.
 
 ## Inspect
 
+### Candidat de récupération des favoris du 18 septembre 2026
+
+Le correctif local conserve les routes v3, le schéma D1, les secrets et les
+quotas existants. Ressources concernées par une promotion future : Worker
+`tobirink-public-api`, D1 `tobirink-public`, Queue `tobirink-public-discovery`
+et sa DLQ `tobirink-public-discovery-dlq`. Aucun changement de gateway n’est
+prévu. L’admission reste limitée à 10/minute, le claim à 20 et la concurrence
+Queue à 1; les continuations attendent 1–900 secondes et les appels extension
+15 secondes maximum. Une admission répétée ne réarme jamais `FAILED`.
+
+Après approbation distincte, réinspecter via la gate le déploiement actif et
+matérialiser un plan frais limité au Worker. La version historique de repli
+compatible connue est `2e2e534b-7816-445c-992a-1576a7087ccd`; elle doit être
+reconfirmée avant toute promotion. Aucun rollback de données ni migration
+destructive n’accompagne le retour au code précédent.
+
+Canary proposé : deux demandes synthétiques seulement, une par titre et une
+par référence exacte, plafond de 100 écritures D1 chacune et arrêt à la première
+résolution sans preuve, au premier conflit ou à la première boucle de reprises.
+Conserver les seuils journaliers 20 000/50 000 documentés ci-dessous. Mesurer
+séparément admission < 500 ms et lecture D1 < 300 ms hors démarrage à froid;
+le délai fournisseur reste observé, sans promesse immédiate. Inspecter les
+tentatives, échéances, Queue/DLQ et résultats vérifiés avant l’extension.
+
+Les ZIP locaux `1.0.36` servent uniquement aux tests et ne doivent pas écraser
+une release immuable. Une publication nécessite une nouvelle version approuvée,
+deux archives installées vérifiées et un pointeur publié cohérent. La preuve
+finale sur les favoris personnels reste à produire après cette promotion,
+avec seulement des compteurs agrégés avant/après.
+
+Incident de validation locale : le premier harness Firefox utilisant seulement
+Playwright `setOffline` a observé des états publics `PENDING`; des demandes
+synthétiques ont donc pu atteindre le service. Ces profils sont fermés et
+aucune donnée personnelle n’a été utilisée. Le harness corrigé impose un proxy
+local fermé et vérifie le blocage avant création du corpus. Aucun nettoyage
+serveur automatique n’est autorisé; une éventuelle inspection et remédiation
+doit conserver les données et suivre la gate opérationnelle.
+
 ```sh
 npm run infra:inspect -- --account <cloudflare-account-id>
 ```

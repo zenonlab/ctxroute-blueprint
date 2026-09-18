@@ -45,7 +45,7 @@ interface AgendaProcessingReceipt {
   readonly revision: string;
 }
 
-type DiscoveryProcessingReport = PublicDiscoveryBatchReport & { readonly metrics?: CollectorCostMetrics };
+type DiscoveryProcessingReport = PublicDiscoveryBatchReport & { readonly metrics?: CollectorCostMetrics; readonly continuationScheduled?: boolean };
 interface CollectorCostMetrics extends D1MetricTotals {
   readonly acceptedResults: number;
   readonly pagesRequested: number;
@@ -193,8 +193,13 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     },
   });
   acceptedResults = report.published;
+  const nextPendingAt = await port.nextPendingAt();
+  if (nextPendingAt !== undefined) {
+    const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(nextPendingAt) - Date.now()) / 1_000)));
+    await bindings.PUBLIC_DISCOVERY_QUEUE.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json', delaySeconds });
+  }
   const result = report.replayed > 0 && report.published === 0 ? 'deduplicated' : report.published > 0 ? 'changed' : 'unchanged';
-  return { ...report, metrics: collectorCost(d1.snapshot(), providers.snapshot(), report.published, result) };
+  return { ...report, continuationScheduled: nextPendingAt !== undefined, metrics: collectorCost(d1.snapshot(), providers.snapshot(), report.published, result) };
   } catch (error) {
     throw new PublicDiscoveryProcessingError(error instanceof Error ? error : undefined, collectorCost(d1.snapshot(), providers.snapshot(), acceptedResults, 'failed'));
   }
@@ -302,7 +307,7 @@ export async function handleNativeCollectorQueue(
   const startedAt = Date.now();
   try {
     const report = await processors.discovery();
-    if (report.failed > 0) {
+    if (report.failed > 0 && report.continuationScheduled !== true) {
       const retryDelaySeconds = 15 * 60;
       emitNativeCollectorDiagnostic({
         attempt: Math.max(1, leader.attempts), code: 'public-discovery-partial',

@@ -74,13 +74,19 @@ ou `saturated`. Seule la transition `created` émet le signal Queue opaque;
 un POST concurrent ou répété classé `existing` n’ajoute aucun message. Un petit
 outbox D1 passe par `UNSENT`, `SENDING` et `SENT` : si l’émission initiale
 échoue, la ligne `PENDING` revient à `UNSENT` et un POST identique peut reprendre
-l’unique envoi non confirmé. L’extension ne reçoit aucun bail, ne propose aucun
+l’envoi non confirmé. Une soumission identique peut aussi réparer un signal
+`SENT` ancien ou un bail expiré, sans voler un bail actif ni remettre les
+tentatives à zéro. Cette réparation concerne également les refreshs existants.
+L’extension ne reçoit aucun bail, ne propose aucun
 identifiant et n’appelle aucun fournisseur. Une seconde soumission de la même
 clé doit porter le même digest de requête; un contenu différent est refusé au
 lieu d’écraser le travail existant.
 
 Le consumer reçoit jusqu’à vingt signaux à la fois mais exécute un seul
-`claim(20)` par lot; les signaux redondants sont acquittés. Le claim ordonne
+`claim(20)` par lot; chaque résultat vérifié est publié dès sa disponibilité.
+Après le lot, une lecture des demandes restantes conserve une continuation
+Queue retardée de 1 à 900 secondes, même après un claim vide. L’échec de cet
+envoi conserve le signal entrant par retry. Le claim ordonne
 les demandes par référence fournisseur exacte, média précis, puis recherche
 ambiguë, avant l’ancienneté et l’empreinte.
 
@@ -110,9 +116,19 @@ interdites.
 
 Une huitième tentative dont le bail expire passe en état D1 interne `FAILED` et
 la lecture publique renvoie `UNAVAILABLE`. Aucun polling de l’extension ne
-réarme cette demande. Un nouveau POST explicite, portant exactement le même
-digest, remet la ligne à `PENDING` avec un compteur réinitialisé; tout contenu
-différent reste un conflit.
+réarme cette demande. Le POST d’admission ordinaire conserve aussi cet état et
+ses tentatives : une resoumission de transport ne constitue pas une autorisation
+de réinitialisation. Une intervention opérationnelle distincte est nécessaire.
+
+Le client conserve dans `storage.local` une cadence commune aux admissions et
+refreshs, avec au moins 6,5 secondes entre deux réservations. La limite serveur
+reste 10/minute. Un `429` expose `Retry-After`, conservé après redémarrage.
+Une échéance PENDING durable empêche qu’une lecture repousse indéfiniment sa
+resoumission. Chaque HTTP expire après 15 secondes, corps compris, et ne commence
+que si le budget de réveil restant le permet. Attente serveur, admission, quota,
+réseau, timeout, indisponibilité, conflit et réponse invalide restent distincts.
+Les attentes et indisponibilités transitoires ne consomment pas de tentative
+locale; les erreurs de contrat restent actionnables et bornées.
 
 Chaque écriture du catalogue et l’écriture terminale sont conditionnées dans le
 même batch D1 par le bail non expiré, son token, le digest de demande et

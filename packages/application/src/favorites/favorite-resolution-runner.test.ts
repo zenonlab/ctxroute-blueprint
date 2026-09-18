@@ -8,6 +8,7 @@ import { reconcileFavoriteSourcePresence } from '../use-cases/reconcile-favorite
 import { repairMissingFavoriteCovers, runFavoriteResolutionSlice } from './favorite-resolution-runner';
 import { favoriteCandidateWorkId, persistFavoriteResolutionCompletion } from './favorite-resolution-commit';
 import { FavoriteProviderRetryError } from './provider-ports';
+import { PublicDiscoveryError } from '../public-discovery';
 import type { FavoriteProviderSearchQuery } from './provider-ports';
 import type { FavoriteIdentityKey } from './favorite-identity-lookup';
 import { bundledFavoriteSiteRules, createFavoriteSiteAdapters } from './site-rules';
@@ -46,15 +47,46 @@ class MemoryOutbox implements FavoriteResolutionOutboxPort {
   retry(id: string, token: string, retryAt: string) { return this.change(id, (task) => retryTask(task, token, retryAt)); }
 }
 
-async function fixture() {
+async function fixture(input = favorite, adapters: Parameters<typeof importFavoriteSources>[3] = []) {
   const storage = new MemoryStoragePort();
-  await importFavoriteSources([favorite], storage, now);
+  await importFavoriteSources([input], storage, now, adapters);
   const task = (await storage.getFavoriteResolutionTask('favorite-resolution_c_72756e6e6572'));
   if (task === undefined) throw new Error('Expected resolution task.');
   return { outbox: new MemoryOutbox(storage, task.id), storage, task };
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('reuses a canonical public work for an exact provider URL without a slug', async () => {
+    const { storage, outbox } = await fixture({ ...favorite, url: 'https://anilist.co/anime/154587', title: 'Local bookmark' }, [{
+      id: 'exact-test', origins: ['https://anilist.co'], analyze: (source, url) => createSourceEvidence({
+        aliases: [], diagnostics: [], key: source.sourceKey, mediaKind: 'ANIME', origin: url.origin, path: url.pathname,
+        proofs: ['CATEGORY_PATH'], sourceAdapter: 'exact-test', strategy: 'exact-origin', explicitProviderReference: { provider: 'anilist', externalId: '154587' },
+      }),
+    }]);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('anilist:154587'));
+    const id = workId(`work_${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('').slice(0, 48)}`);
+    await storage.putWork(createWork({ id, externalReferences: [{ provider: 'anilist', externalId: '154587' }], preferredTitle: 'Frieren', mediaKind: 'anime', hydration: {
+      candidate, hydratedAt: now, matcherVersion: 'favorite-matcher-v4', favoriteAliasKeys: [], providerTitleKeys: ['frieren'],
+    } }));
+    const resolveOrRequest = vi.fn(async () => { throw new Error('No network'); });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source && (await storage.getFavoriteParseArtifact(source.id))?.artifact.sourceEvidence.explicitProviderReference).toEqual({ provider: 'anilist', externalId: '154587' });
+    const getWork = vi.spyOn(storage, 'getWork');
+    const result = await runFavoriteResolutionSlice({ storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration), libraryId: libraryId('library_primary'), now: () => now, token: () => 'exact', publicDiscovery: { resolveOrRequest } });
+    expect(getWork).toHaveBeenCalledWith(id);
+    expect(result).toMatchObject({ completed: 1, retried: 0 });
+    expect(resolveOrRequest).not.toHaveBeenCalled();
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.matchedWorkId).toBe(id);
+  });
+  it.each(['RATE_LIMITED', 'ADMISSION_WAIT', 'TIMEOUT', 'NETWORK'] as const)('preserves attempts during %s', async (code) => {
+    const { storage, outbox, task } = await fixture();
+    await storage.putFavoriteResolutionTask({ ...task, attempt: 7 });
+    await runFavoriteResolutionSlice({ storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration), libraryId: libraryId('library_primary'), now: () => now, token: () => 'wait', publicDiscovery: {
+      resolveOrRequest: async () => { throw new PublicDiscoveryError(code, undefined, '2026-09-07T12:05:00.000Z'); },
+    } });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ attempt: 7, state: 'RETRY_AT', availableAt: '2026-09-07T12:05:00.000Z' });
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RETRYABLE', reason: code });
+  });
   it('resolves a stale verified local identity while D1 and providers are unavailable', async () => {
     const { storage, outbox } = await fixture();
     const id = favoriteCandidateWorkId(candidate);
@@ -149,7 +181,7 @@ describe('runFavoriteResolutionSlice', () => {
     });
     expect(result).toMatchObject({ blocked: 0, completed: 0, retried: 1 });
     expect(search).not.toHaveBeenCalled();
-    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ attempt: 0, availableAt: '2026-09-07T12:05:00.000Z', state: 'RETRY_AT' });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ attempt: 7, availableAt: '2026-09-07T12:05:00.000Z', state: 'RETRY_AT' });
     expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'PUBLIC_DISCOVERY_PENDING' });
   });
 

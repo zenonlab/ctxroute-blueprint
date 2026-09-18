@@ -619,7 +619,7 @@ describe('verified public discovery cache', () => {
     expect(await env.PUBLIC_DB.prepare('SELECT work_id AS workId FROM catalogue_external_references WHERE provider = ?1 AND external_id = ?2').bind('anilist', 'shared-id').first()).toEqual({ workId: 'work_existing' });
   });
 
-  it('exposes the expired eighth attempt as unavailable and requires an identical explicit retry', async () => {
+  it('exposes the expired eighth attempt as unavailable and never rearms it through admission', async () => {
     const key = discoveryKey('5');
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const submission = { key, query: { discoveryTitles: ['Attempt Limit'], mediaKind: 'ANIME' as const, sourceTitles: ['Attempt Limit'] }, schemaVersion: 3 as const };
@@ -642,14 +642,14 @@ describe('verified public discovery cache', () => {
       body: JSON.stringify(submission), headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect(retry.status).toBe(202);
-    await expect(retry.json()).resolves.toMatchObject({ state: 'PENDING' });
-    expect(await env.PUBLIC_DB.prepare('SELECT attempt_count AS attemptCount, state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ attemptCount: 0, state: 'PENDING' });
+    await expect(retry.json()).resolves.toMatchObject({ state: 'UNAVAILABLE' });
+    expect(await env.PUBLIC_DB.prepare('SELECT attempt_count AS attemptCount, state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ attemptCount: 8, state: 'FAILED' });
     const reclaimedAt = new Date().toISOString();
     const reclaimed = await adapter.claimBatch({
       claimToken: 'r'.repeat(48), leaseUntil: new Date(Date.parse(reclaimedAt) + 15 * 60_000).toISOString(),
       limit: 50, now: reclaimedAt, tokenDigest: 'f'.repeat(64),
     });
-    expect(reclaimed.requests.find((item) => item.key.fingerprint === key.fingerprint)?.attempt).toBe(1);
+    expect(reclaimed.requests.find((item) => item.key.fingerprint === key.fingerprint)).toBeUndefined();
   });
 
   it('does not expose retired collective and unverified-cache endpoints', async () => {

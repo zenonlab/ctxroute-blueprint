@@ -1,4 +1,4 @@
-/* global browser, indexedDB */
+/* global browser, indexedDB, fetch, AbortSignal */
 
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
@@ -67,10 +67,17 @@ const uuid = randomUUID();
 await writeFile(join(profile, 'user.js'), `user_pref("marionette.port", ${port});\n`, { flag: 'wx' });
 const context = await firefox.launchPersistentContext(profile, { args: ['--marionette', '--remote-allow-system-access'], executablePath, headless: true, firefoxUserPrefs: {
   'marionette.port': port,
+  'network.proxy.type': 1,
+  'network.proxy.http': '127.0.0.1',
+  'network.proxy.http_port': 9,
+  'network.proxy.ssl': '127.0.0.1',
+  'network.proxy.ssl_port': 9,
+  'network.proxy.no_proxies_on': 'localhost, 127.0.0.1',
   'extensions.webextensions.uuids': JSON.stringify({ 'tobirink@tobirink.local': uuid }),
 } });
 let automation;
 try {
+  await context.setOffline(true);
   process.stdout.write(`Firefox ${context.browser().version()}, archive SHA-256 ${createHash('sha256').update(bytes).digest('hex')}\n`);
   for (let attempt = 0; attempt < 25; attempt += 1) {
     try {
@@ -95,6 +102,15 @@ try {
   };
   const health = await extensionPage.evaluate(() => browser.runtime.sendMessage({ type: 'health.check', version: 1 }));
   assert.equal(health.ok, true);
+  const networkBlocked = await extensionPage.evaluate(async () => {
+    try { await fetch('https://tobirink.com/health', { signal: AbortSignal.timeout(3000) }); return false; }
+    catch { return true; }
+  });
+  assert.equal(networkBlocked, true, 'External network must be blocked before seeding bookmarks.');
+  const builtinCount = await extensionPage.evaluate(async () => {
+    const count = (nodes) => nodes.reduce((total, node) => total + (node.url ? 1 : 0) + count(node.children ?? []), 0);
+    return count(await browser.bookmarks.getTree());
+  });
   await extensionPage.evaluate(() => browser.runtime.sendMessage({ sort: 'TITLE_ASC', type: 'library.catalogue.read', version: 1 }));
   const agendaFixture = installedAgendaFixture();
   await extensionPage.evaluate((fixture) => new Promise((resolve, reject) => {
@@ -149,6 +165,32 @@ try {
     };
   }));
   assert.equal(count, 0);
+  await automation.command('WebDriver:SetTimeouts', { pageLoad: 15000, script: 60000 });
+  await extensionPage.evaluate(async () => {
+    for (let index = 0; index < 1400; index += 1) {
+      await browser.bookmarks.create({ title: `Synthetic corpus ${index}`, url: `https://reader.invalid/manga/synthetic-corpus-${index}/42` });
+    }
+    for (let index = 0; index < 131; index += 1) {
+      await browser.bookmarks.create({ title: `Synthetic utility ${index}`, url: `https://reader.invalid/search/synthetic-${index}` });
+    }
+  });
+  await extensionPage.evaluate(() => browser.runtime.sendMessage({ type: 'favorite.reconcile', version: 1 }));
+  let status;
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    status = await extensionPage.evaluate(() => browser.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }));
+    if (status.ok && status.counts.observed === 1532 + builtinCount && status.counts.processing === 0 && status.inventory.status === 'complete') break;
+    await extensionPage.evaluate(() => browser.runtime.sendMessage({ type: 'favorite.reconcile', version: 1 }));
+    await wait(250);
+  }
+  assert.equal(status?.ok, true);
+  assert.equal(status.counts.observed, 1532 + builtinCount);
+  assert.ok(status.counts.unsupported >= 132);
+  assert.ok(status.counts.retryable >= 1400);
+  assert.equal(status.counts.retryable + status.counts.unsupported, 1532 + builtinCount);
+  assert.equal(status.counts.resolved, 0);
+  assert.equal(status.counts.blocked, 0);
+  assert.equal(status.counts.publicDiscoveryPending ?? 0, 0);
+  process.stdout.write(`Installed Firefox offline corpus: ${JSON.stringify(status.counts)}\n`);
   process.stdout.write('Installed Firefox: health, anime INSTANT and manga DATE Agenda reconstruction, ordinary bookmark exclusion, empty queue and zero imported Review passed.\n');
 } finally {
   automation?.close();

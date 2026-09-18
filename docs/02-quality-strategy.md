@@ -249,6 +249,49 @@ Ces motifs ne constituent ni des rejets mesurés ni un taux de réussite.
 Les états IndexedDB et références fournisseur installés ne sont pas encore
 certifiés; aucun titre, URL, dossier ou identifiant privé n’est conservé ici.
 
+Le harness opt-in `TOBIRINK_LOCAL_BOOKMARK_AUDIT=1 npm run test:parser-equivalence`
+compare la référence `835bf80` à l’extraction courante sans exporter les entrées.
+Sur ces 1 562 liens : requêtes exploitables 1 094 → 1 298; identité URL non
+résolue 422 → 218; racines 33 et utilitaires 6 inchangés; 7 titres bruts vides
+refusés par le harness. Les 204 requêtes supplémentaires ne sont pas des
+identités vérifiées. L’import réel normalise les titres vides avant parsing.
+
+Le corpus `recovery-corpus.test.ts` contient exactement 1 532 favoris,
+dont 1 400 manga/anime et 132 pages utilitaires. Import, runner, matcher et
+collecteur réels emploient un stockage et des fournisseurs simulés : aucune
+résolution avant publication, puis les 1 400 identités attendues, sans tâche
+oubliée. Les tests workerd/D1 distincts couvrent le backlog de 25, les signaux
+perdus, les baux actifs/expirés et FAILED non réarmé. Les tests HTTP couvrent
+429/503/409, JSON invalide, timeout à 15 secondes et cadence après redémarrage.
+Les tests du runner conservent les tentatives pendant une attente transitoire
+et réutilisent les fiches vérifiées anciennes sans fournisseur MV3.
+
+Les archives installées sont testées dans des profils temporaires avec les
+1 400 vrais candidats média, jamais remplacés par des exclusions ordinaires.
+Le parcours hors ligne doit donner zéro résolution inventée et zéro blocage.
+Firefox conserve aussi ses quatre favoris de distribution, comptés séparément.
+Les réveils sont explicitement demandés pour borner le temps du test de charge;
+les alarmes sont couvertes séparément. Ce test ne certifie pas une suspension
+réelle à chaque instruction transactionnelle ni la bibliothèque personnelle.
+Le premier essai Firefox a montré que `setOffline` seul n’isole pas le réseau
+de l’extension : des demandes synthétiques ont pu atteindre l’API. Le harness
+ajoute un proxy local fermé et exige l’échec réseau avant de créer le corpus.
+
+Archives candidates reproductibles (deux builds identiques), validées installées
+le 18 septembre : Chromium 153.0.8010.12 et Firefox 155.0. Chrome observe
+1 532 favoris, 1 400 reprises et 132 exclusions; Firefox observe les mêmes
+1 532 fixtures plus ses quatre favoris initiaux. Aucun résultat résolu ni
+blocage dans ces parcours sans réseau. Version locale de test : `1.0.36`.
+
+| Archive | Octets | SHA-256 |
+| --- | ---: | --- |
+| Chrome | 297360 | `7a3e5864a1569fcafede6bbbf81b75fcc8db8e28c29c08e64ca76f01cc8da289` |
+| Firefox | 297400 | `7dd5132b780707885b162f1a575ecd086548fce9f6ad198ab6d40f030effb373` |
+
+Les budgets opérationnels séparent admission API < 500 ms et lecture D1
+< 300 ms, hors démarrage à froid. Une mesure workerd locale ne certifie pas
+ces latences en production ni le délai de résolution fournisseur.
+
 The [v3 plan](systems/favorite-resolution-correction-plan.md) adds zero Review
 at import, NOT_FOUND actionability, human-only no-match, indexed SQL, MV3
 checkpoints, additive migrations and installed Chromium/Firefox evidence. Le

@@ -4,7 +4,7 @@ import type { ExtensionDiagnosticEvent } from '../../../runtime/extension-diagno
 
 export interface ResolutionStatusProps {
   controller?: { paused: boolean; state: 'idle' | 'inventory' | 'presence' | 'resolving' | 'waiting-provider' | 'blocked' | 'paused' | 'complete' } | undefined;
-  counts?: { observed: number; processing: number; resolved: number; review: number; retryable: number; blocked: number; unsupported: number; internalErrors?: number; publicDiscoveryPending?: number } | undefined;
+  counts?: { observed: number; processing: number; resolved: number; review: number; retryable: number; blocked: number; unsupported: number; internalErrors?: number; publicDiscoveryPending?: number; admissionWaiting?: number; rateLimited?: number; networkErrors?: number; actionRequired?: number; providerPaused?: number } | undefined;
   diagnostics?: { enabled: boolean; events: readonly ExtensionDiagnosticEvent[] } | undefined;
   inventory?: { continuationAt?: string; startedAt?: string; status: 'not-started' | 'inventory' | 'presence' | 'complete' } | undefined;
   state: 'loading' | 'running' | 'ready' | 'error';
@@ -77,6 +77,11 @@ export function ResolutionStatus({ controller, counts, diagnostics, inventory, o
         {counts.blocked ? <><dt>Bloquées après huit tentatives</dt><dd>{counts.blocked}</dd></> : null}
         {counts.internalErrors ? <><dt>Dont erreurs internes</dt><dd>{counts.internalErrors}</dd></> : null}
         {counts.publicDiscoveryPending ? <><dt>Dont attente du cache public</dt><dd>{counts.publicDiscoveryPending}</dd></> : null}
+        {counts.admissionWaiting ? <><dt>En attente d’admission</dt><dd>{counts.admissionWaiting}</dd></> : null}
+        {counts.rateLimited ? <><dt>Limitation temporaire du service</dt><dd>{counts.rateLimited}</dd></> : null}
+        {counts.networkErrors ? <><dt>Réseau indisponible, reprise programmée</dt><dd>{counts.networkErrors}</dd></> : null}
+        {counts.providerPaused ? <><dt>Traitement fournisseur indisponible</dt><dd>{counts.providerPaused}</dd></> : null}
+        {counts.actionRequired ? <><dt>Erreur de réponse nécessitant une action</dt><dd>{counts.actionRequired}</dd></> : null}
         <dt>Liens non pris en charge</dt><dd>{counts.unsupported}</dd>
       </dl> : null}
       {counts?.unsupported ? <p>« Liens non pris en charge » ne signifie pas que les liens sont invalides : leur identité peut manquer, leur source être absente ou leur contenu être hors périmètre.</p> : null}

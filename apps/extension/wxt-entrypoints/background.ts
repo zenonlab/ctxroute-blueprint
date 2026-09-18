@@ -88,7 +88,7 @@ export default defineBackground({
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const resolutionPaused = () => readFavoriteResolutionPaused(browser.storage.local);
     const privateRecovery = new DexiePrivateRecoveryStore(privateStorage.storage.database);
-    const publicDiscovery = new HttpPublicDiscoveryAdapter(configuredSiteOrigin);
+    const publicDiscovery = new HttpPublicDiscoveryAdapter(configuredSiteOrigin, undefined, browser.storage.local);
     const refreshPublicDiscovery = createPublicDiscoveryRefreshRuntime({ checkpointStorage: browser.storage.local, client: publicDiscovery, now, storage: privateStorage.storage });
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, publicDiscovery, releaseAgenda, readShowAdultContent);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);

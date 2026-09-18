@@ -178,7 +178,7 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     && /\p{L}{2}/u.test(stableSlug) && !hasUnverifiedRoutingPrefix;
   if (!categoryRoute && !rootReleaseRoute && !boundedNumericReleaseRoute && !corroboratedUnknownRoute) {
     const segments = segmentFavoriteTitle(input.title, new URL(url.origin).hostname).segments.filter(segment => !segment.excluded);
-    if (release === undefined && segments.length === 1 && /\p{L}{2}/u.test(segments[0]?.cleaned ?? '')) {
+    if (release === undefined && input.title.trim() !== input.url && !/^https?:\/\//iu.test(input.title.trim()) && segments.length === 1 && /\p{L}{2}/u.test(segments[0]?.cleaned ?? '')) {
       const title = segments[0]?.cleaned ?? '';
       return createSourceEvidence({ ...common(input, url), aliases: [{ provenance: 'aligned-bookmark-segment', value: title }], diagnostics: [], mediaKind: 'UNKNOWN', proofs: [], sourceAdapter: 'generic-bookmark-query-v1', strategy: 'generic', title });
     }

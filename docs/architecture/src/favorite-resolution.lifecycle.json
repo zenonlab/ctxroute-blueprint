@@ -8,7 +8,7 @@
     "viewBox": [1080, 790],
     "views": [
       { "id": "first-install", "label": "Première installation", "focus": ["observed", "inventory", "resolving", "projecting", "complete"], "note": "Les alarmes reprennent chaque lot sans clic manuel; l’alignement titre/slug v4 rend les identités locales visibles avant l’hydratation." },
-      { "id": "automatic-recovery", "label": "Reprise automatique", "focus": ["inventory", "scheduled", "resolving"], "note": "Le checkpoint persiste avant chaque suspension MV3; les clés sont lues par 50 et les pages terminées ne sont pas rescannées." },
+      { "id": "automatic-recovery", "label": "Reprise automatique", "focus": ["inventory", "scheduled", "resolving"], "note": "Cadence et échéance PENDING persistent après suspension; la récupération v3 réenfile une seule fois les erreurs automatiques." },
       { "id": "stale-refresh", "label": "Fiches échues", "focus": ["complete", "scheduled", "resolving", "projecting"], "note": "Au plus vingt fiches du jour stable sont signalées; la fiche VERIFIED reste lisible jusqu’à une version validée plus récente." },
       { "id": "user-control", "label": "Contrôle utilisateur", "focus": ["resolving", "paused", "userAction"], "note": "Pause et limite de tentatives sont visibles; une reprise explicite conserve les données." }
     ]
@@ -22,7 +22,7 @@
   "states": [
     { "id": "observed", "type": "start", "label": "Favoris observés", "sublabel": "autorité navigateur", "lane": "main", "col": 0, "step": "01" },
     { "id": "inventory", "type": "active", "label": "Inventaire", "sublabel": "pages atomiques", "lane": "main", "col": 1, "step": "02" },
-    { "id": "resolving", "type": "active", "label": "Résolution", "sublabel": "D1 par lots de 50", "lane": "main", "col": 2, "step": "03" },
+    { "id": "resolving", "type": "active", "label": "Résolution", "sublabel": "preuve locale puis D1", "lane": "main", "col": 2, "step": "03" },
     { "id": "projecting", "type": "active", "label": "Projection locale", "sublabel": "titre puis métadonnées", "lane": "main", "col": 3, "step": "04" },
     { "id": "complete", "type": "success", "label": "À jour", "sublabel": "aucune tâche due", "lane": "main", "col": 4, "step": "05" },
     { "id": "scheduled", "type": "waiting", "label": "Reprise planifiée", "sublabel": "alarme ponctuelle", "lane": "waiting", "col": 0, "tag": "checkpoint actif" },
@@ -37,8 +37,8 @@
     { "id": "scheduled-resolve", "from": "scheduled", "to": "resolving", "label": "alarme ou retryAt", "variant": "security", "route": "straight", "fromSide": "top", "toSide": "bottom" }
   ],
   "cards": [
-    { "dot": "cyan", "title": "État visible", "items": ["Un titre corroborant le slug reste candidat sur une route inconnue", "Attente du cache et erreur locale restent distinguées", "Un lien exclu ne signifie pas une URL invalide"] },
-    { "dot": "amber", "title": "Bornes", "items": ["Cache D1 par lots de 50; 500 favoris donnent dix lectures", "Vingt réhydratations au plus par réveil, étalées sur sept jours", "Huit échecs automatiques avant intervention explicite"] },
+    { "dot": "cyan", "title": "État visible", "items": ["Titre et segments URL proposent une requête, jamais une preuve", "Admission, serveur, quota, réseau et action restent distingués", "Les diagnostics locaux ne conservent que compteurs et échéance"] },
+    { "dot": "amber", "title": "Bornes", "items": ["HTTP limité à 15 secondes dans le budget du réveil", "Cadence durable de 6,5 secondes; Retry-After conservé", "FAILED serveur reste terminal sans réinitialisation automatique"] },
     { "dot": "emerald", "title": "Conservation", "items": ["Pause panne et suspension ne suppriment aucune donnée privée", "Une réponse sans changement ne réécrit pas IndexedDB", "La projection et la fiche VERIFIED restent lisibles pendant l’hydratation"] }
   ]
 }

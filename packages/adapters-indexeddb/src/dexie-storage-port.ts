@@ -64,6 +64,12 @@ export class DexieStoragePort implements StoragePort {
           const result: Awaited<ReturnType<StoragePort['readFavoriteResolutionCounts']>> = { observed, processing: Math.max(0, observed - counts.reduce((sum, count) => sum + count, 0)), resolved: counts[0] ?? 0, review: counts[1] ?? 0, retryable: Math.max(0, (counts[2] ?? 0) - blocked), blocked, unsupported: counts[3] ?? 0 };
           if (internalErrors) result.internalErrors = internalErrors;
           if (publicDiscoveryPending) result.publicDiscoveryPending = publicDiscoveryPending;
+          const groups = { admissionWaiting: ['ADMISSION_WAIT'], rateLimited: ['RATE_LIMITED'], networkErrors: ['NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE'], actionRequired: ['CONTRACT_CONFLICT', 'INVALID_RESPONSE'], providerPaused: ['PROVIDER_UNAVAILABLE'] } as const;
+          for (const key of ['admissionWaiting', 'rateLimited', 'networkErrors', 'actionRequired', 'providerPaused'] as const) {
+            const reasons: readonly string[] = groups[key];
+            const count = await table.where(['presence', 'resolution.kind']).equals(['observed', 'RETRYABLE']).filter(source => source.resolution?.kind === 'RETRYABLE' && reasons.includes(source.resolution.reason)).count();
+            if (count > 0) result[key] = count;
+          }
           return result;
         });
       },

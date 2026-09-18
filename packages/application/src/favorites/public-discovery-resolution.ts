@@ -10,6 +10,7 @@ function cleanedTitles(artifact: FavoriteParseArtifact): readonly string[] {
     .filter((title): title is string => title !== undefined);
   const unique = new Map<string, string>();
   for (const title of titles) {
+    if (/^https?:\/\//iu.test(title.trim())) continue;
     const normalized = normalizeFavoriteTitle(title).normalized;
     if (normalized.length > 0 && !unique.has(normalized)) unique.set(normalized, title);
   }

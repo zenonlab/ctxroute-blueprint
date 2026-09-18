@@ -1,5 +1,5 @@
 import { createFavoriteSource, createProviderCandidate, createWork, workId } from '@tobirink/domain';
-import type { FavoriteParseArtifact, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
+import type { FavoriteParseArtifact, FavoriteResolutionResult, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
 import { favoriteIdentityKey, favoriteManualIdentityKey, favoritePublicReferenceSchema, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
 import type { FavoriteIdentityLookupPort } from './favorite-identity-lookup';
@@ -17,6 +17,7 @@ import { createFavoriteSearchCheckpointPort, providerCandidateSchema, searchFavo
 import type { FavoriteSearchCheckpointPort } from './provider-search-checkpoint';
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, ResolutionProvider } from './provider-ports';
 import type { PublicDiscoveryRequestClientPort } from '../public-discovery';
+import { PublicDiscoveryError } from '../public-discovery';
 import { requestPublicFavoriteDiscovery } from './public-discovery-resolution';
 
 // Cheap local/terminal tasks may drain in one wake; the time budget remains
@@ -75,6 +76,7 @@ export interface FavoriteResolutionRunnerDependencies {
   readonly outbox: FavoriteResolutionOutboxPort;
   readonly storage: StoragePort;
   readonly token: () => string;
+  readonly wakeDeadline?: number;
 }
 
 export interface FavoriteResolutionSliceResult {
@@ -115,7 +117,7 @@ async function retryClaim(
   task: DurableTask,
   token: string,
   retryAt: string,
-  reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' | 'PUBLIC_DISCOVERY_PENDING' = 'PROVIDER_UNAVAILABLE',
+  reason: Extract<FavoriteResolutionResult, { kind: 'RETRYABLE' }>['reason'] = 'PROVIDER_UNAVAILABLE',
 ): Promise<'blocked' | 'retried'> {
   const exhausted = task.attempt >= favoriteResolutionAttemptLimit;
   await dependencies.storage.transaction(['favoriteSources', 'favoriteArtifacts', 'favoriteResolutionTasks'], async (session) => {
@@ -142,6 +144,7 @@ async function deferClaimWithoutAttempt(
   task: DurableTask,
   token: string,
   retryAt: string,
+  reason: Extract<FavoriteResolutionResult, { kind: 'RETRYABLE' }>['reason'] = 'PUBLIC_DISCOVERY_PENDING',
 ): Promise<'retried'> {
   await dependencies.storage.transaction(['favoriteSources', 'favoriteArtifacts', 'favoriteResolutionTasks'], async (session) => {
     const payload = parseFavoriteResolutionTaskPayload(task.payload);
@@ -151,10 +154,10 @@ async function deferClaimWithoutAttempt(
     if (!source || !record || record.artifact.semanticFingerprint !== payload.semanticFingerprint
       || current?.idempotencyKey !== task.idempotencyKey || current.claimToken !== token || current.state !== 'CLAIMED'
       || current.claimExpiresAt === undefined || current.claimExpiresAt <= dependencies.now()) throw new Error('STALE_PRIVATE_REFERENCE');
-    await session.putFavoriteResolutionTask(retryTask({ ...current, attempt: 0 }, token, retryAt));
+    await session.putFavoriteResolutionTask(retryTask({ ...current, attempt: Math.max(0, current.attempt - 1) }, token, retryAt));
     await session.putFavoriteSource(createFavoriteSource({
       ...source,
-      resolution: { kind: 'RETRYABLE', reason: 'PUBLIC_DISCOVERY_PENDING' },
+      resolution: { kind: 'RETRYABLE', reason },
       resolutionVersions: favoriteResolutionVersions(record.artifact),
     }));
   });
@@ -254,10 +257,15 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
           && (artifact.mediaKind === 'UNKNOWN' || artifact.mediaKind === result.mediaKind)) reference = favoritePublicReferenceSchema.parse(result.references[0]);
       } catch { /* Sync is a hint; unavailable hints do not block local proof. */ }
     }
-    const cached = reference === undefined ? undefined : await dependencies.storage.getWork(favoriteCandidateWorkId(reference));
+    let cached = reference === undefined ? undefined : await dependencies.storage.getWork(favoriteCandidateWorkId(reference));
+    if (reference !== undefined && cached === undefined) {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${reference.provider}:${reference.externalId}`));
+      const fingerprint = [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
+      cached = await dependencies.storage.getWork(workId(`work_${fingerprint.slice(0, 48)}`));
+    }
     const exactCandidate = cached?.hydration?.candidate;
     const exact = reference !== undefined && exactCandidate?.provider === reference.provider && exactCandidate.externalId === reference.externalId;
-    const local = reference === undefined ? await readLocalFavoriteIdentity(dependencies.storage, artifact, query) : { kind: 'MISS' as const };
+    const local = explicit === undefined ? await readLocalFavoriteIdentity(dependencies.storage, artifact, query) : { kind: 'MISS' as const };
     const work = exact ? cached : local.kind === 'MATCH' ? local.work : undefined;
     const candidate = work?.hydration?.candidate;
     if (candidate !== undefined && work !== undefined) {
@@ -274,7 +282,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     const identityKey = reference === undefined ? await favoriteIdentityKey(artifact) : await favoriteManualIdentityKey(artifact, reference);
     let discovery;
     try { discovery = await requestPublicFavoriteDiscovery(dependencies.publicDiscovery, identityKey, artifact, reference === undefined ? undefined : { explicitProviderReference: reference }); }
-    catch { return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING'); }
+    catch (error) {
+      const retryAt = error instanceof PublicDiscoveryError && error.retryAt !== undefined ? error.retryAt : new Date(timestamp(dependencies.now()) + 60_000).toISOString();
+      const reason = error instanceof PublicDiscoveryError ? error.code : 'INTERNAL_FAILURE';
+      if (error instanceof PublicDiscoveryError && ['ADMISSION_WAIT', 'RATE_LIMITED', 'NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE'].includes(error.code)) return deferClaimWithoutAttempt(dependencies, task, token, retryAt, reason);
+      return retryClaim(dependencies, task, token, retryAt, reason);
+    }
     if (discovery.state === 'MISS') return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING');
     if (discovery.state === 'PENDING') return deferClaimWithoutAttempt(dependencies, task, token, discovery.retryAt);
     if (discovery.state === 'UNAVAILABLE') return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PROVIDER_UNAVAILABLE');
@@ -452,11 +465,13 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
 
 export async function runFavoriteResolutionSlice(dependencies: FavoriteResolutionRunnerDependencies): Promise<FavoriteResolutionSliceResult> {
   const startedAt = timestamp(dependencies.now());
+  const deadline = dependencies.wakeDeadline ?? startedAt + favoriteResolutionWakeBudgetMs;
+  dependencies.publicDiscovery?.setDeadline?.(deadline);
   let blocked = 0; let completed = 0; let retried = 0;
   let continuationRequired = false;
   for (let index = 0; index < favoriteResolutionSliceLimit; index += 1) {
     const claimedAt = dependencies.now();
-    if (timestamp(claimedAt) - startedAt >= favoriteResolutionWakeBudgetMs) { continuationRequired = true; break; }
+    if (timestamp(claimedAt) >= deadline) { continuationRequired = true; break; }
     const token = dependencies.token();
     const task = await dependencies.outbox.claimNext({
       claimedAt,

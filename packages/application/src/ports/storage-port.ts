@@ -161,7 +161,7 @@ export function assertReviewMatchListQuery(query: ReviewMatchListQuery): void {
 }
 
 export interface StorageReadPort {
-  readFavoriteResolutionCounts(): Promise<{ observed: number; processing: number; resolved: number; review: number; retryable: number; blocked: number; unsupported: number; internalErrors?: number; publicDiscoveryPending?: number }>;
+  readFavoriteResolutionCounts(): Promise<{ observed: number; processing: number; resolved: number; review: number; retryable: number; blocked: number; unsupported: number; internalErrors?: number; publicDiscoveryPending?: number; admissionWaiting?: number; rateLimited?: number; networkErrors?: number; actionRequired?: number; providerPaused?: number }>;
   readPendingFavoriteProjectionCount(): Promise<number>;
   getAgendaEntry(id: AgendaEntryId): Promise<AgendaEntry | undefined>;
   getFavoriteSource(id: FavoriteSourceId): Promise<FavoriteSource | undefined>;

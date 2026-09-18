@@ -3530,7 +3530,7 @@
       "schemaVersion": 1,
       "id": "goal-restore-favorite-recognition-processing",
       "title": "Rétablir la reconnaissance et le traitement des favoris",
-      "status": "ACTIVE",
+      "status": "BLOCKED",
       "executionMode": "collaborative",
       "modeOffered": false,
       "steps": [
@@ -3607,7 +3607,7 @@
         {
           "id": "resume",
           "title": "Réparer les reprises publiques et certifier les parcours",
-          "status": "TODO",
+          "status": "BLOCKED",
           "acceptance": [
             "Reprises idempotentes bornées sans réarmer FAILED",
             "Corpus 1532 dont 1400 médias vers états attendus",
@@ -3641,7 +3641,11 @@
             "git diff --check",
             "git commit -m 'fix(discovery): resume durable admissions and queue processing'"
           ],
-          "evidence": []
+          "evidence": [
+            "Implémentation locale validée: npm run verify réussi; Archify public-discovery/all, docs et ADR passent; tests Queue additionnels 7/7 et typecheck Worker passent.",
+            "Corpus 1532/1400 convergent; archives finales reproductibles testées sur Chromium 153 et Firefox 155 sans faux résultat. Audit privé: 204 nouvelles requêtes possibles, identités installées non certifiées.",
+            "Promotion et certification personnelle restent soumises à autorisation distincte. Incident: un premier harness Firefox setOffline a laissé atteindre l’API par des requêtes synthétiques; impact distant non établi, proxy fermé désormais vérifié. Aucun déploiement ni nettoyage effectué."
+          ]
         }
       ]
     }

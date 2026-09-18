@@ -32,24 +32,22 @@ export async function runPublicDiscoveryBatch(input: PublicDiscoveryBatchInput):
     throw new RangeError('public discovery batch limit must be between 1 and 50');
   }
   const batch = publicDiscoveryClaimBatchSchema.parse(await input.gateway.claim(input.limit));
-  const results: PublicDiscoveryResult[] = [];
+  let published = 0;
+  let replayed = 0;
   let failed = 0;
   for (const request of batch.requests) {
+    let resolution: PublicDiscoveryTerminalResolution;
     try {
-      const resolution = publicDiscoveryTerminalResolutionSchema.parse(await input.resolver.resolve(request));
-      results.push({ key: request.key, requestDigest: request.requestDigest, resolution });
+      resolution = publicDiscoveryTerminalResolutionSchema.parse(await input.resolver.resolve(request));
     } catch {
       failed += 1;
+      continue;
     }
+    const result: PublicDiscoveryResult = { key: request.key, requestDigest: request.requestDigest, resolution };
+    const resultBatch = publicDiscoveryResultBatchSchema.parse({ claimToken: batch.claimToken, nonce: input.nonce(), results: [result], schemaVersion: 3, verifiedAt: input.now() });
+    const receipt = publicDiscoveryReceiptSchema.parse(await input.gateway.publish(resultBatch));
+    published += receipt.published;
+    replayed += receipt.replayed;
   }
-  if (results.length === 0) return { claimed: batch.requests.length, failed, published: 0, replayed: 0 };
-  const resultBatch = publicDiscoveryResultBatchSchema.parse({
-    claimToken: batch.claimToken,
-    nonce: input.nonce(),
-    results,
-    schemaVersion: 3,
-    verifiedAt: input.now(),
-  });
-  const receipt = publicDiscoveryReceiptSchema.parse(await input.gateway.publish(resultBatch));
-  return { claimed: batch.requests.length, failed, ...receipt };
+  return { claimed: batch.requests.length, failed, published, replayed };
 }

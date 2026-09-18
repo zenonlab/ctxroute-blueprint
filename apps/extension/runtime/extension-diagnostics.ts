@@ -13,10 +13,16 @@ const diagnosticCountsSchema = z.strictObject({
   completed: z.number().int().min(0).max(maximumCount).optional(),
   observed: z.number().int().min(0).max(maximumCount).optional(),
   retried: z.number().int().min(0).max(maximumCount).optional(),
+  admissionWaiting: z.number().int().min(0).max(maximumCount).optional(),
+  rateLimited: z.number().int().min(0).max(maximumCount).optional(),
+  networkErrors: z.number().int().min(0).max(maximumCount).optional(),
+  actionRequired: z.number().int().min(0).max(maximumCount).optional(),
+  providerPaused: z.number().int().min(0).max(maximumCount).optional(),
 });
 export const extensionDiagnosticEventSchema = z.strictObject({
   counts: diagnosticCountsSchema.optional(),
   errorCode: z.enum(['INVENTORY_UNAVAILABLE', 'RESOLUTION_UNAVAILABLE']).optional(),
+  nextAttemptAt: z.string().datetime({ offset: true }).optional(),
   occurredAt: z.string().datetime({ offset: true }),
   outcome: z.enum(['started', 'complete', 'retryable', 'failed']),
   runId: identifierSchema,

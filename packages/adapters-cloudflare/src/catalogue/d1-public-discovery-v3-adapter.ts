@@ -75,6 +75,7 @@ export interface PublicDiscoveryV3Port {
   requestRefresh(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryRefreshAdmission>;
   releaseQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
   request(request: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryAdmission>;
+  nextPendingAt?(): Promise<string | undefined>;
 }
 
 function keyValues(key: PublicDiscoveryKeyV3): [string, string, string, string] {
@@ -95,8 +96,7 @@ function stateFromRow(row: DiscoveryRow | null, now: string): PublicDiscoveryRea
     return { reason: row.failureReason, state: 'UNAVAILABLE' };
   }
   if (row.state === 'PENDING' || row.state === 'PROCESSING') {
-    const floor = new Date(Date.parse(now) + 60_000).toISOString();
-    return { retryAt: Date.parse(row.retryAt) > Date.parse(now) ? row.retryAt : floor, state: 'PENDING' };
+    return { retryAt: row.leaseUntil !== null && row.leaseUntil > row.retryAt ? row.leaseUntil : row.retryAt, state: 'PENDING' };
   }
   if (!row.resultJson || !row.verifiedAt) throw new Error('invalid-terminal-public-discovery');
   const resolution = publicDiscoveryTerminalResolutionSchema.parse(JSON.parse(row.resultJson));
@@ -209,9 +209,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       request_json = excluded.request_json, admission_priority = excluded.admission_priority,
       queue_signal_state = 'SENDING', queue_signal_lease_until = excluded.queue_signal_lease_until,
       retry_at = excluded.retry_at, updated_at = excluded.updated_at, purge_after = NULL
-    WHERE (public_discovery_requests_v3.state = 'FAILED'
-        AND public_discovery_requests_v3.request_digest = excluded.request_digest)
-      OR (public_discovery_requests_v3.state IN ('NOT_FOUND', 'AMBIGUOUS')
+    WHERE (public_discovery_requests_v3.state IN ('NOT_FOUND', 'AMBIGUOUS')
         AND public_discovery_requests_v3.result_expires_at <= excluded.updated_at)
     RETURNING state`)
       .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now, this.pendingLimit, priority, signalLeaseUntil)
@@ -229,13 +227,26 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       ? await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
           queue_signal_state = 'SENDING', queue_signal_lease_until = ?7, updated_at = ?6
           WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
-            AND request_digest = ?5 AND state = 'PENDING'
+            AND request_digest = ?5
+            AND ((state = 'PENDING' AND retry_at <= ?6) OR (state = 'PROCESSING' AND lease_until <= ?6))
             AND (queue_signal_state = 'UNSENT'
-              OR (queue_signal_state = 'SENDING' AND queue_signal_lease_until <= ?6))
+              OR (queue_signal_state = 'SENDING' AND queue_signal_lease_until <= ?6)
+              OR (queue_signal_state = 'SENT' AND updated_at <= ?8))
           RETURNING state`)
-        .bind(...keyValues(request.key), request.requestDigest, now, signalLeaseUntil).first()
+        .bind(...keyValues(request.key), request.requestDigest, now, signalLeaseUntil, futureIso(now, -queueSignalLeaseMilliseconds)).first()
       : null;
     return { outcome: created !== null || resumedSignal !== null ? 'created' : 'existing', state: stateFromRow(row, now) };
+  }
+
+  async nextPendingAt(): Promise<string | undefined> {
+    const row = await this.database.prepare(`SELECT MIN(due) AS due FROM (
+      SELECT CASE WHEN state = 'PROCESSING' THEN lease_until ELSE retry_at END AS due
+      FROM public_discovery_requests_v3 WHERE state IN ('PENDING', 'PROCESSING')
+      UNION ALL
+      SELECT CASE WHEN refresh_state = 'PROCESSING' THEN lease_until ELSE retry_at END AS due
+      FROM public_discovery_requests_v3 WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING')
+    )`).first<{ due: string | null }>();
+    return row?.due ?? undefined;
   }
 
   async requestRefresh(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryRefreshAdmission> {
@@ -253,10 +264,13 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       ? await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
           queue_signal_state = 'SENDING', queue_signal_lease_until = ?6, updated_at = ?5
           WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
-            AND state = 'VERIFIED' AND refresh_state = 'PENDING'
+            AND state = 'VERIFIED'
+            AND ((refresh_state = 'PENDING' AND retry_at <= ?5)
+              OR (refresh_state = 'PROCESSING' AND lease_until <= ?5))
             AND (queue_signal_state = 'UNSENT'
-              OR (queue_signal_state = 'SENDING' AND queue_signal_lease_until <= ?5))
-          RETURNING request_digest AS requestDigest`).bind(...keyValues(key), now, signalLeaseUntil)
+              OR (queue_signal_state = 'SENDING' AND queue_signal_lease_until <= ?5)
+              OR (queue_signal_state = 'SENT' AND updated_at <= ?7))
+          RETURNING request_digest AS requestDigest`).bind(...keyValues(key), now, signalLeaseUntil, futureIso(now, -queueSignalLeaseMilliseconds))
         .first<{ requestDigest: string }>()
       : null;
     const row = await this.row(key);
