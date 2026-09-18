@@ -70,12 +70,13 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     this.gate = reserved;
     return reserved;
   }
-  private async exchange<T>(url: string, init: RequestInit, schema: z.ZodType<T>, maximumBytes?: number): Promise<T> {
-    if (this.deadline - Date.now() < 15_000) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(Date.now() + 60_000).toISOString());
+  private async exchange<T>(url: string, init: RequestInit & { credentials: 'omit'; referrerPolicy: 'no-referrer' }, schema: z.ZodType<T>, maximumBytes?: number): Promise<T> {
+    const timeoutMs = Math.min(15_000, this.deadline - Date.now());
+    if (timeoutMs < 1_000) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(Date.now() + 60_000).toISOString());
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => { controller.abort(); reject(new PublicDiscoveryError('TIMEOUT')); }, 15_000);
+      timer = setTimeout(() => { controller.abort(); reject(new PublicDiscoveryError('TIMEOUT')); }, timeoutMs);
     });
     try {
       return await Promise.race([timeout, (async () => {

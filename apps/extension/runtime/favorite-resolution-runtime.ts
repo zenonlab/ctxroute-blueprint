@@ -80,8 +80,9 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
     await dependencies.diagnostics?.record(event).catch(() => undefined);
   };
   const prepareResolutionCaches = async () => {
-    const page = await dependencies.storage.listFavoriteSources({ afterId: cacheScanAfterId, limit: 100 });
-    cacheScanAfterId = page.length === 100 ? page.at(-1)?.id : undefined;
+    // One lookup batch leaves time for admission after a slow prefetch.
+    const page = await dependencies.storage.listFavoriteSources({ afterId: cacheScanAfterId, limit: 50 });
+    cacheScanAfterId = page.length === 50 ? page.at(-1)?.id : undefined;
     const keys = new Map<string, Awaited<ReturnType<typeof favoriteIdentityKey>>>();
     for (const source of page) {
       if (source.presence !== 'observed' || (source.resolution !== undefined && source.resolution.kind !== 'RETRYABLE')) continue;

@@ -124,8 +124,11 @@ Le client conserve dans `storage.local` une cadence commune aux admissions et
 refreshs, avec au moins 6,5 secondes entre deux réservations. La limite serveur
 reste 10/minute. Un `429` expose `Retry-After`, conservé après redémarrage.
 Une échéance PENDING durable empêche qu’une lecture repousse indéfiniment sa
-resoumission. Chaque HTTP expire après 15 secondes, corps compris, et ne commence
-que si le budget de réveil restant le permet. Attente serveur, admission, quota,
+resoumission. Chaque HTTP expire au plus tard après 15 secondes, corps compris,
+ou à l’échéance du réveil si elle arrive avant. Au moins une seconde restante
+est requise pour commencer; exiger quinze secondes disponibles provoquait une
+attente perpétuelle après une préparation dépassant cinq secondes.
+Attente serveur, admission, quota,
 réseau, timeout, indisponibilité, conflit et réponse invalide restent distincts.
 Les attentes et indisponibilités transitoires ne consomment pas de tentative
 locale; les erreurs de contrat restent actionnables et bornées.

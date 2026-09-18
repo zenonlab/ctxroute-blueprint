@@ -266,6 +266,16 @@ perdus, les baux actifs/expirés et FAILED non réarmé. Les tests HTTP couvrent
 Les tests du runner conservent les tentatives pendant une attente transitoire
 et réutilisent les fiches vérifiées anciennes sans fournisseur MV3.
 
+Le diagnostic post-publication de 1.0.37 a reproduit une famine d’admission :
+six secondes de préparation dans un réveil de vingt secondes empêchaient tout
+POST pendant trois réveils, car le client exigeait quinze secondes disponibles.
+Les régressions composent désormais le vrai runtime et le vrai client HTTP,
+avec transport simulé, et exigent une admission après cette préparation lente.
+Un test vérifie l’annulation réseau à quatre secondes quand c’est le budget
+restant. Le test workerd compose le client HTTP, les routes, D1 et le consumer
+Queue avec une réponse AniList simulée; il exige PENDING puis VERIFIED.
+Ces preuves locales ne remplacent pas les compteurs du profil utilisateur.
+
 Les archives installées sont testées dans des profils temporaires avec les
 1 400 vrais candidats média, jamais remplacés par des exclusions ordinaires.
 Le parcours hors ligne doit donner zéro résolution inventée et zéro blocage.

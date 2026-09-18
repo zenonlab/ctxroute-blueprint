@@ -11,6 +11,22 @@ const query = { discoveryTitles: ['Frieren'], mediaKind: 'ANIME' as const, sourc
 
 describe('HttpPublicDiscoveryAdapter', () => {
   afterEach(() => vi.useRealTimers());
+  it('uses the remaining wake time and aborts HTTP before the wake expires', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-18T12:00:00.000Z');
+    let signal: AbortSignal | null | undefined;
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+      signal = init.signal;
+      return new Promise<Response>(() => undefined);
+    });
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    adapter.setDeadline(Date.now() + 4_000);
+    const assertion = expect(adapter.resolveOrRequest(key, query)).rejects.toMatchObject({ code: 'TIMEOUT' });
+    expect(fetcher).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(3_999);
+    expect(signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1); await assertion;
+    expect(signal?.aborted).toBe(true);
+  });
   it('keeps Retry-After across restart and refuses requests outside the wake budget', async () => {
     vi.useFakeTimers(); vi.setSystemTime('2026-09-18T12:00:00.000Z');
     const clocks: Record<string, number> = {};
@@ -19,7 +35,7 @@ describe('HttpPublicDiscoveryAdapter', () => {
     await expect(new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage).requestRefresh(key)).rejects.toMatchObject({ code: 'RATE_LIMITED' });
     const restarted = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage);
     await expect(restarted.requestRefresh(key)).rejects.toMatchObject({ code: 'ADMISSION_WAIT', retryAt: '2026-09-18T12:02:00.000Z' });
-    restarted.setDeadline(Date.now() + 14_999);
+    restarted.setDeadline(Date.now() + 999);
     await expect(restarted.resolveOrRequest(key, query)).rejects.toMatchObject({ code: 'ADMISSION_WAIT' });
     expect(fetcher).toHaveBeenCalledOnce();
   });

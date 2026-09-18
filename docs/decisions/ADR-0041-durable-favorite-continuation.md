@@ -34,6 +34,12 @@ page écrit `complete`. Une interruption rejoue donc au plus une page de manièr
 idempotente. Les checkpoints actifs historiques sans phase reprennent comme
 `inventory`.
 
+La prélecture des identités est bornée à une seule page de cinquante sources
+par réveil. Deux prélectures successives pouvaient épuiser le budget avant
+l’admission; les tâches doivent conserver une possibilité effective d’émission.
+Le timeout HTTP est adapté au temps restant, plafonné à quinze secondes.
+Sous une seconde restante, la requête est différée sans tentative consommée.
+
 Le runtime demande une continuation immédiate quand une des deux phases reste
 active, quand la résolution a consommé la limite de 100 tâches ou quand un appel
 fournisseur a épuisé le budget de 20 secondes. Un checkpoint complet reste

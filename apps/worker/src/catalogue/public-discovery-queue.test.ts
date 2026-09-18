@@ -1,5 +1,6 @@
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
+import { HttpPublicDiscoveryAdapter } from '../../../../packages/adapters-browser/src/catalogue/http-public-discovery-adapter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
 import { handleNativeCollectorQueue, processPublicDiscoveryQueue } from '../native-collectors';
@@ -15,6 +16,44 @@ function submission(marker: string, title: string) {
 beforeEach(async () => applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS));
 
 describe('public discovery queue trigger', () => {
+  it.each(['exact', 'title'] as const)('carries the real extension %s request through admission, Queue, provider validation and D1 publication', async (mode) => {
+    const queue = { send: vi.fn(async () => undefined) };
+    const port = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: port, queue });
+    const client = () => new HttpPublicDiscoveryAdapter('https://tobirink.test', async (url, init) => {
+      // workerd's Request omits redirect:error; preserve browser rejection in this in-process transport.
+      const response = await app.request(url, { ...init, redirect: 'manual' });
+      if (response.status >= 300 && response.status < 400) throw new Error('Unexpected test redirect');
+      return response;
+    });
+    const titleQuery = { discoveryTitles: ['Cowboy Bebop'], sourceTitles: ['Cowboy Bebop'], mediaKind: 'ANIME' as const };
+    const query = mode === 'exact'
+      ? { ...titleQuery, explicitProviderReference: { provider: 'anilist' as const, externalId: '1' } } : titleQuery;
+    const discoveryKey = key(mode === 'exact' ? 'e' : 'f');
+    const extension = client();
+    extension.setDeadline(Date.now() + 14_000);
+    expect(await extension.resolveOrRequest(discoveryKey, query)).toMatchObject({ state: 'PENDING' });
+    expect(queue.send).toHaveBeenCalledOnce();
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      expect(String(input)).toBe('https://graphql.anilist.co');
+      const media = {
+        id: 1, type: 'ANIME', format: 'TV', genres: [], synonyms: [], siteUrl: 'https://anilist.co/anime/1',
+        title: { romaji: 'Cowboy Bebop', english: 'Cowboy Bebop', native: null },
+        coverImage: { extraLarge: null, large: null, medium: null },
+      };
+      return Response.json({ data: String(init?.body).includes('FavoriteSearch')
+        ? { Page: { pageInfo: { hasNextPage: false }, media: [media] } } : { Media: media } });
+    });
+    try {
+      const item = { body: { type: 'public-discovery-ready' as const, version: 1 as const }, attempts: 1, ack: vi.fn(), retry: vi.fn() };
+      await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery: () => processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }) });
+      expect(provider).toHaveBeenCalledTimes(mode === 'exact' ? 1 : 2);
+      expect(item.ack).toHaveBeenCalledOnce(); expect(item.retry).not.toHaveBeenCalled();
+      const result = await client().resolveOrRequest(discoveryKey, query);
+      expect(result).toMatchObject({ state: 'VERIFIED', profile: { candidate: { externalId: '1', titles: ['Cowboy Bebop'], provider: 'anilist' } } });
+      expect(queue.send).toHaveBeenCalledOnce();
+    } finally { provider.mockRestore(); }
+  }, 15_000);
   it('keeps an empty claimed batch alive and retries when continuation delivery fails', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const now = new Date().toISOString();

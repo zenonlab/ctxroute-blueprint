@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { claimTask, isTaskAvailable } from '@tobirink/application';
+import type { FavoriteResolutionClaim } from '@tobirink/application';
+import { HttpPublicDiscoveryAdapter } from '@tobirink/adapters-browser';
+import { publicDiscoveryLookupSubmissionSchema } from '@tobirink/public-discovery';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
 import { createFavoriteResolutionRuntime, reconcileFavoriteBookmarkMutation, recordFavoriteBookmarkMutation } from './favorite-resolution-runtime';
@@ -16,6 +20,51 @@ function resolutionTaskId(bookmarkId: string): string {
 }
 
 describe('createFavoriteResolutionRuntime', () => {
+  it.each(['inventory', 'lookup'] as const)('admits work after six seconds of %s with the real HTTP adapter', async (slowStage) => {
+    vi.useFakeTimers();
+    vi.setSystemTime('2026-09-18T12:00:00.000Z');
+    try {
+      const storage = new MemoryStoragePort();
+      const requests: string[] = [];
+      const publicDiscovery = new HttpPublicDiscoveryAdapter('https://tobirink.com', async (input, init) => {
+        const path = new URL(input).pathname;
+        requests.push(path);
+        if (path.endsWith('/lookup')) {
+          if (slowStage === 'lookup') vi.setSystemTime(Date.now() + 6_000);
+          const body = publicDiscoveryLookupSubmissionSchema.parse(JSON.parse(String(init.body)));
+          return Response.json(body.keys.map(key => ({ key, state: { state: 'MISS' } })));
+        }
+        if (path.endsWith('/requests')) return Response.json({ state: 'PENDING', retryAt: new Date(Date.now() + 60_000).toISOString() }, { status: 202 });
+        return Response.json({ state: 'MISS' });
+      });
+      const id = resolutionTaskId('wire');
+      const now = () => new Date().toISOString();
+      const reconcile = createFavoriteResolutionRuntime({
+        beforeInventory: async () => { if (slowStage === 'inventory') vi.setSystemTime(Date.now() + 6_000); },
+        bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [{ bookmarkId: 'wire', folderPath: [], order: 0, title: 'Frieren', url: 'https://reader.invalid/anime/frieren' }] }) },
+        candidates: unavailableCandidates, hydration: emptyHydration, ensureReady: async () => ({ schemaVersion: 12 }),
+        libraryId: libraryId('library_primary'), now, sourceAdapters: [], storage, token: () => 'wire-diagnostic', publicDiscovery,
+        outbox: {
+          block: vi.fn(), retry: vi.fn(), nextAvailableAt: async () => (await storage.getFavoriteResolutionTask(id))?.availableAt,
+          claimNext: async (input: FavoriteResolutionClaim) => {
+            const task = await storage.getFavoriteResolutionTask(id);
+            if (!task || !isTaskAvailable(task, input.claimedAt)) return undefined;
+            const claimed = claimTask(task, input.claimToken, input.claimedAt, input.claimExpiresAt);
+            await storage.putFavoriteResolutionTask(claimed);
+            return claimed;
+          },
+        },
+      });
+      for (let wake = 0; wake < 3; wake += 1) {
+        await reconcile();
+        vi.setSystemTime(Date.now() + 60_000);
+      }
+      expect(requests.filter(path => path.endsWith('/requests'))).toHaveLength(3);
+      expect(requests.filter(path => path.endsWith('/lookup'))).toHaveLength(3);
+      expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'PUBLIC_DISCOVERY_PENDING' });
+      expect(await storage.getFavoriteResolutionTask(id)).toMatchObject({ state: 'RETRY_AT', attempt: 0 });
+    } finally { vi.useRealTimers(); }
+  });
   it('prepares private synchronized identities before claiming provider work', async () => {
     const storage = new MemoryStoragePort();
     const order: string[] = [];
@@ -23,7 +72,7 @@ describe('createFavoriteResolutionRuntime', () => {
     const lookup = vi.fn(async (keys: readonly { fingerprint: string; mediaKind: 'ANIME' | 'MANGA' | 'MANHWA' | 'MANHUA' | 'UNKNOWN'; parserVersion: string; siteRulesVersion: string }[]) => { order.push('d1-batch'); return keys.map((key) => ({ key, state: { state: 'MISS' as const } })); });
     const claimNext = vi.fn(async () => { order.push('provider'); return undefined; });
     const reconcile = createFavoriteResolutionRuntime({
-      bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [{ bookmarkId: 'media-1', folderPath: [], order: 0, title: 'Frieren Chapter 12', url: 'https://reader.example/manga/frieren/chapter/12' }] }) },
+      bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: Array.from({ length: 51 }, (_, index) => ({ bookmarkId: `media-${index}`, folderPath: [], order: index, title: `Synthetic Harbor ${index}`, url: `https://reader.example/manga/synthetic-harbor-${index}` })) }) },
       candidates: unavailableCandidates, ensureReady: async () => ({ schemaVersion: 12 }), hydration: emptyHydration,
       libraryId: libraryId('library_primary'), now: () => '2026-09-12T12:00:00.000Z',
       outbox: { block: vi.fn(), claimNext, nextAvailableAt: async () => undefined, retry: vi.fn() },
@@ -36,6 +85,9 @@ describe('createFavoriteResolutionRuntime', () => {
     expect(lookup).toHaveBeenCalledOnce();
     expect(order.indexOf('provider')).toBeGreaterThan(order.indexOf('d1-batch'));
     expect(order.indexOf('provider')).toBeGreaterThan(order.indexOf('sync'));
+    expect(lookup.mock.calls[0]?.[0]).toHaveLength(50);
+    await reconcile();
+    expect(lookup.mock.calls[1]?.[0]).toHaveLength(1);
   });
 
   it('continues a 1401-bookmark inventory from its checkpoint until the final batch', async () => {

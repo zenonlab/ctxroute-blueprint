@@ -38,7 +38,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "État visible", "items": ["Titre et segments URL proposent une requête, jamais une preuve", "Admission, serveur, quota, réseau et action restent distingués", "Les diagnostics locaux ne conservent que compteurs et échéance"] },
-    { "dot": "amber", "title": "Bornes", "items": ["HTTP limité à 15 secondes dans le budget du réveil", "Cadence durable de 6,5 secondes; Retry-After conservé", "FAILED serveur reste terminal sans réinitialisation automatique"] },
+    { "dot": "amber", "title": "Bornes", "items": ["HTTP adapté au temps restant, au plus 15 secondes", "Une prélecture de 50; cadence durable de 6,5 secondes", "FAILED serveur reste terminal sans réinitialisation automatique"] },
     { "dot": "emerald", "title": "Conservation", "items": ["Pause panne et suspension ne suppriment aucune donnée privée", "Une réponse sans changement ne réécrit pas IndexedDB", "La projection et la fiche VERIFIED restent lisibles pendant l’hydratation"] }
   ]
 }
