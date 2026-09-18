@@ -94,8 +94,8 @@
     {
       "id": "transportPort",
       "type": "security",
-      "label": "Contrôle et transport",
-      "sublabel": "cadence · circuit · endpoint",
+      "label": "Gateway et transport",
+      "sublabel": "HMAC · cadence · endpoint",
       "stage": 3,
       "row": 2,
       "width": 140,
@@ -190,8 +190,8 @@
     {
       "from": "transportPort",
       "to": "providers",
-      "label": "requête API bornée",
-      "classification": "cible allowlistée · timeout · réponse bornée",
+      "label": "Gateway HMAC → API bornée",
+      "classification": "provider ciblé · timeout · réponse bornée",
       "variant": "emphasis",
       "route": "auto",
       "labelAt": [960, 600]

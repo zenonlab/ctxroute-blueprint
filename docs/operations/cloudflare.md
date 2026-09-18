@@ -437,6 +437,38 @@ The server starts before awaiting the Deno KV connection so platform warm-up
 can probe health immediately. Only signed traffic awaits the lazy KV promise;
 an unavailable binding fails that request closed with the same bounded 503.
 
+## Gateway 401 diagnostics
+
+The gateway is the authority for separating authentication layers:
+
+- `401 {"error":"invalid-signature"}` means the HMAC signature was absent,
+  malformed or invalid. The request did not reach a provider and the log event
+  uses `auth_failure_layer=gateway`.
+- `401 {"error":"anilist-auth-failed"}` means AniList returned upstream 401.
+  The event uses `provider=anilist`, `upstream_status=401` and
+  `auth_failure_layer=upstream`.
+
+Every gateway event contains only the bounded fields
+`gateway_request_id`, `provider`, `upstream_status`, `status`, `duration_ms`,
+`auth_failure_layer` and `retries`. The response also exposes the opaque
+`X-Tobirink-Gateway-Request-Id` for correlation. Do not log or export titles,
+fingerprints, complete URLs, request or response bodies, tokens, or secrets.
+Gateway retries are currently `0`; Queue retry count is authoritative in the
+Worker `native-collector.queue` and `worker.cost` events.
+
+AniList public catalogue data does not require OAuth. The gateway therefore
+does not add an `Authorization` header to Discovery requests. A future private
+AniList feature must be designed separately and keep its token in the Deno
+secret store only; never add it to Worker bindings, `wrangler.jsonc`, bundles,
+or logs.
+
+For an incident, first correlate the Worker response's gateway request ID with
+the Deno event, then inspect only the provider name, statuses, duration and
+retry count. A gateway-layer 401 requires checking the Worker/gateway HMAC
+configuration. An upstream-layer AniList 401 requires checking the upstream
+availability and request policy; it does not justify copying the upstream body
+into logs or returning an unverified Discovery result.
+
 ## Zero-downtime gateway key rotation
 
 The Worker signs with `PROVIDER_GATEWAY_HMAC_KEY` only. Deno accepts that
@@ -472,7 +504,9 @@ The Deno gate never places either HMAC value in process arguments. Secret-set
 operations call `deno deploy env load` with one allowlisted variable stored in
 a private temporary directory and a `0600` file, then remove that directory on
 success or failure. A generic failure code replaces raw CLI errors so a
-provider echo cannot disclose the value. Do not replace this path with direct
+provider echo cannot disclose the value. Current-key updates use Deno's
+`--replace` flag because the current secret already exists; the driver remains
+the only place that supplies this flag. Do not replace this path with direct
 `env add` or `env update-value` automation: both require the value in argv.
 
 ## Public Discovery retention

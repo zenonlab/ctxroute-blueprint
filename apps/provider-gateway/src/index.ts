@@ -6,6 +6,21 @@ const maximumSecretBytes = 256;
 
 type ProviderMethod = 'GET' | 'POST';
 type ProviderFetch = (input: string, init: RequestInit) => Promise<Response>;
+type ProviderName = 'anilist' | 'mangaupdates' | 'unknown';
+type AuthFailureLayer = 'gateway' | 'upstream';
+
+export interface GatewayRequestMetrics {
+  readonly type: 'provider-gateway.request';
+  readonly gateway_request_id: string;
+  readonly provider: ProviderName;
+  readonly upstream_status: number | null;
+  readonly status: number;
+  readonly duration_ms: number;
+  readonly auth_failure_layer: AuthFailureLayer | null;
+  readonly retries: number;
+}
+
+type GatewayLogger = (entry: GatewayRequestMetrics) => void;
 
 interface GatewayEnvelope {
   readonly body: string | null;
@@ -22,8 +37,10 @@ export interface GatewayNonceStore {
 
 interface GatewayOptions {
   readonly fetcher?: ProviderFetch;
+  readonly logger?: GatewayLogger;
   readonly nonceStore: GatewayNonceStore;
   readonly now?: () => number;
+  readonly requestId?: () => string;
   readonly secrets: readonly string[];
 }
 
@@ -40,6 +57,18 @@ function json(status: number, code: string): Response {
     },
     status,
   });
+}
+
+function providerName(target: string | undefined): ProviderName {
+  if (target === undefined) return 'unknown';
+  try {
+    const origin = new URL(target).origin;
+    if (origin === 'https://graphql.anilist.co') return 'anilist';
+    if (origin === 'https://api.mangaupdates.com') return 'mangaupdates';
+  } catch {
+    return 'unknown';
+  }
+  return 'unknown';
 }
 
 function healthy(): Response {
@@ -200,28 +229,47 @@ export class DenoKvNonceStore implements GatewayNonceStore {
 export function createProviderGatewayHandler(options: GatewayOptions): (request: Request) => Promise<Response> {
   const secrets = assertGatewaySecrets(options.secrets);
   const fetcher = options.fetcher ?? fetch.bind(globalThis);
+  const logger = options.logger ?? (() => undefined);
   const now = options.now ?? Date.now;
+  const requestId = options.requestId ?? (() => crypto.randomUUID());
   return async (request) => {
+    const startedAt = now();
+    const gatewayRequestId = requestId();
+    const finish = (response: Response, provider: ProviderName = 'unknown', upstreamStatus: number | null = null, authFailureLayer: AuthFailureLayer | null = null): Response => {
+      response.headers.set('X-Tobirink-Gateway-Request-Id', gatewayRequestId);
+      logger({
+        auth_failure_layer: authFailureLayer,
+        duration_ms: Math.max(0, now() - startedAt),
+        gateway_request_id: gatewayRequestId,
+        provider,
+        retries: 0,
+        status: response.status,
+        type: 'provider-gateway.request',
+        upstream_status: upstreamStatus,
+      });
+      return response;
+    };
     const url = new URL(request.url);
-    if (request.method === 'GET' && url.pathname === '/healthz' && url.search === '') return healthy();
-    if (request.method !== 'POST' || url.pathname !== '/v1/provider-fetch' || url.search !== '') return json(404, 'not-found');
+    if (request.method === 'GET' && url.pathname === '/healthz' && url.search === '') return finish(healthy());
+    if (request.method !== 'POST' || url.pathname !== '/v1/provider-fetch' || url.search !== '') return finish(json(404, 'not-found'));
     const declaredLength = Number(request.headers.get('content-length'));
-    if (Number.isFinite(declaredLength) && declaredLength > requestByteLimit) return json(413, 'request-too-large');
+    if (Number.isFinite(declaredLength) && declaredLength > requestByteLimit) return finish(json(413, 'request-too-large'));
     let raw: Uint8Array<ArrayBuffer>;
     try {
       raw = await readBounded(request.body, requestByteLimit);
     } catch {
-      return json(413, 'request-too-large');
+      return finish(json(413, 'request-too-large'));
     }
     const provided = decodeHex(request.headers.get('x-tobirink-gateway-signature') ?? '');
-    if (provided === undefined || !await matchesGatewaySignature(secrets, raw, provided)) return json(401, 'invalid-signature');
+    if (provided === undefined || !await matchesGatewaySignature(secrets, raw, provided)) return finish(json(401, 'invalid-signature'), 'unknown', null, 'gateway');
     const currentTime = now();
     const envelope = parseEnvelope(raw, currentTime);
-    if (envelope === undefined) return json(400, 'invalid-envelope');
+    if (envelope === undefined) return finish(json(400, 'invalid-envelope'));
+    const provider = providerName(envelope.target);
     try {
-      if (!await options.nonceStore.claim(envelope.nonce, currentTime + replayWindowMs)) return json(409, 'replayed-request');
+      if (!await options.nonceStore.claim(envelope.nonce, currentTime + replayWindowMs)) return finish(json(409, 'replayed-request'), provider);
     } catch {
-      return json(503, 'gateway-not-configured');
+      return finish(json(503, 'gateway-not-configured'), provider);
     }
     let upstream: Response;
     try {
@@ -234,15 +282,16 @@ export function createProviderGatewayHandler(options: GatewayOptions): (request:
         signal: AbortSignal.timeout(20_000),
       });
     } catch {
-      return json(502, 'provider-unavailable');
+      return finish(json(502, 'provider-unavailable'), provider);
     }
     const upstreamLength = Number(upstream.headers.get('content-length'));
-    if (Number.isFinite(upstreamLength) && upstreamLength > responseByteLimit) return json(502, 'provider-response-too-large');
+    if (Number.isFinite(upstreamLength) && upstreamLength > responseByteLimit) return finish(json(502, 'provider-response-too-large'), provider, upstream.status);
     try {
       const body = await readBounded(upstream.body, responseByteLimit);
-      return new Response(body.buffer, { headers: forwardedHeaders(upstream), status: upstream.status });
+      if (provider === 'anilist' && upstream.status === 401) return finish(json(401, 'anilist-auth-failed'), provider, upstream.status, 'upstream');
+      return finish(new Response(body.buffer, { headers: forwardedHeaders(upstream), status: upstream.status }), provider, upstream.status);
     } catch {
-      return json(502, 'provider-response-too-large');
+      return finish(json(502, 'provider-response-too-large'), provider, upstream.status);
     }
   };
 }
@@ -260,22 +309,15 @@ if (import.meta.main) {
   } else {
     try {
       const kv = Deno.openKv().catch(() => undefined);
-      handler = createProviderGatewayHandler({ nonceStore: new DenoKvNonceStore(kv), secrets: previousSecret === undefined ? [secret] : [secret, previousSecret] });
+      handler = createProviderGatewayHandler({
+        logger: (entry) => console.log(JSON.stringify(entry)),
+        nonceStore: new DenoKvNonceStore(kv),
+        secrets: previousSecret === undefined ? [secret] : [secret, previousSecret],
+      });
     } catch {
       handler = createUnconfiguredGatewayHandler();
     }
   }
-  Deno.serve(async (request) => {
-    const startedAt = Date.now();
-    const response = await handler(request);
-    console.log(JSON.stringify({
-      durationMs: Math.max(0, Date.now() - startedAt),
-      method: request.method,
-      path: new URL(request.url).pathname,
-      status: response.status,
-      type: 'provider-gateway.request',
-    }));
-    return response;
-  });
+  Deno.serve(handler);
 }
 import { z } from 'zod';

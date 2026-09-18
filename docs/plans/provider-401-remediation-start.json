@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "goalId": "goal-provider-401-remediation-deploy",
+  "title": "Corriger, diagnostiquer et déployer le flux provider 401",
+  "status": "ACTIVE",
+  "approved": true,
+  "executionMode": "autonomous",
+  "steps": [
+    {
+      "id": "p0-p1-gateway-diagnostics",
+      "status": "IN_PROGRESS",
+      "scope": [
+        "apps/provider-gateway/src/index.ts",
+        "apps/provider-gateway/src/index.test.ts",
+        "apps/worker/src/provider-transport-adapter.ts",
+        "apps/worker/src/provider-transport-adapter.test.ts"
+      ],
+      "acceptance": [
+        "Les 401 gateway et upstream sont distingués sans donnée sensible.",
+        "Les métriques structurées sont corrélables par gateway_request_id.",
+        "La stratégie AniList publique ne reçoit pas de token inutile."
+      ]
+    },
+    {
+      "id": "p1-tests-end-to-end",
+      "status": "TODO",
+      "scope": ["Worker", "gateway", "Queue", "D1"],
+      "acceptance": ["Le chemin complet et les échecs 401/timeout/retry sont couverts."]
+    },
+    {
+      "id": "p1-documentation-archify",
+      "status": "TODO",
+      "scope": ["docs/operations/cloudflare.md", "docs/decisions/ADR-0051-provider-transport-gate.md", "docs/architecture/src/public-discovery.dataflow.json"],
+      "acceptance": ["Documentation, ADR et diagramme sont alignés et validés."]
+    },
+    {
+      "id": "p2-full-validation",
+      "status": "TODO",
+      "scope": ["workspace", "Cloudflare plan", "Deno plan"],
+      "acceptance": ["Les gates locales et les plans fournisseurs frais passent."]
+    },
+    {
+      "id": "p3-controlled-deployment-canary",
+      "status": "TODO",
+      "scope": ["gateway production", "Worker production", "canary synthétique"],
+      "acceptance": ["Le canary passe PENDING vers VERIFIED sans suppression ni faux positif."]
+    }
+  ]
+}

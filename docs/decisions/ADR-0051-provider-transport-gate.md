@@ -22,6 +22,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-15
+- Revised: 2026-09-18
 
 ## Contexte
 
@@ -93,6 +94,27 @@ origine, le même référent et le même user-agent produit que la collecte Agen
 Ces en-têtes ne portent ni secret ni donnée de bibliothèque; ils évitent qu'un
 client serveur anonyme soit confondu avec un trafic générique.
 
+Le gateway distingue les échecs de confiance avant upstream des réponses
+upstream. Une signature absente, malformée ou invalide répond
+`401 invalid-signature` et journalise `auth_failure_layer=gateway`; aucun appel
+fournisseur n'a alors lieu. Une réponse AniList `401` répond
+`401 anilist-auth-failed` et journalise `auth_failure_layer=upstream` avec le
+fournisseur `anilist` et le statut upstream. Le Worker reçoit donc un code
+stable sans devoir connaître le secret ni interpréter le corps du fournisseur.
+
+Les requêtes Discovery AniList ne portent pas de jeton OAuth. La documentation
+officielle AniList indique que les données publiques ne requièrent pas OAuth;
+aucun `Authorization` n'est donc ajouté par défaut et aucun token AniList n'est
+introduit dans le Worker ou dans ce dépôt. Une future fonctionnalité de données
+privées devra recevoir une décision et un secret distincts côté gateway.
+
+Chaque requête du gateway émet une métrique structurée bornée avec
+`gateway_request_id`, `provider`, `upstream_status`, `status`, `duration_ms`,
+`auth_failure_layer` et `retries`. Le même identifiant est renvoyé dans
+`X-Tobirink-Gateway-Request-Id`. La valeur `retries` est zéro dans le gateway;
+les reprises Queue sont mesurées par le consumer Worker. Les événements
+excluent titre recherché, fingerprint, URL complète, payload, token et secret.
+
 Deno Deploy est retenu comme premier candidat gratuit pour une passerelle
 séparée : ses règles autorisent explicitement une API qui interroge une API
 externe et un reverse proxy, contrairement à un forward proxy générique. La
@@ -133,5 +155,6 @@ Sources de décision consultées le 15 septembre 2026 :
 - https://docs.deno.com/deploy/reference/deno_kv/
 - https://docs.deno.com/deploy/kv/transactions/
 - https://docs.deno.com/runtime/reference/cli/deploy/
+- https://anilist.gitbook.io/anilist-apiv2-docs/docs/guide/migration/version-1
 - https://vercel.com/docs/plans/hobby
 - https://render.com/docs/free

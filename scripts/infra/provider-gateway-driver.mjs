@@ -113,7 +113,7 @@ function mutationInvocation(action, organization, secret, previousSecret) {
   }
   if (action.kind === 'gateway-secret-update') {
     assertSecret(secret);
-    return { args: ['deploy', 'env', 'load', SECRET_FILE_TOKEN, ...common, '--app', APP], secretEnvironment: { [SECRET]: secret } };
+    return { args: ['deploy', 'env', 'load', SECRET_FILE_TOKEN, ...common, '--app', APP, '--replace'], secretEnvironment: { [SECRET]: secret } };
   }
   if (action.kind === 'gateway-previous-secret-set') {
     assertSecret(previousSecret);

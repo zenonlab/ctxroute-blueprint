@@ -3275,6 +3275,158 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-provider-401-remediation-deploy",
+      "title": "Corriger, diagnostiquer et déployer le flux provider 401",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "p0-p1-gateway-diagnostics",
+          "title": "Corriger la classification 401 et les diagnostics gateway",
+          "status": "DONE",
+          "acceptance": [
+            "401 signature et upstream classés",
+            "rotation conservée",
+            "métriques structurées sans données sensibles",
+            "secrets absents du bundle et wrangler.jsonc"
+          ],
+          "files": [
+            "apps/provider-gateway/src/index.ts",
+            "apps/provider-gateway/src/index.test.ts",
+            "apps/worker/src/provider-transport-adapter.ts",
+            "apps/worker/src/provider-transport-adapter.test.ts"
+          ],
+          "commands": [
+            "apply_patch sur les fichiers listés",
+            "npm run test --workspace @tobirink/provider-gateway",
+            "npm run test --workspace @tobirink/worker -- src/provider-transport-adapter.test.ts",
+            "deno check src/index.ts"
+          ],
+          "evidence": [
+            "Gateway Deno 11/11, dont 401 signature invalid, AniList upstream 401 -> anilist-auth-failed, métriques bornées et absence de données sensibles.",
+            "Worker transport 11/11; le Worker ne reçoit que la réponse gateway et ne contient aucun token AniList.",
+            "deno check et tous les typechecks workspace passent.",
+            "Archify public-discovery.dataflow showcase 9/9, 0 erreur, 0 avertissement.",
+            "validate:decisions (58 ADR, 518 scopes) et validate:docs -- --all passent."
+          ]
+        },
+        {
+          "id": "p1-tests-end-to-end",
+          "title": "Étendre les tests du chemin complet Worker→Gateway→Provider→Queue→D1",
+          "status": "DONE",
+          "acceptance": [
+            "401/200/timeout/retry couverts",
+            "aucune écriture D1 non vérifiée",
+            "réponse utilisateur seulement après VERIFIED",
+            "aucun faux positif"
+          ],
+          "files": [
+            "apps/provider-gateway/src/index.test.ts",
+            "apps/worker/src/provider-transport-adapter.test.ts",
+            "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.test.ts",
+            "apps/worker/src/native-collectors.test.ts"
+          ],
+          "commands": [
+            "tests ciblés Worker/gateway/Queue/D1",
+            "npm run test:infra",
+            "npm run typecheck"
+          ],
+          "evidence": [
+            "D1/Worker catalogue suite passes 33 tests; public-discovery provider/resolver suite passes 17 tests.",
+            "Worker Queue, D1 routes and native collector retry tests pass 30/30.",
+            "Infra gate suite passes 38/38, including Deno secret redaction, previous-key rotation and bounded plans.",
+            "Existing tests prove PENDING is preserved on provider failure, no unverified D1 publication, and user-facing data is served only from VERIFIED."
+          ]
+        },
+        {
+          "id": "p1-documentation-archify",
+          "title": "Mettre à jour documentation, ADR et diagramme Archify",
+          "status": "DONE",
+          "acceptance": [
+            "runbook et ADR à jour",
+            "diagramme couvre flux produit",
+            "Archify showcase 0 erreur et 0 avertissement"
+          ],
+          "files": [
+            "docs/operations/cloudflare.md",
+            "docs/decisions/ADR-0051-provider-transport-gate.md",
+            "docs/architecture/src/public-discovery.dataflow.json",
+            "docs/plans/provider-401-remediation-start.json",
+            "docs/plans/provider-401-remediation-done.json"
+          ],
+          "commands": [
+            "apply_patch sur les fichiers listés",
+            "npm run archify:validate -- architecture",
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions"
+          ],
+          "evidence": [
+            "ADR-0051 and docs/operations/cloudflare.md describe 401 layer classification, AniList public auth policy, metric fields and rollback.",
+            "public-discovery.dataflow JSON names the HMAC gateway boundary and validates showcase 9/9 with 0 errors and 0 warnings.",
+            "validate:decisions and validate:docs -- --all pass.",
+            "Start plan is recorded at docs/plans/provider-401-remediation-start.json."
+          ]
+        },
+        {
+          "id": "p2-full-validation",
+          "title": "Valider le dépôt et préparer les plans fournisseurs",
+          "status": "DONE",
+          "acceptance": [
+            "gates locales vertes",
+            "plans frais et digestés",
+            "aucune migration ou suppression implicite",
+            "secrets absents des sorties"
+          ],
+          "files": [
+            "aucun fichier produit supplémentaire; plans générés par les gates"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm ls --all",
+            "npm audit --audit-level=high",
+            "git diff --check",
+            "npm run infra:inspect -- --account <compte>",
+            "npm run infra:plan -- --account <compte> --operation gateway-deploy --operation worker-deploy"
+          ],
+          "evidence": [
+            "npm run verify exit 0; gateway 11/11, Worker targeted suites pass, validate:decisions and validate:docs -- --all pass.",
+            "Archify public-discovery.dataflow showcase 9/9 with 0 errors and 0 warnings.",
+            "Fresh Cloudflare/Deno inspections and bounded provider plans completed without exposing secrets; Worker version ec0ac27d at 100%."
+          ]
+        },
+        {
+          "id": "p3-controlled-deployment-canary",
+          "title": "Déployer progressivement et vérifier le canary VERIFIED",
+          "status": "DONE",
+          "acceptance": [
+            "gateway et Worker déployés",
+            "canary PENDING→VERIFIED",
+            "latences et retries observés",
+            "rollback documenté sans suppression"
+          ],
+          "files": [
+            "aucun fichier produit; état fournisseur uniquement dans ressources autorisées"
+          ],
+          "commands": [
+            "infra:apply gateway",
+            "canary synthétique POST/GET",
+            "infra:apply Worker",
+            "observation 401/429/5xx"
+          ],
+          "evidence": [
+            "Gateway revision 73cc4y4ctj1e and Worker version afbeaf62-6cb8-44fc-b416-6f1f0d4ad021 deployed; healthz is HTTP 200 healthy.",
+            "Secret synchronization corrected the gateway-layer HMAC 401; post-rotation Deno logs show provider=anilist, status=200, upstream_status=200, auth_failure_layer=null, duration 417ms and retries=0.",
+            "Synthetic request admitted with 202 PENDING, then explicit AniList canary reached VERIFIED; Queue logged ack-success with acceptedResults=1, providerRequests=1 and retries=0; D1 verified_at is set.",
+            "Rollback remains version-based and data-preserving; no D1 migration, purge or automatic deletion occurred.",
+            "npm run verify, validate:decisions, validate:docs -- --all, Archify showcase 9/9 and provider-gateway rotation tests 12/12 pass."
+          ]
+        }
+      ]
     }
   ]
 }

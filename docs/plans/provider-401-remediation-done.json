@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "goal": "goal-provider-401-remediation-deploy",
+  "status": "DONE",
+  "completedAt": "2026-09-18T16:07:40Z",
+  "evidence": {
+    "diagnosis": {
+      "gateway401": "Deno logs classified the pre-rotation failures as auth_failure_layer=gateway with status 401 and upstream_status=null.",
+      "upstream": "After synchronization, Deno logged provider=anilist, status=200, upstream_status=200, auth_failure_layer=null.",
+      "sensitiveData": "Logs and plans contain no HMAC values, AniList token, request body, title, fingerprint, or complete provider URL."
+    },
+    "deployment": {
+      "gatewayRevision": "73cc4y4ctj1e",
+      "workerVersion": "afbeaf62-6cb8-44fc-b416-6f1f0d4ad021",
+      "health": "GET /healthz returned HTTP 200 with status healthy.",
+      "queueDelivery": "Queue delivery was resumed; the configured consumer delivered messages and produced ack-success."
+    },
+    "canary": {
+      "admission": "POST /v3/catalogue/discoveries/requests returned 202 PENDING.",
+      "verified": "A synthetic explicit AniList reference canary transitioned PENDING to VERIFIED and GET returned a verified profile.",
+      "providerMetrics": "Gateway duration 417ms, status 200, upstream_status 200, retries 0.",
+      "workerMetrics": "Queue ack-success; acceptedResults=1; provider=anilist; providerRequests=1; retries=0.",
+      "d1": "The canary row reached VERIFIED with verified_at set; no unverified result was served."
+    },
+    "validation": [
+      "Gateway tests 12/12 and Worker transport tests 11/11 pass.",
+      "npm run verify passed before deployment; documentation, decision, and Archify validations passed.",
+      "Provider gateway rotation driver regression tests 12/12 pass with current-key --replace coverage.",
+      "Cloudflare inspection reports no pending D1 migrations and the Queue consumer remains attached."
+    ],
+    "rollback": "Restore the previous Worker and gateway versions and restore the prior shared HMAC key through the provider gates; retain all D1 rows and do not purge Queue data."
+  }
+}

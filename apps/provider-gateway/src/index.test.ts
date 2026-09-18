@@ -2,6 +2,7 @@ import {
   DenoKvNonceStore,
   createProviderGatewayHandler,
   createUnconfiguredGatewayHandler,
+  type GatewayRequestMetrics,
   type GatewayNonceStore,
   isAllowedProviderTarget,
 } from './index.ts';
@@ -64,6 +65,50 @@ Deno.test('forwards a valid signed AniList request with fixed product headers', 
   assert(headers.get('user-agent') === 'TobiRink/1.0 (+https://tobirink.com)');
   assert(init?.redirect === 'error');
   assert(response.headers.get('x-ratelimit-remaining') === '29');
+});
+
+Deno.test('classifies gateway and AniList authentication failures without sensitive metrics', async () => {
+  const logs: GatewayRequestMetrics[] = [];
+  const handler = createProviderGatewayHandler({
+    fetcher: () => Promise.resolve(new Response('private upstream body', { status: 401 })),
+    logger: (entry) => logs.push(entry),
+    nonceStore: memoryNonceStore(),
+    now: () => now,
+    requestId: () => 'gateway-request-401',
+    secrets: [secret],
+  });
+
+  const invalid = await gatewayRequest({ nonce: '223e4567-e89b-42d3-a456-426614174000' });
+  invalid.headers.set('X-Tobirink-Gateway-Signature', '0'.repeat(64));
+  const gatewayResponse = await handler(invalid);
+  assert(gatewayResponse.status === 401);
+  assert((await gatewayResponse.json()).error === 'invalid-signature');
+  assert(logs[0]?.gateway_request_id === 'gateway-request-401');
+  assert(logs[0]?.provider === 'unknown');
+  assert(logs[0]?.upstream_status === null);
+  assert(logs[0]?.auth_failure_layer === 'gateway');
+  assert(gatewayResponse.headers.get('x-tobirink-gateway-request-id') === 'gateway-request-401');
+
+  let upstreamLog: GatewayRequestMetrics | undefined;
+  const upstreamHandler = createProviderGatewayHandler({
+    fetcher: () => Promise.resolve(new Response('private upstream body', { status: 401 })),
+    logger: (entry) => { upstreamLog = entry; },
+    nonceStore: memoryNonceStore(),
+    now: () => now,
+    requestId: () => 'gateway-request-401',
+    secrets: [secret],
+  });
+  const upstreamResponse = await upstreamHandler(await gatewayRequest({ nonce: '323e4567-e89b-42d3-a456-426614174000' }));
+  assert(upstreamResponse.status === 401);
+  assert((await upstreamResponse.json()).error === 'anilist-auth-failed');
+  assert(upstreamLog !== undefined);
+  assert(upstreamLog.provider === 'anilist');
+  assert(upstreamLog.upstream_status === 401);
+  assert(upstreamLog.status === 401);
+  assert(upstreamLog.auth_failure_layer === 'upstream');
+  assert(upstreamLog.retries === 0);
+  assert(!JSON.stringify(upstreamLog).includes('query'));
+  assert(!JSON.stringify(upstreamLog).includes('graphql.anilist.co'));
 });
 
 Deno.test('forwards MangaUpdates and rejects direct-only provider targets', async () => {
