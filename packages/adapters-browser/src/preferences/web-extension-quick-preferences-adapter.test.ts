@@ -11,7 +11,7 @@ describe('WebExtensionQuickPreferencesAdapter', () => {
       async set(value) { fixture.value = value['tobirink.quick-preferences.v1']; },
     });
     await expect(adapter.read()).resolves.toEqual(defaultQuickPreferences);
-    const preferences = { nativeNotifications: true, showEstimatedReleases: false };
+    const preferences = { nativeNotifications: true, showEstimatedReleases: false, showAdultContent: true };
     await adapter.write(preferences);
     await expect(adapter.read()).resolves.toEqual(preferences);
     fixture.value = { nativeNotifications: true, unknown: true };

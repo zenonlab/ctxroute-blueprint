@@ -3148,6 +3148,64 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-fix-adult-quick-settings-hydration",
+      "title": "Expose adult mode and restore hydration observability",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "wire-adult-visibility",
+          "title": "Add adult mode to quick settings and extension visibility policy",
+          "status": "DONE",
+          "acceptance": [
+            "Adult mode appears in Réglages rapides and persists through the adapter.",
+            "Background and Web Bridge visibility use the stored preference.",
+            "Targeted tests, typecheck, and git diff --check pass."
+          ],
+          "files": [
+            "packages/application/src/ports/quick-preferences-port.ts",
+            "apps/extension/runtime/use-quick-preferences.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/runtime/messages.test.ts",
+            "apps/extension/agenda-notifications.test.ts",
+            "packages/adapters-browser/src/preferences/web-extension-quick-preferences-adapter.test.ts"
+          ],
+          "commands": [
+            "Modify only listed files with apply_patch.",
+            "Run targeted extension/application tests, typecheck, and git diff --check.",
+            "Review the diff and create the verified commit."
+          ],
+          "evidence": [
+            "QuickPreferences schema/defaults now include showAdultContent=false and the popup presents the third Réglages rapides toggle.",
+            "The extension background passes the persisted adult-visibility preference to Web Bridge, library, search, review, agenda, and notification filters.",
+            "Application 383/383, adapter preference test 1/1, extension 145/145, all workspace typechecks, and documentation Archify source update pass; git diff --check was rerun after removing an unrelated blank line."
+          ]
+        },
+        {
+          "id": "audit-hydration-path",
+          "title": "Audit Public Discovery hydration path",
+          "status": "TODO",
+          "acceptance": [
+            "No retired direct provider calls are restored.",
+            "Worker queue and signed gateway path have passing regression coverage or a documented external blocker.",
+            "Read-only provider inspection records concrete hydration evidence."
+          ],
+          "files": [
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/provider-transport-adapter.ts"
+          ],
+          "commands": [
+            "Inspect and test the listed Worker transport files.",
+            "Run read-only Deno and Cloudflare inspection commands.",
+            "Create a verified commit only for an in-scope local defect; otherwise record evidence without mutation."
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

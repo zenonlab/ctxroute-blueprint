@@ -55,6 +55,7 @@ export default defineBackground({
     const pageContext = new WebExtensionPageContextAdapter(browser.tabs);
     const cache = new WebExtensionPopupContinuationCacheAdapter(browser.storage.local);
     const preferences = new WebExtensionQuickPreferencesAdapter(browser.storage.local);
+    const readShowAdultContent = async () => (await preferences.read()).showAdultContent;
     const tasks = new DexieTaskStore();
     const notifications = new WebExtensionNotificationAdapter(browser.notifications, browser.runtime.getURL('/icons/tobirink-128.png'));
     const bookmarks = new WebExtensionBookmarkImportAdapter(browser.bookmarks);
@@ -89,7 +90,7 @@ export default defineBackground({
     const privateRecovery = new DexiePrivateRecoveryStore(privateStorage.storage.database);
     const publicDiscovery = new HttpPublicDiscoveryAdapter(configuredSiteOrigin);
     const refreshPublicDiscovery = createPublicDiscoveryRefreshRuntime({ checkpointStorage: browser.storage.local, client: publicDiscovery, now, storage: privateStorage.storage });
-    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, publicDiscovery, releaseAgenda, async () => false);
+    const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, publicDiscovery, releaseAgenda, readShowAdultContent);
     const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const ensureAgendaReconcileAlarm = () => browser.alarms.create(agendaReconcileAlarmName, { periodInMinutes: agendaReconcileAlarmPeriodMinutes });
@@ -192,7 +193,7 @@ export default defineBackground({
       const quickPreferences = await preferences.read();
       if (quickPreferences.nativeNotifications) {
         const visibleWorkIds = new Set((await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, releaseWindow())).items
-          .filter(({ work }) => isContentVisible(work.hydration?.candidate, false))
+          .filter(({ work }) => isContentVisible(work.hydration?.candidate, quickPreferences.showAdultContent))
           .map(({ work }) => work.id));
         await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries.filter((entry) => visibleWorkIds.has(entry.workId)));
       }
@@ -267,7 +268,7 @@ export default defineBackground({
       if (parsed.data.type === 'review.queue.read') {
         try {
           await privateStorage.ensureReady();
-          return { ok: true, snapshot: await readReviewQueue(privateStorage.storage, false) };
+          return { ok: true, snapshot: await readReviewQueue(privateStorage.storage, await readShowAdultContent()) };
         } catch {
           return { error: 'review-queue-unavailable', ok: false };
         }
@@ -275,7 +276,7 @@ export default defineBackground({
       if (parsed.data.type === 'review.candidates.read') {
         try {
           await privateStorage.ensureReady();
-          return { ok: true, snapshot: await readLocalReviewCandidateSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.reviewId, false) };
+          return { ok: true, snapshot: await readLocalReviewCandidateSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.reviewId, await readShowAdultContent()) };
         } catch {
           return { error: 'review-candidates-unavailable', ok: false };
         }
@@ -283,7 +284,7 @@ export default defineBackground({
       if (parsed.data.type === 'review.decision.write') {
         try {
           await privateStorage.ensureReady();
-          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data, publicDiscovery, false);
+          const review = await writeLocalReviewDecision(privateStorage.storage, primaryLibraryId, parsed.data, publicDiscovery, await readShowAdultContent());
           return { ok: true, status: review.status };
         } catch (error) {
           return { error: error instanceof Error && /conflict|stale/u.test(error.message) ? 'conflict' : 'unavailable', ok: false };
@@ -295,7 +296,7 @@ export default defineBackground({
           const input = parsed.data.afterId
             ? { afterId: workId(parsed.data.afterId), libraryId: primaryLibraryId }
             : { libraryId: primaryLibraryId };
-          const snapshot = await readLibraryPage(privateStorage.storage, { ...input, showAdultContent: false });
+          const snapshot = await readLibraryPage(privateStorage.storage, { ...input, showAdultContent: await readShowAdultContent() });
           return {
             ok: true,
             snapshot: {
@@ -316,7 +317,7 @@ export default defineBackground({
       if (parsed.data.type === 'library.catalogue.read') {
         try {
           await privateStorage.ensureReady();
-          return { ok: true, snapshot: await readLocalLibraryCatalogueSnapshot(privateStorage.storage, primaryLibraryId, parsed.data, false) };
+          return { ok: true, snapshot: await readLocalLibraryCatalogueSnapshot(privateStorage.storage, primaryLibraryId, parsed.data, await readShowAdultContent()) };
         } catch {
           return { error: 'library-catalogue-unavailable', ok: false };
         }
@@ -324,7 +325,7 @@ export default defineBackground({
       if (parsed.data.type === 'library.search.read') {
         try {
           await privateStorage.ensureReady();
-          return { ok: true, snapshot: await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query, false) };
+          return { ok: true, snapshot: await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query, await readShowAdultContent()) };
         } catch {
           return { error: 'library-search-unavailable', ok: false };
         }
@@ -332,7 +333,7 @@ export default defineBackground({
       if (parsed.data.type === 'search.open') {
         try {
           await privateStorage.ensureReady();
-          await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query, false);
+          await readLocalSearchSnapshot(privateStorage.storage, primaryLibraryId, parsed.data.query, await readShowAdultContent());
           const target = new URL(browser.runtime.getURL('/library.html'));
           target.searchParams.set('query', parsed.data.query.trim());
           await browser.tabs.create({ url: target.toString() });
@@ -348,7 +349,7 @@ export default defineBackground({
           const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
           const quickPreferences = await preferences.read();
           const snapshot = await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, parsed.data);
-          const visibleItems = snapshot.items.filter(({ work }) => isContentVisible(work.hydration?.candidate, false));
+          const visibleItems = snapshot.items.filter(({ work }) => isContentVisible(work.hydration?.candidate, quickPreferences.showAdultContent));
           const visibleWorkIds = new Set(visibleItems.map(({ work }) => work.id));
           if (quickPreferences.nativeNotifications) {
             await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries.filter((entry) => visibleWorkIds.has(entry.workId)));

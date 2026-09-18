@@ -6,6 +6,7 @@ import { readQuickPreferencesMessage, writeQuickPreferencesMessage } from './mes
 const presentation = [
   { description: 'Notifier à l’heure des sorties officielles ou confirmées.', id: 'nativeNotifications', label: 'Notifications de sorties' },
   { description: 'Inclure les dates encore estimées dans l’agenda.', id: 'showEstimatedReleases', label: 'Afficher les estimations' },
+  { description: 'Afficher les œuvres dont le contenu est réservé aux adultes.', id: 'showAdultContent', label: 'Afficher les contenus adultes' },
 ] as const;
 
 interface QuickPreferencesController {
@@ -27,7 +28,7 @@ export function useQuickPreferences(): QuickPreferencesController {
   }, []);
 
   const onChange = useCallback((id: string, enabled: boolean) => {
-    if (!preferences || (id !== 'nativeNotifications' && id !== 'showEstimatedReleases')) return;
+    if (!preferences || (id !== 'nativeNotifications' && id !== 'showEstimatedReleases' && id !== 'showAdultContent')) return;
     const next = { ...preferences, [id]: enabled };
     setPreferences(next);
     void writeQuickPreferencesMessage(next).then(setPreferences).catch(() => {

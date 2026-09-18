@@ -110,9 +110,9 @@ describe('agenda notifications', () => {
     await scheduleAgendaNotification(tasks, official, reminder);
     const calls: string[] = [];
     const notifications = new WebExtensionNotificationAdapter({ create(id) { calls.push(id); } }, '/icons/notification.png');
-    const disabled = { read: async () => ({ nativeNotifications: false, showEstimatedReleases: true }), write: async () => undefined };
+    const disabled = { read: async () => ({ nativeNotifications: false, showEstimatedReleases: true, showAdultContent: false }), write: async () => undefined };
     expect(await drainDueAgendaNotifications({ notifications, preferences: disabled, storage, tasks }, new Date('2026-09-04T09:00:00.000Z'))).toBe(0);
-    const enabled = { read: async () => ({ nativeNotifications: true, showEstimatedReleases: true }), write: async () => undefined };
+    const enabled = { read: async () => ({ nativeNotifications: true, showEstimatedReleases: true, showAdultContent: false }), write: async () => undefined };
     expect(await drainDueAgendaNotifications({ notifications, preferences: enabled, storage, tasks }, new Date('2026-09-04T09:00:00.000Z'))).toBe(1);
     expect(calls).toEqual(['agenda-notification:reminder_restart-gate:2026-09-04T08:00:00.000Z']);
     expect(reminderAlarmName).toBe('tobirink-due-reminders');

@@ -1,0 +1,10 @@
+{
+  "goalId": "goal-fix-adult-quick-settings-hydration",
+  "stepId": "wire-adult-visibility",
+  "status": "DONE",
+  "evidence": [
+    "QuickPreferences schema/defaults now include showAdultContent=false and the popup presents the third Réglages rapides toggle.",
+    "The extension background passes the persisted adult-visibility preference to Web Bridge, library, search, review, agenda, and notification filters.",
+    "Application 383/383, adapter preference test 1/1, extension 145/145, all workspace typechecks, and documentation Archify source update pass; git diff --check was rerun after removing an unrelated blank line."
+  ]
+}

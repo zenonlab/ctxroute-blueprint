@@ -1,0 +1,38 @@
+{
+  "goalId": "goal-fix-adult-quick-settings-hydration",
+  "title": "Expose adult mode and restore hydration observability",
+  "approved": true,
+  "executionMode": "collaborative",
+  "validationEvidence": [
+    "The user explicitly requested the adult quick-settings omission and a full hydration audit.",
+    "Read-only inspection found the strict preference schema has no showAdultContent field and the extension background hardcodes false for visibility.",
+    "The extension architecture intentionally uses Public Discovery for hydration; direct provider calls must remain disabled."
+  ],
+  "steps": [
+    {
+      "id": "wire-adult-visibility",
+      "title": "Add adult mode to quick settings and extension visibility policy",
+      "objective": "Extend the strict quick-preferences contract, popup presentation, persistence fixtures, and service-worker/Web Bridge filters so showAdultContent is user-controlled.",
+      "files": [
+        "packages/application/src/ports/quick-preferences-port.ts",
+        "apps/extension/runtime/use-quick-preferences.ts",
+        "apps/extension/wxt-entrypoints/background.ts",
+        "apps/extension/runtime/messages.test.ts",
+        "apps/extension/agenda-notifications.test.ts",
+        "packages/adapters-browser/src/preferences/web-extension-quick-preferences-adapter.test.ts"
+      ],
+      "acceptance": ["Adult mode appears in Réglages rapides and persists through the adapter.", "Background and Web Bridge visibility use the stored preference.", "Targeted tests, typecheck, and git diff --check pass."],
+      "commands": ["Modify only listed files with apply_patch.", "Run targeted extension/application tests, typecheck, and git diff --check.", "Review the diff and create the verified commit."],
+      "commit": "fix(extension): expose adult visibility preference"
+    },
+    {
+      "id": "audit-hydration-path",
+      "title": "Audit Public Discovery hydration path",
+      "objective": "Verify the queue consumer, Worker-to-gateway transport, and Deno gateway health without restoring retired direct provider calls; add only bounded regression coverage if a local defect is found.",
+      "files": ["apps/worker/src/native-collectors.ts", "apps/worker/src/provider-transport-adapter.ts"],
+      "acceptance": ["No retired direct provider calls are restored.", "Worker queue and signed gateway path have passing regression coverage or a documented external blocker.", "Read-only provider inspection records concrete hydration evidence."],
+      "commands": ["Inspect and test the listed Worker transport files.", "Run read-only Deno and Cloudflare inspection commands.", "Create a verified commit only for an in-scope local defect; otherwise record evidence without mutation."],
+      "commit": "fix(worker): make hydration failure observable"
+    }
+  ]
+}

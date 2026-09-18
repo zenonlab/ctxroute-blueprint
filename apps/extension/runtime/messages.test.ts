@@ -93,7 +93,7 @@ describe('extension Agenda messages', () => {
 
 describe('extension quick preference messages', () => {
   it('accepts only the two persisted preference keys', () => {
-    const preferences = { nativeNotifications: true, showEstimatedReleases: false };
+    const preferences = { nativeNotifications: true, showEstimatedReleases: false, showAdultContent: false };
     expect(extensionMessageSchema.safeParse({ type: 'preferences.quick.read', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ preferences, type: 'preferences.quick.write', version: 1 }).success).toBe(true);
     expect(extensionMessageSchema.safeParse({ preferences: { ...preferences, extra: true }, type: 'preferences.quick.write', version: 1 }).success).toBe(false);
