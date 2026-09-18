@@ -22,6 +22,16 @@ const anilistAdapter: FavoriteSourceAdapter = {
 };
 
 describe('favorite source evidence U-01…U-10', () => {
+  it.fails.each([
+    ['/manga/synthetic-harbor/42', 'MANGA'],
+    ['/anime/synthetic-harbor/vostfr', 'ANIME'],
+    ['/library/synthetic-harbor/reader', 'UNKNOWN'],
+  ])('recovers a corroborated identity before a routing tail: %s', (path, mediaKind) => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'raw-recovery', title: 'Synthetic Harbor', url: `https://reader.invalid${path}` })).toMatchObject({ stableSlug: 'synthetic-harbor', mediaKind });
+  });
+  it.fails('keeps a usable title on an unknown route as an unverified query', () => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'raw-query', title: 'Synthetic Harbor', url: 'https://reader.invalid/library/zx731904' })).toMatchObject({ title: 'Synthetic Harbor', mediaKind: 'UNKNOWN', proofs: [] });
+  });
   it('requeues a previously rejected source after corroborated route recognition', async () => {
     const storage = new MemoryStoragePort();
     const favorite = { bookmarkId: 'recovered', folderPath: [], order: 0, state: 'eligible' as const, title: 'Synthetic Journey', url: 'https://reader.example/library/synthetic-journey' };

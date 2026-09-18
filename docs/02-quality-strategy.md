@@ -232,6 +232,21 @@ browser or `workerd` test when platform behavior is the risk.
 
 ## Favorite correction acceptance
 
+La référence du 18 septembre compare aussi les entrées brutes titre + URL :
+l’extracteur URL FavLib épinglé calcule sa propre source dans le sandbox du
+harness, sans slug fourni par la fixture. Catégorie, chapitre et identifiant
+opaque conservent leur comportement. `Area 51` devient historiquement `Area` :
+la conservation du nombre par TobiRink est une amélioration intentionnelle.
+Quatre tests de régression attendue (`it.fails`) capturent avant correction
+les queues numériques, langues, segments lecteur et requêtes sur route inconnue.
+Ils doivent devenir des tests ordinaires après correction.
+
+Inspection privée locale en lecture seule : trois fichiers de favoris lisibles,
+1 562 liens, 189 terminaisons numériques et 51 terminaisons de langue.
+Ces motifs ne constituent ni des rejets mesurés ni un taux de réussite.
+Les états IndexedDB et références fournisseur installés ne sont pas encore
+certifiés; aucun titre, URL, dossier ou identifiant privé n’est conservé ici.
+
 The [v3 plan](systems/favorite-resolution-correction-plan.md) adds zero Review
 at import, NOT_FOUND actionability, human-only no-match, indexed SQL, MV3
 checkpoints, additive migrations and installed Chromium/Firefox evidence. Le

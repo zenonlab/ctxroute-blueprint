@@ -21,7 +21,7 @@
           "titleMatcher",
           "privateStore"
         ],
-        "note": "Preuves locales tracées avant hydratation; oracle FavLib épinglé exécuté en mémoire sur fixtures synthétiques."
+        "note": "Titre et URL bruts comparés; indices locaux tracés, puis identité vérifiée sur les fiches disponibles."
       },
       {
         "id": "durable-resolution",
@@ -290,7 +290,7 @@
     {
       "from": "parseArtifact",
       "to": "durableQueue",
-      "label": "tâche si identité prouvée",
+      "label": "requête bornée à vérifier",
       "classification": "sinon terminal local",
       "variant": "security",
       "labelAt": [

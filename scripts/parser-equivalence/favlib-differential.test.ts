@@ -8,6 +8,7 @@ import { createFavoriteObservation, createProviderCandidateEnvelope, createSourc
 import type { SourceEvidence } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { extractFavoriteSourceEvidence } from '../../packages/application/src/favorites/source-evidence';
 import { parseFavoriteObservation } from '../../packages/application/src/favorites/favorite-parser';
 import { matchFavoriteTitles } from '../../packages/application/src/favorites/provider-matcher';
 import { readSafeParenthesizedFavoriteTitle } from '../../packages/application/src/favorites/title-normalization';
@@ -93,6 +94,50 @@ function projectTobiRink(fixture: DifferentialCase) {
 function normalizedTitle(value: string | undefined): string | undefined {
   return value?.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
+
+// Load the pinned URL extractor and its pure helpers, never its provider clients.
+function loadRawReference() {
+  const read = (path: string, digest: string) => {
+    const source = execFileSync('git', ['-C', favlibRoot, 'show', `${referenceCommit}:${path}`], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+    expect(createHash('sha256').update(source).digest('hex')).toBe(digest);
+    return source;
+  };
+  const metadata = read(referenceMetadataPath, referenceMetadataDigest);
+  const names = new Set(['decode', 'slugTitle', 'compactTitleKey', 'normalizeTitle', 'titleCandidateFromBookmark', 'stripCatalogMarketingSuffix', 'pathReleaseSegment', 'cleanUrlTitle', 'sourceIdentityFromUrl']);
+  const helpers = [...metadata.matchAll(/^(?:export )?function (\w+)\([^]*?^\}/gmu)].filter(match => names.has(match[1] ?? '')).map(match => match[0]);
+  expect(helpers).toHaveLength(names.size);
+  const constants = [...metadata.matchAll(/^const RELEASE_(?:WORDS|PREFIX) = .+;$/gmu)].map(match => match[0]);
+  expect(constants).toHaveLength(2);
+  const source = read(referencePath, referenceDigest) + '\n' + [...constants, ...helpers].join('\n');
+  const compiled = stripTypeScriptTypes(source, { mode: 'transform', sourceMap: false }).replace(/\bexport\s+(?=(?:const|function|class)\b)/gu, '');
+  if (/\brequire\s*\(|\bprocess\b|\bfetch\s*\(/u.test(compiled)) throw new Error('Raw oracle exceeds the pure reference boundary.');
+  const context = createContext({ URL, TextEncoder });
+  new Script(compiled).runInContext(context, { timeout: 1_000 });
+  return (title: string, url: string) => {
+    context.input = { title, url };
+    return referenceArtifactSchema.parse(new Script('parseFavorite({ ...input, source: sourceIdentityFromUrl(input.url) })').runInContext(context, { timeout: 1_000 }));
+  };
+}
+
+describe.runIf(available)('raw title + URL differential reference', () => {
+  it.each([
+    ['category', 'Synthetic Harbor', '/manga/synthetic-harbor'],
+    ['chapter', 'Synthetic Harbor Chapter 42', '/manga/synthetic-harbor/chapter-42'],
+    ['opaque', 'Synthetic Harbor - Chapter 42', '/manga/route-zx731904/chapter-42'],
+  ])('preserves raw behavior: %s', (_id, title, path) => {
+    const url = `https://reader.invalid${path}`;
+    const expected = loadRawReference()(title, url);
+    const observation = createFavoriteObservation({ bookmarkId: 'raw', folderPath: [], observationRevision: 'raw-v1', observationSequence: 1, observedAt: '2026-09-18T12:00:00.000Z', presence: 'observed', siblingOrder: 0, title, url });
+    const actual = parseFavoriteObservation(observation, extractFavoriteSourceEvidence({ sourceKey: 'raw', title, url }));
+    expect(normalizedTitle(actual.displayTitle)).toBe(normalizedTitle(expected.displayTitle ?? undefined));
+    expect(actual.status).toBe(expected.status);
+  });
+  it('intentionally preserves intrinsic numbers lost by the raw historical extractor', () => {
+    const title = 'Area 51'; const url = 'https://reader.invalid/manga/area-51';
+    expect(normalizedTitle(loadRawReference()(title, url).displayTitle ?? undefined)).toBe('area');
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'intrinsic-number', title, url }).title).toBe('area 51');
+  });
+});
 
 describe.runIf(available)('readonly FavLib differential oracle', () => {
   it('retains the pinned parenthesized identity behavior with stricter qualifier guards', () => {
