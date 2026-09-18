@@ -6,6 +6,43 @@ remain independent of this operational path.
 
 ## Inspect
 
+### Candidate pipeline 1.0.39
+
+La candidate locale du 19 septembre 2026 corrige les reprises R2/Queue,
+la publication D1 et la propagation des modèles dans l'extension. Aucune
+migration D1 n'est nécessaire. Le pointeur public reste `1.0.38` tant que les
+deux nouvelles archives n'ont pas été publiées et relues avec leur SHA-256.
+
+Archives reproductibles par deux builds isolés, conservées sous
+`apps/extension/.output/packages/` :
+
+| Archive 1.0.39 | Octets | SHA-256 |
+| --- | ---: | --- |
+| Chrome MV3 | 298429 | `a1939c4366d7710ad10bfe1405c610a16c4291d6dce76b2a52ee7bbb6b899d9e` |
+| Firefox MV3 | 298470 | `52757a0b93b2957aa59fb09d297569201270e4b0ca44f3c9d719b1ac3e4538cd` |
+
+Chromium 153 conserve le même identifiant d'extension, 1532 sources et 1400
+médias hors ligne lors de la mise à jour 1.0.38 vers 1.0.39. Firefox 155
+reconstruit l'Agenda INSTANT/DATE et traite les 1532 fixtures plus ses quatre
+favoris initiaux, sans résolution inventée ni blocage. Ces profils synthétiques
+ne certifient pas la bibliothèque personnelle.
+
+L'inspection distante a échoué sur `wrangler queues list` avec
+`No API token found`, avant tout plan appliqué. Aucun upload ni déploiement
+1.0.39 n'a été effectué dans cette session. La lecture publique v4 testée pour
+le 19 septembre au 4 octobre retourne zéro modèle (`models-0-0`); elle ne
+prouve pas une collecte réussie. Après rétablissement de l'authentification,
+réinspecter les ressources, publier les deux ZIP via un plan frais, vérifier
+leurs empreintes publiques, puis avancer le pointeur et préparer le plan Worker.
+Conserver toutes les archives et données pour le rollback.
+
+La correction d'ETag paginé requiert le lecteur 1.0.39 pour les réponses v4
+de plusieurs pages : le lecteur 1.0.38 compare encore leurs ETags entre eux.
+La route reste v4 et le cache existant reste conservé, mais les anciennes
+extensions doivent être mises à jour pour cette pagination. Vérifier cette
+limite de compatibilité avant la promotion du Worker et ne pas annoncer une
+certification des anciens clients sur plusieurs pages.
+
 ### Reprise Agenda après interruption
 
 Le Worker corrigé conserve le travail sous `agenda-operations/v2/pending.json`

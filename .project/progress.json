@@ -3756,7 +3756,7 @@
       "schemaVersion": 1,
       "id": "goal-pipeline-d1-r2-reliability",
       "title": "Fiabiliser la pipeline avec D1 canonique et R2 opérationnel",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -3901,7 +3901,7 @@
         {
           "id": "certification",
           "title": "Certifier parcours et préparer livraison",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Frontières interruption vérifiées et archives installées testées",
             "1532 favoris dont 1400 médias avec attentes explicites",
@@ -3932,7 +3932,9 @@
             "git commit -m 'test(pipeline): certify recovery and delivery readiness'"
           ],
           "evidence": [
-            "Candidate 1.0.39 committée 023c51a; certification complète en cours."
+            "npm run verify passe après correction finale; Archify all et public-discovery showcase 9/9, docs/ADR et audit des hooks passent. Archives Chrome/Firefox 1.0.39 reproductibles par deux builds isolés.",
+            "Chromium 153: mise à jour 1.0.38 vers 1.0.39 sur même profil, 1532 sources/1400 médias conservés hors ligne. Firefox 155: Agenda INSTANT/DATE et 1532 fixtures plus 4 favoris initiaux, zéro résolution inventée/blocage.",
+            "SHA-256 Chrome a1939c4366d7710ad10bfe1405c610a16c4291d6dce76b2a52ee7bbb6b899d9e; Firefox 52757a0b93b2957aa59fb09d297569201270e4b0ca44f3c9d719b1ac3e4538cd. Certification personnelle distincte; compatibilité multipage du lecteur 1.0.38 limitée et documentée."
           ]
         }
       ]
@@ -3941,7 +3943,7 @@
       "schemaVersion": 1,
       "id": "goal-deliver-pipeline-1039",
       "title": "Livrer la pipeline fiabilisée en version 1.0.39",
-      "status": "ACTIVE",
+      "status": "BLOCKED",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -3977,7 +3979,7 @@
         {
           "id": "delivery",
           "title": "Déployer les archives immuables 1.0.39 et le Worker vérifié",
-          "status": "TODO",
+          "status": "BLOCKED",
           "acceptance": [
             "Plan fournisseur frais limité aux deux archives 1.0.39 et Worker",
             "SHA-256 des archives publiques et routes v3/v4 vérifiés",
@@ -3997,7 +3999,10 @@
             "node scripts/infra/installed-discovery-canary.mjs <archive>",
             "git commit -m 'docs(release): record pipeline 1.0.39 deployment'"
           ],
-          "evidence": []
+          "evidence": [
+            "Inspection Cloudflare refusée avant toute mutation: wrangler queues list retourne No API token found. Authentification locale demandée; aucun plan appliqué, upload ou déploiement 1.0.39. Pointeur public 1.0.38 conservé.",
+            "Après authentification: réinspection et plans frais, uploads immuables vérifiés puis Worker; vérifier la limite documentée du lecteur historique v4 multipage."
+          ]
         }
       ]
     }
