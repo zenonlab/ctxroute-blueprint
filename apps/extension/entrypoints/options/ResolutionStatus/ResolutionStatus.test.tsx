@@ -3,6 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { ResolutionStatus } from './index';
 
 describe('ResolutionStatus', () => {
+  it('reports the observed mixed cache wait and local failure without attributing it to a provider', () => {
+    const html = renderToStaticMarkup(<ResolutionStatus controller={{ paused: false, state: 'waiting-provider' }} counts={{ blocked: 0, observed: 1532, processing: 0, resolved: 0, retryable: 586, review: 0, unsupported: 946, internalErrors: 1, publicDiscoveryPending: 585 }} diagnostics={{ enabled: true, events: [{ errorCode: 'RESOLUTION_UNAVAILABLE', occurredAt: '2026-09-18T18:16:29.316Z', outcome: 'failed', runId: 'synthetic-run', sequence: 'event-1', stage: 'run', version: 1 }] }} inventory={{ status: 'complete' }} onControl={() => undefined} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
+    expect(html).toContain('Attente du cache public et reprise après erreur locale');
+    expect(html).toContain('RESOLUTION_UNAVAILABLE');
+    expect(html).not.toContain('nouvelle tentative fournisseur');
+    expect(html).not.toContain('bibliothèque locale est à jour');
+  });
   it('distinguishes internal and public-cache waits without calling them provider failures', () => {
     const html = renderToStaticMarkup(<ResolutionStatus controller={{ paused: false, state: 'presence' }} counts={{ blocked: 0, observed: 3, processing: 0, resolved: 0, retryable: 3, review: 0, unsupported: 0, internalErrors: 1, publicDiscoveryPending: 2 }} diagnostics={{ enabled: false, events: [] }} inventory={{ continuationAt: '2026-09-12T12:05:00.000Z', status: 'presence' }} onControl={() => undefined} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
     expect(html).toContain('Dont erreurs internes');

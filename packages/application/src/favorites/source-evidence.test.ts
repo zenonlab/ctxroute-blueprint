@@ -2,6 +2,8 @@ import { createSourceEvidence } from '@tobirink/domain';
 import { describe, expect, it } from 'vitest';
 import { extractFavoriteSourceEvidence } from './source-evidence';
 import type { FavoriteSourceAdapter } from './source-evidence';
+import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
+import { importFavoriteSources } from '../use-cases/import-favorite-sources';
 
 function input(caseId: string, url: string) {
   return { sourceKey: `bookmark-${caseId}`, title: `Fixture ${caseId}`, url };
@@ -20,6 +22,28 @@ const anilistAdapter: FavoriteSourceAdapter = {
 };
 
 describe('favorite source evidence U-01…U-10', () => {
+  it('requeues a previously rejected source after corroborated route recognition', async () => {
+    const storage = new MemoryStoragePort();
+    const favorite = { bookmarkId: 'recovered', folderPath: [], order: 0, state: 'eligible' as const, title: 'Synthetic Journey', url: 'https://reader.example/library/synthetic-journey' };
+    const legacy: FavoriteSourceAdapter = { id: 'legacy-rejected', origins: ['https://reader.example'], analyze: () => undefined };
+    await importFavoriteSources([favorite], storage, '2026-09-18T18:00:00.000Z', [legacy]);
+    const [before] = await storage.listFavoriteSources({ limit: 1 });
+    expect(before?.resolution).toEqual({ kind: 'UNSUPPORTED', reason: 'IDENTITY_MISSING' });
+    await importFavoriteSources([favorite], storage, '2026-09-18T18:01:00.000Z');
+    const [after] = await storage.listFavoriteSources({ limit: 1 });
+    expect(after).toMatchObject({ id: before?.id, url: favorite.url, title: favorite.title });
+    expect(after?.resolution).toBeUndefined();
+    expect(after && await storage.getFavoriteResolutionTask(after.id.replace(/^source_/u, 'favorite-resolution_'))).toMatchObject({ state: 'READY' });
+    expect(after && (await storage.getFavoriteParseArtifact(after.id))?.artifact).toMatchObject({ mediaKind: 'UNKNOWN', status: 'parsed', sourceAdapterVersion: 'source-adapter-v3:generic-url-corroborated-v1' });
+  });
+  it.each(['synthetic-journey', 'library/synthetic-journey'])('keeps corroborated work titles on unknown routes: %s', path => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'unknown-route', title: 'Synthetic Journey', url: `https://reader.example/${path}` })).toMatchObject({
+      mediaKind: 'UNKNOWN', stableSlug: 'synthetic-journey', title: 'synthetic journey', proofs: ['TITLE_SLUG'],
+    });
+  });
+  it.each(['search/synthetic-journey', 'account/synthetic-journey', ''])('does not use title corroboration to bypass excluded routes: %s', path => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'excluded-route', title: 'Synthetic Journey', url: `https://reader.example/${path}` }).disposition).toBeDefined();
+  });
   it('separates an attached chapter and a long routing prefix from a root work slug', () => {
     expect(extractFavoriteSourceEvidence({ sourceKey: 'bookmark-routing-prefix', title: '0906168628 Genius of the Unique Lineage', url: 'https://www.asurascans.com/0906168628-genius-of-the-unique-lineage-chapter-31/' })).toMatchObject({
       canonicalUrl: 'https://www.asurascans.com/0906168628-genius-of-the-unique-lineage',

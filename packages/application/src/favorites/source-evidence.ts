@@ -168,7 +168,9 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     && release !== undefined
     && /^\d{1,4}$/u.test(decoded[0] ?? '')
     && bookmarkCorroboratesSlug(input.title, stableSlug);
-  if (!categoryRoute && !rootReleaseRoute && !boundedNumericReleaseRoute) {
+  const corroboratedUnknownRoute = bookmarkCorroboratesSlug(input.title, stableSlug)
+    && /\p{L}{2}/u.test(stableSlug) && !hasUnverifiedRoutingPrefix;
+  if (!categoryRoute && !rootReleaseRoute && !boundedNumericReleaseRoute && !corroboratedUnknownRoute) {
     return release === undefined ? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED')
       : (bookmarkTitleReleaseEvidence(input, url, release) ?? rejectedEvidence(input, 'URL_IDENTITY_UNRESOLVED'));
   }
@@ -189,7 +191,8 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     mediaKind,
     proofs,
     rawSlug: observedSlug,
-    sourceAdapter: structuralIdentity.transformed ? 'generic-url-structural-v1' : 'generic-url',
+    sourceAdapter: structuralIdentity.transformed ? 'generic-url-structural-v1'
+      : !categoryRoute && !rootReleaseRoute && !boundedNumericReleaseRoute ? 'generic-url-corroborated-v1' : 'generic-url',
     stableSlug,
     strategy: 'generic',
     title,

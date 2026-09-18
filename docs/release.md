@@ -111,6 +111,18 @@ immutable caching and matching hashes for both archives. The production
 `/download` page announces only 1.0.35. Archify architecture validation passed
 with zero errors and warnings, and D1 reported no migrations to apply.
 
+### Favorite classification recovery release — 1.0.36 — 2026-09-18
+
+Candidate 1.0.36 contains the favorite-source correction: a human slug
+corroborated by the bookmark title remains an `UNKNOWN` candidate on an
+otherwise unknown route, while utility and root routes remain excluded. The
+resolution status also distinguishes public-cache waiting from local errors.
+
+The candidate is pending the bounded Cloudflare publication gate. Its release
+plan must contain only the two immutable R2 archives and the Worker download
+pointer update; no D1, Queue, provider secret, or provider gateway mutation is
+part of this release.
+
 Run `npm run package:extension` from the repository root. The command rebuilds
 both browser targets and writes these ignored, reproducible artifacts:
 

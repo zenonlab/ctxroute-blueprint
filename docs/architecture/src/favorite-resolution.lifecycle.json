@@ -37,7 +37,7 @@
     { "id": "scheduled-resolve", "from": "scheduled", "to": "resolving", "label": "alarme ou retryAt", "variant": "security", "route": "straight", "fromSide": "top", "toSide": "bottom" }
   ],
   "cards": [
-    { "dot": "cyan", "title": "État visible", "items": ["L’écran relit l’état pendant tout parcours actif", "Inventaire résolution et attente fournisseur ont des libellés distincts", "L’échéance affichée disparaît dès que la file converge"] },
+    { "dot": "cyan", "title": "État visible", "items": ["Un titre corroborant le slug reste candidat sur une route inconnue", "Attente du cache et erreur locale restent distinguées", "Un lien exclu ne signifie pas une URL invalide"] },
     { "dot": "amber", "title": "Bornes", "items": ["Cache D1 par lots de 50; 500 favoris donnent dix lectures", "Vingt réhydratations au plus par réveil, étalées sur sept jours", "Huit échecs automatiques avant intervention explicite"] },
     { "dot": "emerald", "title": "Conservation", "items": ["Pause panne et suspension ne suppriment aucune donnée privée", "Une réponse sans changement ne réécrit pas IndexedDB", "La projection et la fiche VERIFIED restent lisibles pendant l’hydratation"] }
   ]

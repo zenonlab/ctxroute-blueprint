@@ -38,6 +38,9 @@ const controllerLabels = {
 
 export function ResolutionStatus({ controller, counts, diagnostics, inventory, onControl, onDiagnosticsToggle, onReconcile, onRefresh, state }: ResolutionStatusProps) {
   const latestDiagnostic = diagnostics?.events.at(-1);
+  const waitingLabel = counts?.publicDiscoveryPending
+    ? counts.internalErrors ? 'Attente du cache public et reprise après erreur locale' : 'Attente des résultats du cache public'
+    : counts?.internalErrors ? 'Reprise après erreur locale' : 'Attente avant une nouvelle tentative';
   const inventoryLabel = inventory?.status === 'complete'
     ? 'Inventaire vérifié'
     : inventory?.status === 'presence'
@@ -60,7 +63,7 @@ export function ResolutionStatus({ controller, counts, diagnostics, inventory, o
       {state === 'running' ? <p role="status">Analyse en cours. Cette page peut rester ouverte ou être fermée.</p> : null}
       {state === 'error' ? <p role="alert">L’état local est indisponible. Réessayez.</p> : null}
       {inventory ? <div className={styles.current} role="status">
-        <strong>{controller ? controllerLabels[controller.state] : inventoryLabel}</strong>
+        <strong>{controller?.state === 'waiting-provider' ? waitingLabel : controller ? controllerLabels[controller.state] : inventoryLabel}</strong>
         {inventory.status === 'complete' && counts && counts.processing === 0 && counts.retryable === 0 && counts.blocked === 0 ? <span>Votre bibliothèque locale est à jour.</span> : null}
         {inventory.continuationAt ? <span>Prochaine reprise automatique : <time dateTime={inventory.continuationAt}>{new Date(inventory.continuationAt).toLocaleString('fr-FR')}</time>.</span> : null}
       </div> : null}
@@ -76,10 +79,12 @@ export function ResolutionStatus({ controller, counts, diagnostics, inventory, o
         {counts.publicDiscoveryPending ? <><dt>Dont attente du cache public</dt><dd>{counts.publicDiscoveryPending}</dd></> : null}
         <dt>Liens non pris en charge</dt><dd>{counts.unsupported}</dd>
       </dl> : null}
+      {counts?.unsupported ? <p>« Liens non pris en charge » ne signifie pas que les liens sont invalides : leur identité peut manquer, leur source être absente ou leur contenu être hors périmètre.</p> : null}
       {diagnostics ? <div className={styles.diagnostics}>
         <h3>Diagnostic local</h3>
         <p role="status">{diagnostics.enabled ? 'Activé' : 'Désactivé'} · {diagnostics.events.length} événements conservés sur 100 maximum.</p>
         {latestDiagnostic ? <p>Dernier état : {diagnosticLabels[latestDiagnostic.stage]} · {diagnosticOutcomeLabels[latestDiagnostic.outcome]} · passage {latestDiagnostic.runId} · {latestDiagnostic.occurredAt}{diagnosticCounts(latestDiagnostic) ? ` · ${diagnosticCounts(latestDiagnostic)}` : ''}</p> : <p>Aucun événement enregistré.</p>}
+        {latestDiagnostic?.errorCode ? <p>Code du diagnostic : {latestDiagnostic.errorCode}</p> : null}
         <Button disabled={state === 'loading' || state === 'running'} onClick={onDiagnosticsToggle}>{diagnostics.enabled ? 'Désactiver le diagnostic' : 'Activer le diagnostic'}</Button>
       </div> : null}
       <div className={styles.actions}>

@@ -3427,6 +3427,100 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-favorite-classification-recovery",
+      "title": "Corriger classification et diagnostics des favoris",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "repair-local-resolution",
+          "title": "Corriger les rejets reproductibles et les diagnostics de reprise",
+          "status": "DONE",
+          "acceptance": [
+            "Un slug corroboré par le titre reste candidat UNKNOWN sur une route inconnue.",
+            "Les liens utilitaires restent exclus; la réimportation réenfile les décisions automatiques modifiées.",
+            "Les attentes cache et erreurs locales sont distinguées; les tests et gates passent."
+          ],
+          "files": [
+            "packages/application/src/favorites/source-evidence.ts",
+            "packages/application/src/favorites/source-evidence.test.ts",
+            "packages/application/src/favorites/favorite-parser.ts",
+            "packages/application/src/favorites/favorite-parser.test.ts",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.tsx",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.test.tsx",
+            "docs/decisions/ADR-0037-favorite-analysis-contract.md",
+            "docs/architecture/src/favorite-resolution.lifecycle.json"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/extension",
+            "npm run verify"
+          ],
+          "evidence": [
+            "npm run verify exit 0: application 389/389, extension 146/146, Worker 114/114, builds Chrome/Firefox et audit npm sans vulnérabilité.",
+            "Réimportation synthétique UNSUPPORTED vers READY couverte; version de nouvel adaptateur sans invalidation des clés existantes.",
+            "Archify lifecycle showcase 9/9, zéro erreur/avertissement. Aucun déploiement; cause des 585 attentes réelles et erreur interne non établie sans diagnostics locaux."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-favorite-classification-1-0-36",
+      "title": "Publier la correction favoris 1.0.36",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "publish-1-0-36",
+          "title": "Publier la correction de classification des favoris",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Version 1.0.36 est cohérente dans la source, le pointeur public et le package.",
+            "npm run verify, validations docs/décisions et Archify passent.",
+            "Le plan Cloudflare ne contient que deux publications R2 et le déploiement du Worker.",
+            "Les deux archives versionnées et /download répondent 200 en production avec les hashes locaux.",
+            "Le Worker publié sert la version 1.0.36; aucun D1/Queue/secrets n'est modifié.",
+            ".codex/config.toml reste hors commit."
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "apps/web/published-extension.json",
+            "package-lock.json",
+            "docs/release.md",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "packages/application/src/favorites/source-evidence.ts",
+            "packages/application/src/favorites/source-evidence.test.ts",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.tsx",
+            "apps/extension/entrypoints/options/ResolutionStatus/ResolutionStatus.test.tsx",
+            "docs/architecture/src/favorite-resolution.lifecycle.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run package:extension",
+            "npm run verify",
+            "npm run archify:validate -- favorite-resolution.lifecycle",
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions",
+            "npm run infra:inspect -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b",
+            "npm run infra:plan -- --account 6aef9b2e29d0671c8b5dd36b0b660f4b --operation r2-publish:tobirink-chrome-mv3-1.0.36.zip --operation r2-publish:tobirink-firefox-mv3-1.0.36.zip --operation worker-deploy",
+            "git commit -m 'fix(extension): recover valid favorite links'",
+            "git push origin HEAD:perf/adaptive-public-refresh",
+            "git push origin HEAD:main",
+            "npm run infra:apply -- --plan <reviewed-plan> --approve <digest> --account 6aef9b2e29d0671c8b5dd36b0b660f4b --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-1.0.36.zip --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-1.0.36.zip --allow worker:tobirink-public-api",
+            "curl -fsS https://tobirink.com/download"
+          ],
+          "evidence": [
+            "Déploiement explicitement demandé par l'utilisateur; rollback prévu par repointage vers 1.0.35 et redeploiement de la version Worker précédente."
+          ]
+        }
+      ]
     }
   ]
 }

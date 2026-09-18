@@ -167,6 +167,14 @@ aux routes utilitaires et aux identités numériques sans titre exploitable.
 
 ## Conséquences
 
+L’adaptateur generic-url-corroborated-v1 accepte un slug humain exactement corroboré par le titre même
+sur une route générique inconnue, avec type UNKNOWN et vérification publique
+inchangée. Les exclusions racine/utilitaire restent prioritaires. La version
+de cet adaptateur réenfile les seules routes nouvellement reconnues à la
+prochaine réimportation, sans invalider les autres clés publiques.
+Le statut distingue les attentes du cache et les erreurs locales; le code
+technique du dernier diagnostic est visible sans titre, URL ou erreur brute.
+
 TobiRink ne lit aucune base ni aucun export FavLib pendant sa validation. Un
 harness local peut exécuter le parseur du commit épinglé, chargé par `git show`
 et transpilé en mémoire dans un contexte sans module, processus, réseau ou accès

@@ -220,3 +220,11 @@
 - [x] **Mettre à jour documentation, ADR et diagramme Archify** — DONE _(evidence: ADR-0051 and docs/operations/cloudflare.md describe 401 layer classification, AniList public auth policy, metric fields and rollback., public-discovery.dataflow JSON names the HMAC gateway boundary and validates showcase 9/9 with 0 errors and 0 warnings., validate:decisions and validate:docs -- --all pass.)_
 - [x] **Valider le dépôt et préparer les plans fournisseurs** — DONE _(evidence: npm run verify exit 0; gateway 11/11, Worker targeted suites pass, validate:decisions and validate:docs -- --all pass., Archify public-discovery.dataflow showcase 9/9 with 0 errors and 0 warnings., Fresh Cloudflare/Deno inspections and bounded provider plans completed without exposing secrets; Worker version ec0ac27d at 100%.)_
 - [x] **Déployer progressivement et vérifier le canary VERIFIED** — DONE _(evidence: Gateway revision 73cc4y4ctj1e and Worker version afbeaf62-6cb8-44fc-b416-6f1f0d4ad021 deployed; healthz is HTTP 200 healthy., Secret synchronization corrected the gateway-layer HMAC 401; post-rotation Deno logs show provider=anilist, status=200, upstream_status=200, auth_failure_layer=null, duration 417ms and retries=0., Synthetic request admitted with 202 PENDING, then explicit AniList canary reached VERIFIED; Queue logged ack-success with acceptedResults=1, providerRequests=1 and retries=0; D1 verified_at is set.)_
+
+## Corriger classification et diagnostics des favoris — DONE
+
+- [x] **Corriger les rejets reproductibles et les diagnostics de reprise** — DONE _(evidence: npm run verify exit 0: application 389/389, extension 146/146, Worker 114/114, builds Chrome/Firefox et audit npm sans vulnérabilité., Réimportation synthétique UNSUPPORTED vers READY couverte; version de nouvel adaptateur sans invalidation des clés existantes., Archify lifecycle showcase 9/9, zéro erreur/avertissement. Aucun déploiement; cause des 585 attentes réelles et erreur interne non établie sans diagnostics locaux.)_
+
+## Publier la correction favoris 1.0.36 — ACTIVE
+
+- [ ] **Publier la correction de classification des favoris** — IN_PROGRESS _(evidence: Déploiement explicitement demandé par l'utilisateur; rollback prévu par repointage vers 1.0.35 et redeploiement de la version Worker précédente.)_
