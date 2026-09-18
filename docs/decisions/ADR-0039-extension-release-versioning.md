@@ -82,7 +82,12 @@ au workflow GitHub public vérifié.
 règle DNR MangaUpdates et la restauration directe d’identité. Les parcours
 automatiques comme manuels passent désormais exclusivement par Public
 Discovery v3 et le cache Agenda partagé.
-`1.0.33` est la version publiée immuable. La candidate `1.0.34` absorbe les
+`1.0.33` est restée la version publiée immuable jusqu'à la certification. La
+version `1.0.34` est maintenant publiée avec Chrome (294587 octets, SHA-256
+`264a48e9e292baeb082474e7ceb6c499f9bc3ba0f9e6e8031951c5a98cf0ac6b`) et
+Firefox (294628 octets, SHA-256
+`201f633c0a2d02ed60dc9f02e101f74a941a832f66854064f8238841ed24d79d`). Elle
+absorbe les
 rejets du rafraîchissement Agenda dans le service worker afin qu’une génération
 publique invalide ne produise pas de promesse non gérée. Son inférence générique
 reconnaît les marqueurs de sortie avec leurs séparateurs courants et ne retire
@@ -98,7 +103,10 @@ Existing archives are retained unchanged. A `worker-deploy` preview and apply
 must each rebuild the web workspace before invoking Wrangler, so the reviewed
 bundle and the deployed Worker cannot reuse a stale `apps/web/out` from an
 older extension version. A failed web build prevents Wrangler from running.
-Publishing a new archive remains behind the Cloudflare infrastructure gate.
+Publishing a new archive remains behind the Cloudflare infrastructure gate. The
+1.0.34 plan digest was `d272ac3e68ac5b2a2a05f792fbdf95b18ffc5e99fd9fdc22e38ec04c0cdd78df`
+for the two R2 objects and `worker:tobirink-public-api`; the deployed Worker
+version was `2905a076-d107-4a29-8408-f24f86c97555`.
 
 ## Consequences
 

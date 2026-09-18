@@ -77,15 +77,20 @@ Cloudflare et sa propre étape destructive.
 
 ## Build a release candidate
 
-The current production archives are `1.0.33`, published after the
-provider-free candidate passed the installed Chrome and Agenda smoke tests.
-The repository source is the `1.0.34` candidate while the public pointer remains
-on the immutable `1.0.33` archives until both replacement packages are uploaded
-and verified.
+The current production archives are `1.0.34`, published after deterministic
+Chrome and Firefox packaging and the exact Cloudflare gate plan. The immutable
+archives are Chrome (294587 bytes, SHA-256
+`264a48e9e292baeb082474e7ceb6c499f9bc3ba0f9e6e8031951c5a98cf0ac6b`) and
+Firefox (294628 bytes, SHA-256
+`201f633c0a2d02ed60dc9f02e101f74a941a832f66854064f8238841ed24d79d`).
+Two local packaging passes were byte-identical; both remote downloads returned
+HTTP 200 with `application/zip` and matched these hashes. The Worker deployment
+version was `2905a076-d107-4a29-8408-f24f86c97555`, and `/download` advertises
+only `1.0.34`.
 `apps/extension/package.json` is the candidate version source: WXT reads it for
 both manifests and the packager reads it for ZIP names. The download page reads
-`apps/web/published-extension.json`; advance that pointer only with both
-matching ZIPs and a verified Worker deployment.
+`apps/web/published-extension.json`; the pointer is now `1.0.34` after both
+matching ZIPs and the verified Worker deployment.
 
 Run `npm run package:extension` from the repository root. The command rebuilds
 both browser targets and writes these ignored, reproducible artifacts:

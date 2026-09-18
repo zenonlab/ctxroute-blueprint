@@ -3073,7 +3073,7 @@
         {
           "id": "step-5",
           "title": "Certifier et publier 1.0.34",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "npm run verify et npm ls --all passent.",
             "Deux productions successives des archives Chrome et Firefox ont des SHA-256 identiques.",
@@ -3104,7 +3104,13 @@
             "npm run archify:validate -- production-publication.dataflow",
             "git commit -m chore(release): publish extension 1.0.34"
           ],
-          "evidence": []
+          "evidence": [
+            "npm run verify, npm ls --all, Web route tests, documentation and decision validation passent; npm audit signale zéro vulnérabilité.",
+            "Deux exécutions de package:extension sont byte-identiques : Chrome 294587 octets, SHA-256 264a48e9e292baeb082474e7ceb6c499f9bc3ba0f9e6e8031951c5a98cf0ac6b; Firefox 294628 octets, SHA-256 201f633c0a2d02ed60dc9f02e101f74a941a832f66854064f8238841ed24d79d.",
+            "Inspection Cloudflare du compte 6aef9b2e29d0671c8b5dd36b0b660f4b réussie; le plan d272ac3e68ac5b2a2a05f792fbdf95b18ffc5e99fd9fdc22e38ec04c0cdd78df ne contenait que les deux objets R2 1.0.34 et worker:tobirink-public-api.",
+            "R2 a été publié avant le Worker; version Worker 2905a076-d107-4a29-8408-f24f86c97555. Les deux URLs répondent HTTP 200 application/zip et les hashes distants concordent; /download annonce uniquement 1.0.34.",
+            "Les dataflows extension-delivery-validation et production-publication passent Archify showcase 9/9 avec zéro erreur et zéro avertissement."
+          ]
         },
         {
           "id": "step-6",
