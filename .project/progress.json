@@ -4286,6 +4286,52 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-release-library-sort-1041",
+      "title": "Préparer la correction immuable du tri de bibliothèque 1.0.41",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "candidate",
+          "title": "Versionner et certifier les archives locales 1.0.41",
+          "status": "DONE",
+          "acceptance": [
+            "Les manifests Chrome et Firefox et leurs ZIP portent 1.0.41 et sont reproductibles",
+            "Quatre tris locaux avec 1400 médias restent sous 500 ms et la reconnexion MV3 aboutit",
+            "Le pointeur public conserve 1.0.39; aucun objet R2 ou Worker n'est modifié",
+            "Les validations et le diff passent; le commit exclut .codex/config.toml"
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/operations/cloudflare.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Mettre à jour la version extension et le lockfile sans installer de dépendance",
+            "npm run verify",
+            "npm run package:extension -- --verify-isolated",
+            "npm run package:extension",
+            "Lancer le test Playwright installé avec 1532 favoris et redémarrage MV3",
+            "npm run archify:validate -- dataflow",
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions",
+            "git diff --check",
+            "git commit -m perf(release): certify library sort correction 1.0.41"
+          ],
+          "evidence": [
+            "npm run verify, build Web, Archify dataflow, validate:docs et validate:decisions réussis",
+            "Deux builds isolés et packaging normal byte-identiques: Chrome b651485195278f861b36f8f0ac19dd51ec9d58f6e0695afb9f46df0f0f53c456; Firefox adacd904d2e9fa3f4fa87fe7df75077894833be8e8f50aec880cb285e840dfe9",
+            "Archive Chrome installée: premier rendu 258 ms, quatre tris 59–72 ms, redémarrage MV3 181 ms; pointeur public 1.0.39"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -6,6 +6,26 @@ remain independent of this operational path.
 
 ## Inspect
 
+### Candidate locale corrective 1.0.41 — non publiée
+
+La candidate 1.0.41 contient le correctif du transport WebBridge et du tri de
+la bibliothèque après redémarrage MV3. Le site public sert toujours les liens
+1.0.39. Les archives 1.0.40 restent des candidates distinctes et ne sont pas
+remplacées. `npm run verify`, le build Web, la validation Archify `dataflow` et
+deux builds isolés passent. Le packaging normal reproduit les mêmes octets :
+
+| Archive 1.0.41 | Octets | SHA-256 |
+| --- | ---: | --- |
+| Chrome MV3 | 299406 | `b651485195278f861b36f8f0ac19dd51ec9d58f6e0695afb9f46df0f0f53c456` |
+| Firefox MV3 | 299447 | `adacd904d2e9fa3f4fa87fe7df75077894833be8e8f50aec880cb285e840dfe9` |
+
+Le test Playwright installe le ZIP Chrome, peuple 1532 favoris synthétiques
+dont 1400 médias, puis lit le site reconstruit. Le premier affichage prend
+258 ms; quatre tris rendus prennent 70, 64, 59 et 72 ms. Après arrêt forcé du
+service worker MV3, un autre tri apparaît en 181 ms. Ces chiffres portent sur
+ce profil temporaire et cette machine, pas sur la bibliothèque personnelle.
+Aucune opération fournisseur, migration, publication ou push n'est incluse.
+
 ### Candidate locale corrective 1.0.40 — non publiée
 
 Le 19 septembre 2026, `npm run verify` passe intégralement : Worker 139/139,

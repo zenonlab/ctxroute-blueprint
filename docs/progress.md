@@ -271,3 +271,7 @@
 ## Accélérer les tris de la bibliothèque sur le site — DONE
 
 - [x] **Mesurer et corriger la latence Library de bout en bout** — DONE _(evidence: Archive Chromium corrective reproductible SHA-256 bbe12005d58b865361aeb9f9015bce878714c2824ed154da055b1e851bd938fd; test installé 1532 sources/1400 médias: premier affichage 323 ms, quatre tris rendus 84–103 ms, réveil worker forcé 224 ms., WebBridge répond explicitement aux échecs de transport/format/taille; test de reprise confirme deux lectures seulement et aucune attente du timeout de 5 s., npm run verify, 4 tests E2E Library, contrats IndexedDB Chromium, lint, validations docs/décisions, Archify dataflow showcase 9/9 et visual-check quatre viewports passent; profil personnel non certifié.)_
+
+## Préparer la correction immuable du tri de bibliothèque 1.0.41 — DONE
+
+- [x] **Versionner et certifier les archives locales 1.0.41** — DONE _(evidence: npm run verify, build Web, Archify dataflow, validate:docs et validate:decisions réussis, Deux builds isolés et packaging normal byte-identiques: Chrome b651485195278f861b36f8f0ac19dd51ec9d58f6e0695afb9f46df0f0f53c456; Firefox adacd904d2e9fa3f4fa87fe7df75077894833be8e8f50aec880cb285e840dfe9, Archive Chrome installée: premier rendu 258 ms, quatre tris 59–72 ms, redémarrage MV3 181 ms; pointeur public 1.0.39)_

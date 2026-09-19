@@ -128,6 +128,12 @@ du cache, les notifications et le repli sur l'historique avant le premier
 modèle v4. Le pointeur public reste en `1.0.39` jusqu'à une publication séparée
 des nouveaux ZIP vérifiés; aucun objet antérieur n'est remplacé.
 
+La candidate `1.0.41` ajoute la reconnexion WebBridge après un redémarrage MV3
+et maintient les tris de la bibliothèque sur les données locales. Elle reçoit
+ses propres archives Chrome et Firefox immuables. Le pointeur public reste en
+`1.0.39` tant que les archives et le Worker correspondant ne sont pas publiés
+et vérifiés séparément.
+
 An update gets a cache-distinct Chrome and Firefox ZIP. A release can be built
 and verified locally before the separately approved R2 publication operation.
 Une extension installée depuis un store reçoit les mises à jour signées selon
