@@ -4007,6 +4007,43 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-pipeline-automation-audit",
+      "title": "Auditer la fiabilité automatique réelle de la pipeline",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "audit",
+          "title": "Consigner les garanties et défauts prouvés",
+          "status": "DONE",
+          "acceptance": [
+            "Parcours favoris Discovery Agenda notifications livraison audités avec références aux sources.",
+            "Constats distingués des risques et des preuves manquantes; état public vérifié sans mutation distante.",
+            "Rapport actionnable et limites de certification explicites; aucun correctif produit implicite."
+          ],
+          "files": [
+            "docs/operations/pipeline-automation-audit.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run infra:inspect",
+            "npm run validate:docs -- --all",
+            "git diff --check",
+            "git commit -m 'docs(audit): assess pipeline automation gaps'"
+          ],
+          "evidence": [
+            "Rapport audité: 14 constats hiérarchisés dont 7 P1; sources, conséquences, correctifs et tests attendus explicités. Concurrence marquée risque à reproduire; certification personnelle et inspection administrative non prouvées.",
+            "npm run verify réexécuté avec succès; docs et diff-check passent. HTTP public v4 confirme modèles vides/1970; inspection administrative échoue No API token found. Aucun correctif runtime ni mutation distante.",
+            "Conversion de bornes Paris vérifiée: semaine 21–28 septembre devient dates UTC 20–27, avec borne exclusive tronquant le dimanche. AGENTS/CLAUDE/hooks inchangés et config utilisateur exclue."
+          ]
+        }
+      ]
     }
   ]
 }
