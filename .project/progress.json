@@ -4538,9 +4538,10 @@
             "git push origin main"
           ],
           "evidence": [
-            "Architecture Archify ajoutée à production-surface.architecture.json: vue releaseDelivery centrée sur githubDelivery; npm run archify:validate -- architecture passe avec 9 contrôles, 0 erreur, 0 avertissement.",
-            "ADR-0055 couvre désormais la preuve architecture; commit 144ecc9 poussé sur origin/main avec pre-push complet réussi.",
-            "Cloudflare reste non déployé: les runs GitHub précédents échouent avant runner, sans étape exécutée ni mutation distante prouvée."
+            "Déploiement Cloudflare direct réussi sous le plan frais f3198d1151f51dad5fcf7c28548a3c04ad42b22ccb1d22c3acc4fc29bc04af3b, allowlist unique worker:tobirink-public-api.",
+            "Worker version 1a367735-510f-4e9a-aacb-45bc1f19a51c active à 100%; aucune migration D1 en attente; Queue, R2, bindings, route tobirink.com/* et cron conservés.",
+            "Vérification publique Deno: /healthz retourne 200 healthy. Vérification publique Worker: /, /download, /library, /agenda et /privacy retournent tous HTTP 200.",
+            "Le workflow GitHub reste fonctionnellement déclenché mais échoue avant runner; la livraison runtime est donc prouvée par la gate Cloudflare locale, pas par GitHub Actions."
           ]
         }
       ]
