@@ -1,0 +1,766 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "TobiRink — Public Discovery D1",
+    "output": "public-discovery-complete.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1085,
+      700
+    ],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "stages": [
+    {
+      "label": "Extension"
+    },
+    {
+      "label": "D1"
+    },
+    {
+      "label": "Outbox / Queue"
+    },
+    {
+      "label": "Collecteur"
+    },
+    {
+      "label": "Publication / Refresh"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "source",
+      "type": "frontend",
+      "label": "Favori",
+      "stage": 0,
+      "row": 0,
+      "width": 140
+    },
+    {
+      "id": "local",
+      "type": "security",
+      "label": "ID/URL → route",
+      "stage": 0,
+      "row": 1,
+      "width": 140,
+      "sublabel": "alias → IDB → snapshot"
+    },
+    {
+      "id": "d1",
+      "type": "database",
+      "label": "Lecture D1",
+      "stage": 1,
+      "row": 1,
+      "width": 140
+    },
+    {
+      "id": "outbox",
+      "type": "database",
+      "label": "Outbox",
+      "stage": 2,
+      "row": 1,
+      "width": 140,
+      "sublabel": "UNSENT → SENDING → SENT"
+    },
+    {
+      "id": "claim",
+      "type": "security",
+      "label": "Queue / claim",
+      "stage": 2,
+      "row": 3,
+      "width": 140,
+      "sublabel": "consumer Queue natif seul"
+    },
+    {
+      "id": "search",
+      "type": "external",
+      "label": "AniList → Kitsu Anime",
+      "stage": 3,
+      "row": 2,
+      "width": 140,
+      "sublabel": "MangaUpdates → MangaDex",
+      "tag": "→ Kitsu Manga"
+    },
+    {
+      "id": "match",
+      "type": "security",
+      "label": "Matching",
+      "stage": 3,
+      "row": 3,
+      "width": 140
+    },
+    {
+      "id": "hydrate",
+      "type": "backend",
+      "label": "Hydratation exacte",
+      "stage": 3,
+      "row": 4,
+      "width": 140,
+      "sublabel": "(provider, externalId)",
+      "yOffset": -20
+    },
+    {
+      "id": "publish",
+      "type": "database",
+      "label": "Publication",
+      "stage": 4,
+      "row": 4,
+      "width": 140,
+      "sublabel": "contrôle réf + titres",
+      "yOffset": -20
+    },
+    {
+      "id": "result",
+      "type": "frontend",
+      "label": "Résultat local",
+      "stage": 4,
+      "row": 3,
+      "width": 140
+    },
+    {
+      "id": "admit",
+      "type": "security",
+      "label": "Admission",
+      "stage": 1,
+      "row": 2,
+      "width": 140,
+      "sublabel": "PENDING + outbox atomiques"
+    },
+    {
+      "id": "pending",
+      "type": "database",
+      "label": "PENDING",
+      "stage": 1,
+      "row": 0,
+      "width": 140,
+      "sublabel": "relire sans fournisseur"
+    },
+    {
+      "id": "saturated",
+      "type": "security",
+      "label": "503 borné",
+      "sublabel": "travail préservé",
+      "stage": 1,
+      "row": 3,
+      "width": 140
+    },
+    {
+      "id": "localResult",
+      "type": "frontend",
+      "label": "Résultat local",
+      "stage": 0,
+      "row": 2,
+      "width": 140
+    },
+    {
+      "id": "review",
+      "type": "frontend",
+      "label": "Review humaine",
+      "stage": 0,
+      "row": 3,
+      "width": 140,
+      "sublabel": "locale"
+    },
+    {
+      "id": "ops",
+      "type": "security",
+      "label": "Reprise ops",
+      "sublabel": "aucun réarmement client",
+      "stage": 0,
+      "row": 4,
+      "width": 140,
+      "yOffset": -20
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "Queue opaque",
+      "sublabel": "livraison au moins une fois",
+      "stage": 2,
+      "row": 2,
+      "width": 140
+    },
+    {
+      "id": "continuation",
+      "type": "messagebus",
+      "label": "Continuation",
+      "sublabel": "différée 1–900 s",
+      "stage": 2,
+      "row": 4,
+      "width": 140,
+      "yOffset": -20
+    },
+    {
+      "id": "repair",
+      "type": "security",
+      "label": "Réparation outbox",
+      "stage": 2,
+      "row": 0,
+      "width": 140
+    },
+    {
+      "id": "terminal",
+      "type": "database",
+      "label": "Résultat terminal",
+      "sublabel": "NOT_FOUND / AMBIGUOUS",
+      "stage": 4,
+      "row": 2,
+      "width": 140
+    },
+    {
+      "id": "retry",
+      "type": "security",
+      "label": "RETRYABLE",
+      "sublabel": "D1 PENDING · 8 essais max",
+      "stage": 4,
+      "row": 1,
+      "width": 140
+    },
+    {
+      "id": "old",
+      "type": "database",
+      "label": "Ancien VERIFIED",
+      "sublabel": "reste servi",
+      "stage": 4,
+      "row": 0,
+      "width": 140
+    },
+    {
+      "id": "refresh",
+      "type": "security",
+      "label": "Admission refresh",
+      "sublabel": "ancien VERIFIED servi",
+      "stage": 1,
+      "row": 4,
+      "width": 140,
+      "yOffset": -20
+    }
+  ],
+  "flows": [
+    {
+      "id": "f1",
+      "from": "source",
+      "to": "local",
+      "label": "ordre local",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        100,
+        200
+      ]
+    },
+    {
+      "id": "f2",
+      "from": "local",
+      "to": "d1",
+      "label": "MISS",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "f4",
+      "from": "outbox",
+      "to": "queue",
+      "label": "SENDING → SENT · signal",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        560,
+        340
+      ]
+    },
+    {
+      "id": "f5",
+      "from": "claim",
+      "to": "search",
+      "label": "anime / manga / inconnu",
+      "variant": "emphasis",
+      "route": "auto",
+      "labelAt": [
+        745,
+        240
+      ]
+    },
+    {
+      "id": "f6",
+      "from": "search",
+      "to": "match",
+      "label": "candidats",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        745,
+        428
+      ]
+    },
+    {
+      "id": "f7",
+      "from": "match",
+      "to": "hydrate",
+      "label": "MATCH unique probant",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        705,
+        542
+      ]
+    },
+    {
+      "id": "f8",
+      "from": "hydrate",
+      "to": "publish",
+      "label": "profil valide",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "f9",
+      "from": "publish",
+      "to": "result",
+      "label": "VERIFIED",
+      "variant": "emphasis",
+      "route": "straight"
+    },
+    {
+      "id": "d1-pending",
+      "from": "d1",
+      "to": "pending",
+      "label": "PENDING",
+      "variant": "dashed",
+      "route": "straight",
+      "labelAt": [
+        315,
+        220
+      ]
+    },
+    {
+      "id": "d1-admit",
+      "from": "d1",
+      "to": "admit",
+      "label": "MISS",
+      "variant": "dashed",
+      "route": "straight",
+      "labelAt": [
+        315,
+        314
+      ]
+    },
+    {
+      "id": "admit-created",
+      "from": "admit",
+      "to": "outbox",
+      "label": "created",
+      "variant": "emphasis",
+      "route": "auto",
+      "labelAt": [
+        485,
+        320
+      ]
+    },
+    {
+      "id": "admit-existing",
+      "from": "admit",
+      "to": "pending",
+      "label": "existing",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "right",
+      "route": "vertical-channel",
+      "channelX": 420,
+      "labelAt": [
+        485,
+        210
+      ]
+    },
+    {
+      "id": "admit-saturated",
+      "from": "admit",
+      "to": "saturated",
+      "label": "saturated",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [
+        315,
+        428
+      ]
+    },
+    {
+      "id": "d1-hit",
+      "from": "d1",
+      "to": "localResult",
+      "label": "HIT VERIFIED",
+      "variant": "emphasis",
+      "route": "auto",
+      "labelAt": [
+        140,
+        340
+      ]
+    },
+    {
+      "id": "d1-not-found",
+      "from": "d1",
+      "to": "review",
+      "label": "NOT_FOUND",
+      "variant": "dashed",
+      "route": "auto",
+      "labelAt": [
+        100,
+        450
+      ]
+    },
+    {
+      "id": "d1-ambiguous",
+      "from": "d1",
+      "to": "review",
+      "label": "AMBIGUOUS",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "right",
+      "route": "vertical-channel",
+      "channelX": 222,
+      "labelAt": [
+        100,
+        545
+      ]
+    },
+    {
+      "id": "d1-unavailable",
+      "from": "d1",
+      "to": "ops",
+      "label": "UNAVAILABLE",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "right",
+      "route": "vertical-channel",
+      "channelX": 229,
+      "labelAt": [
+        100,
+        650
+      ]
+    },
+    {
+      "id": "queue-claim",
+      "from": "queue",
+      "to": "claim",
+      "label": "claim(20)",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        530,
+        428
+      ]
+    },
+    {
+      "id": "claim-empty",
+      "from": "claim",
+      "to": "continuation",
+      "label": "claim vide",
+      "variant": "dashed",
+      "route": "straight",
+      "labelAt": [
+        530,
+        542
+      ]
+    },
+    {
+      "id": "continuation-queue",
+      "from": "continuation",
+      "to": "queue",
+      "label": "signal différé",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "left",
+      "route": "vertical-channel",
+      "channelX": 435,
+      "labelAt": [
+        360,
+        550
+      ]
+    },
+    {
+      "id": "outbox-error",
+      "from": "outbox",
+      "to": "repair",
+      "label": "échec/timeout → UNSENT",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [
+        530,
+        230
+      ]
+    },
+    {
+      "id": "repair-resend",
+      "from": "repair",
+      "to": "outbox",
+      "label": "UNSENT → SENDING · digest",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "right",
+      "route": "vertical-channel",
+      "channelX": 625,
+      "labelAt": [
+        745,
+        215
+      ]
+    },
+    {
+      "id": "sent-old-repair",
+      "from": "outbox",
+      "to": "repair",
+      "label": "SENT ancien",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "left",
+      "route": "vertical-channel",
+      "channelX": 435,
+      "labelAt": [
+        435,
+        115
+      ]
+    },
+    {
+      "id": "lease-expired-repair",
+      "from": "claim",
+      "to": "repair",
+      "label": "bail expiré",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "right",
+      "route": "vertical-channel",
+      "channelX": 660,
+      "labelAt": [
+        735,
+        190
+      ]
+    },
+    {
+      "id": "local-hit",
+      "from": "local",
+      "to": "localResult",
+      "label": "HIT local",
+      "variant": "emphasis",
+      "route": "straight",
+      "labelAt": [
+        98,
+        315
+      ]
+    },
+    {
+      "id": "exact-reference",
+      "from": "claim",
+      "to": "hydrate",
+      "label": "référence exacte (provider, externalId)",
+      "variant": "emphasis",
+      "route": "auto",
+      "labelAt": [
+        700,
+        656
+      ]
+    },
+    {
+      "id": "match-ambiguous",
+      "from": "match",
+      "to": "terminal",
+      "label": "AMBIGUOUS : identités / types",
+      "variant": "dashed",
+      "route": "auto",
+      "labelAt": [
+        850,
+        550
+      ]
+    },
+    {
+      "id": "match-notfound",
+      "from": "match",
+      "to": "terminal",
+      "label": "NO_MATCH total : NOT_FOUND",
+      "variant": "dashed",
+      "route": "auto",
+      "labelAt": [
+        945,
+        430
+      ]
+    },
+    {
+      "id": "search-retry",
+      "from": "search",
+      "to": "retry",
+      "label": "403/429/timeout/incomplet (page)/panne",
+      "variant": "security",
+      "route": "auto",
+      "labelAt": [
+        930,
+        340
+      ]
+    },
+    {
+      "id": "d1-refresh",
+      "from": "d1",
+      "to": "refresh",
+      "label": "VERIFIED + next_refresh_at atteint",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "left",
+      "route": "vertical-channel",
+      "channelX": 185,
+      "labelAt": [
+        195,
+        665
+      ]
+    },
+    {
+      "id": "refresh-outbox",
+      "from": "refresh",
+      "to": "outbox",
+      "label": "created : Queue",
+      "variant": "emphasis",
+      "route": "auto",
+      "labelAt": [
+        475,
+        690
+      ]
+    },
+    {
+      "id": "retry-old",
+      "from": "retry",
+      "to": "old",
+      "label": "échec / 8 essais : conservé",
+      "variant": "security",
+      "route": "straight",
+      "labelAt": [
+        960,
+        215
+      ]
+    },
+    {
+      "id": "publish-identical",
+      "from": "publish",
+      "to": "old",
+      "label": "identique : dates seules",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "right",
+      "route": "vertical-channel",
+      "channelX": 1070,
+      "labelAt": [
+        1000,
+        680
+      ]
+    },
+    {
+      "id": "match-fallback",
+      "from": "match",
+      "to": "search",
+      "label": "anime NO_MATCH complet → Kitsu",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "right",
+      "route": "vertical-channel",
+      "channelX": 830,
+      "labelAt": [
+        755,
+        315
+      ]
+    },
+    {
+      "id": "publish-reject",
+      "from": "publish",
+      "to": "retry",
+      "label": "profil invalide / conflit",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "via": [
+        [
+          960,
+          650
+        ],
+        [
+          1050,
+          650
+        ],
+        [
+          1050,
+          271
+        ]
+      ],
+      "labelAt": [
+        900,
+        660
+      ]
+    },
+    {
+      "id": "manga-fallback",
+      "from": "match",
+      "to": "search",
+      "label": "manga NO_MATCH complet → MD/Kitsu",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "left",
+      "route": "vertical-channel",
+      "channelX": 665,
+      "labelAt": [
+        755,
+        285
+      ]
+    },
+    {
+      "id": "mangadex-kitsu",
+      "from": "search",
+      "to": "search",
+      "label": "MD NO_MATCH complet → Kitsu Manga",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "left",
+      "via": [
+        [
+          745,
+          325
+        ],
+        [
+          666,
+          325
+        ],
+        [
+          666,
+          385
+        ]
+      ],
+      "labelAt": [
+        755,
+        260
+      ]
+    },
+    {
+      "id": "refresh-existing",
+      "from": "refresh",
+      "to": "refresh",
+      "label": "existing : aucun signal",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "top",
+      "via": [
+        [
+          235,
+          593
+        ],
+        [
+          235,
+          540
+        ],
+        [
+          315,
+          540
+        ]
+      ],
+      "labelAt": [
+        390,
+        655
+      ]
+    }
+  ]
+}
