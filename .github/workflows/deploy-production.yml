@@ -62,7 +62,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          npm run infra:plan -- \
+          npm run --silent infra:plan -- \
             --provider cloudflare \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
             --operation worker-deploy > .ctxroute-production-plan.json
@@ -74,7 +74,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           PLAN_DIGEST="$(node -e "const fs=require('node:fs'); process.stdout.write(JSON.parse(fs.readFileSync('.ctxroute-production-plan.json','utf8')).digest)")"
-          npm run infra:apply -- \
+          npm run --silent infra:apply -- \
             --provider cloudflare \
             --plan .ctxroute-production-plan.json \
             --approve "$PLAN_DIGEST" \
