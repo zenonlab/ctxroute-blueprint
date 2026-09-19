@@ -5,6 +5,7 @@ import {
   publicDiscoveryRefreshSubmissionSchema,
   publicDiscoveryResultBatchSchema,
   publicDiscoverySubmissionSchema,
+  type PublicDiscoveryKeyV3,
 } from '@tobirink/public-discovery';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -68,6 +69,18 @@ function randomToken(): string {
   return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
 }
 
+async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string): Promise<boolean> {
+  try {
+    if (!services.queue) throw new Error('public-discovery-queue-unavailable');
+    await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
+    await port.confirmQueueSignal(key, requestDigest, new Date().toISOString());
+    return true;
+  } catch {
+    await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
+    return false;
+  }
+}
+
 export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCollectorTestHarness?: () => Promise<void>): Hono<WorkerRuntime> {
   const app = new Hono<WorkerRuntime>();
   const limitedBody = bodyLimit({ maxSize: 64 * 1024, onError: () => noStore({ error: 'body-too-large' }, 413) });
@@ -120,15 +133,9 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
         emitPublicCost(context.env, services, before, 'discovery-admission', 'failed', startedAt);
         return noStore({ error: 'discovery-capacity-unavailable' }, 503);
       }
-      if (admission.outcome === 'created' && services.queue) {
-        try {
-          await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
-          await port.confirmQueueSignal(parsed.data.key, requestDigest, new Date().toISOString());
-        } catch {
-          await port.releaseQueueSignal(parsed.data.key, requestDigest, new Date().toISOString()).catch(() => undefined);
-          emitPublicCost(context.env, services, before, 'discovery-admission', 'backoff', startedAt);
-          return noStore({ error: 'discovery-queue-unavailable' }, 503);
-        }
+      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, requestDigest))) {
+        emitPublicCost(context.env, services, before, 'discovery-admission', 'backoff', startedAt);
+        return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }
       emitPublicCost(context.env, services, before, 'discovery-admission', admission.outcome === 'created' ? 'changed' : 'deduplicated', startedAt, admission.outcome === 'existing' ? { deduplicated: 1 } : {});
       return noStore(admission.state, 202);
@@ -151,15 +158,9 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     const port = v3Port(services);
     try {
       const admission = await port.requestRefresh(parsed.data.key, new Date().toISOString());
-      if (admission.outcome === 'created' && services.queue) {
-        try {
-          await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
-          await port.confirmQueueSignal(parsed.data.key, admission.requestDigest, new Date().toISOString());
-        } catch {
-          await port.releaseQueueSignal(parsed.data.key, admission.requestDigest, new Date().toISOString()).catch(() => undefined);
-          emitPublicCost(context.env, services, before, 'discovery-refresh', 'backoff', startedAt);
-          return noStore({ error: 'discovery-queue-unavailable' }, 503);
-        }
+      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, admission.requestDigest))) {
+        emitPublicCost(context.env, services, before, 'discovery-refresh', 'backoff', startedAt);
+        return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }
       emitPublicCost(context.env, services, before, 'discovery-refresh', admission.outcome === 'created' ? 'changed' : 'deduplicated', startedAt, admission.outcome === 'created' ? { rehydrations: 1 } : { deduplicated: 1 });
       return noStore(admission.state, 202);

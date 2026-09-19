@@ -1,0 +1,39 @@
+{
+  "goalId": "goal-refactor-public-discovery-d1-20260920",
+  "title": "Refactoriser la pipeline Public Discovery D1",
+  "status": "DONE",
+  "approved": true,
+  "validationEvidence": [
+    "ADR-0037 et ADR-0046 lus; source Archify D1 validée 9/9 au commit 5d4d765.",
+    "Routes, resolver, adaptateur D1 et tests ciblés inspectés; risques Queue et publication identifiés."
+  ],
+  "steps": [
+    {
+      "id": "queue-dispatch",
+      "title": "Unifier les routes admission et refresh et fermer le cas Queue absente",
+      "status": "DONE",
+      "acceptance": ["Protocole commun pour envoyer, confirmer et libérer le signal opaque.", "Queue absente ou défaillante donne 503 et laisse le signal réparable; existing ne réémet rien.", "Tests Worker, typecheck et diff verts."],
+      "files": ["apps/worker/src/catalogue/public-discovery-routes.ts", "apps/worker/src/catalogue/public-discovery-queue.test.ts"],
+      "commands": ["npm test --workspace @tobirink/worker -- public-discovery-queue", "npm run typecheck --workspace @tobirink/worker", "git diff --check"],
+      "evidence": ["Queue 10/10, routes 21/21 et typecheck Worker verts; Queue absente donne 503/UNSENT puis reprise 202/SENT."]
+    },
+    {
+      "id": "resolver",
+      "title": "Séparer recherche, matching, fallback et hydratation",
+      "status": "DONE",
+      "acceptance": ["Ports et ordre fournisseurs inchangés; erreur transitoire sans fallback.", "Identité exacte et secours MangaUpdates 405 conservent la référence.", "Tests portable, typecheck et diff verts."],
+      "files": ["packages/public-discovery/src/resolver.ts", "packages/public-discovery/src/resolver.test.ts"],
+      "commands": ["npm test --workspace @tobirink/public-discovery -- resolver", "npm run typecheck --workspace @tobirink/public-discovery", "git diff --check"],
+      "evidence": ["Public Discovery 75/75; erreur transitoire sans fallback, lanes UNKNOWN, ID hydraté et secours 405 testés."]
+    },
+    {
+      "id": "d1-publication",
+      "title": "Factoriser les gardes D1 et certifier le refresh",
+      "status": "DONE",
+      "acceptance": ["Faits canoniques calculés une fois; gardes SQL statiques et batch atomique conservés.", "Refresh identique met à jour les dates; conflit ou échec conserve l'ancien profil.", "Tests D1, verify, Archify et diff verts; commit et push."],
+      "files": ["packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts", "apps/worker/src/catalogue/public-discovery-routes.test.ts"],
+      "commands": ["npm run test:d1", "npm run verify", "npm run archify:validate -- dataflow", "git diff --check"],
+      "evidence": ["Le Sensor interdit les fragments SQL interpolés : requêtes statiques conservées, faits canoniques calculés une fois.", "D1 37/37 et npm run verify verts; Archify 9/9, deliver et visual-check quatre tailles réussis."]
+    }
+  ]
+}

@@ -34,6 +34,8 @@ interface MutableTitleMatchQuery {
   preSerialization?: boolean;
   sourceTitles: readonly string[];
 }
+const animeProviders = ['anilist', 'kitsu-anime'] as const;
+const mangaProviders = ['mangaupdates', 'mangadex', 'kitsu-manga'] as const;
 
 function candidateKey(candidate: ProviderCandidate): string { return `${candidate.provider}:${candidate.externalId}`; }
 
@@ -42,6 +44,21 @@ function matchQueryFor(request: PublicDiscoveryClaimedRequest, titles: readonly 
   if (request.query.mediaKind !== 'UNKNOWN') query.mediaKind = request.query.mediaKind;
   if (request.query.preSerialization !== undefined) query.preSerialization = request.query.preSerialization;
   return query;
+}
+
+function matchCandidates(candidates: readonly ProviderCandidate[], query: FavoriteTitleMatchQuery, aliasesExhausted: boolean): LaneDecision | undefined {
+  const evidence = inspectFavoriteTitleCandidates(query, candidates);
+  if (!aliasesExhausted) {
+    if (evidence.candidateReferences.length === 1 && (evidence.level === 'source-id' || evidence.level === 'ordered-exact')) {
+      return { candidates, references: evidence.candidateReferences, state: 'MATCH' };
+    }
+    if (evidence.candidateReferences.length > 1 && evidence.level === 'ordered-exact') {
+      return { candidates, references: evidence.candidateReferences, state: 'AMBIGUOUS' };
+    }
+    return undefined;
+  }
+  if (evidence.candidateReferences.length === 0) return { candidates, references: [], state: 'NOT_FOUND' };
+  return { candidates, references: evidence.candidateReferences, state: evidence.candidateReferences.length === 1 ? 'MATCH' : 'AMBIGUOUS' };
 }
 
 async function searchProvider(
@@ -56,18 +73,13 @@ async function searchProvider(
     if (envelope.provider !== provider) throw new Error('provider-envelope-mismatch');
     for (const candidate of envelope.candidates) candidates.set(candidateKey(candidate), candidate);
     const bounded = [...candidates.values()].slice(0, 25);
-    const evidence = inspectFavoriteTitleCandidates(matchQuery, bounded);
-    if (evidence.candidateReferences.length === 1 && (evidence.level === 'source-id' || evidence.level === 'ordered-exact')) {
-      return { candidates: bounded, references: evidence.candidateReferences, state: 'MATCH' };
-    }
-    if (evidence.candidateReferences.length > 1 && evidence.level === 'ordered-exact') {
-      return { candidates: bounded, references: evidence.candidateReferences, state: 'AMBIGUOUS' };
-    }
+    const early = matchCandidates(bounded, matchQuery, false);
+    if (early) return early;
   }
   const bounded = [...candidates.values()].slice(0, 25);
-  const evidence = inspectFavoriteTitleCandidates(matchQuery, bounded);
-  if (evidence.candidateReferences.length === 0) return { candidates: bounded, references: [], state: 'NOT_FOUND' };
-  return { candidates: bounded, references: evidence.candidateReferences, state: evidence.candidateReferences.length === 1 ? 'MATCH' : 'AMBIGUOUS' };
+  const final = matchCandidates(bounded, matchQuery, true);
+  if (!final) throw new Error('provider-matching-decision-missing');
+  return final;
 }
 
 async function searchLane(
@@ -83,6 +95,35 @@ async function searchLane(
     if (result.state !== 'NOT_FOUND') return { ...result, candidates: inspected };
   }
   return { candidates: inspected, references: [], state: 'NOT_FOUND' };
+}
+
+async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, request: PublicDiscoveryClaimedRequest): Promise<readonly LaneDecision[]> {
+  const titles = request.query.discoveryTitles.slice(0, 4);
+  const query = matchQueryFor(request, titles);
+  if (request.query.mediaKind === 'ANIME') return [await searchLane(providers, animeProviders, titles, query)];
+  if (request.query.mediaKind !== 'UNKNOWN') return [await searchLane(providers, mangaProviders, titles, query)];
+  return [
+    await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }),
+    await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }),
+  ];
+}
+
+type SelectedMatch =
+  | { readonly kind: 'terminal'; readonly resolution: PublicDiscoveryTerminalResolution }
+  | { readonly kind: 'matched'; readonly reference: PublicDiscoveryReferenceV3; readonly searched: ProviderCandidate | undefined };
+
+function selectMatch(lanes: readonly LaneDecision[]): SelectedMatch {
+  const credible = lanes.filter((lane) => lane.state !== 'NOT_FOUND');
+  if (credible.length === 0) return { kind: 'terminal', resolution: { reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' } };
+  if (credible.length > 1 || credible[0]?.state === 'AMBIGUOUS') {
+    const values = credible.flatMap((lane) => lane.references);
+    return { kind: 'terminal', resolution: { candidates: values.slice(0, 10), reason: 'multiple-credible-provider-identities', state: 'AMBIGUOUS' } };
+  }
+  const lane = credible[0];
+  const reference = lane?.references[0];
+  if (lane === undefined || reference === undefined) throw new Error('matched-reference-missing');
+  const searched = lane.candidates.find((candidate) => candidate.provider === reference.provider && candidate.externalId === reference.externalId);
+  return { kind: 'matched', reference, searched };
 }
 
 async function sha256(value: string): Promise<string> {
@@ -107,42 +148,32 @@ async function verified(candidate: ProviderCandidate): Promise<PublicDiscoveryTe
   };
 }
 
+async function hydrateReference(
+  providers: PublicDiscoveryProviderPorts,
+  reference: PublicDiscoveryReferenceV3,
+  notFoundReason: 'exact-provider-identity-not-found' | 'matched-provider-identity-not-found',
+  searched?: ProviderCandidate,
+): Promise<PublicDiscoveryTerminalResolution> {
+  let candidate: ProviderCandidate | undefined;
+  try { candidate = await providers[reference.provider].hydrate(reference); }
+  catch (error) {
+    if (reference.provider !== 'mangaupdates' || searched === undefined || !(error instanceof Error) || !/HTTP 405\b/u.test(error.message)) throw error;
+    candidate = searched;
+  }
+  if (candidate === undefined) return { reason: notFoundReason, state: 'NOT_FOUND' };
+  if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('hydrated-identity-mismatch');
+  return verified(candidate);
+}
+
 export function createPublicDiscoveryResolver(providers: PublicDiscoveryProviderPorts = createPublicDiscoveryProviders()) {
   return {
     async resolve(request: PublicDiscoveryClaimedRequest): Promise<PublicDiscoveryTerminalResolution> {
       const explicit = request.query.explicitProviderReference;
-      if (explicit !== undefined) {
-        const candidate = await providers[explicit.provider].hydrate(explicit);
-        return candidate === undefined ? { reason: 'exact-provider-identity-not-found', state: 'NOT_FOUND' } : verified(candidate);
-      }
-
-      const titles = request.query.discoveryTitles.slice(0, 4);
-      const query = matchQueryFor(request, titles);
-      const lanes = request.query.mediaKind === 'ANIME'
-        ? [await searchLane(providers, ['anilist', 'kitsu-anime'], titles, query)]
-        : request.query.mediaKind === 'UNKNOWN'
-          ? [
-              await searchLane(providers, ['anilist', 'kitsu-anime'], titles, { ...query, mediaKind: 'ANIME' }),
-              await searchLane(providers, ['mangaupdates', 'mangadex', 'kitsu-manga'], titles, { ...query, mediaKind: 'MANGA' }),
-            ]
-          : [await searchLane(providers, ['mangaupdates', 'mangadex', 'kitsu-manga'], titles, query)];
-      const credible = lanes.filter((lane) => lane.state !== 'NOT_FOUND');
-      if (credible.length === 0) return { reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' };
-      if (credible.length > 1 || credible[0]?.state === 'AMBIGUOUS') {
-        const values = credible.flatMap((lane) => lane.references);
-        return { candidates: values.slice(0, 10), reason: 'multiple-credible-provider-identities', state: 'AMBIGUOUS' };
-      }
-      const lane = credible[0];
-      const reference = lane?.references[0];
-      if (lane === undefined || reference === undefined) throw new Error('matched-reference-missing');
-      const searched = lane.candidates.find((candidate) => candidate.provider === reference.provider && candidate.externalId === reference.externalId);
-      let candidate: ProviderCandidate | undefined;
-      try { candidate = await providers[reference.provider].hydrate(reference); }
-      catch (error) {
-        if (reference.provider !== 'mangaupdates' || !(error instanceof Error) || !/HTTP 405\b/u.test(error.message)) throw error;
-        candidate = searched;
-      }
-      return candidate === undefined ? { reason: 'matched-provider-identity-not-found', state: 'NOT_FOUND' } : verified(candidate);
+      if (explicit !== undefined) return hydrateReference(providers, explicit, 'exact-provider-identity-not-found');
+      const selected = selectMatch(await searchApplicableLanes(providers, request));
+      return selected.kind === 'terminal'
+        ? selected.resolution
+        : hydrateReference(providers, selected.reference, 'matched-provider-identity-not-found', selected.searched);
     },
   };
 }

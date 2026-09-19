@@ -94,4 +94,37 @@ describe('standalone provider resolver', () => {
       state: 'VERIFIED',
     });
   });
+
+  it.each(['HTTP 403', 'HTTP 429', 'TimeoutError', 'incomplete provider page'])('keeps %s retryable without entering fallback', async (failure) => {
+    const ports = providers({ 'kitsu-anime': candidate('kitsu-anime', 'ANIME', '42', 'Target') });
+    ports.anilist.search.mockRejectedValueOnce(new Error(failure));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('ANIME'))).rejects.toThrow(failure);
+    expect(ports['kitsu-anime'].search).not.toHaveBeenCalled();
+  });
+
+  it('does not publish an explicit identity when hydration returns another reference', async () => {
+    const ports = providers({ mangadex: candidate('mangadex', 'MANGA', 'other-id', 'Target') });
+    const input = request('MANGA');
+    await expect(createPublicDiscoveryResolver(ports).resolve({
+      ...input,
+      query: { ...input.query, explicitProviderReference: { externalId: 'expected-id', provider: 'mangadex' } },
+    })).rejects.toThrow('hydrated-identity-mismatch');
+  });
+
+  it('uses the same exact MangaUpdates search identity when its hydration endpoint returns HTTP 405', async () => {
+    const exact = candidate('mangaupdates', 'MANGA', '12345', 'Target');
+    const ports = providers({ mangaupdates: exact });
+    ports.mangaupdates.hydrate.mockRejectedValueOnce(new Error('HTTP 405'));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({
+      profile: { candidate: { externalId: '12345', provider: 'mangaupdates' } }, state: 'VERIFIED',
+    });
+    expect(ports.mangadex.search).not.toHaveBeenCalled();
+  });
+
+  it('does not publish one UNKNOWN lane while the other lane is unavailable', async () => {
+    const ports = providers({ anilist: candidate('anilist', 'ANIME', '1', 'Target') });
+    ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 429'));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('UNKNOWN'))).rejects.toThrow('HTTP 429');
+    expect(ports.anilist.hydrate).not.toHaveBeenCalled();
+  });
 });
