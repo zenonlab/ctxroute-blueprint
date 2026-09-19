@@ -290,4 +290,4 @@
 
 ## Automatiser la livraison Deno et Cloudflare depuis GitHub — ACTIVE
 
-- [ ] **Ajouter la configuration Deno et le workflow Cloudflare protégé** — IN_PROGRESS _(evidence: Étape approuvée et matérialisée; démarrage des changements limités au workflow GitHub, configuration Deno et documentation de livraison.)_
+- [ ] **Ajouter la configuration Deno et le workflow Cloudflare protégé** — IN_PROGRESS _(evidence: Commit a07a93ad4d113cbf09f376bccb0f55848f30b864 poussé sur origin/main; .codex/config.toml exclu., npm run verify, npm run test:infra, validations ADR/docs, Archify production-publication 9/9 et git diff --check passent; pre-push passe 273/274 tests avec 1 skip., Le workflow GitHub a bien été déclenché par push sur main, mais le run 35440622943 a échoué avant le démarrage d’un runner (0 ms facturables, aucune étape exécutée); aucune mutation Cloudflare n’est donc prouvée.)_
