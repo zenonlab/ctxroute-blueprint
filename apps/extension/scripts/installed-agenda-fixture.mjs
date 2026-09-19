@@ -30,7 +30,7 @@ export function seedInstalledAgenda(fixture) {
       transaction.objectStore('localAgendaProjectionState').clear();
       fixture.works.forEach((work) => works.put(work));
       fixture.events.forEach((event) => events.put(event));
-      state.put(fixture.active);
+      if (fixture.active !== undefined) state.put(fixture.active);
       transaction.oncomplete = () => { database.close(); resolve(true); };
       transaction.onerror = () => { database.close(); reject(transaction.error ?? new Error('Agenda seed failed.')); };
     };

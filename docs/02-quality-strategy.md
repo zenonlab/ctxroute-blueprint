@@ -58,6 +58,14 @@ plus de huit jours et la continuation d'un scan historique tronqué. Les codes
 fermés excluent dates et identités; ces tests ne prouvent pas l'installation
 d'une alerte externe ni l'absence de backlog distant.
 
+La certification installée Agenda commence avec uniquement deux œuvres locales,
+sans snapshot public injecté : v4 répond explicitement non initialisée et v3
+fournit l'historique synthétique. Les deux sorties INSTANT/DATE doivent être
+présentes dans la réponse au message puis visibles après rechargement de la
+page hors ligne. Toutes les autres routes réseau sont bloquées. Le parcours
+de mise à jour conserve un profil temporaire et son identifiant d'extension;
+il reste distinct d'une certification de la bibliothèque personnelle.
+
 Pure domain behavior uses fast deterministic unit tests. Every boundary adds a
 contract test. Browser semantics add a real extension journey. Persistence
 changes add forward migration, export/import, and failure recovery fixtures.

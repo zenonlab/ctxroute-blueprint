@@ -12,14 +12,15 @@
   as authority for presence and observed progress, agenda and notifications, a reconstructible
   public catalogue, optimized cover delivery, and optional encrypted recovery.
 - Out of scope for v1: accounts, private library synchronization, payments,
-  social graph, general-purpose web application, microservices, queues, and
+  social graph, general-purpose web application, general-purpose microservices, and
   reuse of FavLib source code.
 - Product shape: local-first WebExtension, a static Next App Router export for
   public catalogue and connected local projections, and an optional edge API.
   The site is not a general-purpose web application and has no account,
   authentication, private storage access, Review route, or radio surface.
-- Release candidate: `1.0.0`; the extension package is the sole version source
-  for WXT manifests, local ZIP names and the unpublished download surface.
+- Local release candidate: `1.0.40`; the extension package sets WXT manifests
+  and local ZIP names. The independently controlled public download pointer
+  remains `1.0.39` until the candidate's publication is separately approved.
 
 ## Discovery context
 
@@ -43,8 +44,9 @@
   mutation and operational action requires scoped approval.
 - Risk and compliance: browsing history, library content, and progress are
   private. No remote telemetry or private-data upload is enabled by default.
-- Deployment environments: unpacked extension in development, signed browser
-  packages for release, and an optional Cloudflare edge environment.
+- Deployment environments: unpacked extension in development, deterministic
+  Chrome/Firefox ZIPs installed manually, and an optional Cloudflare edge
+  environment. Store signing and automatic updates are not certified.
 - Expected change: browser capabilities, content-source integrations, storage
   implementations, and cloud providers are the most volatile boundaries.
 
@@ -64,8 +66,8 @@
 - Platform: current stable Chrome and Firefox; TypeScript strict mode on Node.js
   24 LTS for product tooling. The inherited control plane keeps its Node 22.13+
   compatibility floor until a separately approved migration.
-- Delivery: deterministic browser packages, manual store submission, no
-  automatic production deployment, and a documented rollback to the prior
+- Delivery: deterministic browser packages, manual installation preserving the
+  browser profile, no automatic production deployment, and rollback to the prior
   extension package or Worker version.
 
 ## Inherited governance baseline

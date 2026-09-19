@@ -36,8 +36,9 @@ Corrections locales en cours, distinctes de la version livrée : A02, A03, A04,
 A08 et A11 sont couverts par les tests de périodes Paris/New York, 205
 occurrences, rappels après erreur publique, préférence adulte avant émission,
 lecture IndexedDB concurrente et sérialisation de trois fenêtres. Les tests
-ne certifient pas le profil personnel ni un nouveau déploiement. Les autres
-constats ci-dessous restent à traiter.
+ne certifient pas le profil personnel ni un nouveau déploiement. Les constats
+ci-dessous décrivent la version auditée; les paragraphes de correction indiquent
+les preuves locales et les limites restantes.
 
 Corrections publiques vérifiées : A01 reçoit un repli historique strict après
 une génération v4 jamais publiée; A06 distingue le marqueur ancien sans cache
@@ -66,6 +67,16 @@ A13 : les codes opérateur d'échec, de DLQ imminente et d'attente supérieure �
 huit jours sont documentés. Une alerte externe active et l'état distant de la
 DLQ restent non certifiés; aucun délai garanti n'est annoncé pendant une
 indisponibilité globale. Le cron et les limites de tentatives restent inchangés.
+
+A14 : le brief distingue maintenant la candidate locale 1.0.40 du pointeur
+public 1.0.39 et décrit les ZIP manuels sans promettre de mise à jour signée.
+`npm run verify` passe avec 139 tests Worker, 405 applicatifs, 152 extension et
+68 Public Discovery; le corpus parser passe 11 tests, l'oracle externe reste
+ignoré. Le nouveau test d'installation Chrome utilise une v4 vide, reçoit
+l'historique v3 puis affiche les deux sorties INSTANT/DATE hors ligne. Ces
+preuves ne remplacent ni un canary de nouvelle collecte distante ni la
+certification du profil personnel. Les reçus d'archives et de navigateurs
+sont consignés dans le runbook.
 
 ### A01 — P1 : activation du lecteur avant disponibilité des modèles
 

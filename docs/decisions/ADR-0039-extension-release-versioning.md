@@ -122,8 +122,11 @@ version was `2905a076-d107-4a29-8408-f24f86c97555`.
 
 `1.0.39` livre la reprise R2/Queue, les modèles D1 courants et la propagation
 locale des corrections, avec ETag par page et invalidation des annonces et
-notifications obsolètes. Le pointeur public reste en `1.0.38` jusqu'à la
-vérification des deux nouveaux ZIP immuables; aucun objet antérieur n'est remplacé.
+notifications obsolètes. Sa publication et ses limites sont consignées dans
+le runbook. La candidate `1.0.40` corrige les périodes civiles, la concurrence
+du cache, les notifications et le repli sur l'historique avant le premier
+modèle v4. Le pointeur public reste en `1.0.39` jusqu'à une publication séparée
+des nouveaux ZIP vérifiés; aucun objet antérieur n'est remplacé.
 
 An update gets a cache-distinct Chrome and Firefox ZIP. A release can be built
 and verified locally before the separately approved R2 publication operation.

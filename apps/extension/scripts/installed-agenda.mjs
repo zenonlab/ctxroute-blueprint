@@ -25,9 +25,13 @@ const context = await chromium.launchPersistentContext(profile, { args: ['--enab
 try {
   const fixture = installedAgendaFixture();
   let providerRequests = 0;
+  let modelRequests = 0;
+  let historyRequests = 0;
+  await context.route('**/*', route => new URL(route.request().url()).protocol === 'chrome-extension:' ? route.continue() : route.abort());
   await context.route('https://graphql.anilist.co/**', (route) => { providerRequests += 1; return route.fulfill({ status: 503, body: 'Provider calls are forbidden in the installed Agenda smoke.' }); });
   await context.route('https://api.mangaupdates.com/**', (route) => { providerRequests += 1; return route.fulfill({ status: 503, body: 'Provider calls are forbidden in the installed Agenda smoke.' }); });
   await context.route('https://tobirink.com/v3/releases**', (route) => {
+    historyRequests += 1;
     const url = new URL(route.request().url());
     return route.fulfill({
       contentType: 'application/json',
@@ -36,18 +40,33 @@ try {
       body: JSON.stringify({ entries: fixture.events, generatedAt: fixture.active.checkedAt, revision: fixture.active.revision, window: { from: url.searchParams.get('from'), to: url.searchParams.get('to') } }),
     });
   });
+  await context.route('https://tobirink.com/v4/release-models**', route => {
+    modelRequests += 1;
+    const url = new URL(route.request().url());
+    assert.equal(url.searchParams.get('representation'), 'pages');
+    return route.fulfill({ contentType: 'application/json', headers: { ETag: '"uninitialized"' }, status: 200,
+      body: JSON.stringify({ models: [], generatedAt: '1970-01-01T00:00:00.000Z', revision: 'models-uninitialized', window: { from: url.searchParams.get('from'), to: url.searchParams.get('to') } }) });
+  });
   const debugging = await context.browser().newBrowserCDPSession();
   const { id } = await debugging.send('Extensions.loadUnpacked', { path: extensionPath });
   const page = await context.newPage();
   await page.goto(`chrome-extension://${id}/agenda.html`);
   await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ sort: 'TITLE_ASC', type: 'library.catalogue.read', version: 1 }));
-  await page.evaluate(seedInstalledAgenda, fixture);
+  await page.evaluate(seedInstalledAgenda, { ...fixture, active: undefined, events: [] });
   const response = await page.evaluate((period) => globalThis.chrome.runtime.sendMessage({ ...period, type: 'agenda.period.read', version: 1 }), fixture.period);
   assert.equal(response.ok, true, JSON.stringify(response));
   assert.ok(response.snapshot.items.some((item) => item.mediaType === 'anime' && item.occursAt === fixture.events[0].occurrence.value), JSON.stringify(response));
   assert.ok(response.snapshot.items.some((item) => item.mediaType === 'manga' && item.occursOn === fixture.events[1].occurrence.value), JSON.stringify(response));
   assert.equal(providerRequests, 0);
-  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: shared D1 Agenda reconstructed one anime INSTANT and one manga DATE with zero provider requests.\n`);
+  assert.ok(modelRequests > 0 && historyRequests > 0, 'Fresh installation must consume the historical fallback.');
+  await context.setOffline(true);
+  const offline = await page.evaluate((period) => globalThis.chrome.runtime.sendMessage({ ...period, type: 'agenda.period.read', version: 1 }), fixture.period);
+  assert.equal(offline.ok, true);
+  assert.deepEqual(offline.snapshot.items, response.snapshot.items);
+  await page.reload();
+  await page.getByText('Installed anime', { exact: true }).waitFor();
+  await page.getByText('Installed manga', { exact: true }).waitFor();
+  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: uninitialized v4 falls back to v3; anime INSTANT and manga DATE remain available offline, with zero provider requests.\n`);
 } finally {
   await context.close();
 }

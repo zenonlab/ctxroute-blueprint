@@ -6,6 +6,52 @@ remain independent of this operational path.
 
 ## Inspect
 
+### Candidate locale corrective 1.0.40 — non publiée
+
+Le 19 septembre 2026, `npm run verify` passe intégralement : Worker 139/139,
+application 405/405, extension 152/152, Public Discovery 68/68, contrats 14/14.
+Les validations Archify `all` et `public-discovery.dataflow`, les documents et
+les ADR passent; l'audit npm rapporte zéro vulnérabilité. Le contrôle des hooks
+ne relève aucune modification d'AGENTS, CLAUDE ou des hooks; la configuration
+Codex personnelle reste exclue des commits.
+
+Deux builds isolés puis le packaging normal produisent les mêmes archives :
+
+| Archive 1.0.40 | Octets | SHA-256 |
+| --- | ---: | --- |
+| Chrome MV3 | 299328 | `d8597bacfbf0a218aa7569b17cbe04576c9188fff4b38e40b0146be4c9af160c` |
+| Firefox MV3 | 299370 | `50d1ed5370b3d492c678907ec28d63eeed163d0241a1f3cb83fe56ed754eea6c` |
+
+Chromium 153.0.8010.12 installe l'archive, reçoit une v4 non initialisée puis
+l'historique v3 synthétique et affiche les sorties INSTANT/DATE après
+rechargement hors ligne. Un autre profil conserve son identifiant d'extension,
+1532 sources et 1400 médias pendant la mise à jour 1.0.39 vers 1.0.40 : zéro
+résolution inventée, zéro tâche bloquée et 132 liens non médias exclus.
+Firefox 155.0 installe son ZIP, reconstruit les deux types de dates hors ligne
+et traite les 1532 fixtures plus quatre favoris initiaux : 1536 observés,
+1404 retryables hors ligne, 132 exclus, zéro résolution et zéro blocage.
+
+Commandes de reproduction, exécutées depuis la racine :
+
+```bash
+npm run verify
+npm run archify:validate -- public-discovery.dataflow
+npm run package:extension -- --verify-isolated
+npm run package:extension
+node apps/extension/scripts/installed-agenda.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.40.zip
+node apps/extension/scripts/installed-review.mjs apps/extension/.output/packages/tobirink-chrome-mv3-1.0.40.zip apps/extension/.output/packages/tobirink-chrome-mv3-1.0.39.zip
+FIREFOX_BIN="$HOME/Library/Caches/ms-playwright/firefox-1543/firefox/Nightly.app/Contents/MacOS/firefox" node apps/extension/scripts/installed-firefox.mjs apps/extension/.output/packages/tobirink-firefox-mv3-1.0.40.zip
+```
+
+Le dernier chemin doit désigner un Firefox de test déjà installé. Les profils
+sont temporaires et les réponses réseau Agenda sont synthétiques. Aucun canary
+de nouvelle collecte distante, déploiement, migration distante, publication
+d'archive ou push n'est exécuté dans cette correction. Le pointeur public reste
+1.0.39. La livraison doit suivre l'ordre 0026 → Worker → canaries → archives
+décrit ci-dessous, avec approbation opérationnelle séparée. Les limites de
+MangaUpdates pour les annulations, du coût v3 historique, de l'alerte externe
+et de la certification personnelle restent dans l'audit d'automatisation.
+
 ### Publication pipeline 1.0.39
 
 La version du 19 septembre 2026 corrige les reprises R2/Queue,
