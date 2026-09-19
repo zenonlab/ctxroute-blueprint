@@ -388,10 +388,21 @@ describe('verified public discovery cache', () => {
     await env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3 SET next_refresh_at = '2026-09-15T00:00:00.000Z'
       WHERE fingerprint = ?1`).bind(key.fingerprint).run();
 
+    const refreshBody = JSON.stringify({ key, schemaVersion: 3 });
+    const unavailable = await createPublicDiscoveryApp({ publicDiscoveryV3: adapter }).request(
+      'https://tobirink.test/v3/catalogue/discoveries/refreshes',
+      { body: refreshBody, headers: { 'Content-Type': 'application/json' }, method: 'POST' },
+    );
+    expect(unavailable.status).toBe(503);
+    expect(await env.PUBLIC_DB.prepare(`SELECT refresh_state AS refreshState, queue_signal_state AS signal
+      FROM public_discovery_requests_v3 WHERE fingerprint = ?1`).bind(key.fingerprint).first())
+      .toEqual({ refreshState: 'PENDING', signal: 'UNSENT' });
+    await expect(adapter.read(key, new Date().toISOString())).resolves.toMatchObject({ state: 'VERIFIED' });
+
     const queue = { send: vi.fn(async () => undefined) };
     const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue });
     const refresh = await app.request('https://tobirink.test/v3/catalogue/discoveries/refreshes', {
-      body: JSON.stringify({ key, schemaVersion: 3 }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+      body: refreshBody, headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect(refresh.status).toBe(202);
     await expect(refresh.json()).resolves.toMatchObject({ profile: { workId: 'work_refresh' }, state: 'VERIFIED' });

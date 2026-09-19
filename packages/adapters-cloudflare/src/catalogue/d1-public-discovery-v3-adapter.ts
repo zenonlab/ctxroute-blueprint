@@ -361,8 +361,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     return { claimToken: input.claimToken, requests, schemaVersion: 3 };
   }
 
-  private publicationGuardValues(result: PublicDiscoveryResult, profile: PublicDiscoveryVerifiedProfile | undefined, tokenDigest: string, now: string): SqlValue[] {
-    const canonical = profile ? this.canonicalFacts(profile) : undefined;
+  private publicationGuardValues(result: PublicDiscoveryResult, profile: PublicDiscoveryVerifiedProfile | undefined, canonical: CanonicalFacts | undefined, tokenDigest: string, now: string): SqlValue[] {
     return [
       ...keyValues(result.key), tokenDigest, result.requestDigest, now,
       JSON.stringify(profile?.references ?? []), profile?.workId ?? '',
@@ -386,9 +385,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     };
   }
 
-  private async catalogueNeedsPublication(profile: PublicDiscoveryVerifiedProfile): Promise<boolean> {
+  private async catalogueNeedsPublication(profile: PublicDiscoveryVerifiedProfile, canonical: CanonicalFacts): Promise<boolean> {
     const candidate = profile.candidate;
-    const canonical = this.canonicalFacts(profile);
     const preferredTitle = candidate.displayTitle ?? candidate.titles[0] ?? candidate.externalId;
     const result = await this.database.prepare(`SELECT CASE WHEN
       NOT EXISTS (SELECT 1 FROM catalogue_works
@@ -420,7 +418,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     return result?.needsPublication === 1;
   }
 
-  private catalogueStatements(profile: PublicDiscoveryVerifiedProfile, verifiedAt: string, guardValues: SqlValue[]): Statement[] {
+  private catalogueStatements(profile: PublicDiscoveryVerifiedProfile, canonical: CanonicalFacts, verifiedAt: string, guardValues: SqlValue[]): Statement[] {
     const revision = Math.max(1, Date.parse(verifiedAt));
     const candidate = profile.candidate;
     return [
@@ -467,7 +465,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
             JOIN json_each(?) AS proposed ON existing.normalized_title = proposed.value
             WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`)
         .bind(profile.workId, 'und', title, ...guardValues)),
-      ...this.canonicalFacts(profile).normalizedTitles.map((normalizedTitle) => this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
+      ...canonical.normalizedTitles.map((normalizedTitle) => this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
           normalization_version, normalized_title, media_kind, work_id, created_at)
         SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
@@ -610,9 +608,10 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       return 'replayed';
     }
     if (!row || (row.state !== 'PROCESSING' && !refreshing) || row.claimTokenHash !== tokenDigest || row.requestDigest !== result.requestDigest) throw new Error('stale-public-discovery-result');
-    const guardValues = this.publicationGuardValues(result, profile, tokenDigest, now);
-    const statements = profile && await this.catalogueNeedsPublication(profile)
-      ? this.catalogueStatements(profile, verifiedAt, guardValues)
+    const canonical = profile ? this.canonicalFacts(profile) : undefined;
+    const guardValues = this.publicationGuardValues(result, profile, canonical, tokenDigest, now);
+    const statements = profile && canonical && await this.catalogueNeedsPublication(profile, canonical)
+      ? this.catalogueStatements(profile, canonical, verifiedAt, guardValues)
       : [];
     const resultExpiresAt = result.resolution.state === 'VERIFIED'
       ? null
