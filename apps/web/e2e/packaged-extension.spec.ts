@@ -185,3 +185,121 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     await context.close();
   }
 });
+
+test('installed site Library sorts the full private catalogue promptly', async () => {
+  test.setTimeout(90_000);
+  const repository = resolve(import.meta.dirname, '../../..');
+  const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
+  const archive = process.env.TOBIRINK_TEST_ARCHIVE ?? resolve(repository, `apps/extension/.output/packages/tobirink-chrome-mv3-${version}.zip`);
+  const extensionPath = mkdtempSync(resolve(tmpdir(), 'tobirink-sort-extension-'));
+  const profilePath = mkdtempSync(resolve(tmpdir(), 'tobirink-sort-profile-'));
+  execFileSync('unzip', ['-q', archive, '-d', extensionPath]);
+  const context = await chromium.launchPersistentContext(profilePath, {
+    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+    channel: 'chromium', headless: true,
+  });
+  try {
+    const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+    const extensionId = new URL(worker.url()).host;
+    const optionsPage = await context.newPage();
+    await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
+    await optionsPage.evaluate(() => chrome.runtime.sendMessage({ type: 'favorite.reconcile', version: 1 }));
+    await expect.poll(async () => optionsPage.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 })).inventory?.status)).toBe('complete');
+    await optionsPage.close();
+    const privateLibrary = await context.newPage();
+    await privateLibrary.goto(`chrome-extension://${extensionId}/library.html`);
+    await expect(privateLibrary.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
+    await privateLibrary.evaluate(() => new Promise<void>((resolveSeed, rejectSeed) => {
+      const opening = indexedDB.open('tobirink-private');
+      opening.onerror = () => rejectSeed(opening.error);
+      opening.onsuccess = () => {
+        const database = opening.result;
+        const transaction = database.transaction(['libraries', 'favoriteSources', 'favoriteArtifacts'], 'readwrite');
+        Array.from({ length: 1400 }, (_, index) => index).forEach((index) => {
+          const sourceId = `source_sort${String(index).padStart(4, '0')}`;
+          const title = `Synthetic ${String(index).padStart(4, '0')}`;
+          const url = `https://reader.invalid/manga/${index}`;
+          transaction.objectStore('favoriteSources').put({ id: sourceId, bookmarkId: `sort-${index}`, folderPath: [], importedAt: '2026-09-19T00:00:00.000Z', order: index, presence: 'observed', resolution: { kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE' }, title, url });
+          transaction.objectStore('favoriteArtifacts').put({ sourceId, recordedAt: '2026-09-19T00:00:00.000Z', artifact: { contractVersion: 2, diagnostics: [], displayTitle: title, mediaKind: 'MANGA', parserVersion: 'fixture-v1', raw: { title, url }, semanticFingerprint: `fixture-${index}`, sourceAdapterVersion: 'fixture-v1', sourceEvidence: { aliases: [], diagnostics: [], key: `fixture-${index}`, mediaKind: 'MANGA', proofs: ['CATEGORY_PATH'], sourceAdapter: 'fixture', strategy: 'exact-origin' }, status: 'parsed', transformations: [] } });
+        });
+        for (let index = 1400; index < 1532; index += 1) transaction.objectStore('favoriteSources').put({ id: `source_sort${index}`, bookmarkId: `sort-${index}`, folderPath: [], importedAt: '2026-09-19T00:00:00.000Z', order: index, presence: 'observed', resolution: { kind: 'UNSUPPORTED', reason: 'IDENTITY_MISSING' }, title: `Utility ${index}`, url: `https://reader.invalid/search/${index}` });
+        transaction.objectStore('libraries').put({ id: 'library_primary', workIds: [] });
+        transaction.oncomplete = () => { database.close(); resolveSeed(); };
+        transaction.onerror = () => { database.close(); rejectSeed(transaction.error); };
+      };
+    }));
+    const seededCatalogue = await privateLibrary.evaluate(() => chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
+    expect(seededCatalogue.ok, seededCatalogue.error).toBe(true);
+    const seededCounts = await privateLibrary.evaluate(() => new Promise<{ artifacts: number; sources: number }>((resolveCounts, rejectCounts) => {
+      const opening = indexedDB.open('tobirink-private');
+      opening.onerror = () => rejectCounts(opening.error);
+      opening.onsuccess = () => {
+        const transaction = opening.result.transaction(['favoriteSources', 'favoriteArtifacts'], 'readonly');
+        const sources = transaction.objectStore('favoriteSources').count();
+        const artifacts = transaction.objectStore('favoriteArtifacts').count();
+        transaction.oncomplete = () => resolveCounts({ sources: sources.result, artifacts: artifacts.result });
+        transaction.onerror = () => rejectCounts(transaction.error);
+      };
+    }));
+    expect(seededCounts).toEqual({ artifacts: 1400, sources: 1532 });
+    expect(seededCatalogue.snapshot.statistics.total).toBe(1400);
+    await privateLibrary.close();
+    await context.route('https://tobirink.com/**', async (route) => {
+      const requested = new URL(route.request().url());
+      const response = await route.fetch({ url: `http://127.0.0.1:4173${requested.pathname}${requested.search}` });
+      await route.fulfill({ response });
+    });
+    const site = await context.newPage();
+    const firstLoadStartedAt = Date.now();
+    await site.goto('https://tobirink.com/library');
+    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
+    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24);
+    const firstLoadMs = Date.now() - firstLoadStartedAt;
+    const bridgeTimings: number[] = [];
+    const renderedTimings: number[] = [];
+    for (const sort of ['TITLE_ASC', 'TITLE_DESC', 'ADDED_DESC', 'TITLE_ASC'] as const) {
+      const startedAt = Date.now();
+      const measuredResponse = site.evaluate((expectedSort) => new Promise<{ elapsedMs: number; firstTitle: string }>((resolveResponse) => {
+        const startedAt = performance.now();
+        const onMessage = (event: MessageEvent) => {
+          const response = event.data?.response;
+          if (event.data?.type !== 'tobirink.webbridge.response' || response?.value?.query?.sort !== expectedSort) return;
+          window.removeEventListener('message', onMessage);
+          resolveResponse({ elapsedMs: performance.now() - startedAt, firstTitle: response.value.items[0].title });
+        };
+        window.addEventListener('message', onMessage);
+      }), sort);
+      await site.getByLabel('Tri').selectOption(sort);
+      const measured = await measuredResponse;
+      await expect(site.locator('a[data-variant="library"]').first()).toContainText(measured.firstTitle);
+      bridgeTimings.push(measured.elapsedMs);
+      renderedTimings.push(Date.now() - startedAt);
+    }
+    process.stdout.write(`Installed site Library: first load ${firstLoadMs} ms; bridge sorts ${bridgeTimings.map((value) => value.toFixed(1)).join(', ')} ms; rendered sorts ${renderedTimings.join(', ')} ms.\n`);
+    expect(Math.max(...renderedTimings)).toBeLessThan(500);
+    const devtools = await context.browser()!.newBrowserCDPSession();
+    const targets = await devtools.send('Target.getTargets');
+    const workerTarget = targets.targetInfos.find((entry) => entry.type === 'service_worker' && entry.url === worker.url());
+    expect(workerTarget).toBeDefined();
+    await devtools.send('Target.closeTarget', { targetId: workerTarget!.targetId });
+    const coldStartedAt = Date.now();
+    const coldResponse = site.evaluate(() => new Promise<void>((resolveResponse) => {
+      const onMessage = (event: MessageEvent) => {
+        if (event.data?.type !== 'tobirink.webbridge.response' || event.data.response?.value?.query?.sort !== 'TITLE_DESC') return;
+        window.removeEventListener('message', onMessage);
+        resolveResponse();
+      };
+      window.addEventListener('message', onMessage);
+    }));
+    await site.getByLabel('Tri').selectOption('TITLE_DESC');
+    await coldResponse;
+    await expect(site.locator('a[data-variant="library"]').first()).toContainText('Synthetic 1399');
+    const workerRestartMs = Date.now() - coldStartedAt;
+    process.stdout.write(`Installed site Library: worker restart sort ${workerRestartMs} ms.\n`);
+    expect(workerRestartMs).toBeLessThan(5_000);
+    await devtools.detach();
+    await site.close();
+  } finally {
+    await context.close();
+  }
+});

@@ -4230,6 +4230,62 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-library-sort-latency",
+      "title": "Accélérer les tris de la bibliothèque sur le site",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "measure-and-fix",
+          "title": "Mesurer et corriger la latence Library de bout en bout",
+          "status": "DONE",
+          "acceptance": [
+            "Mesures séparées site, pont, réveil MV3, IndexedDB et rendu sur archive Chromium installée avec 1532 favoris dont 1400 médias.",
+            "Tris successifs de bout en bout sous 500 ms sur le profil de test; premier chargement mesuré séparément, sans attente muette de 5 secondes.",
+            "Facettes, ordre, pagination, états hors ligne et données privées inchangés; aucune écriture fournisseur, D1, R2 ou diagnostic personnel.",
+            "Tests ciblés, vérification complète, Archify dataflow, audit du diff et commit réussissent."
+          ],
+          "files": [
+            "apps/web/app/library/use-library-refresh.ts",
+            "apps/web/app/library/page.tsx",
+            "apps/web/app/components/WebBridgeProvider.tsx",
+            "apps/extension/wxt-entrypoints/web-bridge.content.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "packages/application/src/library/read-library-catalogue.ts",
+            "packages/application/src/library/project-pending-favorites.ts",
+            "packages/adapters-indexeddb/test/browser-entry.ts",
+            "apps/web/e2e/packaged-extension.spec.ts",
+            "apps/web/e2e/workbench.spec.ts",
+            "apps/extension/runtime/web-bridge-adapter.test.ts",
+            "docs/decisions/ADR-0036-static-site-and-local-bridge.md",
+            "docs/decisions/ADR-0042-local-first-library-projection.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/tobirink-ux.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/web",
+            "node packages/adapters-indexeddb/scripts/browser-contract.mjs",
+            "npm run test:e2e --workspace @tobirink/web -- --grep 'packaged Chrome extension'",
+            "npm run archify:validate -- dataflow",
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions",
+            "npm run verify",
+            "git diff --check",
+            "git commit -m 'perf(library): speed up site sorting'"
+          ],
+          "evidence": [
+            "Archive Chromium corrective reproductible SHA-256 bbe12005d58b865361aeb9f9015bce878714c2824ed154da055b1e851bd938fd; test installé 1532 sources/1400 médias: premier affichage 323 ms, quatre tris rendus 84–103 ms, réveil worker forcé 224 ms.",
+            "WebBridge répond explicitement aux échecs de transport/format/taille; test de reprise confirme deux lectures seulement et aucune attente du timeout de 5 s.",
+            "npm run verify, 4 tests E2E Library, contrats IndexedDB Chromium, lint, validations docs/décisions, Archify dataflow showcase 9/9 et visual-check quatre viewports passent; profil personnel non certifié."
+          ]
+        }
+      ]
     }
   ]
 }

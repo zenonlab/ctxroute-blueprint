@@ -1,6 +1,6 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { z } from 'zod';
-import { assertWebBridgeMessageSize, webHandshakeSchema, webRequestEnvelopeSchema } from '@tobirink/contracts/web-bridge';
+import { assertWebBridgeMessageSize, webHandshakeSchema, webPageBridgeInboundSchema, webRequestEnvelopeSchema } from '@tobirink/contracts/web-bridge';
 
 const siteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() || 'https://tobirink.com';
 const pageBridgeMessageSchema = z.union([webHandshakeSchema, webRequestEnvelopeSchema]);
@@ -17,12 +17,19 @@ export default defineContentScript({
       if (!parsed.success) return;
       const value = parsed.data;
       const handshake = webHandshakeSchema.safeParse(value);
-      const response = handshake.success
-        ? await browser.runtime.sendMessage({ handshake: handshake.data, type: 'webbridge.handshake' })
-        : await browser.runtime.sendMessage({ envelope: webRequestEnvelopeSchema.parse(value), type: 'webbridge.request' });
       const requestId = handshake.success ? handshake.data.requestId : webRequestEnvelopeSchema.parse(value).request.requestId;
+      const transportError = (error: string) => ({ error, ok: false as const, requestId, type: 'tobirink.webbridge.response' as const });
+      let response: unknown;
+      try {
+        response = handshake.success
+          ? await browser.runtime.sendMessage({ handshake: handshake.data, type: 'webbridge.handshake' })
+          : await browser.runtime.sendMessage({ envelope: webRequestEnvelopeSchema.parse(value), type: 'webbridge.request' });
+      } catch {
+        response = transportError('webbridge-transport-unavailable');
+      }
+      if (!webPageBridgeInboundSchema.safeParse({ requestId, response, type: 'tobirink.webbridge.response' }).success) response = transportError('webbridge-invalid-response');
       const pageResponse = { requestId, response, type: 'tobirink.webbridge.response' };
-      try { assertWebBridgeMessageSize(JSON.stringify(pageResponse)); } catch { return; }
+      try { assertWebBridgeMessageSize(JSON.stringify(pageResponse)); } catch { pageResponse.response = transportError('webbridge-message-too-large'); }
       window.postMessage(pageResponse, window.location.origin);
     });
   },

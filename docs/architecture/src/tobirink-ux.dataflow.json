@@ -8,7 +8,7 @@
     "quality_profile": "showcase",
     "views": [
       { "id": "new-install", "label": "Nouvelle installation", "focus": ["browser", "extension", "indexeddb"], "note": "Les favoris HTTP(S) entrent dans une base locale neuve avant toute projection UI." },
-      { "id": "site-bridge", "label": "Site connecté", "focus": ["site", "bridge", "indexeddb"], "note": "Accueil lit 4 œuvres; Library garde filtres et curseur dans l’URL; Agenda émet une lecture par semaine lundi [from,to)." },
+      { "id": "site-bridge", "label": "Site connecté", "focus": ["site", "bridge", "indexeddb"], "note": "Chaque tri lit IndexedDB et renvoie au plus 24 cartes; le test installé mesure le chargement et les tris." },
       { "id": "offline-recovery", "label": "Hors ligne et reprise", "focus": ["indexeddb", "extension", "site"], "note": "Les parcours privés restent lisibles localement et signalent l’absence de connexion." }
     ]
   },
@@ -29,12 +29,12 @@
   "flows": [
     { "from": "browser", "to": "extension", "label": "import", "classification": "premier démarrage", "variant": "emphasis", "route": "straight", "labelDy": 53 },
     { "from": "extension", "to": "indexeddb", "label": "écrit local", "classification": "transaction privée", "variant": "emphasis", "route": "straight", "labelDy": 53 },
-    { "from": "indexeddb", "to": "bridge", "label": "projection bornée", "classification": "500 œuvres · 100 entrées", "variant": "security", "route": "straight", "labelDy": 53 },
+    { "from": "indexeddb", "to": "bridge", "label": "projection bornée", "classification": "corpus complet · page de 24", "variant": "security", "route": "straight", "labelDy": 53 },
     { "from": "bridge", "to": "site", "label": "rendu", "classification": "site sans accès direct", "variant": "dashed", "route": "straight", "labelDy": 53 }
   ],
   "cards": [
     { "dot": "emerald", "title": "Autorité locale", "items": ["IndexedDB reste l’autorité privée unique", "L’installation importe les favoris dans une base neuve", "Le site ne lit jamais le stockage privé directement"] },
-    { "dot": "cyan", "title": "Bridge borné", "items": ["Session émise par l’extension, requête et version sont validées", "Purge expirée et LRU: 32 sessions, 64 IDs par session, 512 IDs globaux", "Library applique recherche normalisée, facette, curseur et limite 24", "Agenda transmet les timestamps et disponibilités locales sans précision inventée"] },
-    { "dot": "amber", "title": "États honnêtes", "items": ["Le popup montre seulement une source observée liée à un Work local", "Chaque session WebBridge valide réarme le renouvellement suivant", "Un renouvellement échoué reste borné et récupérable", "Aucune donnée personnelle ni état factice n’est présenté comme réel"] }
+    { "dot": "cyan", "title": "Bridge borné", "items": ["Session émise par l’extension, requête et version sont validées", "Échec du transport signalé sans attendre cinq secondes", "Library applique recherche normalisée, facette, curseur et limite 24"] },
+    { "dot": "amber", "title": "États honnêtes", "items": ["Une reprise de lecture conserve la Library sans second scan", "Un renouvellement échoué reste borné et récupérable", "Les mesures de tri excluent titres et URLs privés"] }
   ]
 }

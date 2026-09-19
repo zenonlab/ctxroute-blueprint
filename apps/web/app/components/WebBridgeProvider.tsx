@@ -122,8 +122,8 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
     return schema.parse(response);
   }, [postAndWait]);
 
-  const establishConnection = useCallback(async (reconnecting: boolean) => {
-    setStatus(reconnecting ? 'reconnecting' : 'loading');
+  const establishConnection = useCallback(async (reconnecting: boolean, preserveConnectedView = false) => {
+    if (!preserveConnectedView) setStatus(reconnecting ? 'reconnecting' : 'loading');
     try {
       const connectedSession = await handshake();
       const [nextBootstrap, nextReview] = await Promise.all([
@@ -161,13 +161,13 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
       return await operation();
     } catch (caught) {
       const reason = caught instanceof Error ? caught.message : 'webbridge-error';
-      const reconnectable = reason === 'expired-web-session' || reason === 'unknown-web-session' || reason === 'webbridge-timeout';
+      const reconnectable = reason === 'expired-web-session' || reason === 'unknown-web-session' || reason === 'webbridge-timeout' || reason === 'webbridge-transport-unavailable';
       if (!reconnectable || automaticReconnectUsedRef.current) {
         setStatus('error');
         throw caught;
       }
       automaticReconnectUsedRef.current = true;
-      await establishConnection(true);
+      await establishConnection(true, true);
       if (!sessionRef.current) throw caught;
       return operation();
     }

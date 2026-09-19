@@ -204,14 +204,22 @@ browser or `workerd` test when platform behavior is the risk.
 ## Performance budgets
 
 - Local UI operations: visible response within 200 ms on the reference profile.
-- Library reads use one IndexedDB transaction, inspect at most 500 work IDs,
-  expose at most 64 values per facet and return at most 24 cards. Missing and
+- Library reads traverse the complete local corpus in transactions of at most
+  100 work IDs and pages of at most 100 favorite sources; they expose at most
+  64 values per facet and return at most 24 cards. Missing and
   cross-provider popularity values sort after the selected comparable provider
   cohort with a stable title/ID tie-breaker.
 - The Chromium storage contract materializes 500 real Dexie works, filters the
   complete corpus before a 24-card page, checks the 64 KiB response ceiling and
   enforces the 200 ms local-read budget. Three validation runs on the reference
   profile measured 34.70–37.70 ms.
+- Le test du site avec l'archive Chromium installée conserve 1 532 sources,
+  dont 1 400 médias provisoires. Il mesure séparément le premier affichage,
+  chaque réponse WebBridge et le rendu après quatre changements de tri; chacun
+  des tris à chaud doit être visible en moins de 500 ms. Le test arrête ensuite
+  le worker MV3 par CDP et mesure le tri qui le réveille, sous cinq secondes.
+  Un échec du transport est renvoyé immédiatement, sans second parcours complet
+  du catalogue. Cette fixture ne certifie pas la latence du profil personnel.
 - Background startup: no unbounded scan and no network dependency.
 - Parser favori local : p95 inférieur à 10 ms pour une entrée typique et à
   50 ms pour une entrée Unicode proche de la borne, mesuré sans réseau.

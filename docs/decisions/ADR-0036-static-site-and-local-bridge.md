@@ -71,6 +71,14 @@ second loss becomes a recoverable error requiring an explicit retry. Global
 search navigates to the URL-addressable Library query, while the bounded Review
 snapshot feeds the Workbench bell and its existing decision command.
 
+Le content script répond avec un code d'erreur borné si l'envoi au service
+worker échoue ou si sa réponse est invalide ou trop grande. Une indisponibilité
+du transport déclenche immédiatement l'unique reconnexion autorisée; elle
+n'attend pas le timeout de cinq secondes de la requête initiale. Pendant cette
+reconnexion liée à une lecture, la Library conserve sa vue et son unique
+requête active; le changement temporaire de statut ne relance pas un second
+scan complet du catalogue.
+
 The web workspace pins Vitest 4.1.11, Testing Library 16.3.3, jsdom 30.0.1
 and Playwright 1.63.0 as development-only verification dependencies. Vitest
 checks schema-gated bridge states; Playwright drives the exported site at the

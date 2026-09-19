@@ -23,10 +23,11 @@ const fixture: BridgeFixture = {
   ],
 };
 
-async function installBridge(page: Page, selectedFixture: BridgeFixture = fixture) {
-  await page.addInitScript((bridgeFixture: BridgeFixture) => {
+async function installBridge(page: Page, selectedFixture: BridgeFixture = fixture, failFirstLibraryRead = false) {
+  await page.addInitScript(({ bridgeFixture, failFirstRead }: { bridgeFixture: BridgeFixture; failFirstRead: boolean }) => {
     window.__agendaReads = 0;
     window.__libraryReads = 0;
+    let libraryReadFailed = false;
     window.addEventListener('message', (event) => {
       const message = event.data;
       if (message?.type === 'webbridge.handshake') {
@@ -41,6 +42,11 @@ async function installBridge(page: Page, selectedFixture: BridgeFixture = fixtur
       if (request.type === 'review.read') value = { candidates: [], context: 'local' };
       if (request.type === 'library.read') {
         window.__libraryReads = (window.__libraryReads ?? 0) + 1;
+        if (failFirstRead && !libraryReadFailed) {
+          libraryReadFailed = true;
+          window.postMessage({ requestId: request.requestId, response: { error: 'webbridge-transport-unavailable', ok: false, requestId: request.requestId, type: 'tobirink.webbridge.response' }, type: 'tobirink.webbridge.response' }, window.location.origin);
+          return;
+        }
         const typeSelection = request.query.facets?.type ?? {};
         const includedTypes = Object.entries(typeSelection).filter(([, state]) => state === 'include').map(([value]) => value);
         const excludedTypes = Object.entries(typeSelection).filter(([, state]) => state === 'exclude').map(([value]) => value);
@@ -62,8 +68,17 @@ async function installBridge(page: Page, selectedFixture: BridgeFixture = fixtur
       }
       if (value) window.postMessage({ requestId: request.requestId, response: { ok: true, requestId: request.requestId, type: 'tobirink.webbridge.response', value }, type: 'tobirink.webbridge.response' }, window.location.origin);
     });
-  }, selectedFixture);
+  }, { bridgeFixture: selectedFixture, failFirstRead: failFirstLibraryRead });
 }
+
+test('Library retries a transport failure without waiting for the five-second timeout', async ({ page }) => {
+  await installBridge(page, fixture, true);
+  const startedAt = Date.now();
+  await page.goto('/library');
+  await expect(page.locator('a[data-variant="library"]')).toHaveCount(4);
+  expect(await page.evaluate(() => window.__libraryReads)).toBe(2);
+  expect(Date.now() - startedAt).toBeLessThan(5_000);
+});
 
 test('desktop Workbench renders real bridge projections and navigation', async ({ page }) => {
   await installBridge(page);
