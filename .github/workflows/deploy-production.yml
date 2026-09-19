@@ -48,6 +48,9 @@ jobs:
       - name: Restore pinned Archify tooling
         run: node .githooks/archify restore
 
+      - name: Build extension manifests for verification
+        run: npm run build:extension && npm run build:extension:firefox
+
       - name: Verify repository
         run: npm run verify
 

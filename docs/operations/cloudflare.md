@@ -10,10 +10,11 @@ Le workflow `.github/workflows/deploy-production.yml` se déclenche sur `main`
 ou par lancement manuel. Il s'exécute sur le runner auto-hébergé explicitement
 labellisé `self-hosted`, `macOS`, `ARM64`, `cloudflare-ci`; il prépare Node 22
 et Python 3.12 via `uv`, installe le lockfile, prépare les types générés de
-l'extension, restaure le pin Archify, exécute `npm run verify`, génère un plan
-expirant puis applique exactement la cible `worker:tobirink-public-api`. Il ne
-modifie ni D1, ni Queue, ni R2, ni les secrets fournisseur. Aucun autre runner
-ne peut recevoir cette lane de production.
+l'extension, restaure le pin Archify, construit les manifests Chrome et Firefox,
+exécute `npm run verify`, génère un plan expirant puis applique exactement la
+cible `worker:tobirink-public-api`. Il ne modifie ni D1, ni Queue, ni R2, ni les
+secrets fournisseur. Aucun autre runner ne peut recevoir cette lane de
+production.
 
 Créer dans l’environnement GitHub `production` les secrets
 `CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID`. Le token doit être limité au
