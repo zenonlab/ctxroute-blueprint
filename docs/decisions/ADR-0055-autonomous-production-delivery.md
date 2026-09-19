@@ -3,8 +3,10 @@ scope:
   - .github/workflows/deploy-production.yml
   - apps/provider-gateway/deno.jsonc
   - docs/operations/cloudflare.md
+  - docs/architecture/src/production-surface.architecture.json
   - docs/architecture/src/production-publication.dataflow.json
 review: on-change
+revised: true
 ---
 
 # ADR-0055 — Livraison de production protégée depuis GitHub

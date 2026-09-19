@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "Surface de production TobiRink",
-    "subtitle": "Workbench public, données locales et candidate extension 1.0.35",
+    "subtitle": "Workbench public et livraison protégée depuis GitHub",
     "visual_preset": "blueprint",
     "animation": "trace",
     "quality_profile": "showcase",
@@ -24,8 +24,8 @@
       {
         "id": "releaseDelivery",
         "label": "Livraison candidate 1.0.35",
-        "focus": ["browser", "worker", "releaseBucket"],
-        "note": "Deux routes versionnées diffuseront les ZIP Chrome et Firefox après vérification et publication."
+        "focus": ["githubDelivery", "worker", "releaseBucket", "verification"],
+        "note": "GitHub vérifie la livraison et le Worker publie les ressources après contrôle de la cible exacte."
       }
     ]
   },
@@ -35,7 +35,8 @@
     { "id": "extensionStore", "type": "database", "label": "IndexedDB extension", "sublabel": "autorité privée", "pos": [480, 120], "size": [160, 64], "tag": "appareil" },
     { "id": "edge", "type": "cloud", "label": "Edge TobiRink", "sublabel": "HTTPS + domaine", "pos": [260, 300], "size": [150, 64], "tag": "Cloudflare" },
     { "id": "worker", "type": "backend", "label": "Worker public", "sublabel": "routes + politiques", "pos": [480, 300], "size": [160, 64], "tag": "tobirink-public-api" },
-    { "id": "staticAssets", "type": "frontend", "label": "Assets Workbench", "sublabel": "export statique", "pos": [740, 90], "size": [158, 64], "tag": "66 fichiers" },
+    { "id": "githubDelivery", "type": "security", "label": "Livraison GitHub", "sublabel": "main + plan expirant", "pos": [740, 90], "size": [158, 64], "tag": "production" },
+    { "id": "staticAssets", "type": "frontend", "label": "Assets Workbench", "sublabel": "export statique", "pos": [740, 170], "size": [158, 64], "tag": "66 fichiers" },
     { "id": "releaseBucket", "type": "database", "label": "Releases R2", "sublabel": "2 ZIP versionnés", "pos": [740, 245], "size": [158, 64], "tag": "candidate 1.0.35" },
     { "id": "publicCatalogue", "type": "database", "label": "Catalogue D1", "sublabel": "Discovery v3 · Agenda", "pos": [740, 400], "size": [158, 64], "tag": "migrations versionnées" },
     { "id": "coverMedia", "type": "cloud", "label": "Médias couvertures", "sublabel": "R2 + Images", "pos": [740, 555], "size": [158, 64], "tag": "public" },
@@ -50,6 +51,7 @@
     { "id": "browserToBridge", "from": "browser", "to": "webBridge", "variant": "security", "route": "orthogonal-h" },
     { "id": "bridgeToStore", "from": "webBridge", "to": "extensionStore", "variant": "security", "route": "straight" },
     { "id": "edgeToWorker", "from": "edge", "to": "worker", "variant": "emphasis", "route": "straight" },
+    { "id": "githubToWorker", "from": "githubDelivery", "to": "worker", "variant": "security", "route": "orthogonal-h" },
     { "id": "workerToAssets", "from": "worker", "to": "staticAssets", "route": "orthogonal-h" },
     { "id": "workerToReleases", "from": "worker", "to": "releaseBucket", "variant": "security", "route": "orthogonal-h" },
     { "id": "workerToCatalogue", "from": "worker", "to": "publicCatalogue", "route": "orthogonal-h" },
@@ -58,7 +60,7 @@
     { "id": "releasesToVerification", "from": "releaseBucket", "to": "verification", "variant": "security", "route": "orthogonal-h" }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Production active", "items": ["Le Worker sert Discovery v3 et Agenda v3", "La production actuelle reste 1.0.34 jusqu’à publication", "Les routes Catalogue v2 répondent en 410"] },
+    { "dot": "emerald", "title": "Production active", "items": ["Le Worker sert Discovery v3 et Agenda v3", "GitHub vérifie puis borne la cible Worker", "Les routes Catalogue v2 répondent en 410"] },
     { "dot": "cyan", "title": "Propriété des données", "items": ["IndexedDB demeure l’autorité des données membres", "Le site ne possède aucun accès direct au stockage navigateur", "D1, R2 et Images contiennent uniquement des ressources publiques"] },
     { "dot": "amber", "title": "Rollback", "items": ["Les versions Worker précédentes restent adressables", "Les migrations D1 sont additives et versionnées", "Les objets R2 sont versionnés et ne sont pas supprimés automatiquement"] }
   ]
