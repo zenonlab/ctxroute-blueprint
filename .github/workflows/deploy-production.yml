@@ -36,9 +36,11 @@ jobs:
           printf '%s\n' "$HOME/.local/bin" "/opt/homebrew/bin" >> "$GITHUB_PATH"
           uv python install 3.12.0
           PYTHON_BIN="$(uv python find 3.12.0)"
-          echo "UV_PYTHON=$PYTHON_BIN" >> "$GITHUB_ENV"
           echo "$(dirname "$PYTHON_BIN")" >> "$GITHUB_PATH"
           "$PYTHON_BIN" --version
+          UV_PYTHON="$PYTHON_BIN" \
+            UV_PROJECT_ENVIRONMENT="$GITHUB_WORKSPACE/packages/code-review-graph/.venv" \
+            uv run --project "$GITHUB_WORKSPACE/packages/code-review-graph" --frozen code-review-graph --version
 
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
