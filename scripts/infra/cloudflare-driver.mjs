@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -49,7 +49,7 @@ export async function loadCloudflareConfig(path) {
   return { worker, d1, r2, queues: [...queueNames].sort().map(name => ({ name })) };
 }
 
-export function createCloudflareDriver({ config, retiredQueues = [], workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET] }) {
+export function createCloudflareDriver({ config, retiredQueues = [], workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET], preserveRoutes = false }) {
   validateCloudflareConfig(config);
   validateRetiredQueues(config, retiredQueues);
   const operations = new Map([
@@ -93,7 +93,7 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
       const output = {};
       if (actions.some(action => action.kind === 'worker-deploy')) {
         await buildWorkerAssets({ workerDirectory });
-        output.worker = (await run(['deploy', '--dry-run'], { cwd: workerDirectory })).trim();
+        output.worker = (await run(await deployArguments(workerDirectory, preserveRoutes, true), { cwd: workerDirectory })).trim();
       }
       const artifacts = await Promise.all(actions.filter(isReleaseArtifactAction).map(async action => {
         const content = await read(action.source);
@@ -112,7 +112,7 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
       }
       const results = [];
       for (const action of selected) {
-        const args = mutationArguments(action);
+        const args = await mutationArguments(action, workerDirectory, preserveRoutes);
         const input = action.kind === 'worker-secret-set' ? `${assertGatewaySecret(gatewaySecret)}\n` : undefined;
         const output = await run(args, { cwd: workerDirectory, input });
         results.push({ kind: action.kind, target: action.target, output: redact(output, gatewaySecret).trim() });
@@ -122,10 +122,10 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
   };
 }
 
-function mutationArguments(action) {
+async function mutationArguments(action, workerDirectory, preserveRoutes) {
   if (action.kind === 'queue-create') return ['queues', 'create', action.queue];
   if (action.kind === 'queue-delete') return ['queues', 'delete', action.queue];
-  if (action.kind === 'worker-deploy') return ['deploy'];
+  if (action.kind === 'worker-deploy') return deployArguments(workerDirectory, preserveRoutes, false);
   if (action.kind === 'worker-secret-set') return ['secret', 'put', PROVIDER_GATEWAY_SECRET, '--name', action.target.split('/')[0].slice('worker-secret:'.length)];
   if (action.kind === 'd1-migrate') return ['d1', 'migrations', 'apply', action.binding, '--remote'];
   if (action.kind === 'r2-publish') {
@@ -134,6 +134,18 @@ function mutationArguments(action) {
   const releaseArguments = releaseMutationArguments(action);
   if (releaseArguments) return releaseArguments;
   throw new Error(`unsupported-action-kind:${action.kind}`);
+}
+
+async function deployArguments(workerDirectory, preserveRoutes, dryRun) {
+  const args = ['deploy'];
+  if (dryRun) args.push('--dry-run');
+  if (!preserveRoutes) return args;
+  const source = JSON.parse(await readFile(resolve(workerDirectory, 'wrangler.jsonc'), 'utf8'));
+  delete source.routes;
+  const configPath = resolve(workerDirectory, `.wrangler-preserve-routes-${process.pid}.jsonc`);
+  await writeFile(configPath, `${JSON.stringify(source, null, 2)}\n`, 'utf8');
+  args.push('--config', configPath);
+  return args;
 }
 
 async function runWrangler(args, { accountId, cwd, input }) {
@@ -146,9 +158,20 @@ async function runWrangler(args, { accountId, cwd, input }) {
     maxBuffer: 4 * 1024 * 1024,
     env: environment,
   };
-  if (input !== undefined) return runWranglerWithInput(npm, ['exec', '--', 'wrangler', ...args], { ...options, input });
-  const { stdout } = await execFileAsync(npm, ['exec', '--', 'wrangler', ...args], options);
-  return stdout;
+  const commandArgs = ['exec', '--', 'wrangler', ...args];
+  try {
+    if (input !== undefined) return await runWranglerWithInput(npm, commandArgs, { ...options, input });
+    const { stdout } = await execFileAsync(npm, commandArgs, options);
+    return stdout;
+  } finally {
+    await cleanupTemporaryConfig(args);
+  }
+}
+
+async function cleanupTemporaryConfig(args) {
+  const configIndex = args.indexOf('--config');
+  const configPath = configIndex >= 0 ? args[configIndex + 1] : undefined;
+  if (configPath?.includes('.wrangler-preserve-routes-')) await unlink(configPath).catch(() => undefined);
 }
 
 function runWranglerWithInput(command, args, { cwd, env, input, maxBuffer }) {

@@ -411,6 +411,12 @@ file or mutate Cloudflare. The plan contains only hashes of inspection and
 preview output, its exact actions, its account, and a short expiry. Redirecting
 that output to a reviewed file is an explicit operator choice outside the gate.
 
+La livraison GitHub de production ajoute `--preserve-routes true` au plan.
+Cette option est incluse dans son digest et fait utiliser à Wrangler une copie
+éphémère de `wrangler.jsonc` sans `routes`; le Worker, ses bindings, ses
+queues et ses cron sont publiés sans réécrire `tobirink.com/*`. L’option n’est
+pas implicite pour les plans locaux.
+
 ## Apply
 
 Apply is a separately approved provider mutation. The operator must supply the

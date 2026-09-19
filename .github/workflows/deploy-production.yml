@@ -65,8 +65,9 @@ jobs:
           npm run --silent infra:plan -- \
             --provider cloudflare \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
-            --operation worker-deploy > .ctxroute-production-plan.json
-          node -e "const fs=require('node:fs'); const plan=JSON.parse(fs.readFileSync('.ctxroute-production-plan.json','utf8')); if (!plan.digest || !Array.isArray(plan.actions) || plan.actions.length !== 1 || plan.actions[0].target !== 'worker:tobirink-public-api') process.exit(1);"
+            --operation worker-deploy \
+            --preserve-routes true > .ctxroute-production-plan.json
+          node -e "const fs=require('node:fs'); const plan=JSON.parse(fs.readFileSync('.ctxroute-production-plan.json','utf8')); if (!plan.digest || !Array.isArray(plan.actions) || plan.actions.length !== 1 || plan.actions[0].target !== 'worker:tobirink-public-api' || plan.options?.preserveRoutes !== true) process.exit(1);"
 
       - name: Apply only the approved Worker target
         env:

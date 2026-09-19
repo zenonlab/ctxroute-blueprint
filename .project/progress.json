@@ -4538,10 +4538,10 @@
             "git push origin main"
           ],
           "evidence": [
-            "Déploiement Cloudflare direct réussi sous le plan frais f3198d1151f51dad5fcf7c28548a3c04ad42b22ccb1d22c3acc4fc29bc04af3b, allowlist unique worker:tobirink-public-api.",
-            "Worker version 1a367735-510f-4e9a-aacb-45bc1f19a51c active à 100%; aucune migration D1 en attente; Queue, R2, bindings, route tobirink.com/* et cron conservés.",
-            "Vérification publique Deno: /healthz retourne 200 healthy. Vérification publique Worker: /, /download, /library, /agenda et /privacy retournent tous HTTP 200.",
-            "Le workflow GitHub reste fonctionnellement déclenché mais échoue avant runner; la livraison runtime est donc prouvée par la gate Cloudflare locale, pas par GitHub Actions."
+            "Production-surface Archify mis à jour pour le mode de livraison à route conservée; npm run archify:validate -- architecture passe pour toutes les sources, dont production-surface 9/9 sans erreur ni avertissement.",
+            "Le plan Cloudflare est désormais protégé par options.preserveRoutes=true dans le digest; un test infra dédié prouve la configuration éphémère sans routes et les 23 tests infra passent.",
+            "npm run verify passe intégralement: 274 tests (273 succès, 1 skip), typechecks workspace, build Chrome/Firefox, intégration, npm audit 0 vulnérabilité et build docs.",
+            "Le dernier run GitHub a réussi jusqu’à npm run verify et la génération du plan mais l’apply a échoué sur /zones/.../workers/routes; le correctif évite cet appel avec preserve-routes. Le plan local n’a pas pu être reproduit car le token .env échoue D1 code 10000."
           ]
         }
       ]

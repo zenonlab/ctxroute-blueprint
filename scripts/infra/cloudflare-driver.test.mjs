@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCloudflareDriver, loadCloudflareConfig, validateCloudflareConfig } from './cloudflare-driver.mjs';
@@ -83,6 +83,29 @@ async function test_preview_and_apply_translations() {
     { workerDirectory: '/worker' },
     { workerDirectory: '/worker' },
   ]);
+}
+
+async function test_preserve_routes_deploy_uses_route_free_ephemeral_config() {
+  const calls = [];
+  const driver = createCloudflareDriver({
+    config,
+    workerDirectory: resolve(fileURLToPath(new URL('../../apps/worker', import.meta.url))),
+    run: async args => { calls.push(args); return args.includes('--dry-run') ? 'bundle preview' : 'applied'; },
+    buildWorkerAssets: async () => {},
+    preserveRoutes: true,
+  });
+  const actions = driver.resolveOperations(['worker-deploy']);
+  await driver.preview(actions);
+  const previewConfig = calls[0][calls[0].indexOf('--config') + 1];
+  assert.equal(calls[0][0], 'deploy');
+  assert.equal(calls[0][1], '--dry-run');
+  assert.ok(previewConfig.endsWith('.jsonc'));
+  assert.equal('routes' in JSON.parse(readFileSync(previewConfig, 'utf8')), false);
+  calls.length = 0;
+  await driver.apply(actions);
+  assert.equal(calls[0][0], 'deploy');
+  assert.ok(calls[0].includes('--config'));
+  unlinkSync(previewConfig);
 }
 
 async function test_gateway_secret_is_stdin_only_and_redacted() {
@@ -235,6 +258,7 @@ function test_reject_invalid_r2_identifiers() {
 test('the driver derives operation targets from configuration', test_derive_operation_targets);
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
+test('preserve-routes deploys with an ephemeral route-free config', test_preserve_routes_deploy_uses_route_free_ephemeral_config);
 test('the gateway secret is passed on stdin and redacted from results', test_gateway_secret_is_stdin_only_and_redacted);
 test('an absent or weak gateway secret fails before Wrangler', test_gateway_secret_fails_closed_before_wrangler);
 test('a failed web build prevents Worker preview and deployment', test_worker_build_failure_prevents_wrangler);

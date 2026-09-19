@@ -9,6 +9,7 @@ const PLAN_KEYS = [
   'expiresAt',
   'inspectionDigest',
   'previewDigest',
+  'options',
   'actions',
   'digest',
 ];
@@ -28,11 +29,12 @@ export function digest(value) {
   return createHash('sha256').update(canonicalJson(value)).digest('hex');
 }
 
-export function createOperationPlan({ driverId, accountId, inspection, preview, actions, now = new Date(), ttlMs = DEFAULT_TTL_MS }) {
+export function createOperationPlan({ driverId, accountId, inspection, preview, actions, options = { preserveRoutes: false }, now = new Date(), ttlMs = DEFAULT_TTL_MS }) {
   assertIdentifier(driverId, 'driverId');
   assertIdentifier(accountId, 'accountId');
   if (!Number.isSafeInteger(ttlMs) || ttlMs < 1 || ttlMs > MAX_TTL_MS) throw new Error('invalid-plan-ttl');
   const normalizedActions = normalizeActions(actions);
+  const normalizedOptions = normalizeOptions(options);
   const createdAt = validDate(now, 'invalid-plan-created-at');
   const body = {
     schemaVersion: 1,
@@ -43,6 +45,7 @@ export function createOperationPlan({ driverId, accountId, inspection, preview, 
     expiresAt: new Date(createdAt.getTime() + ttlMs).toISOString(),
     inspectionDigest: digest(inspection),
     previewDigest: digest(preview),
+    options: normalizedOptions,
     actions: normalizedActions,
   };
   return { ...body, digest: digest(body) };
@@ -59,6 +62,7 @@ export function assertApplicablePlan({ plan, approvedDigest, accountId, resource
   const current = validDate(now, 'invalid-current-time');
   if (expiresAt <= current || createdAt > current || expiresAt.getTime() - createdAt.getTime() > MAX_TTL_MS) throw new Error('stale-plan');
   const actions = normalizeActions(plan.actions);
+  normalizeOptions(plan.options);
   const body = { ...plan };
   delete body.digest;
   if (!isSha256(plan.digest) || digest(body) !== plan.digest) throw new Error('modified-plan');
@@ -67,6 +71,13 @@ export function assertApplicablePlan({ plan, approvedDigest, accountId, resource
   const allowed = new Set(normalizeAllowlist(resourceAllowlist));
   if (actions.some(action => !allowed.has(action.target))) throw new Error('resource-not-allowed');
   return { ...plan, actions };
+}
+
+function normalizeOptions(options) {
+  if (!isRecord(options) || Object.keys(options).some(key => key !== 'preserveRoutes') || (options.preserveRoutes !== true && options.preserveRoutes !== false)) {
+    throw new Error('invalid-plan-options');
+  }
+  return { preserveRoutes: options.preserveRoutes };
 }
 
 export async function applyApprovedPlan({ driver, plan, approvedDigest, accountId, resourceAllowlist, now }) {

@@ -9,6 +9,8 @@ const RETIRED_CLOUDFLARE_QUEUES = [];
 
 export async function runProviderGate(argv, { cwd = process.cwd(), stdout = console.log } = {}) {
   const { command, values } = parseArguments(argv);
+  let approvedPlan;
+  if (command === 'apply') approvedPlan = JSON.parse(await readFile(required(values.plan, '--plan'), 'utf8'));
   const provider = values.provider ?? 'cloudflare';
   let driver;
   if (provider === 'deno') {
@@ -16,7 +18,12 @@ export async function runProviderGate(argv, { cwd = process.cwd(), stdout = cons
   } else if (provider === 'cloudflare') {
     const workerDirectory = resolve(cwd, 'apps/worker');
     const config = await loadCloudflareConfig(resolve(workerDirectory, 'wrangler.jsonc'));
-    driver = createCloudflareDriver({ config, retiredQueues: RETIRED_CLOUDFLARE_QUEUES, workerDirectory });
+    driver = createCloudflareDriver({
+      config,
+      retiredQueues: RETIRED_CLOUDFLARE_QUEUES,
+      workerDirectory,
+      preserveRoutes: command === 'plan' ? boolean(values['preserve-routes'], '--preserve-routes') : Boolean(approvedPlan?.options?.preserveRoutes),
+    });
   } else {
     throw new Error('unsupported-provider');
   }
@@ -38,21 +45,21 @@ export async function runProviderGate(argv, { cwd = process.cwd(), stdout = cons
       inspection,
       preview,
       actions,
+      options: { preserveRoutes: boolean(values['preserve-routes'], '--preserve-routes') },
     });
     stdout(JSON.stringify(plan, null, 2));
     return;
   }
 
   if (command === 'apply') {
-    const plan = JSON.parse(await readFile(required(values.plan, '--plan'), 'utf8'));
     const result = await applyApprovedPlan({
       driver,
-      plan,
+      plan: approvedPlan,
       approvedDigest: required(values.approve, '--approve'),
       accountId: required(values.account, '--account'),
       resourceAllowlist: list(values.allow, '--allow'),
     });
-    stdout(JSON.stringify({ appliedPlan: plan.digest, result }, null, 2));
+    stdout(JSON.stringify({ appliedPlan: approvedPlan.digest, result }, null, 2));
     return;
   }
 
@@ -67,10 +74,16 @@ function parseArguments(argv) {
     const value = args[index + 1];
     if (!flag?.startsWith('--') || value === undefined || value.startsWith('--')) throw new Error(`invalid-argument:${flag ?? ''}`);
     const key = flag.slice(2);
-    if (!['account', 'operation', 'plan', 'approve', 'allow', 'provider'].includes(key)) throw new Error(`unknown-argument:${flag}`);
+    if (!['account', 'operation', 'plan', 'approve', 'allow', 'provider', 'preserve-routes'].includes(key)) throw new Error(`unknown-argument:${flag}`);
     values[key] = values[key] === undefined ? value : [...(Array.isArray(values[key]) ? values[key] : [values[key]]), value];
   }
   return { command, values };
+}
+
+function boolean(value, flag) {
+  if (value === undefined) return false;
+  if (value !== 'true' && value !== 'false') throw new Error(`invalid-boolean:${flag}`);
+  return value === 'true';
 }
 
 function required(value, flag) {

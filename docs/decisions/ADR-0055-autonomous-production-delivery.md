@@ -35,6 +35,12 @@ expirant, vérifie son digest et applique uniquement
 `worker:tobirink-public-api`. Les pull requests n’ont aucun job de déploiement
 et le job ne possède que `contents: read`.
 
+Le plan de production encode aussi l’option `preserveRoutes: true`. Wrangler
+reçoit une configuration temporaire sans déclaration `routes`, ce qui publie la
+nouvelle version et ses déclencheurs sans appeler l’API de routes de zone. La
+route `tobirink.com/*` existante reste donc inchangée; cette option ne peut pas
+être ajoutée après la création du plan sans invalider son digest.
+
 Les secrets `CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID` sont des secrets
 d’environnement GitHub. `PROVIDER_GATEWAY_HMAC_KEY` reste un secret runtime
 séparé du dépôt, présent côté Worker et gateway; aucune valeur secrète n’est

@@ -35,7 +35,7 @@
     { "id": "extensionStore", "type": "database", "label": "IndexedDB extension", "sublabel": "autorité privée", "pos": [480, 120], "size": [160, 64], "tag": "appareil" },
     { "id": "edge", "type": "cloud", "label": "Edge TobiRink", "sublabel": "HTTPS + domaine", "pos": [260, 300], "size": [150, 64], "tag": "Cloudflare" },
     { "id": "worker", "type": "backend", "label": "Worker public", "sublabel": "routes + politiques", "pos": [480, 300], "size": [160, 64], "tag": "tobirink-public-api" },
-    { "id": "githubDelivery", "type": "security", "label": "Livraison GitHub", "sublabel": "main + plan expirant", "pos": [740, 90], "size": [158, 64], "tag": "production" },
+    { "id": "githubDelivery", "type": "security", "label": "Livraison GitHub", "sublabel": "route conservée", "pos": [740, 90], "size": [158, 64], "tag": "production" },
     { "id": "staticAssets", "type": "frontend", "label": "Assets Workbench", "sublabel": "export statique", "pos": [740, 170], "size": [158, 64], "tag": "66 fichiers" },
     { "id": "releaseBucket", "type": "database", "label": "Releases R2", "sublabel": "2 ZIP versionnés", "pos": [740, 245], "size": [158, 64], "tag": "candidate 1.0.35" },
     { "id": "publicCatalogue", "type": "database", "label": "Catalogue D1", "sublabel": "Discovery v3 · Agenda", "pos": [740, 400], "size": [158, 64], "tag": "migrations versionnées" },
