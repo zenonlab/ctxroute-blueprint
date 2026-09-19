@@ -9,7 +9,35 @@ export interface LocalReleaseAgendaPort {
   commit(revision: string, evidence: readonly LocalReleaseEvidence[], events: readonly LocalAgendaEvent[]): Promise<void>;
   isCurrent(revision: string): Promise<boolean>;
   listEvidence(workId: WorkId, limit: number): Promise<readonly LocalReleaseEvidence[]>;
-  listPeriod(from: string, to: string, limit: number): Promise<readonly LocalAgendaEvent[]>;
+  listPeriod(from: string, to: string, limit: number, after?: { occurrence: string; id: string }): Promise<readonly LocalAgendaEvent[]>;
+}
+
+export interface LocalAgendaReadPeriod { from: string; to: string; civilFrom?: string; civilTo?: string }
+
+function civilDate(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/u.test(value)) return value;
+  const date = new Date(value);
+  if (!Number.isFinite(date.valueOf())) throw new Error('invalid-agenda-period');
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+export function publicAgendaWindow(period: LocalAgendaReadPeriod) {
+  return { from: [period.from.slice(0, 10), period.civilFrom ?? civilDate(period.from)].sort()[0]!,
+    to: [period.to.slice(0, 10), period.civilTo ?? civilDate(period.to)].sort().at(-1)! };
+}
+
+async function allPeriodEvents(projection: LocalReleaseAgendaPort, from: string, to: string): Promise<readonly LocalAgendaEvent[]> {
+  const events: LocalAgendaEvent[] = [];
+  let after: { occurrence: string; id: string } | undefined;
+  for (let page = 0; page < 100; page += 1) {
+    const batch = await projection.listPeriod(from, to, 100, after);
+    events.push(...batch);
+    if (batch.length < 100) return events;
+    const last = batch.at(-1)!;
+    if (after?.id === last.id && after.occurrence === last.occurrence.value) throw new Error('local-agenda-pagination-stalled');
+    after = { occurrence: last.occurrence.value, id: last.id };
+  }
+  throw new Error('local-agenda-period-limit');
 }
 
 function canonicalProvider(provider: string): string {
@@ -43,7 +71,9 @@ export async function projectLocalReleaseAgenda(storage: StoragePort, cache: Pub
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([generation.revision, generation.window])));
   const projectionRevision = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
   if (await projection.isCurrent(projectionRevision)) {
-    const events = await projection.listPeriod(generation.window.from, generation.window.to, 100);
+    const end = new Date(`${generation.window.to}T00:00:00.000Z`);
+    end.setUTCDate(end.getUTCDate() + 1);
+    const events = await allPeriodEvents(projection, generation.window.from, end.toISOString().slice(0, 10));
     return { entries: notifiableEntries(events), generatedAt: generation.generatedAt, missingWorkIds: [], state: 'hydrated' };
   }
   const works = await allWorks(storage); const identities: { [identity: string]: Work | undefined } = {};
@@ -71,8 +101,14 @@ export async function projectLocalReleaseAgenda(storage: StoragePort, cache: Pub
 
 function compareSources(left: FavoriteSource, right: FavoriteSource): number { return left.folderPath.join('\u0000').localeCompare(right.folderPath.join('\u0000')) || left.order - right.order || left.id.localeCompare(right.id); }
 async function sourceFor(storage: StorageReadPort, id: WorkId): Promise<FavoriteSource | undefined> { const direct = await storage.listFavoriteSourcesByWorkId({ limit: 100, workId: id }); return direct.filter((source) => source.presence === 'observed').sort(compareSources)[0]; }
-export async function readLocalReleaseAgenda(storage: StorageReadPort, projection: LocalReleaseAgendaPort, period: { from: string; to: string }): Promise<{ items: readonly { event: LocalAgendaEvent; source?: FavoriteSource; work: Work }[]; missingWorkIds: readonly WorkId[] }> {
-  const events = await projection.listPeriod(period.from.slice(0, 10), period.to.slice(0, 10), 100); const missing: WorkId[] = []; const items: { event: LocalAgendaEvent; source?: FavoriteSource; work: Work }[] = [];
+export async function readLocalReleaseAgenda(storage: StorageReadPort, projection: LocalReleaseAgendaPort, period: LocalAgendaReadPeriod): Promise<{ items: readonly { event: LocalAgendaEvent; source?: FavoriteSource; work: Work }[]; missingWorkIds: readonly WorkId[] }> {
+  const civilFrom = period.civilFrom ?? civilDate(period.from); const civilTo = period.civilTo ?? civilDate(period.to);
+  if (period.from >= period.to || civilFrom >= civilTo) throw new Error('invalid-agenda-period');
+  const from = [period.from, civilFrom].sort()[0]!; const to = [period.to, civilTo].sort().at(-1)!;
+  const events = (await allPeriodEvents(projection, from, to)).filter(event => event.occurrence.kind === 'DATE'
+    ? event.occurrence.value >= civilFrom && event.occurrence.value < civilTo
+    : event.occurrence.value >= period.from && event.occurrence.value < period.to);
+  const missing: WorkId[] = []; const items: { event: LocalAgendaEvent; source?: FavoriteSource; work: Work }[] = [];
   for (const event of events) { const id = workId(event.workId); const work = await storage.getWork(id); if (!work) { missing.push(id); continue; } const source = await sourceFor(storage, id); items.push(source ? { event, source, work } : { event, work }); }
   return { items: Object.freeze(items), missingWorkIds: Object.freeze(missing) };
 }

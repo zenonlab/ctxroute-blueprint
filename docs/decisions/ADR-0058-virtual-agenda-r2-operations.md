@@ -1,5 +1,6 @@
 ---
 scope:
+  - apps/extension/runtime/local-agenda-queue*
   - apps/worker/migrations/**
   - apps/worker/src/releases/**
   - apps/worker/src/native-collectors.ts
@@ -39,6 +40,18 @@ plus la prochaine occurrence; elle n’est jamais réutilisée comme observation
 Les états terminé, annulé et hiatus suspendent les prévisions. Les dates civiles
 restent des dates sans heure inventée et les séquences textuelles restent
 textuelles.
+
+La lecture privée distingue les bornes civiles de la fenêtre et les instants
+UTC; elle parcourt les occurrences par pages stables sans tronquer à cent.
+Au-delà de 10 000 occurrences, elle échoue explicitement au lieu de présenter
+une fenêtre incomplète; le contrat de réponse accepte cette même borne.
+WebBridge garde son contrat de cent entrées et 60 Kio; une fenêtre trop grande
+renvoie une erreur explicite au lieu de tronquer silencieusement les sorties.
+Le cache se lit dans une transaction unique. `local-agenda-queue` sérialise
+l'acquisition et l'utilisation d'une génération afin que deux fenêtres ne
+projettent pas leurs résultats respectifs. La panne de rafraîchissement public
+n'empêche pas l'examen des rappels locaux; leur préférence et la politique de
+contenu courante sont revérifiées juste avant l'envoi.
 
 Stocker dans R2 les observations et états de travail sous des clés versionnées.
 Chaque objet porte un jeton propriétaire, une échéance et une version; les

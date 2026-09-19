@@ -66,7 +66,7 @@ export async function scheduleAgendaPeriodNotifications(
 }
 
 export async function resumeDueAgendaNotification(
-  dependencies: { notifications: NotificationPort; storage: StorageReadPort; tasks: TaskStorePort },
+  dependencies: { notifications: NotificationPort; storage: StorageReadPort; tasks: TaskStorePort; canNotify?: (entry: AgendaEntry) => Promise<boolean> },
   input: { claimExpiresAt: string; claimToken: string; now: string },
 ): Promise<'empty' | 'notifiable-entry-missing' | 'published'> {
   const task = await dependencies.tasks.claimNext(input.claimToken, input.now, input.claimExpiresAt);
@@ -87,6 +87,10 @@ export async function resumeDueAgendaNotification(
   const effect = `agenda-notification:${reminder.id}:${entry.occursAt}`;
   if (task.idempotencyKey !== effect) {
     await dependencies.tasks.block(task.id, input.claimToken, 'Release date changed after this notification was scheduled.');
+    return 'notifiable-entry-missing';
+  }
+  if (dependencies.canNotify !== undefined && !await dependencies.canNotify(entry)) {
+    await dependencies.tasks.block(task.id, input.claimToken, 'Notification hidden by current local policy.');
     return 'notifiable-entry-missing';
   }
   await dependencies.notifications.publish({ body: entry.releaseLabel, deduplicationKey: effect, title: 'Sortie à venir' });

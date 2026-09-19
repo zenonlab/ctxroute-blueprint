@@ -4044,6 +4044,179 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-correct-pipeline-automation",
+      "title": "Corriger les lacunes de l'audit d'automatisation",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "local",
+          "title": "Fiabiliser périodes cache et notifications locales",
+          "status": "DONE",
+          "acceptance": [
+            "A02: jours civils et instants distincts dans les fuseaux et changements d'heure.",
+            "A03/A04: panne publique ne bloque pas rappel local; politique courante appliquée à l'envoi.",
+            "A08/A11: périodes sans troncature silencieuse; cache transactionnel et requêtes concurrentes cohérentes."
+          ],
+          "files": [
+            "apps/extension/**",
+            "packages/application/**",
+            "packages/adapters-browser/**",
+            "packages/adapters-indexeddb/**",
+            "packages/ui/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/operations/pipeline-automation-audit.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/**",
+            "docs/decisions/**"
+          ],
+          "commands": [
+            "npm run test:contracts",
+            "npm run test:storage",
+            "npm run test:migrations",
+            "npm run test:e2e",
+            "npm run typecheck",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m 'fix(agenda): preserve local periods and notification policy'"
+          ],
+          "evidence": [
+            "Application 404 tests couverts dont 9 Agenda; extension 152/152, contrats 14/14, stockage et migrations Chromium passent. Paris/New York: dates civiles, changement d'heure et 205 occurrences; cache concurrent et trois fenêtres sérialisées vérifiés.",
+            "Rappels locaux après 503 et visibilité avant envoi couverts; WebBridge refuse explicitement les périodes trop grandes. Typechecks complets, lint, anti-slop, docs/ADR et Archify all passent; aucun état privé supprimé ni déploiement."
+          ]
+        },
+        {
+          "id": "public",
+          "title": "Assurer transition historique pagination et génération efficace",
+          "status": "TODO",
+          "acceptance": [
+            "A01: installation neuve exploite historique valide sans identité inventée.",
+            "A06/A07: ancien client v4 compatible; v3 couvre transitions partielles et plus de 1000 modèles.",
+            "A10: génération durable et lectures bornées; migration éventuelle additive testée localement."
+          ],
+          "files": [
+            "apps/worker/**",
+            "packages/adapters-browser/src/releases/**",
+            "packages/adapters-cloudflare/src/releases/**",
+            "packages/application/src/agenda/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/operations/pipeline-automation-audit.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/**",
+            "docs/decisions/**"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run test:agenda",
+            "npm run typecheck",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m 'fix(releases): preserve historical coverage and paginated compatibility'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "canonical",
+          "title": "Raccorder preuves fournisseur et cohérence canonique",
+          "status": "TODO",
+          "acceptance": [
+            "A05: preuve fournisseur réelle ou indisponibilité explicite; aucune annulation déduite d'une absence.",
+            "A09: profil JSON et colonnes cohérents lors de réponses partielles; dates confirmées distinctes."
+          ],
+          "files": [
+            "apps/worker/**",
+            "packages/adapters-cloudflare/src/catalogue/**",
+            "packages/public-discovery/**",
+            "packages/application/**",
+            "packages/domain/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/operations/pipeline-automation-audit.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/**",
+            "docs/decisions/**"
+          ],
+          "commands": [
+            "npm run test:d1",
+            "npm run test:contracts",
+            "npm run typecheck",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m 'fix(catalogue): align canonical profiles and provider evidence'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "operations",
+          "title": "Mesurer les reprises et exposer leurs limites",
+          "status": "TODO",
+          "acceptance": [
+            "A12: métriques du réveil complet et émissions Queue sans double comptage.",
+            "A13: état de reprise et seuils testés, alerte opérationnelle bornée, cron et essais inchangés."
+          ],
+          "files": [
+            "apps/worker/**",
+            "packages/adapters-cloudflare/src/releases/**",
+            "docs/operations/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/operations/pipeline-automation-audit.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/**",
+            "docs/decisions/**"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run test:infra",
+            "npm run typecheck",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m 'fix(operations): account for complete recovery attempts'"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "certification",
+          "title": "Certifier les corrections et préparer une nouvelle candidate",
+          "status": "TODO",
+          "acceptance": [
+            "A14: rapport et brief alignés sur preuves nouvelles et limites restantes.",
+            "Candidate corrective versionnée sans remplacer les archives publiées; Chrome Firefox et corpus validés.",
+            "Aucune installation de dépendance, secret, quota, nouveau cron, push ou mutation fournisseur implicite."
+          ],
+          "files": [
+            "apps/extension/**",
+            "apps/extension/package.json",
+            "package-lock.json",
+            "scripts/agenda-certification/**",
+            "scripts/parser-equivalence/**",
+            "docs/00-project-brief.md",
+            "docs/operations/**",
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/operations/pipeline-automation-audit.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/**",
+            "docs/decisions/**"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run package:extension -- --verify-isolated",
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions",
+            "npm run archify:validate -- all",
+            "git diff --check",
+            "git commit -m 'test(pipeline): certify automation audit corrections'"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

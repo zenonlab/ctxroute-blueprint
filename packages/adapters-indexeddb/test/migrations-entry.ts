@@ -1,4 +1,5 @@
 import Dexie from 'dexie';
+import type { PublicReleaseSyncRecord } from '../src/releases/public-release-records';
 import before from './fixtures/v1-before.json';
 import after from './fixtures/v2-after.json';
 import versionThree from './fixtures/v3-after.json';
@@ -139,6 +140,16 @@ async function verifySharedReleasePromotion(name: string): Promise<void> {
   await cache.save({ etag: '"releases-shared-window"', events: [mangaEvent], generatedAt: '2026-09-13T00:00:00.000Z', revision: 'shared-1', source: 'shared', window });
   const shared = await cache.load();
   if (shared?.events[0]?.occurrence.kind !== 'DATE' || (await database.publicReleaseSyncState.get('active'))?.source !== 'shared' || await database.publicReleaseSyncState.get('fallback') || await database.publicReleaseStagingEvents.count()) throw new Error('Shared generation did not replace legacy release state atomically.');
+  let concurrentSave: Promise<void> | undefined;
+  const replaceDuringRead = (row: PublicReleaseSyncRecord) => {
+    database.publicReleaseSyncState.hook('reading').unsubscribe(replaceDuringRead);
+    concurrentSave = Dexie.ignoreTransaction(() => cache.save({ etag: '"replacement"', events: [{ ...mangaEvent, id: 'replacement-event' }], generatedAt: '2026-09-14T00:00:00.000Z', revision: 'replacement', source: 'shared', window }));
+    return row;
+  };
+  database.publicReleaseSyncState.hook('reading', replaceDuringRead);
+  const concurrentRead = await cache.load();
+  await concurrentSave;
+  if (concurrentRead?.revision !== 'shared-1' || concurrentRead.events[0]?.id !== mangaEvent.id || (await cache.load())?.revision !== 'replacement') throw new Error('Concurrent cache replacement mixed generation metadata and events.');
   const agenda = new DexieLocalReleaseAgenda(database);
   const localWorkId = workId('work_release-date');
   const evidence = { id: 'evidence-release-date', publicReleaseId: mangaEvent.id, workId: localWorkId, observedAt: '2026-09-13T00:00:00.000Z', source: 'public', occurrence: mangaEvent.occurrence, state: mangaEvent.state, provider: mangaEvent.provider, providerWorkId: mangaEvent.providerWorkId, releaseKind: mangaEvent.releaseKind, sequence: mangaEvent.sequence } as const;
@@ -159,6 +170,14 @@ async function verifySharedReleasePromotion(name: string): Promise<void> {
   await agenda.commit('cancelled', [{ ...instant, state: 'CANCELLED' }], []);
   if ((await database.agenda.get(original.id))?.availability !== 'unavailable' || (await agenda.listPeriod('2026-09-01', '2026-10-01', 100)).length !== 0) throw new Error('Cancelled release remained active or notifiable.');
   if (await database.localAgendaEvents.get(announcement.id) === undefined || await database.works.get(localWorkId) === undefined) throw new Error('Logical invalidation removed history or a private Work.');
+  const many = Array.from({ length: 205 }, (_, index) => ({ ...announcement, id: `agenda_many-${String(index).padStart(3, '0')}`, occurrence: evidence.occurrence }));
+  await agenda.commit('many', [evidence], many);
+  const firstPage = await agenda.listPeriod('2026-09-14', '2026-09-15', 100);
+  const firstCursor = firstPage.at(-1)!;
+  const secondPage = await agenda.listPeriod('2026-09-14', '2026-09-15', 100, { occurrence: firstCursor.occurrence.value, id: firstCursor.id });
+  const secondCursor = secondPage.at(-1)!;
+  const lastPage = await agenda.listPeriod('2026-09-14', '2026-09-15', 100, { occurrence: secondCursor.occurrence.value, id: secondCursor.id });
+  if (firstPage.length !== 100 || secondPage.length !== 100 || lastPage.length !== 5 || new Set([...firstPage, ...secondPage, ...lastPage].map(event => event.id)).size !== 205) throw new Error('Stable IndexedDB pagination lost simultaneous occurrences.');
   storage.close();
   database.close();
 }

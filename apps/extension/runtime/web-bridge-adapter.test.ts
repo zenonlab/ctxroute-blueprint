@@ -120,7 +120,7 @@ describe('WebBridge private projections', () => {
     });
   });
 
-  it('truncates a large Agenda projection below the transport ceiling', async () => {
+  it('rejects an oversized Agenda period explicitly instead of silently truncating it', async () => {
     const storage = new MemoryStoragePort();
     const id = workId('work_largeagenda');
     await storage.putWork(createWork({ externalReferences: [], id, mediaKind: 'anime', preferredTitle: 'Agenda volumineux' }));
@@ -129,8 +129,6 @@ describe('WebBridge private projections', () => {
       await storage.putAgendaEntry(createAgendaEntry({ availability: 'estimated', id: agendaEntryId(`agenda_large${String(index).padStart(3, '0')}`), occursAt: `2026-09-${String(7 + (index % 7)).padStart(2, '0')}T${String(index % 24).padStart(2, '0')}:00:00.000Z`, releaseLabel: `Sortie ${index}`, workId: id }));
     }
     const period = await createWebBridgeRequestHandler(storage)({ type: 'agenda.read', requestId: 'request_large', from: '2026-09-07', to: '2026-09-14' });
-    if (!('entries' in period)) throw new Error('expected-agenda-period');
-    expect(period.entries.length).toBeLessThan(100);
-    expect(new TextEncoder().encode(JSON.stringify(period)).byteLength).toBeLessThanOrEqual(60 * 1024);
+    expect(period).toEqual({ error: 'agenda-period-too-large' });
   });
 });

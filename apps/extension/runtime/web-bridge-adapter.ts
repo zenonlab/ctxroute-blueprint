@@ -155,7 +155,8 @@ export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscov
       const from = localMidnight(request.from);
       const to = localMidnight(request.to);
       const legacy = localAgenda === undefined ? await readAgendaPeriod(storage, { from, to }) : undefined;
-      const projected = localAgenda === undefined ? undefined : await readLocalReleaseAgenda(storage, localAgenda, { from: request.from, to: request.to });
+      if (legacy !== undefined && legacy.items.length >= 100) return { error: 'agenda-period-too-large' };
+      const projected = localAgenda === undefined ? undefined : await readLocalReleaseAgenda(storage, localAgenda, { from, to, civilFrom: request.from, civilTo: request.to });
       const showAdultContent = await readShowAdultContent();
       const periodItems = projected?.items.filter(({ work }) => isContentVisible(work.hydration?.candidate, showAdultContent)).map(({ event, source, work }) => ({ occurrence: event.occurrence, availability: event.availability, releaseLabel: event.releaseLabel, source, work })) ?? legacy?.items.filter(({ work }) => isContentVisible(work.hydration?.candidate, showAdultContent)).map(({ entry, source, work }) => ({ occurrence: { kind: 'INSTANT' as const, value: entry.occursAt }, availability: entry.availability, releaseLabel: entry.releaseLabel, source, work })) ?? [];
       const entries = periodItems.flatMap(({ availability, occurrence, releaseLabel, source, work }) => {
@@ -165,7 +166,7 @@ export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscov
         return source ? [{ ...dated, sourceLabel: source.title, sourceUrl: source.url }] : [dated];
       });
       const snapshot: WebAgendaPeriod = { entries: [...entries], from: request.from, to: request.to };
-      while (!projectionFits(JSON.stringify(snapshot)) && snapshot.entries.length > 0) snapshot.entries.pop();
+      if (snapshot.entries.length > 100 || !projectionFits(JSON.stringify(snapshot))) return { error: 'agenda-period-too-large' };
       return snapshot;
     }
     if (request.type === 'review.read') {

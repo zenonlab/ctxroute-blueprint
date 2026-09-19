@@ -259,3 +259,11 @@
 ## Auditer la fiabilité automatique réelle de la pipeline — DONE
 
 - [x] **Consigner les garanties et défauts prouvés** — DONE _(evidence: Rapport audité: 14 constats hiérarchisés dont 7 P1; sources, conséquences, correctifs et tests attendus explicités. Concurrence marquée risque à reproduire; certification personnelle et inspection administrative non prouvées., npm run verify réexécuté avec succès; docs et diff-check passent. HTTP public v4 confirme modèles vides/1970; inspection administrative échoue No API token found. Aucun correctif runtime ni mutation distante., Conversion de bornes Paris vérifiée: semaine 21–28 septembre devient dates UTC 20–27, avec borne exclusive tronquant le dimanche. AGENTS/CLAUDE/hooks inchangés et config utilisateur exclue.)_
+
+## Corriger les lacunes de l'audit d'automatisation — ACTIVE
+
+- [x] **Fiabiliser périodes cache et notifications locales** — DONE _(evidence: Application 404 tests couverts dont 9 Agenda; extension 152/152, contrats 14/14, stockage et migrations Chromium passent. Paris/New York: dates civiles, changement d'heure et 205 occurrences; cache concurrent et trois fenêtres sérialisées vérifiés., Rappels locaux après 503 et visibilité avant envoi couverts; WebBridge refuse explicitement les périodes trop grandes. Typechecks complets, lint, anti-slop, docs/ADR et Archify all passent; aucun état privé supprimé ni déploiement.)_
+- [ ] **Assurer transition historique pagination et génération efficace** — PENDING
+- [ ] **Raccorder preuves fournisseur et cohérence canonique** — PENDING
+- [ ] **Mesurer les reprises et exposer leurs limites** — PENDING
+- [ ] **Certifier les corrections et préparer une nouvelle candidate** — PENDING

@@ -45,10 +45,12 @@ export class DexieLocalReleaseAgenda implements LocalReleaseAgendaPort {
     const records = await this.database.localReleaseEvidence.where('[workId+occurrence.value]').between([workId, Dexie.minKey], [workId, Dexie.maxKey], true, true).reverse().limit(limit).toArray();
     return records.map((item) => localReleaseEvidenceSchema.parse(item)).sort((left, right) => left.occurrence.value.localeCompare(right.occurrence.value) || left.id.localeCompare(right.id));
   }
-  async listPeriod(from: string, to: string, limit: number): Promise<readonly LocalAgendaEvent[]> {
+  async listPeriod(from: string, to: string, limit: number, after?: { occurrence: string; id: string }): Promise<readonly LocalAgendaEvent[]> {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100 || from >= to) throw new RangeError('Invalid local Agenda period.');
     const active = await this.database.localAgendaProjectionState.get('active');
     const ids = active?.eventIds === undefined ? undefined : new Set(active.eventIds);
-    return (await this.database.localAgendaEvents.where('occurrence.value').between(from, to, true, false).filter(event => ids === undefined || ids.has(event.id)).limit(limit).toArray()).map((item) => localAgendaEventSchema.parse(item)).sort((left, right) => left.occurrence.value.localeCompare(right.occurrence.value) || left.id.localeCompare(right.id));
+    return (await this.database.localAgendaEvents.where('occurrence.value').between(after?.occurrence ?? from, to, true, false)
+      .filter(event => (ids === undefined || ids.has(event.id)) && (after === undefined || event.occurrence.value > after.occurrence || (event.occurrence.value === after.occurrence && event.id > after.id)))
+      .limit(limit).toArray()).map((item) => localAgendaEventSchema.parse(item));
   }
 }

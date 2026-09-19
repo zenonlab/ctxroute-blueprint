@@ -32,6 +32,13 @@ les compteurs et les snapshots distants n'ont pas été inspectés dans cet audi
 
 ## Défauts prioritaires
 
+Corrections locales en cours, distinctes de la version livrée : A02, A03, A04,
+A08 et A11 sont couverts par les tests de périodes Paris/New York, 205
+occurrences, rappels après erreur publique, préférence adulte avant émission,
+lecture IndexedDB concurrente et sérialisation de trois fenêtres. Les tests
+ne certifient pas le profil personnel ni un nouveau déploiement. Les autres
+constats ci-dessous restent à traiter.
+
 ### A01 — P1 : activation du lecteur avant disponibilité des modèles
 
 Le lecteur installé demande exclusivement v4. Il refuse une génération âgée

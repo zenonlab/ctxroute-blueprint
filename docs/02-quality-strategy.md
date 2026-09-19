@@ -360,6 +360,15 @@ leaving `unknown` visible, filters before pagination and statistics, blocks
 adult review/actions/notifications/WebBridge projections, and preserves data
 for an ON/restart/offline round trip.
 
+Local Agenda regressions cover separate civil and instant bounds across Paris
+and New York DST, 205 simultaneous occurrences, and an explicit 10,000-item
+response bound. The IndexedDB browser migration harness starts a concurrent
+generation replacement while reading the active header and requires a coherent
+old generation followed by the complete new one. Notification tests require
+local reminders to drain after public refresh failure and recheck the current
+adult-content policy immediately before publishing. A three-window queue test
+checks that a failed request cannot mix another window's load and projection.
+
 Sensor, CRG, CTXRoute, and Archify continue to validate repository governance.
 They do not replace TypeScript, adapter, browser, migration, or Worker tests and
 never become product runtime dependencies.

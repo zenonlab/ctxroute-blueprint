@@ -87,7 +87,10 @@ describe('extension Agenda messages', () => {
       ok: true,
       snapshot: { items: [{ availability: 'official', id: 'agenda_release-one', mediaType: 'anime', occursAt: '2026-09-08T10:00:00.000Z', release: 'Episode 1', source: 'anilist', sourceUrl: 'javascript:alert(1)', title: 'Frieren', workId: 'work_frieren-one' }], missingWorkIds: [], source: 'local', updatedAt: '2026-09-06T08:00:00.000Z' },
     }).success).toBe(false);
-    expect(agendaPeriodResponseSchema.safeParse({ ok: true, snapshot: { items: Array.from({ length: 101 }, () => ({})), missingWorkIds: [] } }).success).toBe(false);
+    const item = { availability: 'confirmed', id: 'agenda_release-date', mediaType: 'manga', occursOn: '2026-09-09', release: 'Chapitre 58.5', source: 'mangaupdates', title: 'Manga', workId: 'work_manga-date' };
+    const snapshot = { items: Array.from({ length: 205 }, () => item), missingWorkIds: [], source: 'local', updatedAt: '2026-09-06T08:00:00.000Z' };
+    expect(agendaPeriodResponseSchema.safeParse({ ok: true, snapshot }).success).toBe(true);
+    expect(agendaPeriodResponseSchema.safeParse({ ok: true, snapshot: { ...snapshot, items: Array.from({ length: 10_001 }, () => item) } }).success).toBe(false);
   });
 });
 

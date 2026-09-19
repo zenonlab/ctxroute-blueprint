@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   blockTask,
   claimTask,
@@ -16,8 +16,8 @@ import {
 import type { DurableTask, TaskStorePort } from '../../packages/application/src';
 import { WebExtensionNotificationAdapter } from '../../packages/adapters-browser/src';
 import { MemoryStoragePort } from '../../packages/contracts/src/memory-storage-port';
-import { agendaEntryId, createAgendaEntry, createReminder, reminderId, workId } from '../../packages/domain/src';
-import { drainDueAgendaNotifications, reminderAlarmName } from './runtime/local-notification-runtime';
+import { agendaEntryId, createAgendaEntry, createReminder, createWork, reminderId, workId } from '../../packages/domain/src';
+import { drainDueAgendaNotifications, refreshAndDrainAgendaNotifications, reminderAlarmName } from './runtime/local-notification-runtime';
 
 class MemoryTaskStore implements TaskStorePort {
   private readonly records = new Map<string, DurableTask>();
@@ -80,6 +80,25 @@ class MemoryTaskStore implements TaskStorePort {
 }
 
 describe('agenda notifications', () => {
+  it('checks current adult visibility for a reminder scheduled before the preference changed', async () => {
+    const storage = new MemoryStoragePort();
+    const tasks = new MemoryTaskStore();
+    const work = createWork({ id: workId('work_policy-check'), externalReferences: [{ provider: 'anilist', externalId: '42' }], preferredTitle: 'Private title', mediaKind: 'anime', hydration: {
+      candidate: { provider: 'anilist', externalId: '42', titles: ['Private title'], mediaKind: 'ANIME', preSerialization: false, contentClassification: 'adult' },
+      favoriteAliasKeys: [], providerTitleKeys: [], hydratedAt: '2026-09-04T00:00:00.000Z', matcherVersion: 'v1',
+    } });
+    await storage.putWork(work);
+    const entry = createAgendaEntry({ id: agendaEntryId('agenda_policy-check'), workId: work.id, availability: 'official', occursAt: '2026-09-04T08:00:00.000Z', releaseLabel: 'Episode' });
+    const reminder = createReminder({ id: reminderId('reminder_policy-check'), agendaEntryId: entry.id, channel: 'native', enabled: true, leadMinutes: 0 });
+    await storage.putAgendaEntry(entry); await storage.putReminder(reminder);
+    await scheduleAgendaNotification(tasks, entry, reminder);
+    const publish = vi.fn();
+    await drainDueAgendaNotifications({ storage, tasks, notifications: { publish }, preferences: { read: async () => ({ nativeNotifications: true, showAdultContent: false, showEstimatedReleases: true }), write: async () => undefined } }, new Date('2026-09-04T09:00:00.000Z'));
+    expect(publish).not.toHaveBeenCalled();
+    expect(await storage.getWork(work.id)).toEqual(work);
+    expect(await storage.getReminder(reminder.id)).toEqual(reminder);
+  });
+
   it('preserves a manually disabled reminder when a public period is projected again', async () => {
     const storage = new MemoryStoragePort();
     const tasks = new MemoryTaskStore();
@@ -93,7 +112,7 @@ describe('agenda notifications', () => {
   it('routes cached public Agenda periods, preferences and alarm recovery through the background', () => {
     const background = readFileSync(new URL('./wxt-entrypoints/background.ts', import.meta.url), 'utf8');
     const surface = readFileSync(new URL('./runtime/ExtensionSurface.tsx', import.meta.url), 'utf8');
-    expect(background).toMatch(/readLocalReleaseAgenda\(privateStorage\.storage, releaseAgenda, parsed\.data\)/);
+    expect(background).toMatch(/readLocalReleaseAgenda\(privateStorage\.storage, releaseAgenda, period\)/);
     expect(background).toMatch(/new DexiePublicReleaseGenerationCache\(privateStorage\.storage\.database\)/);
     expect(background).toMatch(/new DexieLocalReleaseAgenda\(privateStorage\.storage\.database\)/);
     expect(background).toMatch(/projectLocalReleaseAgenda\(privateStorage\.storage, releaseCache, releaseAgenda\)/);
@@ -123,7 +142,9 @@ describe('agenda notifications', () => {
     const disabled = { read: async () => ({ nativeNotifications: false, showEstimatedReleases: true, showAdultContent: false }), write: async () => undefined };
     expect(await drainDueAgendaNotifications({ notifications, preferences: disabled, storage, tasks }, new Date('2026-09-04T09:00:00.000Z'))).toBe(0);
     const enabled = { read: async () => ({ nativeNotifications: true, showEstimatedReleases: true, showAdultContent: false }), write: async () => undefined };
-    expect(await drainDueAgendaNotifications({ notifications, preferences: enabled, storage, tasks }, new Date('2026-09-04T09:00:00.000Z'))).toBe(1);
+    const refresh = vi.fn(async () => { throw new Error('public-release-http-503'); });
+    expect(await refreshAndDrainAgendaNotifications({ notifications, preferences: enabled, storage, tasks }, refresh, new Date('2026-09-04T09:00:00.000Z'))).toEqual({ published: 1, refreshed: false });
+    expect(refresh).toHaveBeenCalledOnce();
     expect(calls).toEqual(['agenda-notification:reminder_restart-gate:2026-09-04T08:00:00.000Z']);
     expect(reminderAlarmName).toBe('tobirink-due-reminders');
   });

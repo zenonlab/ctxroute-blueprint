@@ -19,17 +19,18 @@ import { repairFavoriteLibraryProjection } from '../runtime/repair-library-proje
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
 import { readLocalLibraryCatalogueSnapshot } from '../runtime/local-library-catalogue-runtime';
-import { agendaNextAlarmName, agendaReconcileAlarmName, agendaReconcileAlarmPeriodMinutes, drainDueAgendaNotifications, reminderAlarmName, reminderAlarmPeriodMinutes } from '../runtime/local-notification-runtime';
+import { agendaNextAlarmName, agendaReconcileAlarmName, agendaReconcileAlarmPeriodMinutes, refreshAndDrainAgendaNotifications, reminderAlarmName, reminderAlarmPeriodMinutes } from '../runtime/local-notification-runtime';
 import { createExtensionLocalStorage } from '../runtime/local-storage';
 import { extensionMessageSchema } from '../runtime/messages';
 const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() || 'https://tobirink.com';
 import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favoriteInventoryAuditPeriodMinutes, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
-import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda } from '@tobirink/application';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda, publicAgendaWindow } from '@tobirink/application';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
 import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, readFavoriteResolutionPaused, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteResolutionPaused } from '../runtime/favorite-resolution-continuation';
 import { createPublicDiscoveryRefreshRuntime } from '../runtime/public-discovery-refresh-runtime';
+import { createLocalAgendaQueue } from '../runtime/local-agenda-queue';
 
 const primaryLibraryId = libraryId('library_primary');
 const providerNetworkDisabled = Object.freeze({
@@ -76,14 +77,9 @@ export default defineBackground({
       end.setUTCDate(end.getUTCDate() + 15);
       return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
     };
-    const refreshPublicReleasesOnce = async (window = releaseWindow()) => {
-      return new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache, window);
-    };
-    let releaseRefreshInFlight: ReturnType<typeof refreshPublicReleasesOnce> | undefined;
+    const agendaQueue = createLocalAgendaQueue();
     const refreshPublicReleases = async (window = releaseWindow()) => {
-      if (releaseRefreshInFlight !== undefined) await releaseRefreshInFlight;
-      releaseRefreshInFlight = refreshPublicReleasesOnce(window).finally(() => { releaseRefreshInFlight = undefined; });
-      return releaseRefreshInFlight;
+      return new HttpPublicReleaseLoader(configuredSiteOrigin).load(releaseCache, window);
     };
     const resolutionOutbox = new DexieFavoriteResolutionOutbox(privateStorage.storage.database);
     const resolutionPaused = () => readFavoriteResolutionPaused(browser.storage.local);
@@ -91,7 +87,8 @@ export default defineBackground({
     const publicDiscovery = new HttpPublicDiscoveryAdapter(configuredSiteOrigin, undefined, browser.storage.local);
     const refreshPublicDiscovery = createPublicDiscoveryRefreshRuntime({ checkpointStorage: browser.storage.local, client: publicDiscovery, now, storage: privateStorage.storage });
     const webBridgeRequestHandler = createWebBridgeRequestHandler(privateStorage.storage, publicDiscovery, releaseAgenda, readShowAdultContent);
-    const webBridgeRuntime = createWebBridgeRuntime(webBridgeRequestHandler);
+    const webBridgeRuntime = createWebBridgeRuntime(request => request.type === 'agenda.read'
+      ? agendaQueue.enqueue(() => webBridgeRequestHandler(request)) : webBridgeRequestHandler(request));
     const ensureReminderAlarm = () => browser.alarms.create(reminderAlarmName, { periodInMinutes: reminderAlarmPeriodMinutes });
     const ensureAgendaReconcileAlarm = () => browser.alarms.create(agendaReconcileAlarmName, { periodInMinutes: agendaReconcileAlarmPeriodMinutes });
     const ensureAgendaNextAlarm = () => browser.alarms.create(agendaNextAlarmName, { delayInMinutes: 1 });
@@ -188,16 +185,17 @@ export default defineBackground({
     }, reconcileFavorites);
     const resumeNotifications = async () => {
       await privateStorage.ensureReady();
-      await refreshPublicReleases();
-      const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
-      const quickPreferences = await preferences.read();
-      if (quickPreferences.nativeNotifications) {
-        const visibleWorkIds = new Set((await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, releaseWindow())).items
-          .filter(({ work }) => isContentVisible(work.hydration?.candidate, quickPreferences.showAdultContent))
-          .map(({ work }) => work.id));
-        await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries.filter((entry) => visibleWorkIds.has(entry.workId)));
-      }
-      await drainDueAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, new Date());
+      return agendaQueue.enqueue(() => refreshAndDrainAgendaNotifications({ notifications, preferences, storage: privateStorage.storage, tasks }, async () => {
+        await refreshPublicReleases();
+        const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
+        const quickPreferences = await preferences.read();
+        if (quickPreferences.nativeNotifications) {
+          const visibleWorkIds = new Set((await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, releaseWindow())).items
+            .filter(({ work }) => isContentVisible(work.hydration?.candidate, quickPreferences.showAdultContent))
+            .map(({ work }) => work.id));
+          await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries.filter((entry) => visibleWorkIds.has(entry.workId)));
+        }
+      }, new Date()));
     };
     browser.runtime.onStartup.addListener(() => {
       void Promise.all([ensureReminderAlarm(), ensureFavoriteInventoryAuditAlarm()]).then(() => Promise.all([resumeNotifications(), reconcileFavorites()])).catch(() => undefined);
@@ -343,39 +341,42 @@ export default defineBackground({
         }
       }
       if (parsed.data.type === 'agenda.period.read') {
+        const period = parsed.data;
         try {
-          await privateStorage.ensureReady();
-          const refresh = await refreshPublicReleases({ from: parsed.data.from.slice(0, 10), to: parsed.data.to.slice(0, 10) });
-          const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
-          const quickPreferences = await preferences.read();
-          const snapshot = await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, parsed.data);
-          const visibleItems = snapshot.items.filter(({ work }) => isContentVisible(work.hydration?.candidate, quickPreferences.showAdultContent));
-          const visibleWorkIds = new Set(visibleItems.map(({ work }) => work.id));
-          if (quickPreferences.nativeNotifications) {
-            await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries.filter((entry) => visibleWorkIds.has(entry.workId)));
-          }
-          return {
-            ok: true,
-            snapshot: {
-              items: visibleItems.filter(({ event }) => quickPreferences.showEstimatedReleases || event.availability !== 'estimated').map(({ event, source, work }) => {
-                const item = {
-                  availability: event.availability,
-                  id: event.id,
-                  mediaType: work.mediaKind,
-                  release: event.releaseLabel,
-                  source: work.externalReferences[0]?.provider ?? work.mediaKind,
-                  title: work.preferredTitle,
-                  workId: work.id,
-                };
-                const dated = event.occurrence.kind === 'DATE' ? { ...item, occursOn: event.occurrence.value } : { ...item, occursAt: event.occurrence.value };
-                return source ? { ...dated, sourceUrl: source.url } : dated;
-              }),
-              missingWorkIds: [...snapshot.missingWorkIds, ...hydration.missingWorkIds],
-              source: hydration.state === 'hydrated' ? 'cache' : 'local',
-              freshness: refresh.freshness,
-              updatedAt: hydration.generatedAt ?? new Date().toISOString(),
-            },
-          };
+          return await agendaQueue.enqueue(async () => {
+            await privateStorage.ensureReady();
+            const refresh = await refreshPublicReleases(publicAgendaWindow(period));
+            const hydration = await projectLocalReleaseAgenda(privateStorage.storage, releaseCache, releaseAgenda);
+            const quickPreferences = await preferences.read();
+            const snapshot = await readLocalReleaseAgenda(privateStorage.storage, releaseAgenda, period);
+            const visibleItems = snapshot.items.filter(({ work }) => isContentVisible(work.hydration?.candidate, quickPreferences.showAdultContent));
+            const visibleWorkIds = new Set(visibleItems.map(({ work }) => work.id));
+            if (quickPreferences.nativeNotifications) {
+              await scheduleAgendaPeriodNotifications(privateStorage.storage, tasks, hydration.entries.filter((entry) => visibleWorkIds.has(entry.workId)));
+            }
+            return {
+              ok: true,
+              snapshot: {
+                items: visibleItems.filter(({ event }) => quickPreferences.showEstimatedReleases || event.availability !== 'estimated').map(({ event, source, work }) => {
+                  const item = {
+                    availability: event.availability,
+                    id: event.id,
+                    mediaType: work.mediaKind,
+                    release: event.releaseLabel,
+                    source: work.externalReferences[0]?.provider ?? work.mediaKind,
+                    title: work.preferredTitle,
+                    workId: work.id,
+                  };
+                  const dated = event.occurrence.kind === 'DATE' ? { ...item, occursOn: event.occurrence.value } : { ...item, occursAt: event.occurrence.value };
+                  return source ? { ...dated, sourceUrl: source.url } : dated;
+                }),
+                missingWorkIds: [...snapshot.missingWorkIds, ...hydration.missingWorkIds],
+                source: hydration.state === 'hydrated' ? 'cache' : 'local',
+                freshness: refresh.freshness,
+                updatedAt: hydration.generatedAt ?? new Date().toISOString(),
+              },
+            };
+          });
         } catch {
           return { error: 'agenda-period-unavailable', ok: false };
         }

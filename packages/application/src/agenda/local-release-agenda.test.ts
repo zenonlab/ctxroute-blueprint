@@ -3,7 +3,7 @@ import { createWork, workId } from '@tobirink/domain';
 import type { LocalAgendaEvent, LocalReleaseEvidence, WorkId } from '@tobirink/domain';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import type { PublicReleaseGeneration, PublicReleaseGenerationCachePort } from './public-release-generation';
-import { projectLocalReleaseAgenda } from './local-release-agenda';
+import { projectLocalReleaseAgenda, publicAgendaWindow, readLocalReleaseAgenda } from './local-release-agenda';
 import type { LocalReleaseAgendaPort } from './local-release-agenda';
 
 class MemoryGeneration implements PublicReleaseGenerationCachePort {
@@ -25,8 +25,9 @@ class MemoryProjection implements LocalReleaseAgendaPort {
   async listEvidence(id: WorkId, limit: number) {
     return [...this.evidence.values()].filter((item) => item.workId === id).sort((a, b) => a.occurrence.value.localeCompare(b.occurrence.value)).slice(-limit);
   }
-  async listPeriod(from: string, to: string, limit: number) {
-    return this.events.filter((item) => item.occurrence.value >= from && item.occurrence.value < to).slice(0, limit);
+  async listPeriod(from: string, to: string, limit: number, after?: { occurrence: string; id: string }) {
+    return this.events.filter((item) => item.occurrence.value >= from && item.occurrence.value < to && (after === undefined || item.occurrence.value > after.occurrence || (item.occurrence.value === after.occurrence && item.id > after.id)))
+      .sort((a, b) => a.occurrence.value < b.occurrence.value ? -1 : a.occurrence.value > b.occurrence.value ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0).slice(0, limit);
   }
 }
 
@@ -38,6 +39,48 @@ const mangaRelease = (chapter: number, releasedOn: string) => ({
 });
 
 describe('local release Agenda projection', () => {
+  it('derives civil bounds from the browser local midnight instead of slicing UTC', async () => {
+    const storage = new MemoryStoragePort();
+    const id = workId('work_local-midnight');
+    await storage.putWork(createWork({ id, externalReferences: [], mediaKind: 'manga', preferredTitle: 'Local midnight' }));
+    const projection = new MemoryProjection();
+    projection.events = [{ id: 'agenda_local-sunday', workId: id, evidenceId: 'evidence_local-sunday', availability: 'confirmed', releaseLabel: 'Chapter', occurrence: { kind: 'DATE', value: '2026-10-25' } }];
+    const period = { from: new Date('2026-10-19T00:00:00').toISOString(), to: new Date('2026-10-26T00:00:00').toISOString() };
+    expect((await readLocalReleaseAgenda(storage, projection, period)).items).toHaveLength(1);
+    expect(publicAgendaWindow(period).to).toBe('2026-10-26');
+  });
+
+  it.each([
+    ['2026-09-20T22:00:00.000Z', '2026-09-27T22:00:00.000Z', '2026-09-21', '2026-09-28'],
+    ['2026-10-18T22:00:00.000Z', '2026-10-25T23:00:00.000Z', '2026-10-19', '2026-10-26'],
+    ['2026-03-02T05:00:00.000Z', '2026-03-09T04:00:00.000Z', '2026-03-02', '2026-03-09'],
+  ])('keeps civil dates and instant boundaries separate across timezone changes: %s', async (from, to, civilFrom, civilTo) => {
+    const storage = new MemoryStoragePort();
+    const id = workId('work_civil-period');
+    await storage.putWork(createWork({ id, externalReferences: [], mediaKind: 'manga', preferredTitle: 'Civil' }));
+    const projection = new MemoryProjection();
+    const end = new Date(`${civilTo}T00:00:00.000Z`);
+    end.setUTCDate(end.getUTCDate() - 1);
+    const occurrenceDates = [civilFrom, end.toISOString().slice(0, 10), civilTo];
+    projection.events = occurrenceDates.map((value, index) => ({ id: `agenda_civil-${index}`, workId: id, evidenceId: `evidence_civil-${index}`, availability: 'confirmed', releaseLabel: 'Chapter', occurrence: { kind: 'DATE', value } }));
+    projection.events.push(...[from, to].map((value, index) => ({ id: `agenda_instant-${index}`, workId: id, evidenceId: `evidence_instant-${index}`, availability: 'official' as const, releaseLabel: 'Episode', occurrence: { kind: 'INSTANT' as const, value } })));
+    const period = { from, to, civilFrom, civilTo };
+    const result = await readLocalReleaseAgenda(storage, projection, period);
+    expect(result.items.map(item => item.event.id).sort()).toEqual(['agenda_civil-0', 'agenda_civil-1', 'agenda_instant-0']);
+    expect(publicAgendaWindow(period)).toEqual({ from: [from.slice(0, 10), civilFrom].sort()[0], to: civilTo });
+  });
+
+  it('reads more than one hundred events sharing the same occurrence without losing or duplicating any', async () => {
+    const storage = new MemoryStoragePort();
+    const id = workId('work_many-releases');
+    await storage.putWork(createWork({ id, externalReferences: [], mediaKind: 'manga', preferredTitle: 'Many releases' }));
+    const projection = new MemoryProjection();
+    projection.events = Array.from({ length: 205 }, (_, index) => ({ id: `agenda_many-${String(index).padStart(3, '0')}`, workId: id, evidenceId: `evidence_many-${index}`, availability: 'confirmed', releaseLabel: 'Chapter', occurrence: { kind: 'DATE', value: '2026-09-27' } }));
+    const result = await readLocalReleaseAgenda(storage, projection, { from: '2026-09-21', to: '2026-09-28' });
+    expect(result.items).toHaveLength(205);
+    expect(new Set(result.items.map(item => item.event.id)).size).toBe(205);
+  });
+
   it('keeps MangaUpdates dates civil, predicts one next date, and never schedules it', async () => {
     const storage = new MemoryStoragePort();
     const id = workId('work_manga-agenda');
@@ -77,9 +120,11 @@ describe('local release Agenda projection', () => {
     await storage.putWork(createWork({ externalReferences: [{ externalId: '42', provider: 'anilist' }], id: workId('work_anime-current'), mediaKind: 'anime', preferredTitle: 'Anime' }));
     const anime = { expiresAt: '2026-11-12T00:00:00.000Z', id: 'anilist-42-current', occurrence: { kind: 'INSTANT' as const, value: '2026-09-13T18:00:00.000Z' }, provenance: { fetchedAt: '2026-09-13T00:00:00.000Z', parserVersion: '2', rulesVersion: '2', source: 'anilist' }, provider: 'anilist' as const, providerWorkId: '42', releaseKind: 'episode' as const, sequence: '1', state: 'SCHEDULED' as const };
     const projection = new MemoryProjection();
-    const cache = new MemoryGeneration(generation([anime]));
+    const cache = new MemoryGeneration(generation(Array.from({ length: 205 }, (_, index) => ({ ...anime, id: `anilist-42-${index}`, sequence: String(index), occurrence: { kind: 'INSTANT', value: '2026-09-28T18:00:00.000Z' } }))));
     await projectLocalReleaseAgenda(storage, cache, projection);
     storage.listWorks = async () => { throw new Error('unexpected-work-scan'); };
-    await expect(projectLocalReleaseAgenda(storage, cache, projection)).resolves.toMatchObject({ entries: [{ releaseLabel: 'episode 1' }], state: 'hydrated' });
+    const reused = await projectLocalReleaseAgenda(storage, cache, projection);
+    expect(reused.state).toBe('hydrated');
+    expect(reused.entries).toHaveLength(205);
   });
 });

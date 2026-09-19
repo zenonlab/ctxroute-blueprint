@@ -13,11 +13,13 @@ export class DexiePublicReleaseGenerationCache implements PublicReleaseGeneratio
   constructor(private readonly database: TobirinkDatabase) {}
 
   async load(): Promise<PublicReleaseGeneration | undefined> {
-    const active = await this.database.publicReleaseSyncState.get('active');
-    if (!active?.activeGeneration || !active.etag || !active.revision || !active.window) return undefined;
-    const events = await this.database.publicReleaseEvents.toArray();
-    const parsed = publicReleaseGenerationSchema.safeParse({ etag: active.etag, events, models: active.models, modelWindow: active.modelWindow, generatedAt: active.checkedAt, revision: active.revision, source: active.source, window: active.window });
-    return parsed.success ? parsed.data : undefined;
+    return this.database.transaction('r', this.database.publicReleaseSyncState, this.database.publicReleaseEvents, async () => {
+      const active = await this.database.publicReleaseSyncState.get('active');
+      if (!active?.activeGeneration || !active.etag || !active.revision || !active.window) return undefined;
+      const events = await this.database.publicReleaseEvents.toArray();
+      const parsed = publicReleaseGenerationSchema.safeParse({ etag: active.etag, events, models: active.models, modelWindow: active.modelWindow, generatedAt: active.checkedAt, revision: active.revision, source: active.source, window: active.window });
+      return parsed.success ? parsed.data : undefined;
+    });
   }
 
   async save(input: PublicReleaseGeneration): Promise<void> {
