@@ -40,6 +40,11 @@ l’admission; les tâches doivent conserver une possibilité effective d’émi
 Le timeout HTTP est adapté au temps restant, plafonné à quinze secondes.
 Sous une seconde restante, la requête est différée sans tentative consommée.
 
+Une tranche de résolution réclame les tâches par groupes de quatre puis traite
+ces claims indépendants avec un pool fixe. Les écritures de chaque tâche restent
+transactionnelles; aucun provider n'est appelé au-delà de ses limites et une
+erreur d'un worker est persistée et tracée individuellement.
+
 Le runtime demande une continuation immédiate quand une des deux phases reste
 active, quand la résolution a consommé la limite de 100 tâches ou quand un appel
 fournisseur a épuisé le budget de 20 secondes. Un checkpoint complet reste
@@ -77,6 +82,13 @@ retour de visibilité. Une lecture reste sans effet fournisseur. Elle peut
 réarmer une alarme absente ou dépassée à partir du checkpoint et de l’outbox,
 sans recommencer l’inventaire. Le background effectue le même contrôle à son
 évaluation et par l’alarme périodique existante.
+
+Le debug de pipeline est un observateur optionnel et booléen. Quand il est
+activé, le runner enregistre uniquement l’opération, l’état, un code fermé et
+une durée bornée pour l’admission, l’attente distante et le commit. Il ne
+contient ni titre, URL, dossier, payload, secret ou identifiant fournisseur.
+Quand il est désactivé, l’observateur est court-circuité et le flux métier reste
+identique.
 
 Après huit échecs automatiques d’une même tâche, le runner la place en
 `BLOCKED/AUTOMATIC_ATTEMPT_LIMIT`. Aucune nouvelle alarme n’est programmée pour

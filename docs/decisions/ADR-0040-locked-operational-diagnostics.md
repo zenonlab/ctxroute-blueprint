@@ -4,6 +4,8 @@ scope:
   - apps/extension/runtime/**
   - apps/extension/wxt-entrypoints/background.ts
   - apps/extension/entrypoints/options/ResolutionStatus/**
+  - apps/provider-gateway/src/**
+  - packages/application/src/favorites/favorite-resolution-runner.ts
   - docs/systems/favorite-resolution-rebuild-pipeline.md
   - docs/architecture/src/favorite-resolution.dataflow.json
 review: on-change
@@ -36,8 +38,16 @@ uniquement lorsque `tobirink.extensionDiagnostics` vaut exactement
 résolution, leurs compteurs bornés et un code d'échec fermé. Ils ne contiennent
 ni titre, ni URL, ni dossier, ni progression, ni identifiant fournisseur, ni
 secret. La page Options de confiance lit l'état et active ou désactive le
-verrou. Ces événements restent locaux et sont exclus de `storage.sync`, des
-exports, de WebBridge et du Worker.
+verrou par un booléen. Le runner trace aussi l'admission, l'attente Queue, le
+résultat fournisseur et le commit `VERIFIED` avec des champs bornés. Le Worker
+et la gateway acceptent un booléen de debug de composition, désactivé par
+défaut côté déploiement. Ces événements restent locaux et sont exclus de
+`storage.sync`, des exports, de WebBridge et du Worker.
+
+Les échecs du runner émettent le même événement borné avec un code fermé,
+y compris les erreurs de provider, de parsing, de claim et de commit. Le
+runner traite au plus quatre claims indépendants en parallèle par tranche;
+les claims restent atomiques et chaque lane fournisseur conserve ses limites.
 
 Les logs de requête natifs de Cloudflare suivent la configuration de la
 plateforme; le verrou Worker gouverne les événements applicatifs Tobirink.
@@ -47,4 +57,5 @@ plateforme; le verrou Worker gouverne les événements applicatifs Tobirink.
 Une exécution peut être corrélée entre son statut HTTP et une famille de route
 sans exposer le contenu traité. La valeur `off`, une valeur absente ou toute
 valeur inconnue désactive le mécanisme. La taille locale reste bornée et une
-panne du diagnostic ne bloque jamais la résolution.
+panne du diagnostic ne bloque jamais la résolution. Désactiver le booléen ne
+modifie ni les claims, ni les baux, ni les retries, ni les résultats métier.

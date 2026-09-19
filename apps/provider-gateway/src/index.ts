@@ -36,6 +36,7 @@ export interface GatewayNonceStore {
 }
 
 interface GatewayOptions {
+  readonly debug?: boolean;
   readonly fetcher?: ProviderFetch;
   readonly logger?: GatewayLogger;
   readonly nonceStore: GatewayNonceStore;
@@ -229,7 +230,7 @@ export class DenoKvNonceStore implements GatewayNonceStore {
 export function createProviderGatewayHandler(options: GatewayOptions): (request: Request) => Promise<Response> {
   const secrets = assertGatewaySecrets(options.secrets);
   const fetcher = options.fetcher ?? fetch.bind(globalThis);
-  const logger = options.logger ?? (() => undefined);
+  const logger = options.debug === false ? (() => undefined) : options.logger ?? (() => undefined);
   const now = options.now ?? Date.now;
   const requestId = options.requestId ?? (() => crypto.randomUUID());
   return async (request) => {
@@ -310,6 +311,7 @@ if (import.meta.main) {
     try {
       const kv = Deno.openKv().catch(() => undefined);
       handler = createProviderGatewayHandler({
+        debug: Deno.env.get('TOBIRINK_GATEWAY_DEBUG') === 'true',
         logger: (entry) => console.log(JSON.stringify(entry)),
         nonceStore: new DenoKvNonceStore(kv),
         secrets: previousSecret === undefined ? [secret] : [secret, previousSecret],

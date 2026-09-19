@@ -80,6 +80,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
     await dependencies.diagnostics?.record(event).catch(() => undefined);
   };
   const prepareResolutionCaches = async () => {
+    const startedAt = Date.now();
     // One lookup batch leaves time for admission after a slow prefetch.
     const page = await dependencies.storage.listFavoriteSources({ afterId: cacheScanAfterId, limit: 50 });
     cacheScanAfterId = page.length === 50 ? page.at(-1)?.id : undefined;
@@ -101,6 +102,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
         dependencies.synchronized?.lookup(batch),
       ]);
     }
+    await dependencies.diagnostics?.record({ operation: 'cache-prepare', durationMs: Math.min(3_600_000, Math.max(0, Date.now() - startedAt)), outcome: 'complete', runId: 'cache-prepare', stage: 'transport' });
   };
   const runOnce = (runId: string, inventoryRequested: boolean) => dependencies.ensureReady()
     .then(async () => {
@@ -150,7 +152,16 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
           await recordDiagnostic({ counts: { batches: inventoryBatches, observed }, errorCode: 'INVENTORY_UNAVAILABLE', outcome: 'failed', runId, stage: 'inventory' });
         }
         await prepareResolutionCaches();
-        const result = await runFavoriteResolutionSlice({ ...dependencies, wakeDeadline });
+        const result = await runFavoriteResolutionSlice({
+          ...dependencies,
+          wakeDeadline,
+          trace: async (event) => dependencies.diagnostics?.record({
+            ...event,
+            stage: event.operation === 'admission' ? 'transport' : 'resolution',
+            runId,
+            outcome: event.outcome === 'started' ? 'started' : event.outcome === 'committed' || event.outcome === 'verified' ? 'complete' : event.outcome === 'pending' || event.outcome === 'retryable' ? 'retryable' : 'failed',
+          }),
+        });
         const refresh = inventoryComplete && result.completed === 0
           ? await dependencies.refreshPublicDiscovery?.().catch(() => ({ continuationRequired: true }))
           : undefined;

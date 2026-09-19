@@ -4381,6 +4381,167 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-restore-favorite-analysis",
+      "title": "Rétablir l’analyse des favoris — mode debug pipeline",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "pipeline-debug",
+          "title": "Ajouter le mode debug booléen et le traçage borné de la pipeline",
+          "status": "DONE",
+          "acceptance": [
+            "Un booléen explicite active et désactive le diagnostic sans changer le résultat métier.",
+            "Les événements couvrent inventaire, admission, lecture/écriture distante, Queue, fournisseur, retry, VERIFIED et projection.",
+            "Les événements restent bornés et ne contiennent ni titre, URL privée, payload ou secret.",
+            "Les tâches FAILED ne sont jamais réarmées automatiquement.",
+            "Les tests ciblés, typechecks et validations documentaires passent."
+          ],
+          "files": [
+            "apps/extension/runtime/extension-diagnostics.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.ts",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "apps/extension/runtime/favorite-resolution-continuation.test.ts",
+            "apps/worker/src/diagnostics.ts",
+            "apps/worker/src/index.ts",
+            "apps/worker/src/catalogue/public-discovery-routes.ts",
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/diagnostics.test.ts",
+            "apps/provider-gateway/src/index.ts",
+            "apps/provider-gateway/src/index.test.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "docs/decisions/ADR-0040-locked-operational-diagnostics.md",
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/02-quality-strategy.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/application -- favorite-resolution-runner",
+            "npm run test --workspace @tobirink/extension -- favorite-resolution-runtime favorite-resolution-continuation",
+            "npm run test --workspace @tobirink/worker -- diagnostics catalogue/native-collectors",
+            "npm run test --workspace @tobirink/provider-gateway -- index",
+            "npm run typecheck",
+            "npm run validate:architecture",
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions"
+          ],
+          "evidence": [
+            "Application runner 47/47; extension diagnostics/runtime 15/15; Worker diagnostics 4/4; provider gateway 12/12; browser transport 17/17.",
+            "All workspace typechecks and eslint --quiet pass.",
+            "Chrome and Firefox MV3 builds pass at 982.76 KiB and 982.85 KiB total.",
+            "Archify favorite-resolution dataflow passes showcase 9/9 with 0 errors and 0 warnings.",
+            "validate:decisions reports 58 ADR and 521 scopes; validate:docs -- --all passes.",
+            "Boolean debug overrides are tested for extension, Worker and Gateway; no provider deployment or external mutation performed."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-optimize-favorite-analysis",
+      "title": "Tracer les échecs et optimiser l’analyse des favoris avec FavLib",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "trace-failures-and-bounded-concurrency",
+          "title": "Tracer les échecs et borner la concurrence de la pipeline",
+          "status": "DONE",
+          "acceptance": [
+            "Les échecs admission, queue, provider, parsing et commit produisent un événement diagnostique borné avec code et durée sans titre, URL, identifiant privé ni payload.",
+            "Les lanes indépendantes utilisent une concurrence explicite et plafonnée; les quotas fournisseurs, claims D1, baux et écritures atomiques restent inchangés.",
+            "Le harness FavLib reste différentiel, épinglé, local et sans export de favoris privés.",
+            "Les scénarios timeout, 429, 502, reprise queue et redémarrage sont couverts par des tests.",
+            "Les tests workspace, typecheck, lint, validations ADR/docs et Archify passent."
+          ],
+          "files": [
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/resolve-provider-lanes.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/diagnostics.ts",
+            "scripts/parser-equivalence/favlib-differential.test.ts",
+            "docs/02-quality-strategy.md",
+            "docs/decisions/ADR-0040-locked-operational-diagnostics.md",
+            "docs/decisions/ADR-0041-durable-favorite-continuation.md",
+            "docs/architecture/src/favorite-resolution.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/application -- favorite-resolution-runner",
+            "npm run test --workspace @tobirink/extension -- favorite-resolution-runtime extension-diagnostics",
+            "npm run test --workspace @tobirink/worker -- diagnostics native-collectors",
+            "npm run test --workspace @tobirink/adapters-browser -- http-public-discovery-adapter provider-http",
+            "npm run typecheck",
+            "npm run lint -- --quiet",
+            "npm run archify:validate -- favorite-resolution.dataflow",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Runner application 63/63 et lanes fournisseur: événements bornés de succès, retry, queue-wait et échec provider; les erreurs ne contiennent pas le détail privé.",
+            "Le runner groupe jusqu’à 4 claims indépendants et traite le groupe avec Promise.allSettled; un échec est persisté/retryé individuellement sans arrêter les autres workers.",
+            "FavLib différentiel épinglé: 11 tests passés, audit local privé opt-in non activé; aucune exportation de favoris.",
+            "Extension 15/15, Worker 14/14, adaptateurs transport 17/17; typecheck complet, lint et git diff --check passent.",
+            "Archify favorite-resolution showcase 9/9, 0 erreur, 0 avertissement; validate:decisions 58/521 et validate:docs -- --all passent."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-autonomous-production-delivery",
+      "title": "Automatiser la livraison Deno et Cloudflare depuis GitHub",
+      "status": "ACTIVE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "add-autonomous-delivery",
+          "title": "Ajouter la configuration Deno et le workflow Cloudflare protégé",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Un push sur main déclenche le workflow; les pull requests n’ont aucun accès de déploiement.",
+            "Le job Cloudflare exécute verify, génère un plan et applique seulement worker:tobirink-public-api avec CLOUDFLARE_API_TOKEN et CLOUDFLARE_ACCOUNT_ID.",
+            "Deno source config fixe l’application gateway dynamique et son entrypoint; l’app GitHub Deno fournit le déploiement automatique.",
+            "Aucun secret ou valeur HMAC n’est versionné; les checks post-déploiement restent requis avant promotion métier.",
+            "Les tests infra, validations docs/ADR, Archify et diff passent."
+          ],
+          "files": [
+            "apps/provider-gateway/deno.jsonc",
+            ".github/workflows/deploy-production.yml",
+            "docs/decisions/ADR-0055-autonomous-production-delivery.md",
+            "docs/operations/cloudflare.md",
+            "docs/release.md",
+            "docs/architecture/src/production-publication.dataflow.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run test:infra",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- production-publication.dataflow",
+            "git diff --check",
+            "git commit -m 'ci(deploy): automate protected production delivery'",
+            "git push origin main"
+          ],
+          "evidence": [
+            "Étape approuvée et matérialisée; démarrage des changements limités au workflow GitHub, configuration Deno et documentation de livraison."
+          ]
+        }
+      ]
     }
   ]
 }

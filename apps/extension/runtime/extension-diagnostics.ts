@@ -19,15 +19,22 @@ const diagnosticCountsSchema = z.strictObject({
   actionRequired: z.number().int().min(0).max(maximumCount).optional(),
   providerPaused: z.number().int().min(0).max(maximumCount).optional(),
 });
+const diagnosticOperationSchema = z.enum([
+  'inventory-read', 'inventory-write', 'cache-prepare', 'admission', 'queue-wait',
+  'provider-result', 'resolution-commit', 'projection', 'continuation',
+]);
 export const extensionDiagnosticEventSchema = z.strictObject({
   counts: diagnosticCountsSchema.optional(),
+  code: z.string().regex(/^[A-Z0-9_-]+$/u).max(64).optional(),
+  durationMs: z.number().int().min(0).max(3_600_000).optional(),
   errorCode: z.enum(['INVENTORY_UNAVAILABLE', 'RESOLUTION_UNAVAILABLE']).optional(),
   nextAttemptAt: z.string().datetime({ offset: true }).optional(),
+  operation: diagnosticOperationSchema.optional(),
   occurredAt: z.string().datetime({ offset: true }),
   outcome: z.enum(['started', 'complete', 'retryable', 'failed']),
   runId: identifierSchema,
   sequence: identifierSchema,
-  stage: z.enum(['run', 'inventory', 'resolution']),
+  stage: z.enum(['run', 'inventory', 'resolution', 'transport', 'projection', 'continuation']),
   version: z.literal(1),
 });
 

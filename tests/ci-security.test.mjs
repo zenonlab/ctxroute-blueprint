@@ -8,12 +8,15 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const read = path => readFileSync(join(root, path), 'utf8');
 
-test('GitHub Actions runtime remains retired', () => {
+test('GitHub Actions runtime remains limited to protected production delivery', () => {
   const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
-  assert.equal(
-    tracked.some((path) => /(^|\/)\.github\/workflows\//u.test(path)),
-    false,
-  );
+  const workflows = tracked.filter((path) => /(^|\/)\.github\/workflows\//u.test(path));
+  assert.deepEqual(workflows, ['.github/workflows/deploy-production.yml']);
+  const workflow = read('.github/workflows/deploy-production.yml');
+  assert.match(workflow, /branches: \[main\]/u);
+  assert.match(workflow, /contents: read/u);
+  assert.match(workflow, /worker:tobirink-public-api/u);
+  assert.doesNotMatch(workflow, /pull_request:/u);
   assert.equal(tracked.includes('src/run.ts'), false);
   assert.equal(tracked.includes('src/agenda/cli.ts'), false);
 });

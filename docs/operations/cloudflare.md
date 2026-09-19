@@ -4,6 +4,31 @@ Tobirink does not expose Wrangler as a release command. Every provider change
 starts from the repository-owned gate, while the extension and Worker runtime
 remain independent of this operational path.
 
+## Livraison GitHub protégée
+
+Le workflow `.github/workflows/deploy-production.yml` se déclenche sur `main`
+ou par lancement manuel. Il installe le lockfile, exécute `npm run verify`,
+génère un plan expirant puis applique exactement la cible
+`worker:tobirink-public-api`. Il ne modifie ni D1, ni Queue, ni R2, ni les
+secrets fournisseur.
+
+Créer dans l’environnement GitHub `production` les secrets
+`CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID`. Le token doit être limité au
+compte et aux opérations Worker nécessaires. Les pull requests ne déploient
+pas.
+
+L’application Deno Deploy installée sur `tristan-monticelli/Tobirink` doit être
+liée à `tobirink-provider-gateway` avec le répertoire d’application
+`apps/provider-gateway`. Le `deno.jsonc` versionné impose le runtime dynamique
+et `src/index.ts`. Le déploiement Deno est déclenché par l’intégration GitHub;
+le workflow Cloudflare ne contient donc aucun token Deno.
+
+`PROVIDER_GATEWAY_HMAC_KEY` reste un secret runtime séparé, configuré côté
+Worker et gateway. Ne jamais le copier dans GitHub, le dépôt ou un plan. Après
+chaque livraison, exécuter les canaries et les vérifications HTTP prévues avant
+toute promotion métier. En cas d’échec, arrêter le workflow et restaurer la
+révision Deno ou la version Worker précédente; conserver D1, R2 et Queue.
+
 ## Inspect
 
 ### Publication corrective 1.0.41 — 19 septembre 2026

@@ -315,6 +315,14 @@ restant. Le test workerd compose le client HTTP, les routes, D1 et le consumer
 Queue avec une réponse AniList simulée; il exige PENDING puis VERIFIED.
 Ces preuves locales ne remplacent pas les compteurs du profil utilisateur.
 
+Le runner de favoris utilise un pool fixe de quatre workers par tranche. Les
+tests vérifient que plusieurs claims indépendants progressent en parallèle,
+qu'un échec est tracé puis replanifié sans interrompre les autres workers, et
+que la limite de tranche, les baux, les claims D1 et les quotas fournisseurs ne
+changent pas. Les tests de transport couvrent également 429, 502 et timeout;
+les événements de debug sont contrôlés par le booléen d'activation et restent
+sans titre, URL, identifiant privé ni payload.
+
 La candidate 1.0.38 ajoute une gate Chromium installée à réseau borné : ZIP
 inchangé, deux favoris publics, prélecture retardée de six secondes et MISS
 simulé pour forcer l’admission. Les POST du service worker et les réponses
@@ -411,3 +419,13 @@ cannot be interpreted as future cancellation evidence.
 Sensor, CRG, CTXRoute, and Archify continue to validate repository governance.
 They do not replace TypeScript, adapter, browser, migration, or Worker tests and
 never become product runtime dependencies.
+
+### Debug pipeline opt-in
+
+Le mode debug est contrôlé par un booléen explicite. Les tests vérifient les
+deux états : activation des événements bornés et désactivation sans effet sur
+les résultats métier. Les événements couvrent inventaire, admission, attente
+Queue, transport fournisseur, retries, commit `VERIFIED` et projection.
+Les assertions interdisent titres, URLs privées, payloads, secrets et
+identifiants privés. Les tests 429, 502 et timeout vérifient des codes fermés;
+aucune tâche `FAILED` n'est réarmée par le seul diagnostic.

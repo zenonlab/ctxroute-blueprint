@@ -13,6 +13,15 @@ describe('worker diagnostics', () => {
     info.mockRestore();
   });
 
+  it('honors the explicit boolean override', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const event = { durationMs: 1, method: 'GET' as const, requestId: 'request-boolean', routeFamily: 'catalogue' as const, schemaVersion: 1 as const, status: 200, type: 'worker.request' as const };
+    emitWorkerDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: workerDiagnosticsLockValue, TOBIRINK_PIPELINE_DEBUG: false }, event);
+    emitWorkerDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: 'off', TOBIRINK_PIPELINE_DEBUG: true }, event);
+    expect(info).toHaveBeenCalledOnce();
+    info.mockRestore();
+  });
+
   it('reduces paths methods and durations to bounded technical values', () => {
     expect(classifyWorkerRoute('/v2/favorites/lookup')).toBe('unknown');
     expect(classifyWorkerRoute('/v3/catalogue/discoveries/collector/claims')).toBe('catalogue');

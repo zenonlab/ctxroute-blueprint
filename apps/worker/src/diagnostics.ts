@@ -14,6 +14,7 @@ export interface WorkerDiagnosticEvent {
 
 export interface WorkerDiagnosticBindings {
   readonly TOBIRINK_WORKER_DIAGNOSTICS?: string;
+  readonly TOBIRINK_PIPELINE_DEBUG?: boolean;
 }
 
 export type WorkerCostResult = 'backoff' | 'changed' | 'deduplicated' | 'failed' | 'unchanged';
@@ -56,12 +57,12 @@ export function classifyWorkerRoute(pathname: string): WorkerRouteFamily {
 }
 
 export function emitWorkerDiagnostic(bindings: WorkerDiagnosticBindings, event: WorkerDiagnosticEvent): void {
-  if (bindings.TOBIRINK_WORKER_DIAGNOSTICS !== workerDiagnosticsLockValue) return;
+  if (bindings.TOBIRINK_PIPELINE_DEBUG !== undefined ? !bindings.TOBIRINK_PIPELINE_DEBUG : bindings.TOBIRINK_WORKER_DIAGNOSTICS !== workerDiagnosticsLockValue) return;
   console.info(JSON.stringify(event));
 }
 
 export function emitWorkerCostDiagnostic(bindings: WorkerDiagnosticBindings | undefined, event: WorkerCostDiagnosticEvent): void {
-  if (bindings?.TOBIRINK_WORKER_DIAGNOSTICS !== workerDiagnosticsLockValue) return;
+  if (bindings === undefined || (bindings.TOBIRINK_PIPELINE_DEBUG !== undefined ? !bindings.TOBIRINK_PIPELINE_DEBUG : bindings.TOBIRINK_WORKER_DIAGNOSTICS !== workerDiagnosticsLockValue)) return;
   console.info(JSON.stringify(event));
 }
 

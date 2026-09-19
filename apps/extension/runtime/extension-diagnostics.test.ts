@@ -28,13 +28,13 @@ describe('WebExtensionDiagnostics', () => {
     expect((await diagnostics.read()).events).toHaveLength(0);
     await diagnostics.initializeEnabled();
     expect(storage.values[extensionDiagnosticsLockKey]).toBe(extensionDiagnosticsLockValue);
-    await diagnostics.record({ counts: { completed: 4, retried: 1, admissionWaiting: 1, rateLimited: 2, networkErrors: 3, actionRequired: 1 }, nextAttemptAt: '2026-09-12T12:01:00.000Z', outcome: 'complete', runId: 'run-1', stage: 'resolution' });
+    await diagnostics.record({ code: 'PENDING', durationMs: 14, operation: 'admission', counts: { completed: 4, retried: 1, admissionWaiting: 1, rateLimited: 2, networkErrors: 3, actionRequired: 1 }, nextAttemptAt: '2026-09-12T12:01:00.000Z', outcome: 'complete', runId: 'run-1', stage: 'transport' });
     await diagnostics.setEnabled(false);
     await diagnostics.record({ outcome: 'failed', runId: 'run-2', stage: 'run' });
     const snapshot = await diagnostics.read();
     expect(snapshot.enabled).toBe(false);
     expect(snapshot.events).toHaveLength(1);
-    expect(snapshot.events[0]).toMatchObject({ counts: { rateLimited: 2 }, nextAttemptAt: '2026-09-12T12:01:00.000Z' });
+    expect(snapshot.events[0]).toMatchObject({ code: 'PENDING', durationMs: 14, operation: 'admission', counts: { rateLimited: 2 }, nextAttemptAt: '2026-09-12T12:01:00.000Z', stage: 'transport' });
     expect(JSON.stringify(storage.values[extensionDiagnosticsEventsKey])).not.toMatch(/title|url|folder|progress|secret/iu);
   });
 

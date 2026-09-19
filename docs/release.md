@@ -1,5 +1,19 @@
 # Extension packaging and rollback
 
+## Livraison autonome contrôlée — 19 septembre 2026
+
+GitHub déclenche la livraison Cloudflare sur `main` après `npm run verify`.
+La gate produit un plan expirant et n’autorise que
+`worker:tobirink-public-api`; aucun accès de déploiement n’est accordé aux pull
+requests. L’application Deno Deploy liée au dépôt déploie séparément la
+gateway depuis `apps/provider-gateway`, avec son runtime et son entrypoint
+versionnés dans `deno.jsonc`.
+
+Les secrets restent dans les environnements opérateur : Cloudflare utilise les
+secrets GitHub dédiés, tandis que `PROVIDER_GATEWAY_HMAC_KEY` reste distinct
+côté Worker et gateway. La réussite du workflow ne remplace pas les canaries,
+la vérification HTTP ni la promotion métier.
+
 ## Publication bibliothèque 1.0.41 — 19 septembre 2026
 
 La migration D1 additive 0026 et le Worker compatible ont été appliqués avant

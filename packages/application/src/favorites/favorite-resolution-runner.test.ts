@@ -87,6 +87,22 @@ describe('runFavoriteResolutionSlice', () => {
     expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ attempt: 7, state: 'RETRY_AT', availableAt: '2026-09-07T12:05:00.000Z' });
     expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RETRYABLE', reason: code });
   });
+  it('emits only bounded admission and commit trace events', async () => {
+    const { storage, outbox } = await fixture();
+    const trace: unknown[] = [];
+    const result = await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'trace',
+      publicDiscovery: { resolveOrRequest: async () => ({ state: 'PENDING' as const, retryAt: '2026-09-07T12:05:00.000Z' }) },
+      trace: async (event) => { trace.push(event); },
+    });
+    expect(result).toMatchObject({ completed: 0, retried: 1 });
+    expect(trace).toEqual([
+      { operation: 'admission', outcome: 'started' },
+      { operation: 'admission', outcome: 'pending', code: 'PENDING', durationMs: expect.any(Number) },
+    ]);
+    expect(JSON.stringify(trace)).not.toMatch(/Frieren|reader\.example|runner/iu);
+  });
   it('resolves a stale verified local identity while D1 and providers are unavailable', async () => {
     const { storage, outbox } = await fixture();
     const id = favoriteCandidateWorkId(candidate);
@@ -445,6 +461,20 @@ describe('runFavoriteResolutionSlice', () => {
     const [source] = await storage.listFavoriteSources({ limit: 1 });
     expect(source?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE' });
     await expect(storage.listReviews({ limit: 100, status: 'pending' })).resolves.toEqual([]);
+  });
+
+  it('traces provider failures and internal commit failures without private data', async () => {
+    const { outbox, storage } = await fixture();
+    const events: Array<{ readonly operation: string; readonly outcome: string; readonly code?: string }> = [];
+    const result = await runFavoriteResolutionSlice({
+      candidates: candidatePorts({ search: async () => { throw new Error('offline'); } }),
+      hydration: hydrationPorts({ hydrate: async () => undefined }),
+      libraryId: libraryId('library_primary'), now: () => now, outbox, storage, token: () => 'trace-token',
+      trace: (event) => { events.push({ operation: event.operation, outcome: event.outcome, code: event.code }); },
+    });
+    expect(result.retried).toBe(1);
+    expect(events).toContainEqual({ operation: 'provider-result', outcome: 'failed', code: 'anilist:PROVIDER_UNAVAILABLE' });
+    expect(events.every((event) => !JSON.stringify(event).includes('offline'))).toBe(true);
   });
 
   it('uses one complete Kitsu fallback after a complete AniList NO_MATCH', async () => {

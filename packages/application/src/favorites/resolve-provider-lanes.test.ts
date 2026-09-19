@@ -81,4 +81,15 @@ describe('independent provider lanes', () => {
     const candidates: Record<ResolutionProvider, FavoriteProviderCandidatePort> = { ...ports(), anilist: provider('anilist', [candidate('anilist')]), mangaupdates: { search: async () => { throw new Error('offline'); } } };
     expect(await resolveFavoriteProviderLanes(candidates, query, 'UNKNOWN')).toMatchObject({ kind: 'RETRYABLE' });
   });
+
+  it('reports bounded provider failure events', async () => {
+    const candidates = ports();
+    candidates.anilist.search.mockRejectedValue(new Error('HTTP 502 private detail'));
+    const events: Array<{ readonly provider: ResolutionProvider; readonly outcome: string; readonly code?: string }> = [];
+    await resolveFavoriteProviderLanes(candidates, query, 'ANIME', undefined, (event) => events.push(event));
+    expect(events).toEqual([
+      { provider: 'anilist', outcome: 'started' },
+      { provider: 'anilist', outcome: 'failed', code: 'PROVIDER_UNAVAILABLE' },
+    ]);
+  });
 });

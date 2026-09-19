@@ -9,8 +9,8 @@
       {
         "id": "publication",
         "label": "Publication bornée",
-        "focus": ["staticExport", "releasePackages", "approvalGate", "releaseBucket", "publicWorker"],
-        "note": "Le gate reconstruit les assets avant preview et apply, puis borne chaque cible externe."
+        "focus": ["staticExport", "releasePackages", "githubDelivery", "approvalGate", "releaseBucket", "publicWorker"],
+        "note": "GitHub vérifie et déclenche les livraisons; le gate reconstruit les assets avant preview et apply, puis borne chaque cible externe."
       },
       {
         "id": "verification",
@@ -30,6 +30,7 @@
   "nodes": [
     { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "version publiée explicite", "stage": 0, "row": 0, "tag": "Next statique" },
     { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox 1.0.41", "stage": 0, "row": 2, "tag": "SHA-256 vérifiés" },
+    { "id": "githubDelivery", "type": "security", "label": "Livraison GitHub", "sublabel": "main + secrets production", "stage": 1, "row": 0, "tag": "plan expirant" },
     { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 1, "tag": "fail closed" },
     { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP versionnés", "stage": 2, "row": 2, "tag": "R2" },
     { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "100 %" },
@@ -40,6 +41,7 @@
   "flows": [
     { "id": "exportToGate", "from": "staticExport", "to": "approvalGate", "label": "build avant Wrangler", "classification": "prévisualisé", "variant": "default" },
     { "id": "packagesToGate", "from": "releasePackages", "to": "approvalGate", "label": "tailles + SHA-256", "classification": "lié au digest", "variant": "security", "labelAt": [300, 450] },
+    { "id": "githubToGate", "from": "githubDelivery", "to": "approvalGate", "label": "plan + digest", "classification": "cible exacte", "variant": "emphasis", "labelAt": [650, 220] },
     { "id": "gateToWorker", "from": "approvalGate", "to": "publicWorker", "label": "déploiement", "classification": "cible autorisée", "variant": "emphasis" },
     { "id": "gateToBucket", "from": "approvalGate", "to": "releaseBucket", "label": "archives versionnées", "classification": "clés autorisées", "variant": "security" },
     { "id": "workerToPages", "from": "publicWorker", "to": "memberPages", "label": "assets statiques", "classification": "public", "variant": "default" },

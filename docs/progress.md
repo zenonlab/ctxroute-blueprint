@@ -279,3 +279,15 @@
 ## Publier la correction de tri 1.0.41 avec migration D1 additive — DONE
 
 - [x] **Migrer D1, déployer, vérifier puis publier les archives et la page 1.0.41** — DONE _(evidence: D1 0026 appliquée; Worker 84d40f2e à 100 %, aucune migration restante; routes Agenda v3/v4 et cinq pages 200, Deux ZIP R2 1.0.41 téléchargés en 200/cache immuable avec SHA-256 identiques aux archives locales; /download annonce 1.0.41, Chromium installé contre tobirink.com: 1532 favoris synthétiques/1400 médias, premier rendu 473 ms, tris 57–69 ms, redémarrage MV3 136 ms; Firefox 155 installé hors ligne sans blocage)_
+
+## Rétablir l’analyse des favoris — mode debug pipeline — DONE
+
+- [x] **Ajouter le mode debug booléen et le traçage borné de la pipeline** — DONE _(evidence: Application runner 47/47; extension diagnostics/runtime 15/15; Worker diagnostics 4/4; provider gateway 12/12; browser transport 17/17., All workspace typechecks and eslint --quiet pass., Chrome and Firefox MV3 builds pass at 982.76 KiB and 982.85 KiB total.)_
+
+## Tracer les échecs et optimiser l’analyse des favoris avec FavLib — DONE
+
+- [x] **Tracer les échecs et borner la concurrence de la pipeline** — DONE _(evidence: Runner application 63/63 et lanes fournisseur: événements bornés de succès, retry, queue-wait et échec provider; les erreurs ne contiennent pas le détail privé., Le runner groupe jusqu’à 4 claims indépendants et traite le groupe avec Promise.allSettled; un échec est persisté/retryé individuellement sans arrêter les autres workers., FavLib différentiel épinglé: 11 tests passés, audit local privé opt-in non activé; aucune exportation de favoris.)_
+
+## Automatiser la livraison Deno et Cloudflare depuis GitHub — ACTIVE
+
+- [ ] **Ajouter la configuration Deno et le workflow Cloudflare protégé** — IN_PROGRESS _(evidence: Étape approuvée et matérialisée; démarrage des changements limités au workflow GitHub, configuration Deno et documentation de livraison.)_

@@ -1,6 +1,10 @@
 {
   "deploy": {
     "org": "tobirink",
-    "app": "tobirink-provider-gateway"
+    "app": "tobirink-provider-gateway",
+    "runtime": {
+      "type": "dynamic",
+      "entrypoint": "src/index.ts"
+    }
   }
 }

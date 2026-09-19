@@ -18,6 +18,9 @@ const diagnosticLabels = {
   inventory: 'Inventaire',
   resolution: 'Résolution',
   run: 'Exécution',
+  transport: 'Transport',
+  projection: 'Projection',
+  continuation: 'Reprise',
 } as const;
 const diagnosticOutcomeLabels = {
   complete: 'terminé',
@@ -88,7 +91,7 @@ export function ResolutionStatus({ controller, counts, diagnostics, inventory, o
       {diagnostics ? <div className={styles.diagnostics}>
         <h3>Diagnostic local</h3>
         <p role="status">{diagnostics.enabled ? 'Activé' : 'Désactivé'} · {diagnostics.events.length} événements conservés sur 100 maximum.</p>
-        {latestDiagnostic ? <p>Dernier état : {diagnosticLabels[latestDiagnostic.stage]} · {diagnosticOutcomeLabels[latestDiagnostic.outcome]} · passage {latestDiagnostic.runId} · {latestDiagnostic.occurredAt}{diagnosticCounts(latestDiagnostic) ? ` · ${diagnosticCounts(latestDiagnostic)}` : ''}</p> : <p>Aucun événement enregistré.</p>}
+        {latestDiagnostic ? <p>Dernier état : {diagnosticLabels[latestDiagnostic.stage]} · {diagnosticOutcomeLabels[latestDiagnostic.outcome]} · passage {latestDiagnostic.runId} · {latestDiagnostic.occurredAt}{latestDiagnostic.operation ? ` · ${latestDiagnostic.operation}` : ''}{latestDiagnostic.code ? ` · ${latestDiagnostic.code}` : ''}{latestDiagnostic.durationMs !== undefined ? ` · ${latestDiagnostic.durationMs} ms` : ''}{diagnosticCounts(latestDiagnostic) ? ` · ${diagnosticCounts(latestDiagnostic)}` : ''}</p> : <p>Aucun événement enregistré.</p>}
         {latestDiagnostic?.errorCode ? <p>Code du diagnostic : {latestDiagnostic.errorCode}</p> : null}
         <Button disabled={state === 'loading' || state === 'running'} onClick={onDiagnosticsToggle}>{diagnostics.enabled ? 'Désactiver le diagnostic' : 'Activer le diagnostic'}</Button>
       </div> : null}

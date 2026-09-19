@@ -67,6 +67,20 @@ Deno.test('forwards a valid signed AniList request with fixed product headers', 
   assert(response.headers.get('x-ratelimit-remaining') === '29');
 });
 
+Deno.test('disables gateway metrics with the explicit boolean debug switch', async () => {
+  const logs: GatewayRequestMetrics[] = [];
+  const handler = createProviderGatewayHandler({
+    debug: false,
+    fetcher: () => Promise.resolve(Response.json({ ok: true })),
+    logger: (entry) => logs.push(entry),
+    nonceStore: memoryNonceStore(),
+    now: () => now,
+    secrets: [secret],
+  });
+  assert((await handler(await gatewayRequest({ nonce: '223e4567-e89b-42d3-a456-426614174000' }))).status === 200);
+  assert(logs.length === 0);
+});
+
 Deno.test('classifies gateway and AniList authentication failures without sensitive metrics', async () => {
   const logs: GatewayRequestMetrics[] = [];
   const handler = createProviderGatewayHandler({

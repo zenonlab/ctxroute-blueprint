@@ -64,10 +64,20 @@ export default defineBackground({
     const bookmarkOrganizer = new WebExtensionOrganizerAdapter(browser.bookmarks);
     const organizerSnapshots = new DexieOrganizerSnapshotStore();
     const privateStorage = createExtensionLocalStorage();
-    const repairLibraryProjection = () => repairFavoriteLibraryProjection(privateStorage.storage, primaryLibraryId);
     const now = () => new Date().toISOString();
     const token = () => crypto.randomUUID();
     const diagnostics = new WebExtensionDiagnostics(browser.storage.local, now, token);
+    const repairLibraryProjection = async () => {
+      const startedAt = Date.now();
+      try {
+        const result = await repairFavoriteLibraryProjection(privateStorage.storage, primaryLibraryId);
+        await diagnostics.record({ operation: 'projection', durationMs: Math.min(3_600_000, Math.max(0, Date.now() - startedAt)), outcome: 'complete', runId: 'projection', stage: 'projection' });
+        return result;
+      } catch (error) {
+        await diagnostics.record({ code: 'PROJECTION_FAILED', durationMs: Math.min(3_600_000, Math.max(0, Date.now() - startedAt)), outcome: 'failed', runId: 'projection', stage: 'projection' }).catch(() => undefined);
+        throw error;
+      }
+    };
     const releaseCache = new DexiePublicReleaseGenerationCache(privateStorage.storage.database);
     const releaseAgenda = new DexieLocalReleaseAgenda(privateStorage.storage.database);
     const releaseWindow = () => {
@@ -108,6 +118,7 @@ export default defineBackground({
       updateContinuation: async (availableAt) => {
         if (await resolutionPaused()) await browser.alarms.clear(favoriteResolutionContinuationAlarmName);
         else await updateFavoriteResolutionContinuation(browser.alarms, availableAt);
+        await diagnostics.record({ nextAttemptAt: availableAt, operation: 'continuation', outcome: availableAt === undefined ? 'complete' : 'retryable', runId: 'continuation', stage: 'continuation' });
       },
       get sourceAdapters() { return [anilistSourceAdapter, mangaUpdatesSourceAdapter, mangaDexSourceAdapter, ...createFavoriteSiteAdapters(bundledFavoriteSiteRules)]; },
       storage: privateStorage.storage,
