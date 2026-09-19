@@ -6,13 +6,13 @@ remain independent of this operational path.
 
 ## Inspect
 
-### Candidate locale corrective 1.0.41 — non publiée
+### Publication corrective 1.0.41 — 19 septembre 2026
 
-La candidate 1.0.41 contient le correctif du transport WebBridge et du tri de
-la bibliothèque après redémarrage MV3. Le site public sert toujours les liens
-1.0.39. Les archives 1.0.40 restent des candidates distinctes et ne sont pas
-remplacées. `npm run verify`, le build Web, la validation Archify `dataflow` et
-deux builds isolés passent. Le packaging normal reproduit les mêmes octets :
+La version 1.0.41 contient le correctif du transport WebBridge et du tri de
+la bibliothèque après redémarrage MV3. Les archives 1.0.40 restent des
+candidates distinctes et ne sont pas remplacées. `npm run verify`, le build Web,
+la validation Archify `dataflow` et deux builds isolés passent. Le packaging
+normal reproduit les mêmes octets :
 
 | Archive 1.0.41 | Octets | SHA-256 |
 | --- | ---: | --- |
@@ -24,7 +24,31 @@ dont 1400 médias, puis lit le site reconstruit. Le premier affichage prend
 258 ms; quatre tris rendus prennent 70, 64, 59 et 72 ms. Après arrêt forcé du
 service worker MV3, un autre tri apparaît en 181 ms. Ces chiffres portent sur
 ce profil temporaire et cette machine, pas sur la bibliothèque personnelle.
-Aucune opération fournisseur, migration, publication ou push n'est incluse.
+
+La gate a appliqué la migration additive `0026_release_generation_revision.sql`
+puis le Worker compatible sous le plan `389b2dae49a99c162296c4164aae9672556774b7cff3ff1737a1e4ce7ea9d22c`.
+Le Worker intermédiaire `118069ee-f97a-4ad9-9b75-3f40523a7d1a` répond 200
+sur les pages et les routes Agenda v3/v4; `/v4/release-models` lit le singleton
+D1 sans erreur. L'inspection confirme qu'aucune migration ne reste en attente.
+
+Le plan `ab7b1ebe00c21a1de97d748b1c70450194a12c21a3d88ec68d30b0e05459f83c`
+a créé uniquement les deux objets R2 1.0.41. Les téléchargements publics
+répondent 200, avec cache immuable et les SHA-256 exacts du tableau ci-dessus.
+Après avancement du pointeur, le plan Worker
+`02352a9f777996daf7befc7ed4f682a03f6a89b8caa0cb462357d48f3f563a04`
+a publié la version `84d40f2e-6cd6-4c83-a33c-0a434ddc7861`.
+Les cinq pages publiques répondent 200 et `/download` annonce les deux ZIP
+1.0.41. Un profil Chromium temporaire, avec l'archive 1.0.41 installée contre
+le vrai site, a affiché 1400 médias issus de 1532 favoris synthétiques :
+premier affichage 473 ms, quatre tris rendus en 64, 61, 69 et 57 ms,
+tri après arrêt forcé du worker en 136 ms. La bibliothèque personnelle reste
+à mesurer sur son installation. Toutes les données et anciennes archives sont
+conservées pour le rollback; aucun secret, quota, gateway ni Queue n'a changé.
+Firefox 155.0 a installé le ZIP 1.0.41 au SHA-256 attendu : son corpus hors
+ligne contient 1536 favoris observés, 1404 médias en reprise, 132 liens non
+médias exclus et zéro tâche bloquée; les deux types de dates Agenda sont
+reconstruits. L'inspection finale confirme le Worker `84d40f2e` à 100 % et
+aucune migration D1 restante.
 
 ### Candidate locale corrective 1.0.40 — non publiée
 

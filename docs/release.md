@@ -1,5 +1,23 @@
 # Extension packaging and rollback
 
+## Publication bibliothèque 1.0.41 — 19 septembre 2026
+
+La migration D1 additive 0026 et le Worker compatible ont été appliqués avant
+les deux nouvelles archives R2 1.0.41. Les téléchargements publics correspondent
+aux SHA-256 Chrome `b651485195278f861b36f8f0ac19dd51ec9d58f6e0695afb9f46df0f0f53c456`
+et Firefox `adacd904d2e9fa3f4fa87fe7df75077894833be8e8f50aec880cb285e840dfe9`.
+Le Worker `84d40f2e-6cd6-4c83-a33c-0a434ddc7861` sert les deux liens 1.0.41;
+les cinq pages publiques et les routes Agenda v3/v4 répondent 200.
+
+Un test Chromium avec l'archive installée et le vrai site mesure 57 à 69 ms
+pour quatre tris de 1400 médias synthétiques, puis 136 ms après un arrêt MV3.
+Le premier affichage prend 473 ms. Ce test ne lit pas la bibliothèque
+personnelle. Le rollback sélectionne le Worker et le pointeur 1.0.39
+précédents, sans supprimer D1, R2 ni les archives. Les opérations et leurs
+digests sont consignés dans `docs/operations/cloudflare.md`. Le ZIP Firefox
+installé passe son parcours hors ligne avec 1536 favoris observés, dont 132
+liens non médias exclus, et aucune tâche bloquée.
+
 ## Collecteurs natifs et gateway Deno certifiés — 15 septembre 2026
 
 Le Worker traite Discovery dès le signal Queue et collecte Agenda toutes les

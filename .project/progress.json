@@ -4332,6 +4332,52 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-publish-library-sort-1041",
+      "title": "Publier la correction de tri 1.0.41 avec migration D1 additive",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "publish",
+          "title": "Migrer D1, déployer, vérifier puis publier les archives et la page 1.0.41",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Seule la migration additive 0026 touche D1; aucune donnée n'est supprimée",
+            "Le Worker compatible puis le site 1.0.41 sont sains; les canaries passent",
+            "Les deux nouveaux ZIP R2 sont immuables et leurs hashes distants égalent ceux certifiés",
+            "Le site public affiche 1.0.41 et la bibliothèque installée trie en moins de 500 ms sur le corpus synthétique",
+            "Le rollback restaure le Worker précédent et le pointeur 1.0.39 en conservant D1, R2 et toutes les archives",
+            "Aucun secret, quota, gateway ou Queue n'est modifié; origin/main avance sans force après vérification"
+          ],
+          "files": [
+            "apps/web/published-extension.json",
+            "docs/architecture/src/production-publication.dataflow.json",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/operations/cloudflare.md",
+            "docs/release.md",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "Revalider npm run verify et les plans Cloudflare expirables",
+            "npm run infra:apply pour d1-migrate:PUBLIC_DB (0026) et worker-deploy uniquement, avec digest et allowlist exacts",
+            "Inspecter le singleton D1 et effectuer les canaries publics bornés sans déclencher de nouvelle collecte",
+            "npm run infra:apply pour les deux nouveaux objets R2 1.0.41 uniquement, avec digest et allowlist exacts",
+            "Relire les ZIP distants et comparer leurs SHA-256",
+            "Avancer le pointeur local 1.0.39 vers 1.0.41 et documenter les preuves",
+            "Valider Archify production-publication, docs, tests Web et diff; committer la publication",
+            "Replanifier et appliquer uniquement worker-deploy pour servir le nouveau pointeur",
+            "Vérifier pages publiques, liens ZIP, hashes, tris installés; git push origin HEAD:main sans force"
+          ],
+          "evidence": [
+            "Production et tests certifiés; commit documentaire et push sans force restent à terminer"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -123,16 +123,16 @@ version was `2905a076-d107-4a29-8408-f24f86c97555`.
 `1.0.39` livre la reprise R2/Queue, les modèles D1 courants et la propagation
 locale des corrections, avec ETag par page et invalidation des annonces et
 notifications obsolètes. Sa publication et ses limites sont consignées dans
-le runbook. La candidate `1.0.40` corrige les périodes civiles, la concurrence
-du cache, les notifications et le repli sur l'historique avant le premier
-modèle v4. Le pointeur public reste en `1.0.39` jusqu'à une publication séparée
-des nouveaux ZIP vérifiés; aucun objet antérieur n'est remplacé.
+le runbook. La candidate non publiée `1.0.40` corrige les périodes civiles, la
+concurrence du cache, les notifications et le repli sur l'historique avant le
+premier modèle v4. Le pointeur public est resté en `1.0.39` jusqu'à la
+publication séparée des ZIP vérifiés; aucun objet antérieur n'a été remplacé.
 
-La candidate `1.0.41` ajoute la reconnexion WebBridge après un redémarrage MV3
-et maintient les tris de la bibliothèque sur les données locales. Elle reçoit
-ses propres archives Chrome et Firefox immuables. Le pointeur public reste en
-`1.0.39` tant que les archives et le Worker correspondant ne sont pas publiés
-et vérifiés séparément.
+`1.0.41` ajoute la reconnexion WebBridge après un redémarrage MV3 et maintient
+les tris de la bibliothèque sur les données locales. Ses archives Chrome et
+Firefox immuables ont été publiées et relues avec les SHA-256 certifiés avant
+l'avancement du pointeur public de `1.0.39` à `1.0.41`. La candidate `1.0.40`
+n'a pas été publiée et ses archives locales ne sont pas remplacées.
 
 An update gets a cache-distinct Chrome and Firefox ZIP. A release can be built
 and verified locally before the separately approved R2 publication operation.
