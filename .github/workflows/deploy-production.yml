@@ -32,6 +32,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
           uv python install 3.12
           PYTHON_BIN="$(uv python find 3.12)"
           echo "$(dirname "$PYTHON_BIN")" >> "$GITHUB_PATH"
