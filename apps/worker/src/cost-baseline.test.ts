@@ -205,7 +205,8 @@ describe('local D1 cost baseline — no external requests', () => {
     const pages = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_release_agenda_page').first();
     expect(pages).toEqual({ count: 0 });
     expect(await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM catalogue_release_model WHERE work_id LIKE 'work_cost_%'").first()).toEqual({ count: 579 });
-    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([2895, 0, 5, 5, 5]);
+    // The generation trigger and provider identity index add two accounted rows per changed model.
+    expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([4053, 0, 7, 7, 7]);
     // Ownership reads, pending publication and two durable confirmations are measured separately from D1 business writes.
     expect(r2Records.map(({ reads, writes }) => [reads, writes])).toEqual([[446, 34], [444, 34], [444, 34], [444, 34], [444, 34]]);
     console.info('r2-cost-baseline', JSON.stringify(r2Records));

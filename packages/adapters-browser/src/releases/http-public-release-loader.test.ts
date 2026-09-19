@@ -12,6 +12,29 @@ const releaseModel = (workId: string, id: string, instant: string): VirtualRelea
 const sourceWindow = { from: '2026-09-01', to: '2026-10-01' };
 
 describe('HttpPublicReleaseLoader', () => {
+  it('recovers a fresh install from paginated history while models have never been published', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(Response.json({ models: [], generatedAt: '1970-01-01T00:00:00.000Z', revision: 'models-empty', window: sourceWindow }, { headers: { ETag: '"empty"' } }))
+      .mockResolvedValueOnce(Response.json({ entries: [releaseEvent('history-one', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'history', window: sourceWindow, nextCursor: '2026-09-13T00:00:00.000Z|history-one' }, { headers: { ETag: '"history-page-1"' } }))
+      .mockResolvedValueOnce(Response.json({ entries: [releaseEvent('history-two', '2026-09-14T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'history', window: sourceWindow }, { headers: { ETag: '"history-page-2"' } }));
+    const cache = { load: async () => undefined, save: vi.fn() };
+    const result = await new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, sourceWindow);
+    expect(result.snapshot.events.map(event => event.id)).toEqual(['history-one', 'history-two']);
+    expect(result.snapshot.models).toBeUndefined();
+    expect(cache.save).toHaveBeenCalledOnce();
+    expect(fetcher.mock.calls.map(call => new URL(String(call[0])).pathname)).toEqual(['/v4/release-models', '/v3/releases', '/v3/releases']);
+  });
+
+  it('does not replace a valid cache when the historical fallback is malformed', async () => {
+    const snapshot = { etag: '"history"', events: [releaseEvent('retained', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-10T00:00:00.000Z', revision: 'history', source: 'shared' as const, window: sourceWindow };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(Response.json({ models: [], generatedAt: '1970-01-01T00:00:00.000Z', revision: 'models-empty', window: sourceWindow }, { headers: { ETag: '"empty"' } }))
+      .mockResolvedValueOnce(Response.json({ entries: [{ invalid: true }] }, { headers: { ETag: '"bad"' } }));
+    const cache = { load: async () => snapshot, save: vi.fn() };
+    await expect(new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, sourceWindow)).resolves.toMatchObject({ snapshot, freshness: 'stale' });
+    expect(cache.save).not.toHaveBeenCalled();
+  });
+
   it('reprojects cached models for another covered window without HTTP', async () => {
     const snapshot = { etag: '"models"', events: [], models: [releaseModel('work-1', 'later', '2026-09-20T00:00:00.000Z')], modelWindow: sourceWindow, generatedAt: '2026-09-12T00:00:00.000Z', revision: 'models-1', source: 'shared' as const, window: { from: '2026-09-12', to: '2026-09-19' } };
     const cache = { load: async () => snapshot, save: vi.fn() };
@@ -88,7 +111,7 @@ describe('HttpPublicReleaseLoader', () => {
   });
 
   it('keeps the last good cache on 304 and avoids a write', async () => {
-    const snapshot = { etag: '"release-r1-window"', events: [], generatedAt: '2026-09-10T00:00:00.000Z', revision: 'r1', source: 'shared' as const, window: { from: '2026-09-01', to: '2026-10-01' } };
+    const snapshot = { etag: '"release-r1-window"', events: [], models: [], generatedAt: '2026-09-10T00:00:00.000Z', revision: 'r1', source: 'shared' as const, window: { from: '2026-09-01', to: '2026-10-01' } };
     const cache = { load: async () => snapshot, save: vi.fn() };
     const loader = new HttpPublicReleaseLoader('https://tobirink.com', async (_input, init) => { expect(init?.headers).toEqual({ 'If-None-Match': snapshot.etag }); return new Response(null, { status: 304 }); }, () => Date.parse('2026-09-12T00:00:00.000Z'));
     expect((await loader.load(cache, snapshot.window)).source).toBe('cache'); expect(cache.save).not.toHaveBeenCalled();

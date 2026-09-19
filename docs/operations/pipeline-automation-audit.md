@@ -39,6 +39,15 @@ lecture IndexedDB concurrente et sérialisation de trois fenêtres. Les tests
 ne certifient pas le profil personnel ni un nouveau déploiement. Les autres
 constats ci-dessous restent à traiter.
 
+Corrections publiques vérifiées : A01 reçoit un repli historique strict après
+une génération v4 jamais publiée; A06 distingue le marqueur ancien sans cache
+des validateurs paginés; A07 fusionne les identités historiques non modélisées
+et passe 1 001 modèles sans perte. A10 ne recalcule plus le catalogue pour
+chaque révision : v4 lit moins de 200 lignes pour une page de 100 modèles parmi
+1 001. Le chemin de compatibilité v3 projette encore ses modèles à chaque
+requête, avec une borne explicite de 10 000; son coût reste distinct de v4.
+La migration additive 0026 et son rollback transactionnel sont testés localement.
+
 ### A01 — P1 : activation du lecteur avant disponibilité des modèles
 
 Le lecteur installé demande exclusivement v4. Il refuse une génération âgée

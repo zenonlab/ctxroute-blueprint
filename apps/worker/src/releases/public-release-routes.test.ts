@@ -134,13 +134,18 @@ describe('public release routes', () => {
       async query() { return { entries: [], generatedAt: page.generatedAt, revision: page.revision, window: page.window }; },
       async queryModels() { return page; },
     } });
-    const response = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29');
+    const response = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29&representation=pages');
     expect(response.status).toBe(200); expect(await response.json()).toEqual(page);
     expect(response.headers.get('ETag')).toMatch(/^"release-models-v4-[a-f0-9]{64}"$/u);
-    const conditional = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29', { headers: { 'If-None-Match': response.headers.get('ETag')! } });
+    const conditional = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29&representation=pages', { headers: { 'If-None-Match': response.headers.get('ETag')! } });
     expect(conditional.status).toBe(304);
-    const otherPage = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29&cursor=work_42', { headers: { 'If-None-Match': response.headers.get('ETag')! } });
+    const otherPage = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29&cursor=work_42&representation=pages', { headers: { 'If-None-Match': response.headers.get('ETag')! } });
     expect(otherPage.status).toBe(200);
+    const legacy = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29');
+    const legacyNext = await app.request('https://api.example/v4/release-models?from=2026-09-13&to=2026-09-29&cursor=work_42', { headers: { 'If-None-Match': legacy.headers.get('ETag')! } });
+    expect(legacyNext.status).toBe(200);
+    expect(legacyNext.headers.get('ETag')).toBe(legacy.headers.get('ETag'));
+    expect(legacyNext.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it.each([

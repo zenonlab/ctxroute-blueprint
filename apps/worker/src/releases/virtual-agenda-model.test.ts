@@ -158,7 +158,7 @@ describe('virtual Agenda model publication', () => {
     await expect(new D1PublicReleaseCalendarAdapter(env.PUBLIC_DB).queryModels({ from: '2026-09-15', limit: 100, to: '2026-10-01' }))
       .rejects.toThrow();
     await expect(new D1PublicReleaseCalendarAdapter(env.PUBLIC_DB).queryModels({ from: '2026-09-17', limit: 100, to: '2026-10-01' }))
-      .resolves.toMatchObject({ models: expect.arrayContaining([expect.objectContaining({ workId: 'work_known_agenda' })]), revision: expect.stringMatching(/^models-[a-f0-9]{48}$/u) });
+      .resolves.toMatchObject({ models: expect.arrayContaining([expect.objectContaining({ workId: 'work_known_agenda' })]), revision: expect.stringMatching(/^models-v2-[a-f0-9]{32}$/u) });
     const second = await run('known-b', '2026-09-24T03:23:00.000Z');
     expect(second).toMatchObject({ changed: false, revision: first?.revision });
     expect(await env.PUBLIC_DB.prepare("SELECT model_digest AS modelDigest, observed_at AS observedAt FROM catalogue_release_model WHERE work_id = 'work_known_agenda'").first()).toEqual(firstModel);

@@ -263,7 +263,7 @@
 ## Corriger les lacunes de l'audit d'automatisation — ACTIVE
 
 - [x] **Fiabiliser périodes cache et notifications locales** — DONE _(evidence: Application 404 tests couverts dont 9 Agenda; extension 152/152, contrats 14/14, stockage et migrations Chromium passent. Paris/New York: dates civiles, changement d'heure et 205 occurrences; cache concurrent et trois fenêtres sérialisées vérifiés., Rappels locaux après 503 et visibilité avant envoi couverts; WebBridge refuse explicitement les périodes trop grandes. Typechecks complets, lint, anti-slop, docs/ADR et Archify all passent; aucun état privé supprimé ni déploiement.)_
-- [ ] **Assurer transition historique pagination et génération efficace** — PENDING
+- [x] **Assurer transition historique pagination et génération efficace** — DONE _(evidence: Worker 134/134, Agenda 49/49, lecteur navigateur 22/22, typechecks complets, lint, anti-slop, docs/ADR et Archify all passent. Fresh install v4 non publié vers v3 paginé, compatibilité ancien ETag sans 304 et 1001 modèles plus historique couverts., Migration additive 0026 conserve les modèles et annule sa révision lors du rollback D1; v4 100 modèles lit moins de 200 lignes. Coût 579 modèles: 4053 écritures initiales, zéro inchangé, sept par modification. v3 historique reste borné à 10000 modèles et plus coûteux; aucun déploiement.)_
 - [ ] **Raccorder preuves fournisseur et cohérence canonique** — PENDING
 - [ ] **Mesurer les reprises et exposer leurs limites** — PENDING
 - [ ] **Certifier les corrections et préparer une nouvelle candidate** — PENDING

@@ -33,6 +33,11 @@ exceptions bornées, validité, état éditorial et provenance. Comparer la form
 sémantique avant mise à jour. Les anciennes tables restent lisibles pendant la
 bascule, mais ne sont plus l’autorité de `/v3/releases` après activation du
 nouveau lecteur.
+Une ligne `catalogue_release_generation` porte la révision commune et la
+dernière observation. Des triggers transactionnels l'avancent avec les modèles;
+les lectures ne recalculent plus un digest de tout le catalogue. La migration
+0026 est additive et initialise uniquement cette ligne de contrôle depuis
+les modèles existants, sans réécrire les œuvres ni les données historiques.
 
 Projeter localement seulement la fenêtre demandée. Une date explicite prime sur
 une estimation. Une estimation issue du prédicteur manga existant produit au
@@ -91,6 +96,11 @@ complet. Un échec Queue laisse le travail récupérable; un doublon ne republie
 pas un modèle identique. `/v4/release-models` expose les modèles bornés et
 paginés aux nouvelles extensions, qui calculent localement leur fenêtre;
 `/v3/releases` continue de projeter côté Worker pour les anciennes versions.
+Une extension neuve reçoit le repli v3 lorsque v4 n'a aucune génération publiée
+(date initiale 1970 et aucun modèle). Ce repli partage le budget réseau, les
+limites de pages et la validation stricte; il ne crée aucune identité locale.
+Une fenêtre vide publiée récemment reste un résultat valide et ne déclenche
+pas ce repli. Un échec conserve seulement un cache encore valide.
 
 ## Conséquences
 
@@ -101,14 +111,27 @@ annonce du modèle. Seul `CONFIRMED` alimente les observations; une correction
 de date pour un même chapitre remplace l'observation précédente. Une séquence
 fractionnaire ou suffixée reste textuelle dans l'ancre et le dernier confirmé.
 
-Les lectures v3 privilégient les modèles D1 et gardent le repli historique
-lorsqu'aucun modèle ne couvre la fenêtre. v3 et v4 partagent un digest de
-génération sur tous les modèles; une modification durant la lecture fait échouer
+Les lectures v3 fusionnent les modèles D1 et les annonces historiques des
+identités sans modèle couvrant la fenêtre. Une annonce historique d'une identité
+modélisée ne peut réactiver une ancienne date. La compatibilité v3 projette au
+plus 10 000 modèles par requête; ce chemin historique reste plus coûteux que
+v4 et refuse explicitement un dépassement. v3 et v4 partagent une génération
+calculée sur la révision D1 et les pointeurs historiques; une modification durant la lecture fait échouer
 la page pour permettre une reprise bornée. Chaque ETag dépend de la page et
 de ses paramètres, y compris sa fraîcheur. La date de confirmation R2 publiée
 reste séparée de la préparation du snapshot suivant et de la modification métier.
 La révision du lecteur historique est un SHA-256 borné compatible avec la route.
 Les clients doivent comparer les générations entre pages, pas leurs ETag.
+La fixture de 579 modèles mesure désormais 4 053 écritures à l'amorçage,
+zéro à collecte inchangée et sept pour un modèle modifié : le trigger et
+l'index d'identité ajoutent deux écritures comptabilisées. En contrepartie,
+une page v4 de cent modèles parmi 1 001 lit moins de deux cents lignes D1.
+Le lecteur 1.0.38 comparait néanmoins les ETag entre pages. Pour ce client,
+v4 sans `representation=pages` conserve un marqueur faible commun et répond
+toujours 200 avec `Cache-Control: no-store`; ce marqueur de compatibilité
+n'autorise jamais un 304. Les lecteurs corrigés demandent `representation=pages`
+et utilisent les vrais validateurs de représentation. La révision du corps
+reste l'autorité de cohérence entre pages pour les deux modes.
 
 La lecture et le passage du temps ne produisent aucune écriture distante. D1
 porte la donnée publique courante; R2 porte la reprise et l’historique borné

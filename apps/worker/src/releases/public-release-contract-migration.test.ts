@@ -96,7 +96,7 @@ describe('public release contract migration', () => {
     ]);
     const metrics = instrumentD1(env.PUBLIC_DB);
     const page = await new D1PublicReleaseCalendarAdapter(metrics.database).query({ from: '2026-09-14', limit: 10, to: '2026-10-01' });
-    expect(page).toMatchObject({ entries: [{ occurrence: { kind: 'DATE', value: '2026-09-21' }, state: 'ESTIMATED' }], revision: expect.stringMatching(/^models-[a-f0-9]{48}$/u) });
+    expect(page).toMatchObject({ entries: [{ occurrence: { kind: 'DATE', value: '2026-09-21' }, state: 'ESTIMATED' }], revision: expect.stringMatching(/^models-v2-[a-f0-9]{32}$/u) });
     const models = await new D1PublicReleaseCalendarAdapter(metrics.database).queryModels({ from: '2026-09-14', limit: 10, to: '2026-10-01' });
     expect(models.revision).toBe(page.revision);
     expect(metrics.snapshot().rowsWritten).toBe(0);

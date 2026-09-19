@@ -136,8 +136,10 @@ export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerR
 
   app.get('/v4/release-models', async (context) => {
     const url = new URL(context.req.url);
-    const allowed = new Set(['from', 'to', 'cursor', 'limit']);
+    const allowed = new Set(['from', 'to', 'cursor', 'limit', 'representation']);
     for (const key of url.searchParams.keys()) if (!allowed.has(key)) return noStoreJson(context, 'unsupported-query-parameter', 400);
+    const representation = url.searchParams.get('representation');
+    if (representation !== null && representation !== 'pages') return noStoreJson(context, 'unsupported-representation', 400);
     const limit = Number(url.searchParams.get('limit') ?? '100');
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) return noStoreJson(context, 'invalid-limit', 400);
     const from = url.searchParams.get('from'); const to = url.searchParams.get('to');
@@ -151,6 +153,11 @@ export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerR
       if (cursor) query.cursor = cursor;
       const page = await services.releaseCalendar.queryModels(query);
       if (!/^[A-Za-z0-9._-]{1,64}$/u.test(page.revision)) return noStoreJson(context, 'release-calendar-unavailable', 503);
+      if (representation === null) {
+        const marker = await representationTag('release-models-legacy', { models: [], revision: page.revision, generatedAt: page.generatedAt, window: page.window }, { from, to, limit });
+        context.header('Cache-Control', 'no-store'); context.header('ETag', `W/${marker}`); context.header('X-Content-Type-Options', 'nosniff');
+        return context.json(page);
+      }
       const entityTag = await representationTag('release-models-v4', page, query);
       if (context.req.header('If-None-Match') === entityTag) return new Response(null, { status: 304, headers: { ETag: entityTag, 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600' } });
       context.header('Cache-Control', services.policy.http.publicReadCacheControl); context.header('ETag', entityTag); context.header('X-Content-Type-Options', 'nosniff');

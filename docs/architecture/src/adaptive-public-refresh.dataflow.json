@@ -68,8 +68,8 @@
         "Agenda, Discovery et réhydratation échouent indépendamment",
         "Le dernier modèle ou profil vérifié reste servi",
         "Collecte, snapshot prêt, D1 validé, puis confirmation R2",
-        "D1 fournit les modèles courants; R2 conserve les annonces historiques",
-        "Statut canonique, génération commune et ETag propre à chaque page"
+        "D1 fournit les modèles; v3 conserve la couverture historique",
+        "Révision D1 transactionnelle, pages validées, compatibilité sans cache"
       ]
     },
     {

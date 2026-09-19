@@ -369,6 +369,13 @@ local reminders to drain after public refresh failure and recheck the current
 adult-content policy immediately before publishing. A three-window queue test
 checks that a failed request cannot mix another window's load and projection.
 
+Public Agenda transition tests mix 1,001 canonical models and unmodeled history,
+page through all 1,002 occurrences, suppress superseded historical dates and
+require zero read-side D1 writes. A v4 page of 100 models must read fewer than
+200 rows. Migration 0026 preserves existing models and its revision rolls back
+with a failed business transaction. Fresh-install tests cover the bounded v3
+fallback and preservation of the last valid cache after malformed history.
+
 Sensor, CRG, CTXRoute, and Archify continue to validate repository governance.
 They do not replace TypeScript, adapter, browser, migration, or Worker tests and
 never become product runtime dependencies.

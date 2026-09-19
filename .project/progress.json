@@ -4093,7 +4093,7 @@
         {
           "id": "public",
           "title": "Assurer transition historique pagination et génération efficace",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "A01: installation neuve exploite historique valide sans identité inventée.",
             "A06/A07: ancien client v4 compatible; v3 couvre transitions partielles et plus de 1000 modèles.",
@@ -4119,7 +4119,10 @@
             "git diff --check",
             "git commit -m 'fix(releases): preserve historical coverage and paginated compatibility'"
           ],
-          "evidence": []
+          "evidence": [
+            "Worker 134/134, Agenda 49/49, lecteur navigateur 22/22, typechecks complets, lint, anti-slop, docs/ADR et Archify all passent. Fresh install v4 non publié vers v3 paginé, compatibilité ancien ETag sans 304 et 1001 modèles plus historique couverts.",
+            "Migration additive 0026 conserve les modèles et annule sa révision lors du rollback D1; v4 100 modèles lit moins de 200 lignes. Coût 579 modèles: 4053 écritures initiales, zéro inchangé, sept par modification. v3 historique reste borné à 10000 modèles et plus coûteux; aucun déploiement."
+          ]
         },
         {
           "id": "canonical",
