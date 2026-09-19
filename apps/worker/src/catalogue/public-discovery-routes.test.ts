@@ -179,7 +179,8 @@ describe('verified public discovery cache', () => {
     const body = { key, query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Sousou no Frieren'] }, schemaVersion: 3 };
     const metrics = instrumentD1(env.PUBLIC_DB);
     const adapter = new D1PublicDiscoveryV3Adapter(metrics.database);
-    const app = createPublicDiscoveryApp({ d1Metrics: metrics, publicDiscoveryV3: adapter });
+    const queue = { send: vi.fn(async () => undefined) };
+    const app = createPublicDiscoveryApp({ d1Metrics: metrics, publicDiscoveryV3: adapter, queue });
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const responses = await Promise.all(Array.from({ length: 50 }, () => app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
       body: JSON.stringify(body), headers: { 'CF-Connecting-IP': '192.0.2.3', 'Content-Type': 'application/json' }, method: 'POST',
@@ -188,7 +189,8 @@ describe('verified public discovery cache', () => {
     expect(responses.every((response) => response.status === 202)).toBe(true);
     expect((await Promise.all(responses.map((response) => response.json<{ state: string }>()))).every(({ state }) => state === 'PENDING')).toBe(true);
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ count: 1 });
-    expect(metrics.snapshot().rowsWritten).toBe(4);
+    expect(queue.send).toHaveBeenCalledOnce();
+    expect(metrics.snapshot().rowsWritten).toBeLessThanOrEqual(8);
   });
 
   it('reads up to fifty discovery states in one public request', async () => {
@@ -267,7 +269,7 @@ describe('verified public discovery cache', () => {
     const active = await env.PUBLIC_DB.prepare(`SELECT COUNT(*) AS count FROM public_discovery_requests_v3
       WHERE state IN ('PENDING', 'PROCESSING')`).first<{ count: number }>();
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB, (active?.count ?? 0) + 2);
-    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter });
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue: { send: async () => undefined } });
     const submit = (marker: string) => app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
       body: JSON.stringify({ key: discoveryKey(marker), query: { discoveryTitles: [`Work ${marker}`], mediaKind: 'ANIME', sourceTitles: [`Work ${marker}`] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',

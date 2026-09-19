@@ -149,6 +149,27 @@ describe('public discovery queue trigger', () => {
     expect(retry.status).toBe(503);
   });
 
+  it('releases a newly admitted signal when the Queue binding is missing, then repairs it on retry', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const body = JSON.stringify(submission('a', 'Missing queue binding'));
+    const submit = (app: ReturnType<typeof createPublicDiscoveryApp>) => app.request(
+      'https://tobirink.test/v3/catalogue/discoveries/requests',
+      { body, headers: { 'Content-Type': 'application/json' }, method: 'POST' },
+    );
+    const unavailable = await submit(createPublicDiscoveryApp({ publicDiscoveryV3: adapter }));
+    expect(unavailable.status).toBe(503);
+    await expect(unavailable.json()).resolves.toEqual({ error: 'discovery-queue-unavailable' });
+    expect(await env.PUBLIC_DB.prepare('SELECT state, queue_signal_state AS signal FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+      .bind(key('a').fingerprint).first()).toEqual({ signal: 'UNSENT', state: 'PENDING' });
+
+    const queue = { send: vi.fn(async () => undefined) };
+    const repaired = await submit(createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue }));
+    expect(repaired.status).toBe(202);
+    expect(queue.send).toHaveBeenCalledOnce();
+    expect(await env.PUBLIC_DB.prepare('SELECT queue_signal_state AS signal FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+      .bind(key('a').fingerprint).first()).toEqual({ signal: 'SENT' });
+  });
+
   it('emits one Queue signal for ten thousand identical admissions', async () => {
     const queue = { send: vi.fn(async () => undefined) };
     let requests = 0;

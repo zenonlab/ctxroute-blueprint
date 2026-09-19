@@ -484,7 +484,7 @@
       "id": "outbox-error",
       "from": "outbox",
       "to": "repair",
-      "label": "échec/timeout → UNSENT",
+      "label": "Queue abs./échec/timeout → UNSENT",
       "variant": "security",
       "route": "straight",
       "labelAt": [
