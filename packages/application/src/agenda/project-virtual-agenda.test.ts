@@ -10,6 +10,14 @@ const base: VirtualReleaseModelContract = {
 };
 
 describe('projectVirtualAgenda', () => {
+  it('invalidates future announcements from a verified cancelled status while preserving confirmed history', () => {
+    const announced = { id: 'future', provider: 'mangaupdates' as const, providerWorkId: '42', releaseKind: 'chapter' as const, sequence: '59', occurrence: { kind: 'DATE' as const, value: '2026-09-12' }, state: 'SCHEDULED' as const, provenance: { source: 'mangaupdates', fetchedAt: '2026-09-02T00:00:00.000Z', parserVersion: '1', rulesVersion: '1' }, expiresAt: '2026-10-01T00:00:00.000Z' };
+    const confirmed = { ...announced, id: 'confirmed', sequence: '58', state: 'CONFIRMED' as const, occurrence: { kind: 'DATE' as const, value: '2026-09-01' } };
+    const past = { ...announced, id: 'past', sequence: '57', occurrence: { kind: 'DATE' as const, value: '2026-08-25' } };
+    const model = { ...base, editorialStatus: 'CANCELLED' as const, exceptions: [confirmed, past], explicitNext: announced, provenance: { ...base.provenance, observedAt: '2026-09-10T00:00:00.000Z' } };
+    expect(projectVirtualAgenda([model], { from: '2026-08-01', to: '2026-10-01' })).toMatchObject([{ id: 'past', state: 'SCHEDULED' }, { id: 'confirmed', state: 'CONFIRMED' }, { id: 'future', state: 'CANCELLED', provenance: { fetchedAt: '2026-09-10T00:00:00.000Z' } }]);
+  });
+
   it('projects only one estimate and preserves a fractional anchor without inventing a total', () => {
     expect(projectVirtualAgenda([base], { from: '2026-09-01', to: '2026-10-01' })).toMatchObject([
       { occurrence: { kind: 'DATE', value: '2026-09-08' }, state: 'ESTIMATED' },

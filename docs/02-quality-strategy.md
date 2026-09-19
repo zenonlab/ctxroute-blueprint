@@ -376,6 +376,14 @@ require zero read-side D1 writes. A v4 page of 100 models must read fewer than
 with a failed business transaction. Fresh-install tests cover the bounded v3
 fallback and preservation of the last valid cache after malformed history.
 
+Canonical publication tests cover explicit undefined fields, an incomplete
+historical profile JSON, unchanged alias timestamps, and agreement between
+profile JSON, typed metadata and model status. A raw AniList response drives
+cancellation through the R2 checkpoint and D1 publication, followed by a new
+dated announcement. Status-only resumption must retain cancellation tombstones;
+confirmed history is never cancelled. Missing status, hiatus and past schedules
+cannot be interpreted as future cancellation evidence.
+
 Sensor, CRG, CTXRoute, and Archify continue to validate repository governance.
 They do not replace TypeScript, adapter, browser, migration, or Worker tests and
 never become product runtime dependencies.

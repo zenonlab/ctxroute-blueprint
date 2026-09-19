@@ -10,7 +10,7 @@ const mangaUpdatesRecordSchema = z.object({ chapter: nullableScalarSchema, chapt
 const mangaUpdatesSeriesSchema = z.object({ id: nullableScalarSchema, series_id: nullableScalarSchema }).passthrough();
 export const mangaUpdatesAgendaResultSchema = z.object({ metadata: z.object({ series: mangaUpdatesSeriesSchema.nullable().optional() }).passthrough().nullable().optional(), record: mangaUpdatesRecordSchema, series: mangaUpdatesSeriesSchema.nullable().optional(), series_id: nullableScalarSchema }).passthrough();
 export const mangaUpdatesAgendaPageSchema = z.object({ page: z.number().int().positive(), per_page: z.number().int().min(1).max(100), results: z.array(mangaUpdatesAgendaResultSchema).max(100), total_hits: z.number().int().nonnegative() }).passthrough();
-export const aniListAgendaPageSchema = z.object({ data: z.object({ Page: z.object({ airingSchedules: z.array(z.object({ airingAt: z.number().int().positive(), episode: z.number().int().positive(), media: z.object({ id: z.number().int().positive() }) })).max(50), pageInfo: z.object({ hasNextPage: z.boolean() }) }) }) });
+export const aniListAgendaPageSchema = z.object({ data: z.object({ Page: z.object({ airingSchedules: z.array(z.object({ airingAt: z.number().int().positive(), episode: z.number().int().positive(), media: z.object({ id: z.number().int().positive(), status: z.enum(['FINISHED', 'RELEASING', 'NOT_YET_RELEASED', 'CANCELLED', 'HIATUS']).nullish() }) })).max(50), pageInfo: z.object({ hasNextPage: z.boolean() }) }) }) });
 
 async function readBoundedText(response: Response): Promise<string> {
   const declaredLength = Number(response.headers.get('content-length') ?? 0);

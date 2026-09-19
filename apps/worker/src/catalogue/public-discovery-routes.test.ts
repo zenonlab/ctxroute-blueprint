@@ -474,6 +474,36 @@ describe('verified public discovery cache', () => {
     await adapter.publishBatch({ claimToken: aliasClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440074', results: [resumed], schemaVersion: 3, verifiedAt: resumedAt }, 'u'.repeat(64), 'b'.repeat(64), resumedAt);
     await expect(adapter.read(key, resumedAt)).resolves.toMatchObject({ state: 'VERIFIED', verifiedAt: changedAt, profile: { candidate: { editorialStatus: 'ONGOING' } } });
     expect(await env.PUBLIC_DB.prepare("SELECT editorial_status AS status FROM catalogue_release_model WHERE work_id = 'work_refresh'").first()).toEqual({ status: 'ONGOING' });
+    await env.PUBLIC_DB.prepare("UPDATE catalogue_current_metadata SET profile_json = json_remove(profile_json, '$.candidate.episodeCount') WHERE work_id = 'work_refresh'").run();
+    await expect(adapter.read(key, resumedAt)).resolves.toMatchObject({ profile: { candidate: { episodeCount: 24 } } });
+    const partialKey = { ...key, fingerprint: '72'.repeat(32) };
+    const partialAt = new Date(Date.parse(resumedAt) + 60_000).toISOString();
+    await adapter.request({ ...request, key: partialKey }, partialAt);
+    const partialClaim = await adapter.claimBatch({ claimToken: 'v'.repeat(48), tokenDigest: 'v'.repeat(64), now: partialAt, leaseUntil: new Date(Date.parse(partialAt) + 900_000).toISOString(), limit: 20 });
+    const partial = { ...resumed, key: partialKey, resolution: { ...resumed.resolution, profile: { ...resumed.resolution.profile, candidate: { ...resumed.resolution.profile.candidate, editorialStatus: undefined, episodeCount: undefined, displayTitle: 'Refresh Work revised' } } } };
+    await adapter.publishBatch({ claimToken: partialClaim.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440075', results: [partial], schemaVersion: 3, verifiedAt: partialAt }, 'v'.repeat(64), 'c'.repeat(64), partialAt);
+    await expect(adapter.read(key, partialAt)).resolves.toMatchObject({ verifiedAt: changedAt, profile: { candidate: { editorialStatus: 'ONGOING', episodeCount: 24, displayTitle: 'Refresh Work revised' } } });
+    expect(await env.PUBLIC_DB.prepare(`SELECT editorial_status AS status, episode_total AS total,
+      json_extract(profile_json, '$.candidate.editorialStatus') AS profileStatus,
+      json_extract(profile_json, '$.candidate.episodeCount') AS profileTotal
+      FROM catalogue_current_metadata WHERE work_id = 'work_refresh'`).first()).toEqual({ status: 'ONGOING', total: 24, profileStatus: 'ONGOING', profileTotal: 24 });
+    const futureAnnouncement = { id: 'canonical-future', provider: 'anilist', providerWorkId: '754321', releaseKind: 'episode', sequence: '2', state: 'SCHEDULED', occurrence: { kind: 'INSTANT', value: new Date(Date.parse(partialAt) + 7 * 86_400_000).toISOString() }, expiresAt: '2027-01-01T00:00:00.000Z', provenance: { fetchedAt: partialAt, source: 'anilist', parserVersion: '2', rulesVersion: '2' } };
+    const confirmedRelease = { ...futureAnnouncement, id: 'canonical-confirmed', sequence: '1', state: 'CONFIRMED', occurrence: { kind: 'DATE', value: partialAt.slice(0, 10) } };
+    await env.PUBLIC_DB.prepare("UPDATE catalogue_release_model SET explicit_next_json = ?1, exceptions_json = ?2 WHERE work_id = 'work_refresh'")
+      .bind(JSON.stringify(futureAnnouncement), JSON.stringify([confirmedRelease, futureAnnouncement])).run();
+    for (const [index, status] of (['CANCELLED', 'ONGOING'] as const).entries()) {
+      const lifecycleAt = new Date(Date.parse(partialAt) + (index + 1) * 60_000).toISOString();
+      const lifecycleKey = { ...key, fingerprint: String(73 + index).repeat(32) };
+      const token = String(index + 1).repeat(64);
+      await adapter.request({ ...request, key: lifecycleKey }, lifecycleAt);
+      const lifecycleClaim = await adapter.claimBatch({ claimToken: token.slice(0, 48), tokenDigest: token, now: lifecycleAt, leaseUntil: new Date(Date.parse(lifecycleAt) + 900_000).toISOString(), limit: 20 });
+      const lifecycleResult = { ...partial, key: lifecycleKey, resolution: { ...partial.resolution, profile: { ...partial.resolution.profile, candidate: { ...partial.resolution.profile.candidate, editorialStatus: status } } } };
+      await adapter.publishBatch({ claimToken: lifecycleClaim.claimToken, nonce: `550e8400-e29b-41d4-a716-44665544007${6 + index}`, results: [lifecycleResult], schemaVersion: 3, verifiedAt: lifecycleAt }, token, token, lifecycleAt);
+      expect(await env.PUBLIC_DB.prepare(`SELECT editorial_status AS status, json_extract(explicit_next_json, '$.state') AS nextState,
+        json_extract(exceptions_json, '$[0].state') AS confirmedState, json_extract(exceptions_json, '$[1].state') AS announcementState
+        FROM catalogue_release_model WHERE work_id = 'work_refresh'`).first()).toEqual({ status, nextState: 'CANCELLED', confirmedState: 'CONFIRMED', announcementState: 'CANCELLED' });
+    }
+    expect(await env.PUBLIC_DB.prepare("SELECT editorial_status AS status FROM catalogue_release_model WHERE work_id = 'work_refresh'").first()).toEqual({ status: 'ONGOING' });
     await env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3 SET
       refresh_state = 'PROCESSING', refresh_attempt_count = 8, claim_token_hash = ?1, lease_until = ?2
       WHERE fingerprint = ?3`).bind('e'.repeat(64), '2000-01-01T00:00:00.000Z', key.fingerprint).run();

@@ -115,7 +115,7 @@ function mergeProfile(current: PublicDiscoveryVerifiedProfile | undefined, incom
   }
   const references = [...new Map([...current.references, ...incoming.references]
     .map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
-  const candidate: PublicDiscoveryCandidate = { ...current.candidate, ...incoming.candidate };
+  const candidate: PublicDiscoveryCandidate = { ...current.candidate, ...Object.fromEntries(Object.entries(incoming.candidate).filter(([, value]) => value !== undefined)) };
   return publicDiscoveryVerifiedProfileSchema.parse({ candidate, references, workId: incoming.workId });
 }
 
@@ -138,9 +138,20 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   }
 
   private async metadataProfile(workId: string): Promise<PublicDiscoveryVerifiedProfile | undefined> {
-    const row = await this.database.prepare('SELECT profile_json AS profileJson FROM catalogue_current_metadata WHERE work_id = ?1 LIMIT 1')
-      .bind(workId).first<{ profileJson: string }>();
-    return row === null ? undefined : publicDiscoveryVerifiedProfileSchema.parse(JSON.parse(row.profileJson));
+    const row = await this.database.prepare(`SELECT profile_json AS profileJson, editorial_status AS editorialStatus,
+      format, start_year AS startYear, end_year AS endYear, episode_total AS episodeCount,
+      chapter_total AS chapterCount, volume_total AS volumeCount, cover_url AS coverUrl,
+      cover_attribution AS coverAttribution FROM catalogue_current_metadata WHERE work_id = ?1 LIMIT 1`)
+      .bind(workId).first<{ profileJson: string; editorialStatus: PublicDiscoveryCandidate['editorialStatus'] | null;
+        format: string | null; startYear: number | null; endYear: number | null; episodeCount: number | null;
+        chapterCount: number | null; volumeCount: number | null; coverUrl: string | null; coverAttribution: string | null }>();
+    if (row === null) return undefined;
+    const profile = publicDiscoveryVerifiedProfileSchema.parse(JSON.parse(row.profileJson));
+    const candidate: PublicDiscoveryCandidate = { editorialStatus: row.editorialStatus ?? undefined, format: row.format ?? undefined,
+      startYear: row.startYear ?? undefined, endYear: row.endYear ?? undefined, episodeCount: row.episodeCount ?? undefined,
+      chapterCount: row.chapterCount ?? undefined, volumeCount: row.volumeCount ?? undefined, ...profile.candidate };
+    if (candidate.cover === undefined && row.coverUrl != null && row.coverAttribution != null) candidate.cover = { url: row.coverUrl, attribution: row.coverAttribution };
+    return publicDiscoveryVerifiedProfileSchema.parse({ ...profile, candidate });
   }
 
   async readMany(keys: readonly PublicDiscoveryKeyV3[], now: string) {
@@ -506,15 +517,15 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
             WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
         ON CONFLICT(work_id) DO UPDATE SET
           profile_json = excluded.profile_json,
-          editorial_status = COALESCE(excluded.editorial_status, catalogue_current_metadata.editorial_status),
-          format = COALESCE(excluded.format, catalogue_current_metadata.format),
-          start_year = COALESCE(excluded.start_year, catalogue_current_metadata.start_year),
-          end_year = COALESCE(excluded.end_year, catalogue_current_metadata.end_year),
-          episode_total = COALESCE(excluded.episode_total, catalogue_current_metadata.episode_total),
-          chapter_total = COALESCE(excluded.chapter_total, catalogue_current_metadata.chapter_total),
-          volume_total = COALESCE(excluded.volume_total, catalogue_current_metadata.volume_total),
-          cover_url = COALESCE(excluded.cover_url, catalogue_current_metadata.cover_url),
-          cover_attribution = COALESCE(excluded.cover_attribution, catalogue_current_metadata.cover_attribution),
+          editorial_status = excluded.editorial_status,
+          format = excluded.format,
+          start_year = excluded.start_year,
+          end_year = excluded.end_year,
+          episode_total = excluded.episode_total,
+          chapter_total = excluded.chapter_total,
+          volume_total = excluded.volume_total,
+          cover_url = excluded.cover_url,
+          cover_attribution = excluded.cover_attribution,
           genres_json = excluded.genres_json, categories_json = excluded.categories_json,
           content_classification = excluded.content_classification,
           source_provider = excluded.source_provider, source_external_id = excluded.source_external_id,
@@ -530,11 +541,20 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           candidate.provider, candidate.externalId, verifiedAt, candidate.metadataVersion ?? 1, revision,
           ...guardValues,
         ),
-      this.database.prepare(`UPDATE catalogue_release_model SET editorial_status = ?1, revision = ?2
+      this.database.prepare(`UPDATE catalogue_release_model SET editorial_status = ?1, revision = ?2, observed_at = ?5, source = ?6,
+        exceptions_json = CASE WHEN ?1 = 'CANCELLED' THEN (
+          SELECT json_group_array(json(CASE WHEN json_extract(value, '$.state') = 'SCHEDULED'
+            AND json_extract(value, '$.occurrence.value') >= CASE WHEN json_extract(value, '$.occurrence.kind') = 'DATE' THEN substr(?5, 1, 10) ELSE ?5 END
+            THEN json_set(value, '$.state', 'CANCELLED', '$.provenance.fetchedAt', ?5, '$.provenance.source', ?6)
+            ELSE value END)) FROM json_each(exceptions_json)) ELSE exceptions_json END,
+        explicit_next_json = CASE WHEN ?1 = 'CANCELLED' AND json_extract(explicit_next_json, '$.state') = 'SCHEDULED'
+          AND json_extract(explicit_next_json, '$.occurrence.value') >= CASE WHEN json_extract(explicit_next_json, '$.occurrence.kind') = 'DATE' THEN substr(?5, 1, 10) ELSE ?5 END
+          THEN json_set(explicit_next_json, '$.state', 'CANCELLED', '$.provenance.fetchedAt', ?5, '$.provenance.source', ?6)
+          ELSE explicit_next_json END
         WHERE work_id = ?3 AND editorial_status IS NOT ?1
           AND EXISTS (SELECT 1 FROM catalogue_current_metadata
             WHERE work_id = ?3 AND profile_json = ?4 AND revision = ?2)`)
-        .bind(candidate.editorialStatus ?? 'UNKNOWN', revision, profile.workId, JSON.stringify(profile)),
+        .bind(candidate.editorialStatus ?? 'UNKNOWN', revision, profile.workId, JSON.stringify(profile), verifiedAt, candidate.provider),
     ];
   }
 

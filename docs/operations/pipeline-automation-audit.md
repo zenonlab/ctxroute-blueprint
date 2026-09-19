@@ -48,6 +48,16 @@ chaque révision : v4 lit moins de 200 lignes pour une page de 100 modèles parm
 requête, avec une borne explicite de 10 000; son coût reste distinct de v4.
 La migration additive 0026 et son rollback transactionnel sont testés localement.
 
+A05 : la réponse brute AniList fournit désormais le statut explicite utilisé
+pour annuler une annonce future; le test traverse R2 et D1 jusqu'à la reprise
+datée. Le statut canonique annule aussi les annonces futures dans le batch D1,
+sans réactivation sur simple changement de statut. MangaUpdates ne fournit
+pas cette preuve dans son flux de sorties; cette limite est conservée.
+A09 : les champs absents restent vérifiés, les colonnes dérivent du profil
+fusionné et les anciens JSON incomplets réutilisent les colonnes conservées.
+Les dernières sorties confirmées restent dans leur contrat Agenda, distinct
+des totaux annoncés du profil Discovery v3.
+
 ### A01 — P1 : activation du lecteur avant disponibilité des modèles
 
 Le lecteur installé demande exclusivement v4. Il refuse une génération âgée

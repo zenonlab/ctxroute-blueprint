@@ -67,7 +67,7 @@ export class AniListAgendaCollector implements PublicAgendaCollector {
     for (let page = cursor.nextPage; page <= aniListPageLimit; page += 1) {
       const response = await this.fetcher('https://graphql.anilist.co', {
         method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Origin: 'https://tobirink.com', Referer: 'https://tobirink.com/', 'User-Agent': 'TobiRink/1.0 (+https://tobirink.com)' },
-        body: JSON.stringify({ query: 'query($page:Int!,$from:Int!,$to:Int!){Page(page:$page,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$from,airingAt_lesser:$to,sort:TIME){airingAt episode media{id}}}}', variables: { from, page, to } }), signal: AbortSignal.timeout(8_000),
+        body: JSON.stringify({ query: 'query($page:Int!,$from:Int!,$to:Int!){Page(page:$page,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$from,airingAt_lesser:$to,sort:TIME){airingAt episode media{id status}}}}', variables: { from, page, to } }), signal: AbortSignal.timeout(8_000),
       });
       if (!response.ok) {
         const text = (await response.text()).slice(0, 512);
@@ -78,10 +78,10 @@ export class AniListAgendaCollector implements PublicAgendaCollector {
       }
       const body = await parseAniListAgendaPage(response);
       received += body.data.Page.airingSchedules.length;
-      const fetchedAt = new Date().toISOString();
+      const fetchedAt = new Date(this.clock()).toISOString();
       const pageEvents = body.data.Page.airingSchedules.map((item) => publicAgendaReleaseEventSchema.parse({
         id: `anilist-episode-${item.media.id}-${item.episode}`, provider: 'anilist', providerWorkId: String(item.media.id), releaseKind: 'episode', sequence: item.episode,
-        occurrence: { kind: 'INSTANT', value: new Date(item.airingAt * 1000).toISOString() }, state: 'SCHEDULED', provenance: { source: 'anilist', fetchedAt, parserVersion: '2', rulesVersion: '2' }, expiresAt: new Date((item.airingAt + 60 * 86400) * 1000).toISOString(),
+        occurrence: { kind: 'INSTANT', value: new Date(item.airingAt * 1000).toISOString() }, state: item.media.status === 'CANCELLED' && item.airingAt * 1000 >= Date.parse(fetchedAt) ? 'CANCELLED' : 'SCHEDULED', provenance: { source: 'anilist', fetchedAt, parserVersion: '3', rulesVersion: '3' }, expiresAt: new Date((item.airingAt + 60 * 86400) * 1000).toISOString(),
       }));
       for (const event of pageEvents) events.set(event.id, event);
       const hasNextPage = body.data.Page.pageInfo.hasNextPage;

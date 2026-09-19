@@ -4127,7 +4127,7 @@
         {
           "id": "canonical",
           "title": "Raccorder preuves fournisseur et cohérence canonique",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "A05: preuve fournisseur réelle ou indisponibilité explicite; aucune annulation déduite d'une absence.",
             "A09: profil JSON et colonnes cohérents lors de réponses partielles; dates confirmées distinctes."
@@ -4153,7 +4153,10 @@
             "git diff --check",
             "git commit -m 'fix(catalogue): align canonical profiles and provider evidence'"
           ],
-          "evidence": []
+          "evidence": [
+            "Worker 135/135, collecteurs publics 68/68, application 405/405 et contrats 14/14 passent; typechecks, lint, anti-slop, docs/ADR et Archify showcase passent. Timeout isolé de normalisation non reproduit en relance ciblée puis complète.",
+            "Annulation AniList brute traverse R2 et D1; nouvelle date fournisseur reprend la sortie. Statut seul ne réactive pas les tombstones; sorties confirmées conservées. Profil partiel et alias convergent avec colonnes D1; capacité d’annulation MangaUpdates explicitement indisponible."
+          ]
         },
         {
           "id": "operations",

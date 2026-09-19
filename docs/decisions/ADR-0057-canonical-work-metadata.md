@@ -36,6 +36,11 @@ du nouveau profil avec les valeurs connues. Les références sont réunies par
 identité exacte. Un contenu sémantiquement identique ne change ni fiche ni
 révision; compteur, classification ou autre métadonnée publique modifiée crée
 une révision visible par tous les alias.
+Un champ absent ou `undefined` conserve la valeur vérifiée; `UNKNOWN` est une
+valeur explicite, et une liste vide explicite remplace la liste précédente.
+Les colonnes métier sont dérivées du profil fusionné, sans seconde fusion SQL.
+La lecture complète les champs manquants des anciens JSON depuis les colonnes
+déjà conservées, puis valide le profil; la prochaine publication les aligne.
 
 Les réponses Discovery et Catalogue lisent cette source commune. Les copies
 historiques dans les résultats Discovery restent temporairement disponibles
@@ -60,3 +65,7 @@ le même batch D1, même sans nouvelle sortie. L'intervalle historique reste
 conservé pendant un hiatus; la projection suspend les estimations. Les
 compteurs annoncés du profil v3 ne sont jamais remplacés par une séquence
 confirmée, qui conserve sa colonne textuelle distincte.
+Un statut CANCELLED transforme dans ce même batch les annonces encore futures
+en annulations explicites. Une reprise de statut seule ne réactive pas ces
+anciennes dates : une nouvelle annonce fournisseur est nécessaire. Les sorties
+confirmées et les snapshots historiques sont conservés.

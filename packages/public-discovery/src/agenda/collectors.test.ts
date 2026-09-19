@@ -4,6 +4,21 @@ import { AniListAgendaCollector, collectPublicAgendaLanes, MangaUpdatesAgendaCol
 const event = { id: 'anilist-1', provider: 'anilist' as const, providerWorkId: '1', releaseKind: 'episode' as const, occurrence: { kind: 'INSTANT' as const, value: '2026-09-13T00:00:00.000Z' }, state: 'SCHEDULED' as const, provenance: { source: 'anilist', fetchedAt: '2026-09-13T00:00:00.000Z', parserVersion: '1', rulesVersion: '1' }, expiresAt: '2026-09-14T00:00:00.000Z' };
 
 describe('public Agenda collectors', () => {
+  it.each([
+    ['CANCELLED', '2026-09-13T00:00:00.000Z', 'CANCELLED'],
+    ['CANCELLED', '2026-09-11T00:00:00.000Z', 'SCHEDULED'],
+    ['HIATUS', '2026-09-13T00:00:00.000Z', 'SCHEDULED'],
+    [null, '2026-09-13T00:00:00.000Z', 'SCHEDULED'],
+    [undefined, '2026-09-13T00:00:00.000Z', 'SCHEDULED'],
+  ])('uses explicit future cancellation evidence only: %s at %s', async (status, instant, expected) => {
+    const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
+      expect(String(init?.body)).toContain('media{id status}');
+      return Response.json({ data: { Page: { airingSchedules: [{ airingAt: Date.parse(instant!) / 1000, episode: 1, media: { id: 700, status } }], pageInfo: { hasNextPage: false } } } });
+    });
+    const collected = await new AniListAgendaCollector(fetcher, async () => undefined, async () => undefined, () => Date.parse('2026-09-12T00:00:00.000Z')).collect({ from: '2026-09-11', to: '2026-09-28' });
+    expect(collected.events).toMatchObject([{ state: expected, provenance: { fetchedAt: '2026-09-12T00:00:00.000Z', parserVersion: '3', rulesVersion: '3' } }]);
+  });
+
   it('isolates provider failures while retaining successful lane events', async () => {
     const result = await collectPublicAgendaLanes([{ provider: 'anilist', collect: async () => ({ events: [event], received: 1, skippedUnidentified: 0 }) }, { provider: 'mangaupdates', collect: async () => { throw new Error('429'); } }], { from: '2026-09-12', to: '2026-09-28' });
     expect(result.events).toHaveLength(1); expect(result.failures[0]).toBe('mangaupdates:429');

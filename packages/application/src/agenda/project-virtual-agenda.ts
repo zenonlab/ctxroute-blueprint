@@ -19,7 +19,14 @@ export function projectVirtualAgenda(
       const key = JSON.stringify([event.provider, event.providerWorkId, event.releaseKind, event.sequence ?? event.id]);
       occurrences.set(key, event);
     }
-    for (const event of occurrences.values()) if (inWindow(event, window.from, window.to)) events.set(event.id, event);
+    for (const event of occurrences.values()) {
+      if (!inWindow(event, window.from, window.to)) continue;
+      const observedAt = model.provenance.observedAt;
+      const future = event.occurrence.value >= (event.occurrence.kind === 'DATE' ? observedAt.slice(0, 10) : observedAt);
+      const projected = model.editorialStatus === 'CANCELLED' && event.state === 'SCHEDULED' && future
+        ? { ...event, state: 'CANCELLED' as const, provenance: { ...event.provenance, fetchedAt: observedAt, source: model.provenance.source } } : event;
+      events.set(event.id, projected);
+    }
     if ([...occurrences.values()].some(event => (event.state === 'SCHEDULED' || event.state === 'CANCELLED') && event.occurrence.value.slice(0, 10) >= model.anchor.date) || model.intervalDays === undefined || suspended.has(model.editorialStatus)) continue;
     const nextTime = Date.parse(`${model.anchor.date}T00:00:00.000Z`) + Math.round(model.intervalDays * 86_400_000);
     const nextDate = new Date(nextTime).toISOString().slice(0, 10);

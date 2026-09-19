@@ -110,6 +110,20 @@ L'ancienne version reste dans les snapshots R2. Une absence ne retire pas une
 annonce du modèle. Seul `CONFIRMED` alimente les observations; une correction
 de date pour un même chapitre remplace l'observation précédente. Une séquence
 fractionnaire ou suffixée reste textuelle dans l'ancre et le dernier confirmé.
+La collecte AniList demande `media.status` avec chaque horaire : seul le statut
+explicite `CANCELLED` transforme une annonce encore future en annulation. Un champ absent,
+null ou HIATUS n'est pas une annulation d'occurrence. Le statut canonique
+CANCELLED invalide également les annonces SCHEDULED encore futures conservées
+dans le modèle, sans toucher aux sorties CONFIRMED ni réinterpréter le passé.
+La date de preuve du statut est conservée lors de son changement.
+MangaUpdates ne fournit pas de preuve
+d'annulation d'occurrence dans le flux de sorties utilisé; cette capacité reste
+indisponible et aucune absence n'est interprétée comme une annulation.
+Si AniList retire complètement un horaire de sa réponse, seule la réhydratation
+exacte du profil peut alors apporter la preuve de statut; la collecte ne devine
+pas cette annulation. Seules les règles Agenda AniList passent en version 3,
+appliquée aux prochaines pages collectées. Les règles favoris sont inchangées.
+Référence fournisseur : [MediaStatus AniList](https://anilist.gitbook.io/anilist-apiv2-docs/docs/reference/enum/mediastatus).
 
 Les lectures v3 fusionnent les modèles D1 et les annonces historiques des
 identités sans modèle couvrant la fenêtre. Une annonce historique d'une identité
