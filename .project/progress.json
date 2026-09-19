@@ -4337,14 +4337,14 @@
       "schemaVersion": 1,
       "id": "goal-publish-library-sort-1041",
       "title": "Publier la correction de tri 1.0.41 avec migration D1 additive",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
         {
           "id": "publish",
           "title": "Migrer D1, déployer, vérifier puis publier les archives et la page 1.0.41",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Seule la migration additive 0026 touche D1; aucune donnée n'est supprimée",
             "Le Worker compatible puis le site 1.0.41 sont sains; les canaries passent",
@@ -4374,7 +4374,10 @@
             "Vérifier pages publiques, liens ZIP, hashes, tris installés; git push origin HEAD:main sans force"
           ],
           "evidence": [
-            "Production et tests certifiés; commit documentaire et push sans force restent à terminer"
+            "D1 0026 appliquée; Worker 84d40f2e à 100 %, aucune migration restante; routes Agenda v3/v4 et cinq pages 200",
+            "Deux ZIP R2 1.0.41 téléchargés en 200/cache immuable avec SHA-256 identiques aux archives locales; /download annonce 1.0.41",
+            "Chromium installé contre tobirink.com: 1532 favoris synthétiques/1400 médias, premier rendu 473 ms, tris 57–69 ms, redémarrage MV3 136 ms; Firefox 155 installé hors ligne sans blocage",
+            "npm run verify, Archify showcase 9/9 et visual-check, docs/décisions, pré-push lint/coverage/intégration validés; push fast-forward origin/main f458b54..dfcd612; profil personnel non certifié"
           ]
         }
       ]

@@ -276,6 +276,6 @@
 
 - [x] **Versionner et certifier les archives locales 1.0.41** — DONE _(evidence: npm run verify, build Web, Archify dataflow, validate:docs et validate:decisions réussis, Deux builds isolés et packaging normal byte-identiques: Chrome b651485195278f861b36f8f0ac19dd51ec9d58f6e0695afb9f46df0f0f53c456; Firefox adacd904d2e9fa3f4fa87fe7df75077894833be8e8f50aec880cb285e840dfe9, Archive Chrome installée: premier rendu 258 ms, quatre tris 59–72 ms, redémarrage MV3 181 ms; pointeur public 1.0.39)_
 
-## Publier la correction de tri 1.0.41 avec migration D1 additive — ACTIVE
+## Publier la correction de tri 1.0.41 avec migration D1 additive — DONE
 
-- [ ] **Migrer D1, déployer, vérifier puis publier les archives et la page 1.0.41** — IN_PROGRESS _(evidence: Production et tests certifiés; commit documentaire et push sans force restent à terminer)_
+- [x] **Migrer D1, déployer, vérifier puis publier les archives et la page 1.0.41** — DONE _(evidence: D1 0026 appliquée; Worker 84d40f2e à 100 %, aucune migration restante; routes Agenda v3/v4 et cinq pages 200, Deux ZIP R2 1.0.41 téléchargés en 200/cache immuable avec SHA-256 identiques aux archives locales; /download annonce 1.0.41, Chromium installé contre tobirink.com: 1532 favoris synthétiques/1400 médias, premier rendu 473 ms, tris 57–69 ms, redémarrage MV3 136 ms; Firefox 155 installé hors ligne sans blocage)_
