@@ -14,7 +14,9 @@ concurrency:
 
 jobs:
   verify-and-deploy-worker:
-    runs-on: ubuntu-latest
+    # GitHub-hosted Linux runners are unavailable for this repository. Keep the
+    # production lane on the explicitly registered, online runner only.
+    runs-on: [self-hosted, macOS, ARM64, cloudflare-ci]
     environment: production
     steps:
       - name: Checkout

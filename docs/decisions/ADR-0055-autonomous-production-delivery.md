@@ -28,8 +28,10 @@ sur les changements de `main`. Son répertoire `apps/provider-gateway` reste
 configuré dans le tableau de bord Deno, tandis que `deno.jsonc` fixe le runtime
 dynamique et `src/index.ts` comme entrypoint.
 
-Un workflow GitHub déclenché par `main` ou manuellement exécute `npm run verify`,
-génère un plan Cloudflare expirant, vérifie son digest et applique uniquement
+Un workflow GitHub déclenché par `main` ou manuellement s'exécute uniquement sur
+le runner auto-hébergé enregistré avec les labels `self-hosted`, `macOS`,
+`ARM64`, `cloudflare-ci`. Il exécute `npm run verify`, génère un plan Cloudflare
+expirant, vérifie son digest et applique uniquement
 `worker:tobirink-public-api`. Les pull requests n’ont aucun job de déploiement
 et le job ne possède que `contents: read`.
 
