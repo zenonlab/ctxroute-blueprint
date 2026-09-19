@@ -50,6 +50,14 @@ migration R2 v1 vers v2 prouve la conservation des objets de rollback.
 Ces preuves synthétiques ne certifient ni la bibliothèque personnelle ni la
 mise à jour installée de l'extension, qui nécessite son parcours dédié.
 
+Les métriques opérationnelles sont confrontées aux appels réels du bucket :
+admission suivie d'un échec Queue, signal conservé, réservation encore valide
+puis nouvelle tentative après expiration. Les tests couvrent également l'échec
+R2 avant le claim, trois messages de reprise coalescés, le code d'attente de
+plus de huit jours et la continuation d'un scan historique tronqué. Les codes
+fermés excluent dates et identités; ces tests ne prouvent pas l'installation
+d'une alerte externe ni l'absence de backlog distant.
+
 Pure domain behavior uses fast deterministic unit tests. Every boundary adds a
 contract test. Browser semantics add a real extension journey. Persistence
 changes add forward migration, export/import, and failure recovery fixtures.

@@ -17,7 +17,7 @@ export interface WorkerDiagnosticBindings {
 }
 
 export type WorkerCostResult = 'backoff' | 'changed' | 'deduplicated' | 'failed' | 'unchanged';
-export type WorkerCostTask = 'agenda' | 'discovery' | 'discovery-admission' | 'discovery-lookup' | 'discovery-refresh';
+export type WorkerCostTask = 'agenda' | 'agenda-admission' | 'agenda-recovery' | 'discovery' | 'discovery-admission' | 'discovery-lookup' | 'discovery-refresh';
 export type WorkerCostProvider = 'anilist' | 'kitsu' | 'mangadex' | 'mangaupdates' | 'mixed' | 'none';
 
 export interface WorkerCostDiagnosticEvent {
@@ -43,6 +43,8 @@ export interface WorkerCostDiagnosticEvent {
   readonly r2Writes?: number;
   readonly r2Lists?: number;
   readonly r2Conflicts?: number;
+  readonly queueSends?: number;
+  readonly queueFailures?: number;
 }
 
 export function classifyWorkerRoute(pathname: string): WorkerRouteFamily {

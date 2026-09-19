@@ -1,5 +1,19 @@
 import type { R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
 
+export interface QueueMetricTotals { readonly queueSends: number; readonly queueFailures: number }
+
+export function instrumentQueueSend<T>(queue: Pick<Queue<T>, 'send'>) {
+  const totals = { queueSends: 0, queueFailures: 0 };
+  return {
+    send: async (body: T, options?: QueueSendOptions) => {
+      totals.queueSends += 1;
+      try { await queue.send(body, options); }
+      catch (error) { totals.queueFailures += 1; throw error; }
+    },
+    snapshot: (): QueueMetricTotals => Object.freeze({ ...totals }),
+  };
+}
+
 export interface R2MetricTotals {
   readonly r2Reads: number;
   readonly r2Writes: number;

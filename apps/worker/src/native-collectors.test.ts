@@ -39,6 +39,7 @@ describe('native collector queue', () => {
       acceptedResults: 0, d1RowsRead: 0, d1RowsWritten: 0, durationMs: expect.any(Number),
       pagesRequested: 0, provider: 'none', providerRequests: 0, result: 'unchanged', retries: 0,
       r2Reads: 0, r2Writes: 0, r2Lists: 0, r2Conflicts: 0,
+      queueSends: 0, queueFailures: 0,
       schemaVersion: 1, task: 'discovery', type: 'worker.cost',
     });
   });

@@ -91,6 +91,33 @@ pas une estimation de facture ni une certification de production. Les annonces
 ne produisent plus d'observations confirmées; les anciennes mesures 805/393
 incluaient cette promotion incorrecte.
 
+La candidate corrective ajoute `queueSends` (tentatives) et `queueFailures`,
+ainsi que les événements `worker.cost` des tâches `agenda-admission` et
+`agenda-recovery`. Additionner ces tâches à `agenda` et `discovery` pour le
+coût du traitement complet; ne pas sommer un total de réveil supplémentaire.
+La reprise est coalescée une fois par lot Queue, même avec plusieurs messages
+opérationnels. Le scan legacy continue par lots de vingt, y compris si aucun
+signal de sa première page ne reste à traiter.
+
+Seuils opérateur : chaque `agenda-recovery-failed` et `retry-to-dlq` exige une
+inspection; `agenda-recovery-overdue` signale une session de plus de huit jours.
+Inspecter la Queue et sa DLQ, puis les pointeurs R2 sans les modifier. La
+réservation d'envoi expire après une minute; une reprise contrôlée peut ensuite
+réémettre le travail conservé. Sans aucun réveil Queue, le prochain cron
+hebdomadaire est le seul secours automatique prévu; son échec exclut toute
+garantie de délai maximal. Le raccordement de ces codes à une alerte externe
+et l'inspection distante du backlog/DLQ restent à certifier séparément. Aucun
+destinataire ni service d'alerte n'est créé par ces changements locaux.
+
+Ordre de livraison de cette candidate : appliquer la migration additive 0026,
+vérifier le singleton `catalogue_release_generation` et la conservation des
+modèles, puis déployer le Worker compatible et effectuer les canaries avant
+d'avancer le pointeur d'une nouvelle archive immuable. La migration initialise
+son singleton depuis les modèles présents; aucun backfill massif n'est requis.
+Rollback : restaurer le Worker précédent en conservant tables, index, triggers,
+archives et snapshots. Les nouvelles ressources D1 sont ignorées par l'ancien
+Worker. Ces opérations distantes demandent une approbation dédiée.
+
 ### Publication 1.0.38
 
 Publication autonome autorisée le 19 septembre 2026. La version de repli

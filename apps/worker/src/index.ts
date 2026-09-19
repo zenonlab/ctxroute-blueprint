@@ -60,12 +60,14 @@ app.onError((_error, context) => {
 export default {
   fetch: app.fetch,
   queue: async (batch: MessageBatch<NativeCollectorSignal>, env: NativeCollectorBindings) => {
+    let recovery: Promise<void> | undefined;
+    const recover = () => recovery ??= recoverPendingAgenda(env);
     await handleNativeCollectorQueue(batch.messages, {
       agenda: (scheduledFor) => processAgendaQueue(env, scheduledFor),
       discovery: () => processPublicDiscoveryQueue(env),
-      recovery: () => recoverPendingAgenda(env),
+      recovery: recover,
     });
-    await recoverPendingAgenda(env);
+    await recover();
   },
   scheduled: (controller: ScheduledController, env: NativeCollectorBindings) => enqueueAgendaRefresh(controller, env),
 };

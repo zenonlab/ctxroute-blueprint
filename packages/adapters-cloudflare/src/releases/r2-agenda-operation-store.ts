@@ -127,11 +127,11 @@ export class R2AgendaOperationStore {
     return result === null ? undefined : current.scheduled[0];
   }
 
-  async recoverLegacySignals(): Promise<void> {
-    if (this.bucket.list === undefined) return;
+  async recoverLegacySignals(): Promise<boolean> {
+    if (this.bucket.list === undefined) return false;
     const scan = await this.bucket.get([this.prefix, 'legacy-signals-scan.json'].join('/'));
     const checkpoint = scan === null ? { cursor: null, complete: false } : signalScanSchema.parse(await scan.json<unknown>());
-    if (checkpoint.complete) return;
+    if (checkpoint.complete) return false;
     const sourcePrefix = this.prefix === 'agenda-operations/v2' ? 'agenda-operations/v1' : this.prefix;
     const options: Parameters<NonNullable<AgendaOperationBucket['list']>>[0] = { prefix: [sourcePrefix, 'signals', ''].join('/'), limit: 20 };
     if (checkpoint.cursor !== null) options.cursor = checkpoint.cursor;
@@ -147,6 +147,7 @@ export class R2AgendaOperationStore {
     await this.put([this.prefix, 'legacy-signals-scan.json'].join('/'), JSON.stringify({ cursor: listed.cursor ?? null, complete: !listed.truncated }), {
       httpMetadata: { contentType: 'application/json' }, onlyIf: currentEtag === undefined ? { etagDoesNotMatch: '*' } : { etagMatches: currentEtag },
     });
+    return listed.truncated;
   }
 
   async readLane(provider: 'anilist' | 'mangaupdates'): Promise<R2AgendaLaneState> {

@@ -4161,7 +4161,7 @@
         {
           "id": "operations",
           "title": "Mesurer les reprises et exposer leurs limites",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "A12: métriques du réveil complet et émissions Queue sans double comptage.",
             "A13: état de reprise et seuils testés, alerte opérationnelle bornée, cron et essais inchangés."
@@ -4185,7 +4185,10 @@
             "git diff --check",
             "git commit -m 'fix(operations): account for complete recovery attempts'"
           ],
-          "evidence": []
+          "evidence": [
+            "Worker 139/139 et adaptateurs R2 20/20; typechecks complets, lint, anti-slop, docs/ADR et Archify showcase 9/9 passent. Compteurs comparés aux appels R2 réels, Queue échouée puis reprise après expiration et échec avant claim couverts.",
+            "Reprise unique pour trois messages du même lot; scan tronqué garde une continuation. Seuil huit jours et codes opérateur bornés documentés, coûts 0026 séparés des références historiques. Alerte externe et backlog/DLQ distants non certifiés; cadence et tentatives inchangées."
+          ]
         },
         {
           "id": "certification",

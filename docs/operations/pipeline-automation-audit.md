@@ -58,6 +58,15 @@ fusionné et les anciens JSON incomplets réutilisent les colonnes conservées.
 Les dernières sorties confirmées restent dans leur contrat Agenda, distinct
 des totaux annoncés du profil Discovery v3.
 
+A12 : admission, reprise et collecte émettent des mesures distinctes, y compris
+les tentatives R2/Queue échouées. Les tests comparent leur somme aux appels
+réels et prouvent une reprise unique par lot. Un scan historique tronqué
+conserve une continuation même sans travail restant dans sa première page.
+A13 : les codes opérateur d'échec, de DLQ imminente et d'attente supérieure à
+huit jours sont documentés. Une alerte externe active et l'état distant de la
+DLQ restent non certifiés; aucun délai garanti n'est annoncé pendant une
+indisponibilité globale. Le cron et les limites de tentatives restent inchangés.
+
 ### A01 — P1 : activation du lecteur avant disponibilité des modèles
 
 Le lecteur installé demande exclusivement v4. Il refuse une génération âgée

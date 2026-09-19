@@ -78,7 +78,7 @@
       "items": [
         "Une vérification inchangée ne republie aucune fiche",
         "Le temps projette l'Agenda sans écriture distante",
-        "D1, R2, Queue, Worker et HTTP sont comptés séparément",
+        "Collecte, admission et reprise comptent leurs tentatives séparément",
         "Les coûts historiques restent des fixtures, pas des coefficients"
       ]
     },

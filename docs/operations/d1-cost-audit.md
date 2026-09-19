@@ -2,6 +2,15 @@
 
 Date : 17 septembre 2026. État : référence 0021 et cible Agenda virtuel/R2 mesurées localement; certification distante de la cible en attente.
 
+Mise à jour du 19 septembre, schéma 0026 : la fixture courante de 579 annonces
+mesure **4 053 écritures D1 initiales, zéro inchangé et sept par modification**.
+L'index fournisseur et le trigger de génération ajoutent deux écritures par
+modèle modifié. R2 mesure 446 lectures/34 écritures au premier cycle, puis
+444/34. Ces mesures de publication excluent admission, reprise, Queue et HTTP;
+les tâches `agenda-admission` et `agenda-recovery` les rapportent séparément.
+Les tableaux 0021/0024 ci-dessous restent des références historiques, pas le
+coût du schéma courant ni celui d'un réveil complet en production.
+
 Le [plan maître A à Z](./tobirink-a-z-master-plan.md) est la source de vérité
 pour l'ordre d'exécution, les seuils proposés et les frontières d'approbation.
 
@@ -193,7 +202,7 @@ pages de cinquante événements au maximum. La fenêtre reste fixe pour isoler l
 détection de changement. Chaque cycle couvre claim, pages, fin des deux lanes et
 publication fusionnée, sans appel HTTP fournisseur.
 
-### Cible 0024 — modèles courants D1 et opérations R2
+### Référence historique 0024 — modèles courants D1 et opérations R2
 
 | Cycle | Lectures D1 | Écritures D1 | Lectures R2 | Écritures R2 | Publication |
 |---|---:|---:|---:|---:|---|

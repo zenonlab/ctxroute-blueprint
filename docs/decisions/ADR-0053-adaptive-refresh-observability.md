@@ -55,6 +55,21 @@ de `worker.cost`. Ne créer ni table D1, ni Analytics Engine, ni identifiant de
 cardinalité. Les événements excluent titre, empreinte, référence d’œuvre, URL,
 IP, payload fournisseur, secret et identifiant d’installation.
 
+Les tâches `agenda-admission` et `agenda-recovery` émettent leurs propres coûts,
+y compris lors d'un échec R2 ou Queue. Chaque appel R2 est compté avant son
+exécution; `queueSends` compte les tentatives et `queueFailures` leurs échecs.
+La collecte n'inclut pas ces événements dans son total. Une reprise au plus par
+lot Queue évite de scanner plusieurs fois les mêmes signaux. Une interruption
+du scan legacy conserve son checkpoint; un scan tronqué émet une
+continuation `agenda-recovery` même si les vingt premiers signaux sont terminés.
+Les erreurs avant
+le claim et après la publication conservent les compteurs déjà accumulés.
+Une attente Agenda supérieure à huit jours émet `agenda-recovery-overdue`;
+un échec de reprise émet `agenda-recovery-failed`. Ces codes fermés ne portent
+aucune date ni identité. Ils rendent le défaut observable au prochain réveil;
+ils ne créent pas un service d'alerte externe et ne garantissent aucun réveil
+pendant une interruption globale de Queue et du cron.
+
 ## Conséquences
 
 Les coûts sont comparables aux métriques natives D1 et aux quotas HTTP sans
