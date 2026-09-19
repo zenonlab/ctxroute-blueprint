@@ -1,17 +1,15 @@
 # Agent Instructions
 
-## Bounded execution authorization
+## Autonomous development authorization
 
-- Work through one bounded approved step at a time.
-- Read-only inspection, research, planning, and validation are allowed without a new approval.
-- Before the first mutation of a step, present the exact objective, affected files or external resources, commands, risks, rollback, and acceptance criteria.
-- Explicit approval for that exact step authorizes its listed reversible repository mutations, documentation and Progress updates, validation commands, and verified commit. Do not request another `go` between those operations.
-- When the user explicitly confirms autonomous mode for a goal, continue through its validated, materialized steps without requesting another `go` between steps. This authority remains limited to each step's listed scope and stops at the separately confirmed operations below.
-- Installing or updating dependencies is covered only when named in the approved step. Calling a state-changing provider API, deploying, publishing, pushing, deleting, handling secrets or costs, and expanding beyond the listed scope each require explicit approval.
-- Never infer authorization from urgency, prior broad access, or an earlier approval.
-- If implementation reveals a materially different choice or scope, stop, explain it, and decide again with the user. Ordinary implementation details inside the approved scope are not a new decision point.
-- Never delete automatically. Preserve user work and request confirmation for the exact deletion target.
-- Keep provider SDKs and commands behind project-owned ports, adapters, or operational gates.
+- Default to autonomous execution for ordinary repository work: inspect, implement, test, document, update Progress, commit, and push the validated result without asking for another `go` between steps.
+- Before the first mutation of a new objective, state the objective, affected files or resources, validation, risks, rollback, and acceptance criteria in the working update.
+- Keep the implementation focused on the requested objective. If the required design, target, or scope changes materially, stop and explain the decision before proceeding.
+- The production workflow may deploy automatically from `main` after its repository checks and scoped Cloudflare plan pass. Do not add interactive approval gates that make normal development progress impossible.
+- Keep secrets out of source, logs, artifacts, commits, and command output. Use the existing CI secret store and project-owned provider adapters.
+- Preserve safety boundaries for destructive or high-impact operations: deletion, irreversible data migrations, secret rotation, billing changes, permission changes, and direct production mutations outside the declared CI workflow require explicit confirmation immediately before the operation.
+- Never delete user work automatically. Preserve unrelated changes and use reversible edits whenever possible.
+- Audit the diff, tests, deployment scope, and documentation before reporting completion.
 
 ## Mandatory initialization
 
