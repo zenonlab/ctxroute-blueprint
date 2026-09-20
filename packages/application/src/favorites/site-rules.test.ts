@@ -16,10 +16,29 @@ describe('declarative site routes', () => {
     });
   });
 
+  it.each(['https://manhwaz.com', 'https://www.manhwaz.com'])('accepts a real Manhwaz slug without a routing suffix on %s', (origin) => {
+    const result = extractFavoriteSourceEvidence({
+      sourceKey: 'manhwaz-real-source',
+      title: 'The Strongest Magical Swordsman Ever Reborn As An F-Rank Adventurer. Chapter 88 - ManhwaZ',
+      url: `${origin}/webtoon/the-strongest-magical-swordsman-ever-reborn-as-an-f-rank-adventurer-/chapter-88`,
+    }, adapters);
+    expect(result).toMatchObject({
+      canonicalUrl: `${origin}/webtoon/the-strongest-magical-swordsman-ever-reborn-as-an-f-rank-adventurer-`,
+      mediaKind: 'MANHWA', release: { kind: 'chapter', value: 88 },
+      stableSlug: 'the-strongest-magical-swordsman-ever-reborn-as-an-f-rank-adventurer-',
+      title: 'the strongest magical swordsman ever reborn as an f rank adventurer',
+    });
+  });
+
   it.each(['', '/1234567-chapter-101', '/1234567-chapter-12.5', '/1234567-chapter-0'])('extracts a Comix manga identity with route %s', (tail) => {
     const result = evidence(`https://comix.to/title/ab123-synthetic-86-journey${tail}`);
     expect(result).toMatchObject({ mediaKind: 'MANGA', stableSlug: 'synthetic-86-journey', title: 'synthetic 86 journey', canonicalUrl: 'https://comix.to/title/ab123-synthetic-86-journey' });
     expect(result.release?.value).toBe(tail === '' ? undefined : Number(tail.split('chapter-')[1]));
+  });
+
+  it('accepts the four-character Comix identifiers used by real bookmarks', () => {
+    const result = evidence('https://comix.to/title/2l25-moral-less-scandal/9059271-chapter-54');
+    expect(result).toMatchObject({ mediaKind: 'MANGA', stableSlug: 'moral-less-scandal', title: 'moral less scandal', release: { kind: 'chapter', value: 54 } });
   });
 
   it.each(['https://comix.to/collections/123', 'https://comix.to/title/ab123-synthetic/123-chapter-no', 'https://comix.to/title/ab123-synthetic/123-chapter-100001', 'https://comix.to/title/ab123-synthetic/123-chapter-1/extra'])('rejects a non-work or malformed Comix route %s', (url) => {

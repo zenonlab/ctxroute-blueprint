@@ -137,6 +137,16 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     };
     identityIndex -= 1;
   }
+  const nestedNumericId = /^\d{1,12}$/u.test(decoded.at(-1) ?? '');
+  const nestedCategory = decoded[decoded.length - 4]?.toLowerCase();
+  const nestedRelease = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)(?:[-_].+)?$/iu.exec(decoded.at(-2) ?? '');
+  if (nestedNumericId && nestedCategory !== undefined && categoryKinds[nestedCategory] !== undefined && nestedRelease !== null) {
+    const label = nestedRelease[1] ?? '';
+    const rawNumber = nestedRelease[2] ?? '';
+    releaseSuffix = nestedRelease[0];
+    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(',', '.')) };
+    identityIndex = decoded.length - 3;
+  }
   const corroborated = decoded.slice(0, identityIndex + 1)
     .map((slug, index) => ({ slug, index }))
     .filter(({ slug }) => !structuralSegments.has(slug.toLowerCase()) && /\p{L}{2}/u.test(slug) && bookmarkCorroboratesSlug(input.title, slug));

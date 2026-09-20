@@ -44,7 +44,7 @@
     { "id": "eligibility", "type": "security", "label": "Qualification URL", "sublabel": "packages/application", "pos": [250, 270], "size": [160, 68], "tag": "HTTP(S) borné" },
     { "id": "sourceRegistry", "type": "backend", "label": "Registre injecté", "sublabel": "packages/application", "pos": [480, 270], "size": [160, 68], "tag": "règles JSON versionnées" },
     { "id": "genericEvidence", "type": "backend", "label": "Preuve générique", "sublabel": "structure de route", "pos": [710, 120], "size": [160, 68], "tag": "type UNKNOWN permis" },
-    { "id": "mangadexAdapter", "type": "backend", "label": "Parseur MangaDex", "sublabel": "local · sans fetch", "pos": [710, 220], "size": [160, 68], "tag": "UUID exact" },
+    { "id": "mangadexAdapter", "type": "backend", "label": "Parseur MangaDex", "sublabel": "local · sans fetch", "pos": [710, 220], "size": [160, 68], "tag": "titre + UUID" },
     { "id": "kitsuAdapter", "type": "backend", "label": "Parseurs Kitsu", "sublabel": "local · sans fetch", "pos": [710, 320], "size": [160, 68], "tag": "route exacte" },
     { "id": "anilistAdapter", "type": "backend", "label": "Parseur AniList", "sublabel": "local · sans fetch", "pos": [710, 420], "size": [160, 68], "tag": "origine exacte" },
     { "id": "mangaUpdatesAdapter", "type": "backend", "label": "Parseur MangaUpdates", "sublabel": "local · sans fetch", "pos": [710, 520], "size": [160, 68], "tag": "/series/{id}" },

@@ -116,6 +116,16 @@ describe('favorite source evidence U-01…U-10', () => {
       title: 'a wannabe golden gangster',
     });
   });
+  it('recognizes a numeric reader tail after a chapter route', () => {
+    expect(extractFavoriteSourceEvidence({
+      sourceKey: 'bookmark-mangabtt',
+      title: 'Read Ikitsuku Saki wa Yuusha ka Maou ka Chapter 7-eng-li Online | MangaBTT',
+      url: 'https://mangabtt.com/manga/ikitsuku-saki-wa-yuusha-ka-maou-ka/chapter-7-eng-li/411818',
+    })).toMatchObject({
+      mediaKind: 'MANGA', release: { kind: 'chapter', value: 7 }, stableSlug: 'ikitsuku-saki-wa-yuusha-ka-maou-ka',
+      title: 'ikitsuku saki wa yuusha ka maou ka',
+    });
+  });
   it('falls back to the human title when a routing-prefixed slug is not corroborated', () => {
     expect(extractFavoriteSourceEvidence({
       sourceKey: 'bookmark-uncorroborated-routing-prefix',

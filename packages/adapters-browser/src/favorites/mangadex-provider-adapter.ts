@@ -30,11 +30,25 @@ const hydrationSchema = z.object({
 type MangaDexData = z.infer<typeof hydrationSchema>['data'];
 const searchSchema = z.object({ result: z.literal('ok'), data: z.array(z.record(z.string(), z.json())).max(20), limit: z.number().int().min(1).max(20), offset: z.number().int().nonnegative(), total: z.number().int().nonnegative() });
 
+function mangaDexChapterTitle(title: string): string | undefined {
+  const match = /^(?:\d+\s*\|\s*)?chapter\s+\d+(?:\.\d+)?\s*-\s*(.+?)\s*-\s*MangaDex$/iu.exec(title.trim());
+  return match?.[1]?.trim() || undefined;
+}
+
 export const mangaDexSourceAdapter: FavoriteSourceAdapter = {
   id: 'mangadex-url-v1', origins: ['https://mangadex.org', 'https://www.mangadex.org'],
   analyze(input, url) {
-    const [route, rawId] = url.decodedSegments;
+    const [route, rawId, page] = url.decodedSegments;
     const parsed = uuid.safeParse(rawId);
+    if (route === 'chapter') {
+      if (!parsed.success || (page !== undefined && !/^\d+$/u.test(page)) || url.decodedSegments.length > 3) return undefined;
+      const title = mangaDexChapterTitle(input.title);
+      if (title === undefined) return undefined;
+      return createSourceEvidence({
+        aliases: [{ provenance: 'aligned-bookmark-segment', value: title }], canonicalUrl: `${url.origin}/chapter/${parsed.data.toLowerCase()}`, diagnostics: [], key: input.sourceKey,
+        mediaKind: 'MANGA', origin: url.origin, path: url.pathname, proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], sourceAdapter: 'mangadex-chapter-title-v1', strategy: 'exact-origin', title,
+      });
+    }
     if (route !== 'title' || !parsed.success || url.decodedSegments.length > 3) return undefined;
     const id = parsed.data.toLowerCase();
     return createSourceEvidence({

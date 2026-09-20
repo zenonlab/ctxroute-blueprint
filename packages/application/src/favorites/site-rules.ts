@@ -49,18 +49,20 @@ function numberValue(segment: Extract<Segment, { kind: 'number' }>, value: strin
 function matches(segment: Segment, value: string): boolean {
   if (segment.kind === 'literal') return segment.values.includes(value);
   if (segment.kind === 'number') return numberValue(segment, value) !== undefined;
-  if (segment.prefix === 'opaque-5' && !/^[a-z0-9]{5}-.{2,250}$/u.test(value)) return false;
+  if (segment.prefix === 'opaque-5' && !/^[a-z0-9]{4,5}-.{2,250}$/u.test(value)) return false;
   return value.length >= 2 && value.length <= 256 && /\p{L}/u.test(value) && !/[\s/?#\\]/u.test(value);
 }
 
 interface RuleIdentityValue { readonly slug: string; readonly transformations: readonly FavoriteIdentityTransformation[] }
 
 function identityValue(segment: Extract<Segment, { kind: 'identity' }>, raw: string): RuleIdentityValue | undefined {
-  const withoutPrefix = segment.prefix === 'opaque-5' ? raw.slice(6) : raw;
+  const opaque = segment.prefix === 'opaque-5' ? /^([a-z0-9]{4,5})-(.+)$/u.exec(raw) : undefined;
+  const withoutPrefix = opaque?.[2] ?? raw;
   if (segment.routingSuffixDigits === undefined) return { slug: withoutPrefix, transformations: [] };
   const match = /^(.+)[-_.](0\d{2})$/u.exec(withoutPrefix);
   const slug = match?.[1];
-  if (slug === undefined || !/\p{L}/u.test(slug)) return undefined;
+  if (slug === undefined) return { slug: withoutPrefix, transformations: [] };
+  if (!/\p{L}/u.test(slug)) return undefined;
   return { slug, transformations: ['numeric-routing-suffix'] };
 }
 

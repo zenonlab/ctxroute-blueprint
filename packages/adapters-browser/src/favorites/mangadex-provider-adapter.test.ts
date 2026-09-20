@@ -1,10 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MangaDexFavoriteProviderAdapter } from './mangadex-provider-adapter';
+import { MangaDexFavoriteProviderAdapter, mangaDexSourceAdapter } from './mangadex-provider-adapter';
+import { extractFavoriteSourceEvidence } from '@tobirink/application';
 
 const id = '12345678-1234-4234-8234-123456789abc';
 const payload = { result: 'ok', data: { id, type: 'manga', attributes: { title: { en: 'Synthetic Series' }, altTitles: [{ ja: 'Synthetic Alias' }], contentRating: 'safe', lastChapter: '42', lastVolume: '6', originalLanguage: 'ko', status: 'ongoing', tags: [{ attributes: { group: 'genre', name: { en: 'Adventure' } } }, { attributes: { group: 'theme', name: { en: 'School Life' } } }, { attributes: { group: 'format', name: { en: 'Long Strip' } } }], year: 2021 }, relationships: [{ attributes: { fileName: 'cover-file.jpg' }, id: '12345678-1234-4234-8234-123456789abd', type: 'cover_art' }] } };
 
 describe('MangaDex exact hydration', () => {
+  it('recovers a MangaDex chapter bookmark from its visible title', () => {
+    const result = extractFavoriteSourceEvidence({
+      sourceKey: 'mangadex-chapter', title: '1 | Chapter 13 - Isekai Walking - MangaDex',
+      url: 'https://mangadex.org/chapter/7245e755-b252-4d42-86fb-6cb9e060db8a/1',
+    }, [mangaDexSourceAdapter]);
+    expect(result).toMatchObject({ mediaKind: 'MANGA', title: 'Isekai Walking', sourceAdapter: 'mangadex-chapter-title-v1' });
+  });
   it.each(['abc123', 'https://www.mangaupdates.com/series/abc123/synthetic'])('retains a modern MangaUpdates reference: %s', async (mu) => {
     const adapter = new MangaDexFavoriteProviderAdapter(async () => Response.json({ ...payload, data: { ...payload.data, attributes: { ...payload.data.attributes, links: { mu } } } }));
     expect((await adapter.hydrate({ provider: 'mangadex', externalId: id }))?.linkedReferences).toEqual([{ provider: 'mangaupdates', externalId: String(parseInt('abc123', 36)) }]);
