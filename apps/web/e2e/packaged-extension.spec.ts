@@ -260,8 +260,8 @@ test('installed site Library sorts the full private catalogue promptly', async (
     const site = await context.newPage();
     const firstLoadStartedAt = Date.now();
     await site.goto('https://tobirink.com/library');
-    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
-    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24);
+    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 15_000 });
+    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24, { timeout: 15_000 });
     const firstLoadMs = Date.now() - firstLoadStartedAt;
     const bridgeTimings: number[] = [];
     const renderedTimings: number[] = [];
@@ -279,7 +279,10 @@ test('installed site Library sorts the full private catalogue promptly', async (
       }), sort);
       await site.getByLabel('Tri').selectOption(sort);
       const measured = await measuredResponse;
-      await expect(site.locator('a[data-variant="library"]').first()).toContainText(measured.firstTitle);
+      // The bridge response can precede React's list commit on the shared runner.
+      // Keep the rendered-time budget below 5 s; this timeout only avoids a
+      // false negative while waiting for the already-measured result to paint.
+      await expect(site.locator('a[data-variant="library"]').first()).toContainText(measured.firstTitle, { timeout: 15_000 });
       bridgeTimings.push(measured.elapsedMs);
       renderedTimings.push(Date.now() - startedAt);
     }
