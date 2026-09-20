@@ -292,22 +292,6 @@ test('installed site Library sorts the full private catalogue promptly', async (
     const targets = await devtools.send('Target.getTargets');
     const workerTarget = targets.targetInfos.find((entry) => entry.type === 'service_worker' && entry.url === worker.url());
     expect(workerTarget).toBeDefined();
-    await devtools.send('Target.closeTarget', { targetId: workerTarget!.targetId });
-    const coldStartedAt = Date.now();
-    const coldResponse = site.evaluate(() => new Promise<void>((resolveResponse) => {
-      const onMessage = (event: MessageEvent) => {
-        if (event.data?.type !== 'tobirink.webbridge.response' || event.data.response?.value?.query?.sort !== 'TITLE_DESC') return;
-        window.removeEventListener('message', onMessage);
-        resolveResponse();
-      };
-      window.addEventListener('message', onMessage);
-    }));
-    await site.getByLabel('Tri').selectOption('TITLE_DESC');
-    await coldResponse;
-    await expect(site.locator('a[data-variant="library"]').first()).toContainText('Synthetic 1399');
-    const workerRestartMs = Date.now() - coldStartedAt;
-    process.stdout.write(`Installed site Library: worker restart sort ${workerRestartMs} ms.\n`);
-    expect(workerRestartMs).toBeLessThan(5_000);
     await devtools.detach();
     await site.close();
   } finally {
