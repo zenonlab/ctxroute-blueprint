@@ -6,6 +6,7 @@ import {
   publicDiscoveryTerminalResolutionSchema,
   publicDiscoveryVerifiedProfileSchema,
   type PublicDiscoveryClaimBatch,
+  type PublicDiscoveryClaimedRequest,
   type PublicDiscoveryCandidate,
   type PublicDiscoveryKeyV3,
   type PublicDiscoveryReadState,
@@ -68,6 +69,7 @@ interface CanonicalFacts {
 }
 export interface PublicDiscoveryV3Port {
   claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
+  deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string): Promise<void>;
   confirmQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
   publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ published: number; replayed: number }>;
   read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState>;
@@ -319,7 +321,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3
         WHERE (((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
             AND attempt_count < 8)
-          OR (state = 'VERIFIED' AND ((refresh_state = 'PENDING')
+          OR (state = 'VERIFIED' AND ((refresh_state = 'PENDING' AND retry_at <= ?3)
             OR (refresh_state = 'PROCESSING' AND lease_until <= ?3)) AND refresh_attempt_count < 8)
         ORDER BY admission_priority, updated_at, fingerprint LIMIT ?4)
       RETURNING request_json AS requestJson, result_json AS resultJson, request_digest AS requestDigest,
@@ -359,6 +361,26 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       });
     });
     return { claimToken: input.claimToken, requests, schemaVersion: 3 };
+  }
+
+  async deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string): Promise<void> {
+    if (!Number.isFinite(Date.parse(retryAt)) || retryAt <= now) throw new TypeError('invalid-public-discovery-defer-time');
+    const result = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+      state = 'PENDING', attempt_count = attempt_count - 1,
+      claim_token_hash = NULL, lease_until = NULL, retry_at = ?8, updated_at = ?9
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+        AND request_digest = ?5 AND claim_token_hash = ?6 AND attempt_count = ?7
+        AND state = 'PROCESSING' RETURNING fingerprint`)
+      .bind(...keyValues(request.key), request.requestDigest, tokenDigest, request.attempt, retryAt, now).first();
+    if (result) return;
+    const refresh = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+      refresh_state = 'PENDING', refresh_attempt_count = refresh_attempt_count - 1,
+      claim_token_hash = NULL, lease_until = NULL, retry_at = ?8, updated_at = ?9
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+        AND request_digest = ?5 AND claim_token_hash = ?6 AND refresh_attempt_count = ?7
+        AND state = 'VERIFIED' AND refresh_state = 'PROCESSING' RETURNING fingerprint`)
+      .bind(...keyValues(request.key), request.requestDigest, tokenDigest, request.attempt, retryAt, now).first();
+    if (!refresh) throw new Error('public-discovery-defer-claim-lost');
   }
 
   private publicationGuardValues(result: PublicDiscoveryResult, profile: PublicDiscoveryVerifiedProfile | undefined, canonical: CanonicalFacts | undefined, tokenDigest: string, now: string): SqlValue[] {
