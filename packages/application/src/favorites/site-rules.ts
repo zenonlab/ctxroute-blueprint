@@ -34,15 +34,15 @@ type MutableSourceEvidence = { -readonly [Key in keyof SourceEvidence]: SourceEv
 
 function numberValue(segment: Extract<Segment, { kind: 'number' }>, value: string): number | undefined {
   if (segment.format === 'id-chapter') {
-    const match = /^\d{1,12}-chapter-(\d{1,6}(?:\.\d{1,3})?)$/u.exec(value);
-    const number = match === null ? NaN : Number(match[1]);
+    const match = /^\d{1,12}-chapter-(\d{1,6}(?:[.,-]\d{1,3})?)$/u.exec(value);
+    const number = match === null ? NaN : Number(match[1]?.replace(/[,-]/gu, '.') ?? 'NaN');
     return number >= 0 && number <= segment.maximum ? number : undefined;
   }
   const prefix = segment.prefix ?? '';
   if (!value.startsWith(prefix)) return undefined;
   const raw = value.slice(prefix.length);
-  if (!/^\d{1,6}(?:\.\d{1,3})?$/u.test(raw)) return undefined;
-  const number = Number(raw);
+  if (!/^\d{1,6}(?:[.,-]\d{1,3})?$/u.test(raw)) return undefined;
+  const number = Number(raw.replace(',', '.').split('-')[0] ?? 'NaN');
   return number > 0 && number <= segment.maximum ? number : undefined;
 }
 

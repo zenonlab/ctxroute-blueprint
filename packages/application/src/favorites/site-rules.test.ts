@@ -59,6 +59,11 @@ describe('declarative site routes', () => {
     expect(result.sourceAdapter).toContain(`site-rules-v${bundledFavoriteSiteRules.version}:`);
   });
 
+  it('accepts Anime-Sama season routes with a hyphenated season marker', () => {
+    const result = evidence('https://anime-sama.fr/catalogue/dead-mount-death-play/saison1-2/vostfr');
+    expect(result).toMatchObject({ mediaKind: 'ANIME', stableSlug: 'dead-mount-death-play', season: 1 });
+  });
+
   it.each(['https://www.youtube.com/watch?v=synthetic', 'https://youtube.com/shorts/synthetic', 'https://example.org/news/synthetic', 'https://anime-sama.fr/catalogue/synthetic/watch'])('keeps unsupported route %s out of identity resolution', (url) => {
     expect(evidence(url).disposition).toBe('URL_IDENTITY_UNRESOLVED');
   });

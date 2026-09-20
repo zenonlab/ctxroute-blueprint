@@ -81,6 +81,19 @@ describe('favorite source evidence U-01…U-10', () => {
   it.each(['synthetic-series/chapter-12', 'synthetic-series-chapter-12', 'synthetic-series/chapter/12'])('recognizes root release evidence without inventing a media type: %s', path => {
     expect(extractFavoriteSourceEvidence(input('root-release', `https://fixtures.tobirink.invalid/${path}`))).toMatchObject({ mediaKind: 'UNKNOWN', stableSlug: 'synthetic-series', release: { value: 12, kind: 'chapter' } });
   });
+  it.each([
+    ['https://mangaclash.com/manga/quest-supremacy/chapter-70-1', 'quest-supremacy', 70.1],
+    ['https://mangaeffect.com/manga/oshi-no-ko/chapter-145', 'oshi-no-ko', 145],
+    ['https://shieldmanga.net/manga/bones/chapter-3-5/', 'bones', 3.5],
+  ])('recognizes a hyphenated chapter number used by manga readers: %s', (url, stableSlug, value) => {
+    expect(extractFavoriteSourceEvidence(input('hyphenated-chapter', url))).toMatchObject({ mediaKind: 'MANGA', stableSlug, release: { kind: 'chapter', value } });
+  });
+  it('uses the bookmark title only for ADKami numeric anime routes', () => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'adkami-anime', title: 'Kakushigoto - Episode 1 vostfr - ADKami', url: 'https://www.adkami.com/anime/3759/1/1/2/1/' })).toMatchObject({
+      mediaKind: 'ANIME', proofs: ['CATEGORY_PATH'], sourceAdapter: 'known-numeric-route-v1', title: 'Kakushigoto',
+    });
+    expect(extractFavoriteSourceEvidence(input('numeric-generic', 'https://fixtures.tobirink.invalid/anime/3759'))).toMatchObject({ disposition: 'URL_IDENTITY_UNRESOLVED' });
+  });
   it.each(['watch?v=synthetic', 'blog/ordinary-link'])('still rejects explicitly excluded links: %s', path => {
     expect(extractFavoriteSourceEvidence(input('ordinary', `https://fixtures.tobirink.invalid/${path}`)).disposition).toBe('URL_IDENTITY_UNRESOLVED');
   });

@@ -25,10 +25,11 @@ const structuralSegments = new Set([
   'anime', 'chapter', 'chapitre', 'comic', 'episode', 'manga', 'manhua', 'manhwa',
   'read', 'saison', 'scan', 'season', 'series', 'title', 'volume', 'watch', 'webtoon',
 ]);
-const releasePattern = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
-const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
-const numericReleasePattern = /^(\d{3,12})[-_.](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
+const releasePattern = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)$/iu;
+const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)$/iu;
+const numericReleasePattern = /^(\d{3,12})[-_.](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)$/iu;
 const localizedReleaseSuffixPattern = /(?:^|[-_.])(\d+(?:[.,]\d+)?)[-_.](?:vostfr|vf|vo|sub|dub)$/iu;
+const titleIdentityOrigins = new Set(['https://www.adkami.com']);
 
 interface StructuralIdentity { readonly slug: string; readonly transformed: boolean }
 
@@ -74,6 +75,16 @@ function common(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl) {
   return { key: input.sourceKey, origin: url.origin, path: url.pathname } as const;
 }
 
+function knownNumericRouteEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl): SourceEvidence | undefined {
+  if (!titleIdentityOrigins.has(url.origin) || url.decodedSegments[0]?.toLowerCase() !== 'anime' || !/^\d+$/u.test(url.decodedSegments[1] ?? '')) return undefined;
+  const title = segmentFavoriteTitle(input.title, new URL(url.origin).hostname).cleanedTitle.replace(/\s*[|·-]\s*episode$/iu, '').trim();
+  if (!/\p{L}{2}/u.test(title) || /^(?:episode|épisode|watch|read)$/iu.test(title)) return undefined;
+  return createSourceEvidence({
+    ...common(input, url), aliases: [{ provenance: 'aligned-bookmark-segment', value: title }], diagnostics: [],
+    mediaKind: 'ANIME', proofs: ['CATEGORY_PATH'], sourceAdapter: 'known-numeric-route-v1', strategy: 'exact-origin', title,
+  });
+}
+
 function rejectedEvidence(input: FavoriteSourceEvidenceInput, disposition: FavoriteUrlDisposition, sourceAdapter = 'generic-url', strategy: SourceEvidence['strategy'] = 'generic'): SourceEvidence {
   return createSourceEvidence({ aliases: [], diagnostics: [], disposition, key: input.sourceKey, mediaKind: 'UNKNOWN', proofs: [], sourceAdapter, strategy });
 }
@@ -104,7 +115,7 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     const label = decoded[identityIndex - 1] ?? '';
     const rawNumber = decoded[identityIndex] ?? '';
     releaseSuffix = `${label}/${rawNumber}`;
-    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(',', '.')) };
+    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(/[,-]/gu, '.')) };
     identityIndex -= 2;
   }
   const numericRelease = numericReleasePattern.exec(decoded[identityIndex] ?? '');
@@ -112,14 +123,14 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     const label = numericRelease[2] ?? '';
     const rawNumber = numericRelease[3] ?? '';
     releaseSuffix = numericRelease[0];
-    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(',', '.')) };
+    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(/[,-]/gu, '.')) };
     identityIndex -= 1;
   }
   const separated = releasePattern.exec(decoded[identityIndex] ?? '');
   if (separated !== null) {
     identityIndex -= 1;
     releaseSuffix = separated[0];
-    release = { kind: releaseKind(separated[1] ?? ''), provenance: 'URL_PATH', raw: separated[0], value: Number((separated[2] ?? '').replace(',', '.')) };
+    release = { kind: releaseKind(separated[1] ?? ''), provenance: 'URL_PATH', raw: separated[0], value: Number((separated[2] ?? '').replace(/[,-]/gu, '.')) };
   }
   const seasonTail = /^(?:season|saison|s)[-_]?([1-9]\d?)$/iu.exec(decoded[identityIndex] ?? '');
   if (seasonTail !== null) identityIndex -= 1;
@@ -139,12 +150,12 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
   }
   const nestedNumericId = /^\d{1,12}$/u.test(decoded.at(-1) ?? '');
   const nestedCategory = decoded[decoded.length - 4]?.toLowerCase();
-  const nestedRelease = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)(?:[-_].+)?$/iu.exec(decoded.at(-2) ?? '');
+  const nestedRelease = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)(?:[-_].+)?$/iu.exec(decoded.at(-2) ?? '');
   if (nestedNumericId && nestedCategory !== undefined && categoryKinds[nestedCategory] !== undefined && nestedRelease !== null) {
     const label = nestedRelease[1] ?? '';
     const rawNumber = nestedRelease[2] ?? '';
     releaseSuffix = nestedRelease[0];
-    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(',', '.')) };
+    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(/[,-]/gu, '.')) };
     identityIndex = decoded.length - 3;
   }
   const corroborated = decoded.slice(0, identityIndex + 1)
@@ -159,7 +170,7 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
   if (attached !== null) {
     stableSlug = attached[1];
     releaseSuffix = `${attached[2] ?? ''}-${attached[3] ?? ''}`;
-    release = { kind: releaseKind(attached[2] ?? ''), provenance: 'URL_SLUG_SUFFIX', raw: releaseSuffix, value: Number((attached[3] ?? '').replace(',', '.')) };
+    release = { kind: releaseKind(attached[2] ?? ''), provenance: 'URL_SLUG_SUFFIX', raw: releaseSuffix, value: Number((attached[3] ?? '').replace(/[,-]/gu, '.')) };
     raw[identityIndex] = encodeURIComponent(stableSlug ?? '');
   }
   const structuralIdentity = stableSlug === undefined
@@ -229,6 +240,8 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
 export function extractFavoriteSourceEvidence(input: FavoriteSourceEvidenceInput, adapters: readonly FavoriteSourceAdapter[] = []): SourceEvidence {
   const qualification = qualifyFavoriteUrl(input.url);
   if (qualification.kind === 'REJECTED') return rejectedEvidence(input, qualification.disposition);
+  const knownNumericRoute = knownNumericRouteEvidence(input, qualification);
+  if (knownNumericRoute !== undefined) return knownNumericRoute;
   const applicable = adapters.filter((adapter) => adapter.origins.includes(qualification.origin));
   if (applicable.length > 1) {
     return createSourceEvidence({ ...common(input, qualification), aliases: [], diagnostics: ['SOURCE_ADAPTER_CONFLICT'], key: input.sourceKey, mediaKind: 'UNKNOWN', proofs: [], sourceAdapter: 'conflict', strategy: 'exact-origin' });

@@ -12,6 +12,27 @@ const { chromium } = require('@playwright/test');
 let extensionPath = fileURLToPath(new URL('../.output/chrome-mv3', import.meta.url));
 const archive = process.argv[2];
 const previousArchive = process.argv[3];
+const favoritesExport = process.env.TOBIRINK_FAVORITES_EXPORT;
+
+function decodeBookmarkText(value) {
+  return value
+    .replaceAll('&amp;', '&')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&#39;', "'");
+}
+
+async function readExportedBookmarks(path) {
+  const html = await readFile(path, 'utf8');
+  const bookmarks = [...html.matchAll(/<A\s+[^>]*HREF="([^"]+)"[^>]*>([\s\S]*?)<\/A>/giu)]
+    .map((match) => ({ title: decodeBookmarkText(match[2].replace(/<[^>]+>/gu, '').trim()), url: decodeBookmarkText(match[1]) }))
+    .filter(({ title, url }) => title.length > 0 && /^https?:\/\//iu.test(url));
+  if (bookmarks.length === 0) throw new Error(`No HTTP bookmarks found in ${path}`);
+  return bookmarks;
+}
+
+const exportedBookmarks = favoritesExport === undefined ? undefined : await readExportedBookmarks(favoritesExport);
 if (archive !== undefined) {
   const bytes = await readFile(previousArchive ?? archive);
   extensionPath = await mkdtemp(join(tmpdir(), 'tobirink-installed-archive-'));
@@ -35,11 +56,14 @@ try {
   const seederPath = await mkdtemp(join(tmpdir(), 'tobirink-bookmark-seeder-'));
   await writeFile(join(seederPath, 'manifest.json'), JSON.stringify({ manifest_version: 3, name: 'Tobirink bookmark fixture', permissions: ['bookmarks'], version: '1.0.0' }));
   await writeFile(join(seederPath, 'seed.html'), '<!doctype html><meta charset="utf-8"><script src="seed.js"></script>');
-  await writeFile(join(seederPath, 'seed.js'), 'globalThis.fixtureReady = true;');
+  const seedCode = exportedBookmarks === undefined
+    ? 'globalThis.fixtureReady = true;'
+    : `const items = ${JSON.stringify(exportedBookmarks)}; (async () => { const folder = await chrome.bookmarks.create({ title: 'Imported real favorites' }); for (const item of items) await chrome.bookmarks.create({ parentId: folder.id, title: item.title, url: item.url }); globalThis.fixtureReady = true; })();`;
+  await writeFile(join(seederPath, 'seed.js'), seedCode);
   const { id: seederId } = await debugging.send('Extensions.loadUnpacked', { path: seederPath });
   await page.goto(`chrome-extension://${seederId}/seed.html`);
   await page.waitForFunction(() => globalThis.fixtureReady === true);
-  await page.evaluate(async () => {
+  if (exportedBookmarks === undefined) await page.evaluate(async () => {
     const folder = await globalThis.chrome.bookmarks.create({ title: 'Synthetic large library' });
     for (let index = 0; index < 1393; index += 1) {
       await globalThis.chrome.bookmarks.create({ parentId: folder.id, title: `Synthetic corpus ${index}`, url: `https://reader.invalid/manga/synthetic-corpus-${index}/42` });
@@ -68,15 +92,18 @@ try {
   }
   assert.equal(status?.ok, true);
   assert.equal(status.inventory.status, 'complete');
-  assert.equal(status.counts.observed, 1532);
-  assert.equal(status.counts.unsupported, 132);
-  process.stdout.write(`Installed offline diagnostics: counts=${JSON.stringify(status.counts)}\n`);
+  const expectedObserved = exportedBookmarks?.length ?? 1532;
+  assert.equal(status.counts.observed, expectedObserved);
+  if (exportedBookmarks === undefined) assert.equal(status.counts.unsupported, 132);
+  process.stdout.write(`Installed offline diagnostics: source=${exportedBookmarks === undefined ? 'synthetic' : favoritesExport} counts=${JSON.stringify(status.counts)}\n`);
   const catalogue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
   assert.equal(catalogue.ok, true);
-  assert.equal(catalogue.snapshot.statistics.total, 1400);
-  assert.ok(catalogue.snapshot.items.every((item) => item.state === 'retryable'));
-  assert.equal(status.counts.retryable, 1400);
-  assert.equal(status.counts.resolved, 0);
+  if (exportedBookmarks === undefined) {
+    assert.equal(catalogue.snapshot.statistics.total, 1400);
+    assert.ok(catalogue.snapshot.items.every((item) => item.state === 'retryable'));
+    assert.equal(status.counts.retryable, 1400);
+    assert.equal(status.counts.resolved, 0);
+  }
   assert.equal(status.counts.blocked, 0);
   const queue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'review.queue.read', version: 1 }));
   assert.deepEqual(queue, { ok: true, snapshot: { items: [], status: 'pending' } });
@@ -109,15 +136,17 @@ try {
     assert.notEqual(version, oldVersion);
     const retained = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }));
     assert.equal(retained.ok, true);
-    assert.equal(retained.counts.observed, 1532);
-    assert.equal(retained.counts.resolved, 0);
+    assert.equal(retained.counts.observed, expectedObserved);
+    if (exportedBookmarks === undefined) assert.equal(retained.counts.resolved, 0);
     const library = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
     assert.equal(library.ok, true);
-    assert.equal(library.snapshot.statistics.total, 1400);
-    assert.ok(library.snapshot.items.every((item) => item.state === 'retryable'));
-    process.stdout.write(`Preserved profile upgrade ${oldVersion} -> ${version}: 1532 sources and 1400 offline media retained.\n`);
+    if (exportedBookmarks === undefined) {
+      assert.equal(library.snapshot.statistics.total, 1400);
+      assert.ok(library.snapshot.items.every((item) => item.state === 'retryable'));
+    }
+    process.stdout.write(`Preserved profile upgrade ${oldVersion} -> ${version}: ${expectedObserved} sources retained.\n`);
   }
-  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: 1532 bookmarks including 1400 media, offline retry without false resolution, zero blocked tasks and zero imported Review passed.\n`);
+  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: ${expectedObserved} imported bookmarks, ${status.counts.retryable} retryable, ${status.counts.unsupported} unsupported, zero blocked tasks and zero imported Review passed.\n`);
 } finally {
   await context.close();
 }
