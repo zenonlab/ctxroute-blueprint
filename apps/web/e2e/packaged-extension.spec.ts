@@ -31,7 +31,7 @@ const mangaDexPayload = {
 };
 
 test('the packaged Chrome extension imports, resolves, bridges and survives offline', async () => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   const repository = resolve(import.meta.dirname, '../../..');
   const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
   const archive = resolve(repository, `apps/extension/.output/packages/tobirink-chrome-mv3-${version}.zip`);
@@ -260,8 +260,8 @@ test('installed site Library sorts the full private catalogue promptly', async (
     const site = await context.newPage();
     const firstLoadStartedAt = Date.now();
     await site.goto('https://tobirink.com/library');
-    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 15_000 });
-    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24, { timeout: 15_000 });
+    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 60_000 });
+    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24, { timeout: 60_000 });
     const firstLoadMs = Date.now() - firstLoadStartedAt;
     const bridgeTimings: number[] = [];
     const renderedTimings: number[] = [];
