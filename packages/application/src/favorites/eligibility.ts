@@ -43,7 +43,8 @@ export function qualifyFavoriteUrl(rawUrl: string): FavoriteUrlQualification {
   const decodedSegments = rawSegments.map(decodeSegment);
   const normalizedSegments = decodedSegments.map((segment) => segment.toLowerCase());
   if (normalizedSegments.length === 1 && ['catalog', 'catalogue'].includes(normalizedSegments[0] ?? '')) return rejected(rawUrl, 'UTILITY_PAGE');
-  if (normalizedSegments.some((segment) => utilitySegments.has(segment))) return rejected(rawUrl, 'UTILITY_PAGE');
+  const publicIndexMediaRoute = normalizedSegments[0] === 'public' && normalizedSegments[1] === 'index.php' && mediaSegments.has(normalizedSegments[2] ?? '');
+  if (normalizedSegments.some((segment) => utilitySegments.has(segment)) && !publicIndexMediaRoute) return rejected(rawUrl, 'UTILITY_PAGE');
   if (normalizedSegments.some(segment => ['news', 'blog', 'shorts'].includes(segment))) return rejected(rawUrl, 'URL_IDENTITY_UNRESOLVED');
   if (normalizedSegments.includes('drama') && !normalizedSegments.some((segment) => mediaSegments.has(segment))) {
     return rejected(rawUrl, 'URL_IDENTITY_UNRESOLVED');

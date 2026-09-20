@@ -43,7 +43,8 @@ function numberValue(segment: Extract<Segment, { kind: 'number' }>, value: strin
   const raw = value.slice(prefix.length);
   if (!/^\d{1,6}(?:[.,-]\d{1,3})?$/u.test(raw)) return undefined;
   const number = Number(raw.replace(',', '.').split('-')[0] ?? 'NaN');
-  return number > 0 && number <= segment.maximum ? number : undefined;
+  const allowsZero = segment.prefix === 'chapter-';
+  return (number > 0 || allowsZero && number === 0) && number <= segment.maximum ? number : undefined;
 }
 
 function matches(segment: Segment, value: string): boolean {
@@ -116,10 +117,10 @@ export const bundledFavoriteSiteRules: FavoriteSiteRules = favoriteSiteRulesSche
   schemaVersion: 1, version: 3,
   rules: [...['https://anime-sama.fr', 'https://anime-sama.si'].flatMap((origin, index) => [
     { id: `anime-sama-${index}-identity`, identitySegment: 1, mediaKind: 'UNKNOWN', origin, segments: [catalogue, identity] },
-    ...[false, true].flatMap((withLanguage) => [
-      { id: `anime-sama-${index}-anime-${withLanguage}`, identitySegment: 1, mediaKind: 'ANIME', origin, seasonSegment: 2, segments: [catalogue, identity, { kind: 'number', maximum: 99, prefix: 'saison' }, ...(withLanguage ? [language] : [])] },
-      { id: `anime-sama-${index}-scan-${withLanguage}`, identitySegment: 1, mediaKind: 'MANGA', origin, segments: [catalogue, identity, { kind: 'literal', values: ['scan', 'scans'] }, ...(withLanguage ? [language] : [])] },
-    ]),
+    ...['catalogue', 'anime'].flatMap((category) => [false, true].flatMap((withLanguage) => [
+      { id: `anime-sama-${index}-${category}-anime-${withLanguage}`, identitySegment: 1, mediaKind: 'ANIME', origin, seasonSegment: 2, segments: [{ kind: 'literal', values: [category] }, identity, { kind: 'number', maximum: 99, prefix: 'saison' }, ...(withLanguage ? [language] : [])] },
+      ...(category === 'catalogue' ? [{ id: `anime-sama-${index}-scan-${withLanguage}`, identitySegment: 1, mediaKind: 'MANGA', origin, segments: [catalogue, identity, { kind: 'literal', values: ['scan', 'scans'] }, ...(withLanguage ? [language] : [])] }] : []),
+    ])),
   ]),
   ...[false, true].map((withChapter) => {
     const rule = {
@@ -128,11 +129,12 @@ export const bundledFavoriteSiteRules: FavoriteSiteRules = favoriteSiteRulesSche
     };
     return withChapter ? { ...rule, release: { kind: 'chapter', segment: 2 } } : rule;
   }),
-  ...['https://manhwaz.com', 'https://www.manhwaz.com'].flatMap((origin, originIndex) => [false, true].map((withChapter) => {
+  ...['https://manhwaz.com', 'https://www.manhwaz.com'].flatMap((origin, originIndex) => [false, true].flatMap((withPublicPrefix) => [false, true].map((withChapter) => {
+    const prefix = withPublicPrefix ? [{ kind: 'literal', values: ['public'] }, { kind: 'literal', values: ['index.php'] }] : [];
     const rule = {
-      id: `manhwaz-webtoon-${originIndex}-${withChapter}`, origin, identitySegment: 1, mediaKind: 'MANHWA',
-      segments: [{ kind: 'literal', values: ['webtoon'] }, { kind: 'identity', routingSuffixDigits: 3 }, ...(withChapter ? [{ kind: 'number', maximum: 100_000, prefix: 'chapter-' }] : [])],
+      id: `manhwaz-webtoon-${originIndex}-${withPublicPrefix}-${withChapter}`, origin, identitySegment: prefix.length + 1, mediaKind: 'MANHWA',
+      segments: [...prefix, { kind: 'literal', values: ['webtoon'] }, { kind: 'identity', routingSuffixDigits: 3 }, ...(withChapter ? [{ kind: 'number', maximum: 100_000, prefix: 'chapter-' }] : [])],
     };
-    return withChapter ? { ...rule, release: { kind: 'chapter', segment: 2 } } : rule;
-  }))],
+    return withChapter ? { ...rule, release: { kind: 'chapter', segment: prefix.length + 2 } } : rule;
+  })) )],
 });

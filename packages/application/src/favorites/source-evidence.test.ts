@@ -102,6 +102,16 @@ describe('favorite source evidence U-01…U-10', () => {
     const slugTitle = stableSlug.replaceAll('-', ' ');
     expect(extractFavoriteSourceEvidence({ sourceKey: 'bounded-reader-route', title: slugTitle, url })).toMatchObject({ mediaKind: 'MANGA', sourceAdapter: 'known-title-route-v1', stableSlug });
   });
+  it.each([
+    ['https://weebcentral.com/chapters/01JJ2EBCSNET6TN5V9JDJMAQR0', 'Episode 17 | Childhood Friend Complex (Eunhi) | Weeb Central'],
+    ['https://www.yyzzbaby.com/statuses/18285290.html', 'Dead Mount Death Play Chapter 84'],
+    ['https://flamecomics.xyz/series/148/091191e0899443b3', 'Destined Murderer - Pack of Lies (1) - Chapter 15 - Flame Comics'],
+  ])('accepts a known title-derived manga route on %s', (url, title) => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'title-derived-route', title, url })).toMatchObject({ mediaKind: 'MANGA', sourceAdapter: 'known-title-derived-route-v1' });
+  });
+  it('accepts an AsuraScans slug with an attached chapter', () => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'asura-route', title: 'Reformation of the Deadbeat Noble Chapter 81 - Asura Scans', url: 'https://www.asurascans.com/reformation-of-the-deadbeat-noble-chapter-81-a-flame-that-keeps-burning/' })).toMatchObject({ mediaKind: 'MANGA', release: { kind: 'chapter', value: 81 }, stableSlug: 'reformation-of-the-deadbeat-noble' });
+  });
   it.each(['watch?v=synthetic', 'blog/ordinary-link'])('still rejects explicitly excluded links: %s', path => {
     expect(extractFavoriteSourceEvidence(input('ordinary', `https://fixtures.tobirink.invalid/${path}`)).disposition).toBe('URL_IDENTITY_UNRESOLVED');
   });

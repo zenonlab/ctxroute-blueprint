@@ -17,6 +17,8 @@ export interface FavoriteSourceAdapter {
   analyze(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl): SourceEvidence | undefined;
 }
 
+type MutableSourceEvidence = { -readonly [Key in keyof SourceEvidence]: SourceEvidence[Key] };
+
 const categoryKinds: Readonly<Record<string, FavoriteMediaKind>> = Object.freeze({
   anime: 'ANIME', comic: 'MANGA', manga: 'MANGA', manhua: 'MANHUA', manhwa: 'MANHWA', scan: 'MANGA', webtoon: 'MANHWA',
 });
@@ -30,7 +32,7 @@ const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|v
 const numericReleasePattern = /^(\d{3,12})[-_.](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)$/iu;
 const localizedReleaseSuffixPattern = /(?:^|[-_.])(\d+(?:[.,]\d+)?)[-_.](?:vostfr|vf|vo|sub|dub)$/iu;
 const titleIdentityOrigins = new Set(['https://www.adkami.com']);
-const titleRouteOrigins = new Set(['https://mangakakalot.so', 'https://www.japscan.lol', 'https://www.japscan.me', 'https://arenascan.com']);
+const titleRouteOrigins = new Set(['https://mangakakalot.so', 'https://www.japscan.lol', 'https://www.japscan.me', 'https://arenascan.com', 'https://www.asurascans.com']);
 
 interface StructuralIdentity { readonly slug: string; readonly transformed: boolean }
 
@@ -40,9 +42,15 @@ function comparableIdentity(value: string): string {
 
 function bookmarkCorroboratesSlug(observedTitle: string, stableSlug: string): boolean {
   const slugKey = comparableIdentity(stableSlug);
-  return slugKey.length > 0 && segmentFavoriteTitle(observedTitle).segments
+  const exactSegment = slugKey.length > 0 && segmentFavoriteTitle(observedTitle).segments
     .filter((segment) => !segment.excluded)
     .some((segment) => comparableIdentity(segment.cleaned) === slugKey);
+  if (exactSegment) return true;
+  const slugTokens = normalizeFavoriteTitle(stableSlug).significantTokens;
+  const titleTokens = normalizeFavoriteTitle(observedTitle).significantTokens;
+  if (slugTokens.length < 2 || titleTokens.length < 2) return false;
+  const matched = slugTokens.filter(token => titleTokens.some(titleToken => titleToken === token || token.length > 4 && (titleToken === `${token}s` || token === `${titleToken}s`))).length;
+  return matched >= 2 && matched / slugTokens.length >= 0.7;
 }
 
 function stripLeadingRoutingIdentifier(slug: string, release: SourceEvidence['release'], observedTitle: string): StructuralIdentity {
@@ -92,15 +100,39 @@ function knownTitleRouteEvidence(input: FavoriteSourceEvidenceInput, url: Eligib
   const isJapScan = (url.origin === 'https://www.japscan.lol' || url.origin === 'https://www.japscan.me') && segments[0] === 'lecture-en-ligne';
   const isMangaKakalot = url.origin === 'https://mangakakalot.so' && segments[0] === 'reading';
   const isArenaScan = url.origin === 'https://arenascan.com' && (segments[0] === 'manga' || segments.length === 1);
-  if (!isJapScan && !isMangaKakalot && !isArenaScan) return undefined;
+  const isAsuraScan = url.origin === 'https://www.asurascans.com' && segments.length === 1 && /-chapter-\d+/iu.test(segments[0] ?? '') && !/^\d{6,12}-/u.test(segments[0] ?? '');
+  if (!isJapScan && !isMangaKakalot && !isArenaScan && !isAsuraScan) return undefined;
   const rawSlug = isJapScan || isMangaKakalot ? segments[1] : segments[0] === 'manga' ? segments[1] : segments[0];
   if (rawSlug === undefined) return undefined;
-  const stableSlug = isArenaScan ? rawSlug.replace(/-\d+(?:-\d+)?$/u, '') : rawSlug;
+  const stableSlug = isArenaScan ? rawSlug.replace(/-\d+(?:-\d+)?$/u, '') : isAsuraScan ? rawSlug.replace(/-chapter-\d+.*$/iu, '') : rawSlug;
   if (stableSlug.length < 3 || !/\p{L}{2}/u.test(stableSlug) || !bookmarkCorroboratesSlug(input.title, stableSlug)) return undefined;
   const title = displayTitle(stableSlug);
-  return createSourceEvidence({
+  const chapter = isAsuraScan ? rawSlug.match(/-chapter-(\d+(?:[.,]\d+)?)/iu)?.[1] : undefined;
+  const evidence: MutableSourceEvidence = {
     ...common(input, url), aliases: [{ provenance: 'stable-url-slug', value: title }], canonicalUrl: `${url.origin}/${(isJapScan || isMangaKakalot ? segments.slice(0, 2) : isArenaScan && segments[0] === 'manga' ? segments.slice(0, 2) : [stableSlug]).join('/')}`,
     diagnostics: [], mediaKind: 'MANGA', proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], rawSlug, sourceAdapter: 'known-title-route-v1', stableSlug, strategy: 'exact-origin', title,
+  };
+  if (chapter !== undefined) evidence.release = { kind: 'chapter', provenance: 'URL_SLUG_SUFFIX', raw: `chapter-${chapter}`, value: Number(chapter.replace(',', '.')) };
+  return createSourceEvidence(evidence);
+}
+
+function titleDerivedMangaEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl): SourceEvidence | undefined {
+  const segments = url.decodedSegments;
+  const isWeebCentral = url.origin === 'https://weebcentral.com' && segments.length === 2 && segments[0] === 'chapters' && /^[0-9A-Z]{20,30}$/u.test(segments[1] ?? '');
+  const isYyzzBaby = url.origin === 'https://www.yyzzbaby.com' && segments.length === 2 && segments[0] === 'statuses' && /^\d+\.html$/u.test(segments[1] ?? '');
+  const isFlameComics = url.origin === 'https://flamecomics.xyz' && segments.length === 3 && segments[0] === 'series' && /^\d+$/u.test(segments[1] ?? '') && /^[a-z0-9]+$/u.test(segments[2] ?? '');
+  if (!isWeebCentral && !isYyzzBaby && !isFlameComics) return undefined;
+  const analysis = segmentFavoriteTitle(input.title, url.host);
+  const rawSlug = segments.at(-1);
+  if (rawSlug === undefined) return undefined;
+  const title = isWeebCentral
+    ? analysis.segments.filter(segment => !segment.excluded).map(segment => segment.cleaned).find(value => /\p{L}{2}/u.test(value)) ?? ''
+    : isFlameComics ? analysis.cleanedTitle.replace(/\s+-\s+chapter\s+\d+(?:\s+-\s+flame\s+comics)?$/iu, '').replace(/\s+-\s+flame\s+comics$/iu, '') : analysis.cleanedTitle;
+  const stableSlug = normalizeFavoriteTitle(title).normalized.replace(/\s+/gu, '-');
+  if (stableSlug.length < 3 || normalizeFavoriteTitle(title).significantTokens.length < 2) return undefined;
+  return createSourceEvidence({
+    ...common(input, url), aliases: [{ provenance: 'aligned-bookmark-segment', value: title }], canonicalUrl: url.url, diagnostics: [], mediaKind: 'MANGA',
+    proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], rawSlug, sourceAdapter: 'known-title-derived-route-v1', stableSlug, strategy: 'exact-origin', title,
   });
 }
 
@@ -263,6 +295,8 @@ export function extractFavoriteSourceEvidence(input: FavoriteSourceEvidenceInput
   if (knownNumericRoute !== undefined) return knownNumericRoute;
   const knownTitleRoute = knownTitleRouteEvidence(input, qualification);
   if (knownTitleRoute !== undefined) return knownTitleRoute;
+  const titleDerivedRoute = titleDerivedMangaEvidence(input, qualification);
+  if (titleDerivedRoute !== undefined) return titleDerivedRoute;
   const applicable = adapters.filter((adapter) => adapter.origins.includes(qualification.origin));
   if (applicable.length > 1) {
     return createSourceEvidence({ ...common(input, qualification), aliases: [], diagnostics: ['SOURCE_ADAPTER_CONFLICT'], key: input.sourceKey, mediaKind: 'UNKNOWN', proofs: [], sourceAdapter: 'conflict', strategy: 'exact-origin' });

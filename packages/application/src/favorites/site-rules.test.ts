@@ -30,6 +30,15 @@ describe('declarative site routes', () => {
     });
   });
 
+  it.each(['https://manhwaz.com', 'https://www.manhwaz.com'])('accepts Manhwaz public index routes and chapter zero on %s', (origin) => {
+    const result = evidence(`${origin}/public/index.php/webtoon/dreaming-freedom/chapter-0`);
+    expect(result).toMatchObject({ mediaKind: 'MANHWA', release: { kind: 'chapter', value: 0 }, stableSlug: 'dreaming-freedom' });
+  });
+
+  it('accepts Anime-Sama direct anime routes', () => {
+    expect(evidence('https://anime-sama.fr/anime/kekkai-sensen/saison1')).toMatchObject({ mediaKind: 'ANIME', season: 1, stableSlug: 'kekkai-sensen' });
+  });
+
   it.each(['', '/1234567-chapter-101', '/1234567-chapter-12.5', '/1234567-chapter-0'])('extracts a Comix manga identity with route %s', (tail) => {
     const result = evidence(`https://comix.to/title/ab123-synthetic-86-journey${tail}`);
     expect(result).toMatchObject({ mediaKind: 'MANGA', stableSlug: 'synthetic-86-journey', title: 'synthetic 86 journey', canonicalUrl: 'https://comix.to/title/ab123-synthetic-86-journey' });
