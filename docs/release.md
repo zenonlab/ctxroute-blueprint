@@ -19,7 +19,9 @@ téléchargements publics.
 Le scénario de tri installé sur 1 400 œuvres exige un passage rapide sous
 500 ms et borne chacun des quatre tris sous 1 s. Cette double limite conserve
 la preuve du chemin rapide sans confondre un pic ponctuel du runner partagé
-avec une régression fonctionnelle.
+avec une régression fonctionnelle. La CI exécute les neuf scénarios Playwright
+séquentiellement sur ce runner pour éviter de faire concurrence au Chromium
+avec plusieurs profils d'extension en parallèle.
 
 La publication a ensuite été appliquée par le plan protégé `772a71e296835afa9e8aeac3fd4197c723cec09d7de41e8798f97df35f79401b`.
 Le Worker `b25b2c41-081e-47ac-807c-f03d01eeab76` sert désormais le pointeur
