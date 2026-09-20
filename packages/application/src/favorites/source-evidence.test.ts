@@ -94,6 +94,14 @@ describe('favorite source evidence U-01…U-10', () => {
     });
     expect(extractFavoriteSourceEvidence(input('numeric-generic', 'https://fixtures.tobirink.invalid/anime/3759'))).toMatchObject({ disposition: 'URL_IDENTITY_UNRESOLVED' });
   });
+  it.each([
+    ['https://www.japscan.lol/lecture-en-ligne/fire-punch/30/8.html', 'fire-punch'],
+    ['https://mangakakalot.so/reading/shangri-la-frontier-kusoge-hunter-kamige-ni-idoman-to-su/1109960', 'shangri-la-frontier-kusoge-hunter-kamige-ni-idoman-to-su'],
+    ['https://arenascan.com/high-society-31/', 'high-society'],
+  ])('accepts a corroborated manga route on %s', (url, stableSlug) => {
+    const slugTitle = stableSlug.replaceAll('-', ' ');
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'bounded-reader-route', title: slugTitle, url })).toMatchObject({ mediaKind: 'MANGA', sourceAdapter: 'known-title-route-v1', stableSlug });
+  });
   it.each(['watch?v=synthetic', 'blog/ordinary-link'])('still rejects explicitly excluded links: %s', path => {
     expect(extractFavoriteSourceEvidence(input('ordinary', `https://fixtures.tobirink.invalid/${path}`)).disposition).toBe('URL_IDENTITY_UNRESOLVED');
   });

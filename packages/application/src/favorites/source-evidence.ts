@@ -30,6 +30,7 @@ const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|v
 const numericReleasePattern = /^(\d{3,12})[-_.](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)$/iu;
 const localizedReleaseSuffixPattern = /(?:^|[-_.])(\d+(?:[.,]\d+)?)[-_.](?:vostfr|vf|vo|sub|dub)$/iu;
 const titleIdentityOrigins = new Set(['https://www.adkami.com']);
+const titleRouteOrigins = new Set(['https://mangakakalot.so', 'https://www.japscan.lol', 'https://www.japscan.me', 'https://arenascan.com']);
 
 interface StructuralIdentity { readonly slug: string; readonly transformed: boolean }
 
@@ -82,6 +83,24 @@ function knownNumericRouteEvidence(input: FavoriteSourceEvidenceInput, url: Elig
   return createSourceEvidence({
     ...common(input, url), aliases: [{ provenance: 'aligned-bookmark-segment', value: title }], diagnostics: [],
     mediaKind: 'ANIME', proofs: ['CATEGORY_PATH'], sourceAdapter: 'known-numeric-route-v1', strategy: 'exact-origin', title,
+  });
+}
+
+function knownTitleRouteEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl): SourceEvidence | undefined {
+  if (!titleRouteOrigins.has(url.origin)) return undefined;
+  const segments = url.decodedSegments;
+  const isJapScan = (url.origin === 'https://www.japscan.lol' || url.origin === 'https://www.japscan.me') && segments[0] === 'lecture-en-ligne';
+  const isMangaKakalot = url.origin === 'https://mangakakalot.so' && segments[0] === 'reading';
+  const isArenaScan = url.origin === 'https://arenascan.com' && (segments[0] === 'manga' || segments.length === 1);
+  if (!isJapScan && !isMangaKakalot && !isArenaScan) return undefined;
+  const rawSlug = isJapScan || isMangaKakalot ? segments[1] : segments[0] === 'manga' ? segments[1] : segments[0];
+  if (rawSlug === undefined) return undefined;
+  const stableSlug = isArenaScan ? rawSlug.replace(/-\d+(?:-\d+)?$/u, '') : rawSlug;
+  if (stableSlug.length < 3 || !/\p{L}{2}/u.test(stableSlug) || !bookmarkCorroboratesSlug(input.title, stableSlug)) return undefined;
+  const title = displayTitle(stableSlug);
+  return createSourceEvidence({
+    ...common(input, url), aliases: [{ provenance: 'stable-url-slug', value: title }], canonicalUrl: `${url.origin}/${(isJapScan || isMangaKakalot ? segments.slice(0, 2) : isArenaScan && segments[0] === 'manga' ? segments.slice(0, 2) : [stableSlug]).join('/')}`,
+    diagnostics: [], mediaKind: 'MANGA', proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], rawSlug, sourceAdapter: 'known-title-route-v1', stableSlug, strategy: 'exact-origin', title,
   });
 }
 
@@ -242,6 +261,8 @@ export function extractFavoriteSourceEvidence(input: FavoriteSourceEvidenceInput
   if (qualification.kind === 'REJECTED') return rejectedEvidence(input, qualification.disposition);
   const knownNumericRoute = knownNumericRouteEvidence(input, qualification);
   if (knownNumericRoute !== undefined) return knownNumericRoute;
+  const knownTitleRoute = knownTitleRouteEvidence(input, qualification);
+  if (knownTitleRoute !== undefined) return knownTitleRoute;
   const applicable = adapters.filter((adapter) => adapter.origins.includes(qualification.origin));
   if (applicable.length > 1) {
     return createSourceEvidence({ ...common(input, qualification), aliases: [], diagnostics: ['SOURCE_ADAPTER_CONFLICT'], key: input.sourceKey, mediaKind: 'UNKNOWN', proofs: [], sourceAdapter: 'conflict', strategy: 'exact-origin' });

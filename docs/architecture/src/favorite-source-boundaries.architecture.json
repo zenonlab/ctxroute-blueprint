@@ -42,7 +42,7 @@
   "components": [
     { "id": "favoriteObservation", "type": "external", "label": "Observation favorite", "sublabel": "titre et URL bruts", "pos": [40, 270], "size": [150, 68], "tag": "privé local" },
     { "id": "eligibility", "type": "security", "label": "Qualification URL", "sublabel": "packages/application", "pos": [250, 270], "size": [160, 68], "tag": "HTTP(S) borné" },
-    { "id": "sourceRegistry", "type": "backend", "label": "Registre injecté", "sublabel": "packages/application", "pos": [480, 270], "size": [160, 68], "tag": "règles JSON + saisons bornées" },
+    { "id": "sourceRegistry", "type": "backend", "label": "Registre injecté", "sublabel": "packages/application", "pos": [480, 270], "size": [160, 68], "tag": "règles JSON + routes bornées" },
     { "id": "genericEvidence", "type": "backend", "label": "Preuve générique", "sublabel": "structure de route", "pos": [710, 120], "size": [160, 68], "tag": "type UNKNOWN permis" },
     { "id": "mangadexAdapter", "type": "backend", "label": "Parseur MangaDex", "sublabel": "local · sans fetch", "pos": [710, 220], "size": [160, 68], "tag": "titre + UUID" },
     { "id": "kitsuAdapter", "type": "backend", "label": "Parseurs Kitsu", "sublabel": "local · sans fetch", "pos": [710, 320], "size": [160, 68], "tag": "route exacte" },
