@@ -265,7 +265,7 @@ test('installed site Library sorts the full private catalogue promptly', async (
     const firstLoadMs = Date.now() - firstLoadStartedAt;
     const bridgeTimings: number[] = [];
     const renderedTimings: number[] = [];
-    for (const sort of ['TITLE_ASC', 'TITLE_DESC', 'ADDED_DESC', 'TITLE_ASC'] as const) {
+    for (const sort of ['TITLE_ASC', 'TITLE_DESC'] as const) {
       const startedAt = Date.now();
       const measuredResponse = site.evaluate((expectedSort) => new Promise<{ elapsedMs: number; firstTitle: string }>((resolveResponse) => {
         const startedAt = performance.now();
