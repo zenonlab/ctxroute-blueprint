@@ -16,6 +16,11 @@ upload ni avancement du pointeur `1.0.42` n'est considéré comme validé avant
 le plan Cloudflare protégé, son digest et la vérification des deux
 téléchargements publics.
 
+Le scénario de tri installé sur 1 400 œuvres exige un passage rapide sous
+500 ms et borne chacun des quatre tris sous 1 s. Cette double limite conserve
+la preuve du chemin rapide sans confondre un pic ponctuel du runner partagé
+avec une régression fonctionnelle.
+
 La publication a ensuite été appliquée par le plan protégé `772a71e296835afa9e8aeac3fd4197c723cec09d7de41e8798f97df35f79401b`.
 Le Worker `b25b2c41-081e-47ac-807c-f03d01eeab76` sert désormais le pointeur
 1.0.42. Les téléchargements publics ont été comparés aux candidats locaux :
