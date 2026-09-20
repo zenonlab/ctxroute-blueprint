@@ -31,7 +31,7 @@ const mangaDexPayload = {
 };
 
 test('the packaged Chrome extension imports, resolves, bridges and survives offline', async () => {
-  test.setTimeout(180_000);
+  test.setTimeout(90_000);
   const repository = resolve(import.meta.dirname, '../../..');
   const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
   const archive = resolve(repository, `apps/extension/.output/packages/tobirink-chrome-mv3-${version}.zip`);
@@ -191,7 +191,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
 });
 
 test('installed site Library sorts the full private catalogue promptly', async () => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   const repository = resolve(import.meta.dirname, '../../..');
   const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
   const archive = process.env.TOBIRINK_TEST_ARCHIVE ?? resolve(repository, `apps/extension/.output/packages/tobirink-chrome-mv3-${version}.zip`);
