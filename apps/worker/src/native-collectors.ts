@@ -165,6 +165,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   try {
   const port = new D1PublicDiscoveryV3Adapter(d1.database);
   let activeToken = '';
+  let activeTokenDigest = '';
   const resolver = createPublicDiscoveryResolver(createPublicDiscoveryProviders(
     providers.fetch,
     new D1ProviderRuntimeControl(d1.database),
@@ -173,9 +174,11 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     gateway: {
       claim: async (limit) => {
         activeToken = randomToken();
+        activeTokenDigest = await digest(activeToken);
         const now = new Date();
-        return port.claimBatch({ claimToken: activeToken, leaseUntil: new Date(now.valueOf() + 15 * 60_000).toISOString(), limit, now: now.toISOString(), tokenDigest: await digest(activeToken) });
+        return port.claimBatch({ claimToken: activeToken, leaseUntil: new Date(now.valueOf() + 15 * 60_000).toISOString(), limit, now: now.toISOString(), tokenDigest: activeTokenDigest });
       },
+      defer: (request, retryAt, now) => port.deferClaim(request, activeTokenDigest, retryAt, now),
       publish: async (batch: PublicDiscoveryResultBatch) => {
         const receipt = await port.publishBatch(batch, await digest(activeToken), await digest(JSON.stringify(batch.results)), new Date().toISOString());
         return { published: receipt.published, replayed: receipt.replayed };
@@ -200,7 +203,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(nextPendingAt) - Date.now()) / 1_000)));
     await queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json', delaySeconds });
   }
-  const result = report.replayed > 0 && report.published === 0 ? 'deduplicated' : report.published > 0 ? 'changed' : 'unchanged';
+  const result = report.replayed > 0 && report.published === 0 ? 'deduplicated' : report.published > 0 ? 'changed' : (report.deferred ?? 0) > 0 ? 'backoff' : 'unchanged';
   return { ...report, continuationScheduled: nextPendingAt !== undefined, metrics: { ...collectorCost(d1.snapshot(), providers.snapshot(), report.published, result), ...queue.snapshot() } };
   } catch (error) {
     throw new PublicDiscoveryProcessingError(error instanceof Error ? error : undefined, { ...collectorCost(d1.snapshot(), providers.snapshot(), acceptedResults, 'failed'), ...queue.snapshot() });

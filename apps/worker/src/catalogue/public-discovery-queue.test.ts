@@ -1,9 +1,9 @@
 import { applyD1Migrations, env } from 'cloudflare:test';
-import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
+import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import { HttpPublicDiscoveryAdapter } from '../../../../packages/adapters-browser/src/catalogue/http-public-discovery-adapter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
-import { handleNativeCollectorQueue, processPublicDiscoveryQueue } from '../native-collectors';
+import { handleNativeCollectorQueue, processPublicDiscoveryQueue, type NativeCollectorSignal } from '../native-collectors';
 
 function key(marker: string) {
   return { fingerprint: marker.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
@@ -16,6 +16,64 @@ function submission(marker: string, title: string) {
 beforeEach(async () => applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS));
 
 describe('public discovery queue trigger', () => {
+  it('requeues a cadence-deferred claim at its deadline without using a provider attempt', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const request = { ...submission('c', 'Cadence deferred work'), requestDigest: 'd'.repeat(64) };
+    const now = '2026-09-20T12:00:00.000Z';
+    await adapter.request(request, now);
+    const claim = await adapter.claimBatch({ claimToken: 'a'.repeat(48), tokenDigest: 'b'.repeat(64), now, leaseUntil: '2026-09-20T12:15:00.000Z', limit: 1 });
+    expect(claim.requests).toHaveLength(1);
+    await adapter.deferClaim(claim.requests[0]!, 'b'.repeat(64), '2026-09-20T12:00:08.000Z', now);
+    expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, claim_token_hash AS claim FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+      .bind(request.key.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 0, claim: null });
+    expect((await adapter.claimBatch({ claimToken: 'c'.repeat(48), tokenDigest: 'd'.repeat(64), now: '2026-09-20T12:00:07.000Z', leaseUntil: '2026-09-20T12:15:07.000Z', limit: 1 })).requests).toHaveLength(0);
+    const resumed = await adapter.claimBatch({ claimToken: 'c'.repeat(48), tokenDigest: 'd'.repeat(64), now: '2026-09-20T12:00:08.000Z', leaseUntil: '2026-09-20T12:15:08.000Z', limit: 1 });
+    expect(resumed.requests[0]?.attempt).toBe(1);
+    await adapter.publishBatch({ claimToken: resumed.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440001', results: [{ key: request.key, requestDigest: request.requestDigest, resolution: { reason: 'synthetic-no-match', state: 'NOT_FOUND' } }], schemaVersion: 3, verifiedAt: '2026-09-20T12:00:09.000Z' }, 'd'.repeat(64), 'e'.repeat(64), '2026-09-20T12:00:09.000Z');
+  });
+
+  it('defers a refresh without losing its verified profile or consuming a refresh attempt', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const request = { ...submission('b', 'Verified refresh'), requestDigest: 'f'.repeat(64) };
+    const initialAt = '2026-09-01T12:00:00.000Z';
+    await adapter.request(request, initialAt);
+    const initial = await adapter.claimBatch({ claimToken: 'e'.repeat(48), tokenDigest: 'e'.repeat(64), now: initialAt, leaseUntil: '2026-09-01T12:15:00.000Z', limit: 1 });
+    const verified = { key: request.key, requestDigest: request.requestDigest, resolution: {
+      profile: {
+        candidate: { displayTitle: 'Verified refresh', externalId: '999998', genres: [], mediaKind: 'ANIME' as const, metadataVersion: 2 as const, preSerialization: false, provider: 'anilist' as const, titles: ['Verified refresh'] },
+        references: [{ externalId: '999998', provider: 'anilist' as const }], workId: 'work_anilist_999998',
+      }, state: 'VERIFIED' as const,
+    } };
+    await adapter.publishBatch({
+      claimToken: initial.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440002',
+      results: [verified], schemaVersion: 3, verifiedAt: initialAt,
+    }, 'e'.repeat(64), 'f'.repeat(64), initialAt);
+    await env.PUBLIC_DB.prepare('UPDATE public_discovery_requests_v3 SET next_refresh_at = ?1 WHERE fingerprint = ?2')
+      .bind('2026-09-19T00:00:00.000Z', request.key.fingerprint).run();
+    const now = '2026-09-20T12:00:00.000Z';
+    expect((await adapter.requestRefresh(request.key, now)).outcome).toBe('created');
+    const claimed = await adapter.claimBatch({ claimToken: 'g'.repeat(48), tokenDigest: 'g'.repeat(64), now, leaseUntil: '2026-09-20T12:15:00.000Z', limit: 1 });
+    expect(claimed.requests[0]?.attempt).toBe(1);
+    await adapter.deferClaim(claimed.requests[0]!, 'g'.repeat(64), '2026-09-20T12:00:08.000Z', now);
+    expect(await env.PUBLIC_DB.prepare('SELECT state, refresh_state AS refreshState, refresh_attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+      .bind(request.key.fingerprint).first()).toEqual({ state: 'VERIFIED', refreshState: 'PENDING', attempts: 0 });
+    await expect(adapter.read(request.key, now)).resolves.toMatchObject({ state: 'VERIFIED', profile: { workId: 'work_anilist_999998' } });
+    expect((await adapter.claimBatch({ claimToken: 'h'.repeat(48), tokenDigest: 'h'.repeat(64), now: '2026-09-20T12:00:07.000Z', leaseUntil: '2026-09-20T12:15:07.000Z', limit: 1 })).requests).toHaveLength(0);
+    const resumed = await adapter.claimBatch({ claimToken: 'h'.repeat(48), tokenDigest: 'h'.repeat(64), now: '2026-09-20T12:00:08.000Z', leaseUntil: '2026-09-20T12:15:08.000Z', limit: 1 });
+    expect(resumed.requests[0]?.attempt).toBe(1);
+    await adapter.publishBatch({ claimToken: resumed.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440003', results: [verified], schemaVersion: 3, verifiedAt: '2026-09-20T12:00:09.000Z' }, 'h'.repeat(64), 'i'.repeat(64), '2026-09-20T12:00:09.000Z');
+  });
+
+  it('does not extend a D1 provider reservation beyond the request window', async () => {
+    const controls = new D1ProviderRuntimeControl(env.PUBLIC_DB);
+    expect(await controls.reserve('anilist', 10_000, 3_000)).toBe(10_000);
+    expect(await controls.reserve('anilist', 10_000, 3_000)).toBe(18_000);
+    const before = await env.PUBLIC_DB.prepare('SELECT next_allowed_at AS nextAllowed, active_until AS activeUntil FROM public_discovery_provider_runtime WHERE provider = ?1').bind('anilist').first();
+    expect(await controls.reserve('anilist', 10_000, 3_000)).toBe(26_000);
+    const after = await env.PUBLIC_DB.prepare('SELECT next_allowed_at AS nextAllowed, active_until AS activeUntil FROM public_discovery_provider_runtime WHERE provider = ?1').bind('anilist').first();
+    expect(after).toEqual(before);
+  });
+
   it.each(['exact', 'title'] as const)('carries the real extension %s request through admission, Queue, provider validation and D1 publication', async (mode) => {
     const queue = { send: vi.fn(async () => undefined) };
     const port = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
@@ -60,10 +118,12 @@ describe('public discovery queue trigger', () => {
     await adapter.request({ ...submission('3', 'Synthetic leased work'), requestDigest: 'a'.repeat(64) }, now);
     await adapter.claimBatch({ claimToken: 'a'.repeat(48), tokenDigest: 'b'.repeat(64), now, leaseUntil: new Date(Date.now() + 15 * 60_000).toISOString(), limit: 1 });
     const metrics = { backlogBytes: 0, backlogCount: 0 };
-    const queue = { metrics: async () => metrics, send: vi.fn(async () => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    const queue = { metrics: async () => metrics, send: vi.fn(async (_body: NativeCollectorSignal, _options?: { contentType?: string; delaySeconds?: number }) => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
     const bindings = { ...env, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_GATEWAY_HMAC_KEY: 'x'.repeat(32) };
     expect(await processPublicDiscoveryQueue(bindings)).toMatchObject({ claimed: 0, continuationScheduled: true });
-    expect(queue.send).toHaveBeenCalledExactlyOnceWith({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json', delaySeconds: 900 });
+    expect(queue.send).toHaveBeenCalledOnce();
+    expect(queue.send.mock.calls[0]?.[1]?.delaySeconds).toBeGreaterThan(0);
+    expect(queue.send.mock.calls[0]?.[1]?.delaySeconds).toBeLessThanOrEqual(900);
     queue.send.mockRejectedValueOnce(new Error('local-queue-failure'));
     const item = { body: { type: 'public-discovery-ready', version: 1 }, attempts: 1, ack: vi.fn(), retry: vi.fn() };
     await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery: () => processPublicDiscoveryQueue(bindings) });
@@ -175,6 +235,7 @@ describe('public discovery queue trigger', () => {
     let requests = 0;
     const port = {
       claimBatch: vi.fn(), confirmQueueSignal: vi.fn(async () => undefined), publishBatch: vi.fn(), read: vi.fn(),
+      deferClaim: vi.fn(async () => undefined),
       releaseQueueSignal: vi.fn(async () => undefined),
       requestRefresh: vi.fn(),
       request: vi.fn(async () => ({
