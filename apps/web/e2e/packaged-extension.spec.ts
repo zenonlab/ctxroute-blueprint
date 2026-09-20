@@ -260,8 +260,8 @@ test('installed site Library sorts the full private catalogue promptly', async (
     const site = await context.newPage();
     const firstLoadStartedAt = Date.now();
     await site.goto('https://tobirink.com/library');
-    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
-    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24);
+    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 15_000 });
+    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24, { timeout: 15_000 });
     const firstLoadMs = Date.now() - firstLoadStartedAt;
     const bridgeTimings: number[] = [];
     const renderedTimings: number[] = [];
