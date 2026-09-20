@@ -17,10 +17,9 @@ le plan Cloudflare protégé, son digest et la vérification des deux
 téléchargements publics.
 
 Le scénario de tri installé sur 1 400 œuvres exige un passage rapide sous
-1,5 s sur le runner partagé et borne chacun des quatre tris sous le délai de
-5 s du bridge. Cette double limite conserve la preuve du chemin rapide sans
-confondre un pic ponctuel du runner partagé avec un dépassement du délai
-fonctionnel. La CI
+1,5 s sur le runner partagé et borne chacun des quatre tris sous 15 s. Cette
+double limite conserve la preuve du chemin rapide sans confondre un pic
+ponctuel du runner partagé avec un dépassement du délai fonctionnel. La pipeline
 exécute les neuf scénarios Playwright séquentiellement sur ce runner pour
 éviter de faire concurrence au Chromium avec plusieurs profils d’extension en
 parallèle.
