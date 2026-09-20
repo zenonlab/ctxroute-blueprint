@@ -67,7 +67,7 @@ jobs:
         run: npm run setup:browser --workspace @tobirink/web
 
       - name: Run browser E2E suite
-        run: npm run test:e2e --workspace @tobirink/web
+        run: npm run test:e2e --workspace @tobirink/web -- --workers=1
 
       - name: Verify repository
         run: npm run verify
