@@ -20,10 +20,10 @@ jobs:
     environment: production
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -54,6 +54,21 @@ jobs:
       - name: Build extension manifests for verification
         run: npm run build:extension && npm run build:extension:firefox
 
+      - name: Build public web application
+        run: npm run build --workspace @tobirink/web
+
+      - name: Package release candidate
+        run: npm run package:extension
+
+      - name: Verify isolated extension builds
+        run: node scripts/release/package-extension.mjs --verify-isolated
+
+      - name: Install Playwright Chromium
+        run: npm run setup:browser --workspace @tobirink/web
+
+      - name: Run browser E2E suite
+        run: npm run test:e2e --workspace @tobirink/web
+
       - name: Verify repository
         run: npm run verify
 
@@ -81,3 +96,30 @@ jobs:
             --approve "$PLAN_DIGEST" \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
             --allow worker:tobirink-public-api
+
+      - name: Verify public production probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe() {
+            local url="$1"
+            local headers_file
+            headers_file="$(mktemp)"
+            trap 'rm -f "$headers_file"' RETURN
+            local status
+            status="$(curl --fail --silent --show-error --location --dump-header "$headers_file" --output /dev/null --write-out '%{http_code}' "$url")"
+            test "$status" = 200
+            local trace_id cache_control
+            trace_id="$(awk 'BEGIN{IGNORECASE=1} /^x-(tobirink-)?(request|trace)-id:/ {sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' "$headers_file" | tr -d '\r')"
+            cache_control="$(awk 'BEGIN{IGNORECASE=1} /^cache-control:/ {sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' "$headers_file" | tr -d '\r')"
+            printf '%s status=%s trace_id=%s cache_control=%s\n' "$url" "$status" "${trace_id:-unavailable}" "${cache_control:-unavailable}"
+          }
+          probe https://tobirink.com/
+          probe https://tobirink.com/library
+          probe https://tobirink.com/download
+          probe https://tobirink-provider-gateway.tobirink.deno.net/healthz
+
+      - name: Remove temporary deployment plan
+        if: ${{ always() }}
+        shell: bash
+        run: rm -f .ctxroute-production-plan.json

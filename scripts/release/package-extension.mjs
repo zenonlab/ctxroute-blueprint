@@ -17,6 +17,10 @@ function run(command, args) {
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed with status ${result.status}.`);
 }
 
+function prepareExtension() {
+  run('npm', ['run', 'postinstall', '--workspace', '@tobirink/extension']);
+}
+
 function filesUnder(directory) {
   return readdirSync(directory).flatMap((name) => {
     const path = join(directory, name);
@@ -41,6 +45,7 @@ function packageTarget(target, sourceRoot = outputRoot, destination = packageRoo
   return {
     artifact,
     files: entries.length,
+    manifest: builtManifest,
     sha256: createHash('sha256').update(first).digest('hex'),
     size: first.length,
     target,
@@ -56,7 +61,9 @@ async function verifyIsolatedBuilds() {
   const runs = [];
   for (let index = 0; index < 2; index += 1) {
     const output = mkdtempSync(join(verificationRoot, 'run-'));
+    prepareExtension();
     await build({ browser: 'chrome', outDir: output, root: extensionRoot });
+    prepareExtension();
     await build({ browser: 'firefox', outDir: output, root: extensionRoot });
     const artifacts = [packageTarget('chrome-mv3', output, output), packageTarget('firefox-mv3', output, output)];
     runs.push({ artifacts, output });
@@ -74,7 +81,9 @@ async function verifyIsolatedBuilds() {
 if (process.argv.length === 3 && process.argv[2] === '--verify-isolated') {
   await verifyIsolatedBuilds();
 } else if (process.argv.length === 2) {
+  prepareExtension();
   run('npm', ['run', 'build:extension']);
+  prepareExtension();
   run('npm', ['run', 'build:extension:firefox']);
   mkdirSync(packageRoot, { recursive: true });
   const artifacts = [packageTarget('chrome-mv3'), packageTarget('firefox-mv3')];

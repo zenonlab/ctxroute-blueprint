@@ -4,6 +4,34 @@ Tobirink does not expose Wrangler as a release command. Every provider change
 starts from the repository-owned gate, while the extension and Worker runtime
 remain independent of this operational path.
 
+## Candidate extension 1.0.42 — préparation locale
+
+La version source et le pointeur Web sont alignés sur `1.0.42`, tandis que
+les archives publiques `1.0.41` restent intactes. La séquence locale est :
+
+    npm ci --ignore-scripts
+    npm run postinstall --workspace @tobirink/extension
+    npm run build --workspace @tobirink/web
+    npm run package:extension
+    node scripts/release/package-extension.mjs --verify-isolated
+    npm run setup:browser --workspace @tobirink/web
+    npm run test:e2e --workspace @tobirink/web
+
+Le manifeste ignoré sous `apps/extension/.output/packages/` est la preuve
+locale des deux manifestes générés, tailles, nombres de fichiers et SHA-256.
+La publication R2 est limitée aux deux ZIP `1.0.42`; le pointeur public ne
+peut avancer qu'après comparaison des téléchargements distants et des hashes
+acceptés. Aucune migration D1, suppression, rotation de secret ou permission
+n'est incluse.
+
+Le plan appliqué `772a71e296835afa9e8aeac3fd4197c723cec09d7de41e8798f97df35f79401b`
+contenait exactement les deux uploads R2 1.0.42 et `worker:tobirink-public-api`
+avec `preserveRoutes=true`. Le Worker publié est
+`b25b2c41-081e-47ac-807c-f03d01eeab76`. Les deux URLs publiques répondent 200
+avec `application/zip`, cache immutable et des SHA-256 identiques aux archives
+locales; `/download` annonce uniquement 1.0.42. Les objets 1.0.41 ont été
+relus et leurs hashes historiques sont inchangés.
+
 ## Livraison GitHub protégée
 
 Le workflow `.github/workflows/deploy-production.yml` se déclenche sur `main`
@@ -888,3 +916,20 @@ Keep the core unchanged. Implement another driver with the same `inspect`,
 `preview`, and `apply` boundary, add it at the command composition root, and run
 the shared negative contract suite. Provider SDKs and commands stay in that
 driver; application use cases and HTTP routes do not change.
+## Contrôle final de livraison
+
+La livraison autonome standard vérifie après l’apply Cloudflare :
+
+- `https://tobirink.com/` → HTTP 200 ;
+- `https://tobirink.com/library` → HTTP 200 ;
+- `https://tobirink-provider-gateway.tobirink.deno.net/healthz` → HTTP 200.
+
+Le contrôle ne journalise pas les corps de réponse. Il affiche seulement le
+statut et, lorsqu’il existe, l’identifiant de requête/corrélation fourni par les
+en-têtes. La gateway Deno est déployée par son application GitHub App existante
+sur `main`; aucun token Deno n’est ajouté au workflow Cloudflare.
+
+Les mutations D1, R2, Queues et les rotations de `PROVIDER_GATEWAY_HMAC_KEY`
+restent hors de cette livraison et exigent chacune leur propre plan, allowlist,
+validation et preuve. Elles ne doivent pas être ajoutées au job standard pour
+contourner cette séparation.

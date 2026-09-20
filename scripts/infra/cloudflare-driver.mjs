@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,13 +16,23 @@ function releasePublishOperations(config) {
   if (!releaseBucket) return [];
   const extensionRoot = fileURLToPath(new URL('../../apps/extension', import.meta.url));
   const version = JSON.parse(readFileSync(resolve(extensionRoot, 'package.json'), 'utf8')).version;
+  const manifestPath = resolve(extensionRoot, '.output', 'packages', 'release-manifest.json');
+  const releaseManifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  if (releaseManifest.version !== version || !Array.isArray(releaseManifest.artifacts)) {
+    throw new Error('release-manifest-version-mismatch');
+  }
   return ['chrome', 'firefox'].map(browser => {
     const artifact = `tobirink-${browser}-mv3-${version}.zip`;
+    const record = releaseManifest.artifacts.find(item => item.artifact === artifact && item.target === `${browser}-mv3`);
+    const source = resolve(extensionRoot, '.output', 'packages', artifact);
+    if (!record || record.version !== version || !record.sha256 || !Number.isSafeInteger(record.size) || record.size !== statSync(source).size) {
+      throw new Error(`release-manifest-artifact-mismatch:${artifact}`);
+    }
     return [`r2-publish:${artifact}`, {
       artifact,
       bucket: releaseBucket.name,
       kind: 'r2-publish',
-      source: resolve(extensionRoot, '.output', 'packages', artifact),
+      source,
       target: `r2:${releaseBucket.name}/downloads/${artifact}`,
     }];
   });
