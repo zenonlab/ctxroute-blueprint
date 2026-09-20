@@ -933,3 +933,59 @@ Les mutations D1, R2, Queues et les rotations de `PROVIDER_GATEWAY_HMAC_KEY`
 restent hors de cette livraison et exigent chacune leur propre plan, allowlist,
 validation et preuve. Elles ne doivent pas être ajoutées au job standard pour
 contourner cette séparation.
+
+## Reprise Discovery après épuisement artificiel des tentatives — 2026-09-20
+
+Le snapshot distant en lecture seule compte 476 demandes v3 : 88 `VERIFIED`
+(83 anime, 5 manga), 333 `FAILED/ATTEMPT_LIMIT`, 38 `PROCESSING`, 14
+`NOT_FOUND` et 3 `AMBIGUOUS`. Les 333 échecs comprennent 2 anime, 182 manga,
+2 manhua, 33 manhwa et 114 médias inconnus. Les logs Queue montrent des lots
+`acceptedResults=0`, `providerRequests=0` : une réservation de cadence trop
+éloignée consommait quand même les essais pris au claim. La correction
+versionnée diffère ces claims sans consommer d'essai et ne transforme ni `403`,
+ni timeout, ni fournisseur indisponible en `NOT_FOUND`.
+
+Avant tout changement de production, conserver l'export D1 complet du
+20 septembre sous `build/backups/tobirink-public-pre-discovery-cadence-20260920.sql`
+(ignoré par Git, SHA-256
+`6ff390845441f79ac59f4cef18509d5ea0be9a03e0d96a43caac61c983b1f4b2`,
+2 019 796 octets). Son chargement complet dans SQLite en mémoire réussit.
+Un nouvel export et son hash sont nécessaires si la reprise est décalée ou si
+les comptes changent matériellement. Ne jamais copier le SQL, les titres, les
+digests de demande ou une URL d'export signée dans les logs ou artefacts CI.
+
+La séquence de reprise est distincte de la livraison habituelle :
+
+1. Publier seulement le code Worker validé depuis `main` par le workflow
+   protégé `deploy-production.yml`, avec plan digesté
+   `worker:tobirink-public-api` et `preserveRoutes=true`. Ce plan n'autorise
+   aucune migration, remise à zéro D1, mutation R2 ou changement Queue.
+   Le plan local du 20 septembre s'est arrêté en lecture sur
+   `d1 migrations list` avec `Authentication error [10000]` : ne pas élargir
+   le jeton local pour le contourner. Générer et vérifier le digest dans la
+   gate CI existante avec ses credentials bornés.
+2. Vérifier `/`, `/library`, `/download` et la gateway `/healthz`, puis
+   confirmer dans les logs bornés que les reports de cadence réservent zéro
+   requête fournisseur et ne créent plus de nouveau `FAILED` sans appel HTTP.
+   Contrôler séparément les erreurs réelles MangaUpdates et MangaDex : leur
+   accès depuis cette machine ne prouve pas l'accès depuis Worker/gateway.
+3. Après accord immédiat pour chaque mutation hors CI, lancer deux demandes
+   canari publiques et identifiées à l'avance, une anime via AniList et une
+   manga via la lane MangaUpdates puis, si elle répond réellement sans
+   correspondance, MangaDex. Observer les réponses fournisseur, le passage
+   `PENDING → VERIFIED` et l'écriture canonique D1. Ne pas conclure au succès
+   d'un simple HTTP 200, d'une réponse `PENDING` ou du healthcheck gateway.
+4. Préparer un plan de réarmement séparé pour les seules lignes
+   `FAILED/ATTEMPT_LIMIT` issues de cet incident, avec comptes par média,
+   clauses conditionnelles sur l'état et le digest courants, lots bornés,
+   signal Queue opaque et contrôle après chaque lot. Les 38 baux en cours,
+   les 88 profils vérifiés et les résultats terminaux ne sont pas remis à zéro.
+   Le POST v3 actuel ne réarme pas `FAILED` ; aucun SQL manuel sans plan de
+   reprise testé et accord explicite immédiatement avant son application.
+
+Arrêter la reprise si un canari échoue, si une demande nouvelle ou réarmée
+passe à `FAILED` sans appel fournisseur, si une publication perd un ancien `VERIFIED`, si la gateway
+répond autrement que 200 au healthcheck, ou si le budget D1/Queue dépasse le
+plan. Conserver les profils existants et les archives 1.0.41/1.0.42. Le
+rollback du seul code Worker repasse par un plan de déploiement revu; une
+restauration D1 est une opération séparée et non automatique.
