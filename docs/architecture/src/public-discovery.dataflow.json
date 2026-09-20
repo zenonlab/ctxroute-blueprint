@@ -85,11 +85,11 @@
       "id": "collector",
       "type": "backend",
       "label": "Collecteur Worker",
-      "sublabel": "un claim D1 de 20 par lot",
+      "sublabel": "claim(20) · cadence différée",
       "stage": 3,
       "row": 1,
       "width": 140,
-      "tag": "ack ou retry explicite"
+      "tag": "différé sans essai"
     },
     {
       "id": "transportPort",
@@ -173,7 +173,7 @@
       "from": "queue",
       "to": "collector",
       "label": "lot de signaux disponible",
-      "classification": "un claim(20) · bail D1 idempotent",
+      "classification": "claim(20) · bail D1 conditionnel",
       "variant": "emphasis",
       "route": "straight",
       "labelAt": [638, 480]
@@ -181,8 +181,8 @@
     {
       "from": "collector",
       "to": "transportPort",
-      "label": "requête réservée",
-      "classification": "priorité identité · Retry-After · seuil configurable",
+      "label": "réservation ou report",
+      "classification": "Retry-After · report sans essai",
       "variant": "security",
       "route": "auto",
       "labelAt": [740, 428]

@@ -26,18 +26,20 @@ export class D1ProviderRuntimeControl {
       throw new TypeError('invalid-provider-runtime-reservation');
     }
     const row = await this.database.prepare(`UPDATE public_discovery_provider_runtime SET
-      next_allowed_at = CASE WHEN circuit_open_until > ?2 THEN next_allowed_at
-        ELSE MAX(next_allowed_at, active_until, ?2) + ?3 END,
-      active_until = CASE WHEN circuit_open_until > ?2 THEN active_until
-        ELSE MAX(next_allowed_at, active_until, ?2) + ?4 END,
+      next_allowed_at = MAX(next_allowed_at, active_until, ?2) + ?3,
+      active_until = MAX(next_allowed_at, active_until, ?2) + ?4,
       updated_at = ?5
-      WHERE provider = ?1
-      RETURNING CASE WHEN circuit_open_until > ?2 THEN circuit_open_until
-        ELSE active_until - ?4 END AS notBefore`)
+      WHERE provider = ?1 AND circuit_open_until <= ?2
+        AND MAX(next_allowed_at, active_until, ?2) - ?2 <= ?4
+      RETURNING active_until - ?4 AS notBefore`)
       .bind(provider, now, minimumIntervalMs, this.requestTimeoutMilliseconds, new Date(now).toISOString())
       .first<{ notBefore: number }>();
-    if (!row) throw new Error('provider-runtime-state-missing');
-    return row.notBefore;
+    if (row) return row.notBefore;
+    const deferred = await this.database.prepare(`SELECT MAX(next_allowed_at, active_until, circuit_open_until, ?2) AS notBefore
+      FROM public_discovery_provider_runtime WHERE provider = ?1`)
+      .bind(provider, now).first<{ notBefore: number }>();
+    if (!deferred) throw new Error('provider-runtime-state-missing');
+    return deferred.notBefore;
   }
 
   async recordSuccess(provider: FavoriteProvider, now: number): Promise<void> {

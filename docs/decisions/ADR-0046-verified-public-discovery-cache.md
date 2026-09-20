@@ -89,6 +89,11 @@ Queue retardée de 1 à 900 secondes, même après un claim vide. L’échec de 
 envoi conserve le signal entrant par retry. Le claim ordonne
 les demandes par référence fournisseur exacte, média précis, puis recherche
 ambiguë, avant l’ancienneté et l’empreinte.
+Si la réservation de cadence ou un `429` impose une attente avant tout résultat
+fournisseur, le collecteur libère le bail, remet la demande (ou son refresh)
+à `PENDING` jusqu’à cette échéance et restitue la tentative prise au claim.
+Le pointeur de continuation Queue suit cette échéance. Une panne effective du
+fournisseur reste transitoire et ne devient jamais un `NOT_FOUND` implicite.
 
 Le composant portable de l’ADR-0047 lit les demandes v3 en attente via une source
 injectée. Il route la recherche vers AniList, MangaUpdates, MangaDex, Kitsu
