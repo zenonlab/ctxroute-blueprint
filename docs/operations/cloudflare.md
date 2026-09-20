@@ -942,10 +942,16 @@ Le snapshot distant en lecture seule compte 476 demandes v3 : 88 `VERIFIED`
 2 manhua, 33 manhwa et 114 médias inconnus. Les logs Queue montrent des lots
 `acceptedResults=0`, `providerRequests=0` : une réservation de cadence trop
 éloignée consommait quand même les essais pris au claim. La correction
-versionnée diffère ces claims sans consommer d'essai et ne transforme ni `403`,
+versionnée diffère ces claims sans consommer d’essai et ne transforme ni `403`,
 ni timeout, ni fournisseur indisponible en `NOT_FOUND`.
 
-Avant tout changement de production, conserver l'export D1 complet du
+Une relecture distante effectuée le 20 septembre après ce snapshot confirme
+toujours 476 demandes, sans écriture (`changes=0`, `rows_written=0`) : 371
+`FAILED`, 88 `VERIFIED`, 14 `NOT_FOUND` et 3 `AMBIGUOUS`, sans ligne
+`PROCESSING`. Cette différence d’état est observée seulement ; elle ne vaut
+pas autorisation de réarmer les échecs.
+
+Avant tout changement de production, conserver l’export D1 complet du
 20 septembre sous `build/backups/tobirink-public-pre-discovery-cadence-20260920.sql`
 (ignoré par Git, SHA-256
 `6ff390845441f79ac59f4cef18509d5ea0be9a03e0d96a43caac61c983b1f4b2`,
