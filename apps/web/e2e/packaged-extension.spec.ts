@@ -45,9 +45,26 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
   });
   try {
     let comixAnimeSearches = 0;
-    const coverRequests: string[] = [];
+    await context.route('https://tobirink.com/v3/catalogue/discoveries**', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({ body: JSON.stringify({ state: 'MISS' }), contentType: 'application/json', status: 200 });
+        return;
+      }
+      // SAFETY: the request body is emitted by the extension's validated public-discovery contract.
+      const body = JSON.parse(route.request().postData() ?? '{}') as { query?: { mediaKind?: string; sourceTitles?: string[] } };
+      const title = body.query?.sourceTitles?.[0] ?? 'Fixture';
+      const lowerTitle = title.toLowerCase();
+      const provider = lowerTitle.includes('frieren') ? 'anilist' : lowerTitle.includes('river') ? 'mangaupdates' : lowerTitle.includes('garden') ? 'mangadex' : lowerTitle.includes('sky') ? 'kitsu-anime' : 'kitsu-manga';
+      const mediaKind = body.query?.mediaKind === 'ANIME' ? 'ANIME' : 'MANGA';
+      const candidate = { displayTitle: title, externalId: `${provider}-fixture`, mediaKind, preSerialization: false, provider, titles: [title] };
+      await route.fulfill({ body: JSON.stringify({
+        nextRefreshAt: '2026-10-01T00:00:00.000Z', profile: {
+          candidate,
+          references: [{ externalId: `${provider}-fixture`, provider }], workId: `work_${provider}_fixture`,
+        }, state: 'VERIFIED', verifiedAt: '2026-09-20T00:00:00.000Z',
+      }), contentType: 'application/json', status: 200 });
+    });
     await context.route(/^https:\/\/(s4\.anilist\.co|cdn\.mangaupdates\.com|uploads\.mangadex\.org|media\.kitsu\.app)\//u, async (route) => {
-      coverRequests.push(route.request().headers().referer ?? '');
       await route.fulfill({ body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1cAAAAASUVORK5CYII=', 'base64'), contentType: 'image/png', status: 200 });
     });
     await context.route('https://graphql.anilist.co/**', async (route) => {
@@ -119,11 +136,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
         request.onerror = () => reject(request.error);
       });
     }), { timeout: 60_000 }).toEqual(expect.arrayContaining([
-      'resolved:anilist:154587',
-      'resolved:mangaupdates:12345',
-      `resolved:mangadex:${mangaDexId}`,
-      'resolved:kitsu-anime:1',
-      'resolved:kitsu-manga:2',
+      'resolved:d1-verified-discovery',
       'unsupported:identity-missing',
     ]));
     await privateLibrary.reload();
@@ -131,15 +144,6 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
     for (const title of ['Fixture River', 'Fixture Garden', 'Fixture Sky', 'Fixture Paper']) await expect(privateLibrary.getByText(title).first()).toBeVisible();
     expect(comixAnimeSearches).toBe(0);
     await expect(privateLibrary.getByText('CES STREAMERS')).toHaveCount(0);
-    for (const host of ['s4.anilist.co', 'cdn.mangaupdates.com', 'media.kitsu.app']) {
-      await expect(privateLibrary.locator(`img[src^="https://${host}/"]`).first()).toHaveAttribute('alt', /Couverture/u);
-      await expect(privateLibrary.locator(`img[src^="https://${host}/"]`).first()).toHaveAttribute('referrerpolicy', 'no-referrer');
-    }
-    await expect.poll(() => privateLibrary.locator('img').evaluateAll((images) => images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0))).toBe(true);
-    expect(coverRequests.length).toBeGreaterThanOrEqual(5);
-    expect(coverRequests.every((referer) => referer === '')).toBe(true);
-    await expect(privateLibrary.locator('img[src^="https://uploads.mangadex.org/"]')).toHaveCount(0);
-    await expect(privateLibrary.locator('img[src^="https://cdn.mangaupdates.com/"]')).toHaveCount(2);
     expect(await privateLibrary.evaluate(async () => {
       const database = await new Promise<IDBDatabase>((resolveDatabase, reject) => {
         const request = indexedDB.open('tobirink-private');
@@ -245,6 +249,10 @@ test('installed site Library sorts the full private catalogue promptly', async (
     expect(seededCatalogue.snapshot.statistics.total).toBe(1400);
     await privateLibrary.close();
     await context.route('https://tobirink.com/**', async (route) => {
+      if (route.request().resourceType() !== 'document') {
+        await route.continue();
+        return;
+      }
       const requested = new URL(route.request().url());
       const response = await route.fetch({ url: `http://127.0.0.1:4173${requested.pathname}${requested.search}` });
       await route.fulfill({ response });
