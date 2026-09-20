@@ -1,5 +1,37 @@
 # Extension packaging and rollback
 
+## Candidate corrective 1.0.42 — 20 septembre 2026
+
+La candidate `1.0.42` conserve les archives publiques immuables `1.0.41`.
+Le packager utilise le toolchain CI Node 22/npm verrouillé, prépare les types
+WXT avant chaque build et écrit un manifeste contenant les tailles, SHA-256,
+comptes de fichiers et manifestes Chrome/Firefox. Deux builds isolés doivent
+produire des octets identiques.
+
+La pipeline exécute le build Web, les 9 scénarios Playwright (6 Web et 3
+extension), puis les probes `/`, `/library`, `/download` et gateway
+`/healthz`. La gate R2 recalcule les hashes et tailles depuis les ZIP
+candidats et refuse un artefact absent ou différent du manifeste local. Aucun
+upload ni avancement du pointeur `1.0.42` n'est considéré comme validé avant
+le plan Cloudflare protégé, son digest et la vérification des deux
+téléchargements publics.
+
+Le scénario de tri installé sur 1 400 œuvres exige un passage rapide sous
+500 ms et borne chacun des quatre tris sous 1 s. Cette double limite conserve
+la preuve du chemin rapide sans confondre un pic ponctuel du runner partagé
+avec une régression fonctionnelle.
+
+La publication a ensuite été appliquée par le plan protégé `772a71e296835afa9e8aeac3fd4197c723cec09d7de41e8798f97df35f79401b`.
+Le Worker `b25b2c41-081e-47ac-807c-f03d01eeab76` sert désormais le pointeur
+1.0.42. Les téléchargements publics ont été comparés aux candidats locaux :
+Chrome `54f7a3d57c752e909d7c342a15951ac96c84619bac497cc4575f0c2c140b674a`
+(300221 octets) et Firefox
+`061965f3ecfb0316751297602622b00ff4e1f55b017c73dd05272e22c6dfbe4e`
+(300262 octets). Les hashes historiques Chrome
+`b651485195278f861b36f8f0ac19dd51ec9d58f6e0695afb9f46df0f0f53c456` et
+Firefox `adacd904d2e9fa3f4fa87fe7df75077894833be8e8f50aec880cb285e840dfe9`
+de 1.0.41 restent inchangés.
+
 ## Livraison autonome contrôlée — 19 septembre 2026
 
 GitHub déclenche la livraison Cloudflare sur `main` après `npm run verify`.
@@ -1136,3 +1168,21 @@ If the candidate is rejected, restore the retained FavLib site/Worker and
 previous download artifact through the same manual process. Do not migrate,
 delete, convert or otherwise touch the new TobiRink IndexedDB database. Record
 both artifact hashes, the restored version and the reason before resuming work.
+## Chaîne de livraison autonome — audit du 19 septembre 2026
+
+Les changements fusionnés dans `main` déclenchent le workflow de production.
+`verify` est obligatoire avant tout plan ou apply Cloudflare. Le plan est
+temporaire, signé par son digest, borné à `worker:tobirink-public-api` et
+conserve les routes existantes. Les probes finales contrôlent le site principal,
+`/library` et `https://tobirink-provider-gateway.tobirink.deno.net/healthz` en
+n’exposant que les statuts HTTP et identifiants de corrélation.
+
+Le déploiement Deno reste celui de l’application GitHub App déjà liée au dépôt
+et à `apps/provider-gateway`; aucune action GitHub concurrente n’est ajoutée.
+La preuve exploitable est le commit `main`, le run de l’application Deno et la
+réponse publique `/healthz`. L’absence de journal Deno accessible depuis le
+dépôt ne doit pas être compensée par un token ou un nouveau workflow.
+
+D1, R2, Queues et toute rotation de secrets restent des opérations séparées,
+explicitement planifiées et protégées. Le workflow de livraison standard ne
+les modifie pas.

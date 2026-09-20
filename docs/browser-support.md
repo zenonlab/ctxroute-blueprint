@@ -26,6 +26,9 @@ components do not branch on a browser name.
 
 - `npm run build:extension` and `npm run build:extension:firefox` generate all
   six declared entrypoints for both targets.
+- CI installs the pinned Playwright Chromium and runs the complete
+  nine-scenario browser suite: six Web scenarios plus three packaged-extension
+  scenarios.
 - `npm run test:security` validates both generated manifests, their extension
   CSP, exact origin allowlist and Firefox metadata.
 - The extension suite passes its Vitest integration, contract and vertical-flow
