@@ -133,7 +133,7 @@ describe('HttpPublicReleaseLoader', () => {
     ];
     const cache = { load: async () => undefined, save: vi.fn() };
     const fetcher = vi.fn(async (_input: RequestInfo | URL) => responses.shift()!);
-    const result = await new HttpPublicReleaseLoader('https://tobirink.com', fetcher).load(cache, { from: '2026-09-01', to: '2026-10-01' });
+    const result = await new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, { from: '2026-09-01', to: '2026-10-01' });
     expect(result.snapshot.events).toHaveLength(2);
     expect(fetcher.mock.calls[1]?.[0].toString()).toContain('cursor=work-1');
     expect(cache.save).toHaveBeenCalledTimes(1);
@@ -145,14 +145,14 @@ describe('HttpPublicReleaseLoader', () => {
     const first = Response.json({ models: [releaseModel('work-1', 'anilist-episode-42-1', '2026-09-13T00:00:00.000Z')], generatedAt: '2026-09-12T00:00:00.000Z', nextCursor: 'work-1', revision: 'models-1-2', window: sourceWindow }, { headers: { ETag: '"release-models-1-window"' } });
     const cache = { load: async () => undefined, save: vi.fn() };
     const fetcher = vi.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(new Response(null, { status: 503 }));
-    await expect(new HttpPublicReleaseLoader('https://tobirink.com', fetcher).load(cache, { from: '2026-09-01', to: '2026-10-01' })).rejects.toThrow('public-release-http-503');
+    await expect(new HttpPublicReleaseLoader('https://tobirink.com', fetcher, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, { from: '2026-09-01', to: '2026-10-01' })).rejects.toThrow('public-release-http-503');
     expect(cache.save).not.toHaveBeenCalled();
   });
 
   it('does not replace the active generation with an empty shared result', async () => {
     const response = Response.json({ models: [], generatedAt: '2026-09-12T00:00:00.000Z', revision: 'models-0-0', window: sourceWindow }, { headers: { ETag: '"release-models-empty-window"' } });
     const cache = { load: async () => undefined, save: vi.fn() };
-    await expect(new HttpPublicReleaseLoader('https://tobirink.com', async () => response).load(cache, { from: '2026-09-01', to: '2026-10-01' })).rejects.toThrow('public-release-generation-empty');
+    await expect(new HttpPublicReleaseLoader('https://tobirink.com', async () => response, () => Date.parse('2026-09-12T01:00:00.000Z')).load(cache, { from: '2026-09-01', to: '2026-10-01' })).rejects.toThrow('public-release-generation-empty');
     expect(cache.save).not.toHaveBeenCalled();
   });
 
