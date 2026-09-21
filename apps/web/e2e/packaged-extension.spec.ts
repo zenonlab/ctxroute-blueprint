@@ -261,30 +261,26 @@ test('installed site Library sorts the full private catalogue promptly', async (
     });
     let site = await context.newPage();
     const firstLoadStartedAt = Date.now();
-    await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
-    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 30_000 });
-    const firstLoadMs = Date.now() - firstLoadStartedAt;
-    const bridgeTimings: number[] = [];
-    const renderedTimings: number[] = [];
     let sortSelect = site.getByLabel('Tri');
-    // A shared runner can expose the static shell before the content script
-    // attaches. Recreate the document a bounded number of times so this gate
-    // proves the installed extension bridge rather than a timing accident.
+    // The public shell and the extension bridge can attach in separate turns
+    // on the shared runner. Retry the complete mount, including the initial
+    // main surface, so a partial document cannot consume all later retries.
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
+        await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
+        await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 30_000 });
         await expect(sortSelect).toBeVisible({ timeout: 8_000 });
         break;
       } catch (caught) {
         if (attempt === 4) throw caught;
-        const retry = site.getByRole('button', { name: 'Réessayer' });
-        if (await retry.isVisible({ timeout: 500 }).catch(() => false)) await retry.click();
         await site.close();
         site = await context.newPage();
-        await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
-        await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 30_000 });
         sortSelect = site.getByLabel('Tri');
       }
     }
+    const firstLoadMs = Date.now() - firstLoadStartedAt;
+    const bridgeTimings: number[] = [];
+    const renderedTimings: number[] = [];
     let currentSort = await sortSelect.evaluate((element) => {
       // SAFETY: the accessible label targets the native sort <select> control.
       return element instanceof HTMLSelectElement ? element.value : '';
