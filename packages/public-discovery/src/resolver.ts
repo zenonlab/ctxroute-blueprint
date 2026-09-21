@@ -85,9 +85,14 @@ async function searchProvider(
 
 function isTransientProviderError(error: Error): boolean {
   if (error instanceof FavoriteProviderRetryError) return true;
-  if (error instanceof FavoriteProviderHttpError) return [403, 404, 408, 425, 429, 500, 502, 503, 504].includes(error.status);
+  if (error instanceof FavoriteProviderHttpError) return [403, 404, 405, 408, 425, 429, 500, 502, 503, 504].includes(error.status);
   if (!(error instanceof Error)) return false;
-  return /(?:abort|fetch failed|incomplete provider page|network|tim(?:e|ed out)|HTTP (?:403|404|408|425|429|500|502|503|504)\b)/iu.test(`${error.name}: ${error.message}`);
+  return /(?:abort|fetch failed|incomplete provider page|network|tim(?:e|ed out)|HTTP (?:403|404|405|408|425|429|500|502|503|504)\b)/iu.test(`${error.name}: ${error.message}`);
+}
+
+function retryableProviderError(error: Error): FavoriteProviderRetryError {
+  if (error instanceof FavoriteProviderRetryError) return error;
+  return new FavoriteProviderRetryError(error.message, Date.now() + 60_000);
 }
 
 async function searchLane(
@@ -127,7 +132,7 @@ async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, re
           await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }),
         ];
   const unavailable = lanes.find((lane) => lane.unavailable !== undefined)?.unavailable;
-  if (unavailable !== undefined) throw unavailable;
+  if (unavailable !== undefined) throw retryableProviderError(unavailable);
   return lanes;
 }
 
@@ -232,7 +237,7 @@ async function hydrateWithTransientFallback(
         lastUnavailable = fallbackError;
       }
     }
-    throw lastUnavailable;
+    throw retryableProviderError(lastUnavailable);
   }
 }
 
