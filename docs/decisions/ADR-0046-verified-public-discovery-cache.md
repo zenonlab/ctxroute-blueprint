@@ -84,6 +84,10 @@ lieu d’écraser le travail existant.
 
 Le consumer reçoit jusqu’à vingt signaux à la fois mais exécute un seul
 `claim(20)` par lot; chaque résultat vérifié est publié dès sa disponibilité.
+Chaque résolution possède aussi une deadline applicative de trente secondes :
+si un transport amont ou une opération d’infrastructure reste suspendu, le
+claim est différé comme une erreur fournisseur retryable au lieu de rester
+`PROCESSING` jusqu’à l’expiration du bail de quinze minutes.
 Après le lot, une lecture des demandes restantes conserve une continuation
 Queue retardée de 1 à 900 secondes, même après un claim vide. L’échec de cet
 envoi conserve le signal entrant par retry. Le claim ordonne
