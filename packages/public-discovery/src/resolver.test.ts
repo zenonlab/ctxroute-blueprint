@@ -129,6 +129,19 @@ describe('standalone provider resolver', () => {
     expect(ports.mangadex.search).not.toHaveBeenCalled();
   });
 
+  it('falls back to Kitsu when a matched MangaUpdates identity cannot be hydrated transiently', async () => {
+    const ports = providers({
+      mangaupdates: candidate('mangaupdates', 'MANGA', '12345', 'Target'),
+      'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target'),
+    });
+    ports.mangaupdates.hydrate.mockRejectedValueOnce(new Error('HTTP 503'));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({
+      profile: { candidate: { provider: 'kitsu-manga', externalId: '84' } }, state: 'VERIFIED',
+    });
+    expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
+    expect(ports['kitsu-manga'].hydrate).toHaveBeenCalledOnce();
+  });
+
   it('does not publish one UNKNOWN lane while the other lane is unavailable', async () => {
     const ports = providers({ anilist: candidate('anilist', 'ANIME', '1', 'Target') });
     ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 429'));
