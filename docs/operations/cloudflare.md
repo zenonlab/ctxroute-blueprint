@@ -605,9 +605,14 @@ a page checkpoint, `not_before`, and its last valid snapshot.
 AniList is paced at one HTTP request every three seconds and MangaUpdates at
 one every six seconds. Count quota consumption in HTTP requests, including
 every pagination request. A `Retry-After` response becomes the per-message
-Queue retry delay, capped at twenty-four hours. A partial provider failure must
-leave its active snapshot and the currently served generation untouched while
-allowing a changed successful lane to merge with that snapshot.
+Queue retry delay, capped at twenty-four hours. Discovery search errors
+classified as transient (403, 404, 429, 5xx, timeouts or incomplete pages)
+advance to the next provider in the same media lane; only when every
+applicable provider fails does the request return to `PENDING`. An `UNKNOWN`
+request waits for both media lanes and never publishes one lane while the other
+is unavailable. A partial provider failure must leave its active snapshot and
+the currently served generation untouched while allowing a changed successful
+lane to merge with that snapshot.
 
 The semantic generation digest excludes collection timestamps and expirations.
 Migration `0021_agenda_active_projection.sql` backfills the indexed
@@ -984,6 +989,11 @@ La séquence de reprise est distincte de la livraison habituelle :
    Lire ensuite ces seules clés jusqu'à un résultat terminal ou dix minutes,
    sans resoumettre et sans réarmer les 371 échecs. Les éventuelles lignes
    canari restent dans D1; leur suppression n'est pas un rollback automatique.
+   Le canari du 21 septembre a confirmé `Cowboy Bebop → VERIFIED` via AniList.
+   `One Piece` a rencontré une panne MangaUpdates : son compteur runtime a
+   augmenté, tandis que MangaDex n'avait encore aucun appel observé et la clé
+   est restée `PENDING` avec backoff. Ce signal a motivé le fallback applicatif
+   désormais testé ; il ne justifie pas le réarmement des 371 anciennes lignes.
 4. Préparer un plan de réarmement séparé pour les seules lignes
    `FAILED/ATTEMPT_LIMIT` issues de cet incident, avec comptes par média,
    clauses conditionnelles sur l'état et le digest courants, lots bornés,

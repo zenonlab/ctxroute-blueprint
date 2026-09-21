@@ -1,12 +1,12 @@
 import { publicDiscoveryCandidateSchema } from './contracts.js';
 import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoveryTerminalResolution } from './contracts.js';
-import { inspectFavoriteTitleCandidates } from './provider-kit.js';
+import { FavoriteProviderRetryError, inspectFavoriteTitleCandidates } from './provider-kit.js';
 import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit.js';
 import { AniListFavoriteProviderAdapter } from './providers/anilist.js';
 import { KitsuFavoriteProviderAdapter } from './providers/kitsu.js';
 import { MangaDexFavoriteProviderAdapter } from './providers/mangadex.js';
 import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates.js';
-import { FavoriteProviderRateGate } from './provider-http.js';
+import { FavoriteProviderHttpError, FavoriteProviderRateGate } from './provider-http.js';
 import type { FavoriteProviderFetch, FavoriteProviderRuntimeControlPort } from './provider-http.js';
 
 export type PublicDiscoveryProviderPorts = Readonly<Record<ResolutionProvider, FavoriteProviderPort>>;
@@ -28,6 +28,7 @@ interface LaneDecision {
   readonly candidates: readonly ProviderCandidate[];
   readonly references: readonly PublicDiscoveryReferenceV3[];
   readonly state: 'MATCH' | 'AMBIGUOUS' | 'NOT_FOUND';
+  readonly unavailable?: Error;
 }
 interface MutableTitleMatchQuery {
   mediaKind?: ProviderCandidate['mediaKind'];
@@ -82,6 +83,13 @@ async function searchProvider(
   return final;
 }
 
+function isTransientProviderError(error: Error): boolean {
+  if (error instanceof FavoriteProviderRetryError) return true;
+  if (error instanceof FavoriteProviderHttpError) return [403, 404, 408, 425, 429, 500, 502, 503, 504].includes(error.status);
+  if (!(error instanceof Error)) return false;
+  return /(?:abort|fetch failed|incomplete provider page|network|tim(?:e|ed out)|HTTP (?:403|404|408|425|429|500|502|503|504)\b)/iu.test(`${error.name}: ${error.message}`);
+}
+
 async function searchLane(
   providers: PublicDiscoveryProviderPorts,
   order: readonly ResolutionProvider[],
@@ -89,23 +97,38 @@ async function searchLane(
   query: FavoriteTitleMatchQuery,
 ): Promise<LaneDecision> {
   const inspected: ProviderCandidate[] = [];
+  let unavailable: Error | undefined;
   for (const provider of order) {
-    const result = await searchProvider(provider, providers[provider], titles, query);
+    let result: LaneDecision;
+    try {
+      result = await searchProvider(provider, providers[provider], titles, query);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+      if (!isTransientProviderError(error)) throw error;
+      unavailable = error;
+      continue;
+    }
     inspected.push(...result.candidates);
     if (result.state !== 'NOT_FOUND') return { ...result, candidates: inspected };
   }
-  return { candidates: inspected, references: [], state: 'NOT_FOUND' };
+  const result: LaneDecision = { candidates: inspected, references: [], state: 'NOT_FOUND' };
+  return unavailable === undefined ? result : { ...result, unavailable };
 }
 
 async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, request: PublicDiscoveryClaimedRequest): Promise<readonly LaneDecision[]> {
   const titles = request.query.discoveryTitles.slice(0, 4);
   const query = matchQueryFor(request, titles);
-  if (request.query.mediaKind === 'ANIME') return [await searchLane(providers, animeProviders, titles, query)];
-  if (request.query.mediaKind !== 'UNKNOWN') return [await searchLane(providers, mangaProviders, titles, query)];
-  return [
-    await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }),
-    await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }),
-  ];
+  const lanes = request.query.mediaKind === 'ANIME'
+    ? [await searchLane(providers, animeProviders, titles, query)]
+    : request.query.mediaKind !== 'UNKNOWN'
+      ? [await searchLane(providers, mangaProviders, titles, query)]
+      : [
+          await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }),
+          await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }),
+        ];
+  const unavailable = lanes.find((lane) => lane.unavailable !== undefined)?.unavailable;
+  if (unavailable !== undefined) throw unavailable;
+  return lanes;
 }
 
 type SelectedMatch =

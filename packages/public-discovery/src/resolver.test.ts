@@ -95,11 +95,19 @@ describe('standalone provider resolver', () => {
     });
   });
 
-  it.each(['HTTP 403', 'HTTP 429', 'TimeoutError', 'incomplete provider page'])('keeps %s retryable without entering fallback', async (failure) => {
+  it.each(['HTTP 403', 'HTTP 429', 'TimeoutError', 'incomplete provider page'])('falls back after a transient %s', async (failure) => {
     const ports = providers({ 'kitsu-anime': candidate('kitsu-anime', 'ANIME', '42', 'Target') });
     ports.anilist.search.mockRejectedValueOnce(new Error(failure));
-    await expect(createPublicDiscoveryResolver(ports).resolve(request('ANIME'))).rejects.toThrow(failure);
-    expect(ports['kitsu-anime'].search).not.toHaveBeenCalled();
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('ANIME'))).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { provider: 'kitsu-anime' } } });
+    expect(ports['kitsu-anime'].search).toHaveBeenCalledOnce();
+  });
+
+  it('falls back from MangaUpdates to MangaDex after a transient failure', async () => {
+    const ports = providers({ mangadex: candidate('mangadex', 'MANGA', 'md-1', 'Target') });
+    ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 429'));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { provider: 'mangadex' } } });
+    expect(ports.mangadex.search).toHaveBeenCalledOnce();
+    expect(ports['kitsu-manga'].search).not.toHaveBeenCalled();
   });
 
   it('does not publish an explicit identity when hydration returns another reference', async () => {
