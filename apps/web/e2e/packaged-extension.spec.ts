@@ -247,7 +247,9 @@ test('installed site Library sorts the full private catalogue promptly', async (
     }));
     expect(seededCounts).toEqual({ artifacts: 1400, sources: 1532 });
     expect(seededCatalogue.snapshot.statistics.total).toBe(1400);
-    await privateLibrary.close();
+    // Keep one extension page alive while the public site attaches. This
+    // prevents Chromium from suspending the MV3 worker between surfaces on
+    // the shared runner and keeps the bridge mount deterministic.
     await context.route('https://tobirink.com/**', async (route) => {
       if (route.request().resourceType() !== 'document') {
         await route.continue();
