@@ -217,19 +217,35 @@ async function runWebBuild({ workerDirectory }) {
   });
 }
 
-async function fingerprintWorkerInputs({ workerDirectory }) {
+export async function fingerprintWorkerInputs({ workerDirectory }) {
   const roots = [resolve(workerDirectory, 'wrangler.jsonc'), resolve(workerDirectory, 'src'), resolve(workerDirectory, '../web/out')];
+  const buildIds = await generatedBuildIds(resolve(workerDirectory, '../web/out'));
   const files = [];
   for (const root of roots) await collectFiles(root, files);
   files.sort((left, right) => left.localeCompare(right));
   const hash = createHash('sha256');
   for (const file of files) {
-    hash.update(file.slice(workerDirectory.length + 1));
+    hash.update(normalizeGeneratedValue(file.slice(workerDirectory.length + 1), buildIds));
     hash.update('\0');
-    hash.update(await readFile(file));
+    hash.update(normalizeGeneratedContent(await readFile(file), buildIds));
     hash.update('\0');
   }
   return hash.digest('hex');
+}
+
+async function generatedBuildIds(outputDirectory) {
+  const staticDirectory = resolve(outputDirectory, '_next/static');
+  const entries = await readdir(staticDirectory, { withFileTypes: true });
+  return entries.filter(entry => entry.isDirectory() && entry.name !== 'chunks' && entry.name !== 'media').map(entry => entry.name);
+}
+
+function normalizeGeneratedValue(value, buildIds) {
+  return buildIds.reduce((current, buildId) => current.replaceAll(buildId, '<next-build-id>'), value);
+}
+
+function normalizeGeneratedContent(content, buildIds) {
+  if (buildIds.length === 0 || content.includes(0)) return content;
+  return Buffer.from(normalizeGeneratedValue(content.toString('utf8'), buildIds));
 }
 
 async function collectFiles(path, files) {
