@@ -17,7 +17,7 @@
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "Une archive installée vérifie l’émission après prélecture lente; les canaries contrôlent admission et preuve sans contenu privé."
+        "note": "L’archive publiée teste la frontière extension→API en lecture seule; les canaries contrôlent admission et preuve sans contenu privé."
       },
       {
         "id": "verified-refresh",
