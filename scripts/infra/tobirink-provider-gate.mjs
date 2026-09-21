@@ -37,8 +37,11 @@ export async function runProviderGate(argv, { cwd = process.cwd(), stdout = cons
     const accountId = required(values.account, '--account');
     const operations = list(values.operation, '--operation');
     const actions = driver.resolveOperations(operations);
-    const inspection = await driver.inspect(accountId);
     const preview = await driver.preview(actions);
+    // A provider dry-run can materialize or refresh deployment metadata. Capture
+    // the inspection after preview so apply verifies the state that the plan
+    // actually saw, while retaining the fresh-state guard before mutation.
+    const inspection = await driver.inspect(accountId);
     const plan = createOperationPlan({
       driverId: driver.id,
       accountId,
