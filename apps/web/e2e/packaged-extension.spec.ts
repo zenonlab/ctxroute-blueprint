@@ -191,7 +191,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
 });
 
 test('installed site Library sorts the full private catalogue promptly', async () => {
-  test.setTimeout(180_000);
+  test.setTimeout(90_000);
   const repository = resolve(import.meta.dirname, '../../..');
   const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
   const archive = process.env.TOBIRINK_TEST_ARCHIVE ?? resolve(repository, `apps/extension/.output/packages/tobirink-chrome-mv3-${version}.zip`);
@@ -260,12 +260,12 @@ test('installed site Library sorts the full private catalogue promptly', async (
     const site = await context.newPage();
     const firstLoadStartedAt = Date.now();
     await site.goto('https://tobirink.com/library');
-    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 60_000 });
-    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24, { timeout: 60_000 });
+    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
+    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24);
     const firstLoadMs = Date.now() - firstLoadStartedAt;
     const bridgeTimings: number[] = [];
     const renderedTimings: number[] = [];
-    for (const sort of ['TITLE_ASC', 'TITLE_DESC'] as const) {
+    for (const sort of ['TITLE_ASC', 'TITLE_DESC', 'ADDED_DESC', 'TITLE_ASC'] as const) {
       const startedAt = Date.now();
       const measuredResponse = site.evaluate((expectedSort) => new Promise<{ elapsedMs: number; firstTitle: string }>((resolveResponse) => {
         const startedAt = performance.now();
@@ -284,14 +284,30 @@ test('installed site Library sorts the full private catalogue promptly', async (
       renderedTimings.push(Date.now() - startedAt);
     }
     process.stdout.write(`Installed site Library: first load ${firstLoadMs} ms; bridge sorts ${bridgeTimings.map((value) => value.toFixed(1)).join(', ')} ms; rendered sorts ${renderedTimings.join(', ')} ms.\n`);
-    // A shared CI host may briefly stall Chromium. Keep one path below 5 s
-    // while retaining a bounded 60-second safety ceiling below the test timeout.
-    expect(Math.min(...renderedTimings)).toBeLessThan(5_000);
-    expect(Math.max(...renderedTimings)).toBeLessThan(60_000);
+    // A shared CI host may briefly stall Chromium. Keep one path below 1.5 s
+    // while retaining a bounded 15-second budget for every bridge interaction.
+    expect(Math.min(...renderedTimings)).toBeLessThan(1_500);
+    expect(Math.max(...renderedTimings)).toBeLessThan(15_000);
     const devtools = await context.browser()!.newBrowserCDPSession();
     const targets = await devtools.send('Target.getTargets');
     const workerTarget = targets.targetInfos.find((entry) => entry.type === 'service_worker' && entry.url === worker.url());
     expect(workerTarget).toBeDefined();
+    await devtools.send('Target.closeTarget', { targetId: workerTarget!.targetId });
+    const coldStartedAt = Date.now();
+    const coldResponse = site.evaluate(() => new Promise<void>((resolveResponse) => {
+      const onMessage = (event: MessageEvent) => {
+        if (event.data?.type !== 'tobirink.webbridge.response' || event.data.response?.value?.query?.sort !== 'TITLE_DESC') return;
+        window.removeEventListener('message', onMessage);
+        resolveResponse();
+      };
+      window.addEventListener('message', onMessage);
+    }));
+    await site.getByLabel('Tri').selectOption('TITLE_DESC');
+    await coldResponse;
+    await expect(site.locator('a[data-variant="library"]').first()).toContainText('Synthetic 1399');
+    const workerRestartMs = Date.now() - coldStartedAt;
+    process.stdout.write(`Installed site Library: worker restart sort ${workerRestartMs} ms.\n`);
+    expect(workerRestartMs).toBeLessThan(5_000);
     await devtools.detach();
     await site.close();
   } finally {
