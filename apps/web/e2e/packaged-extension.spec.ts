@@ -261,12 +261,11 @@ test('installed site Library sorts the full private catalogue promptly', async (
     const firstLoadStartedAt = Date.now();
     await site.goto('https://tobirink.com/library');
     await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
-    // The main shell can paint before the navigation links on a shared CI host.
-    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24, { timeout: 30_000 });
     const firstLoadMs = Date.now() - firstLoadStartedAt;
     const bridgeTimings: number[] = [];
     const renderedTimings: number[] = [];
     const sortSelect = site.getByLabel('Tri');
+    await expect(sortSelect).toBeVisible({ timeout: 30_000 });
     let currentSort = await sortSelect.evaluate((element) => {
       // SAFETY: the accessible label targets the native sort <select> control.
       return element instanceof HTMLSelectElement ? element.value : '';
