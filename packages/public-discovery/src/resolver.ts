@@ -95,6 +95,10 @@ function retryableProviderError(error: Error): FavoriteProviderRetryError {
   return new FavoriteProviderRetryError(error.message, Date.now() + 60_000);
 }
 
+function isProviderInvariantError(error: Error): boolean {
+  return /(?:provider-envelope-mismatch|provider-matching-decision-missing|hydrated-identity-mismatch)/u.test(error.message);
+}
+
 async function searchLane(
   providers: PublicDiscoveryProviderPorts,
   order: readonly ResolutionProvider[],
@@ -109,7 +113,7 @@ async function searchLane(
       result = await searchProvider(provider, providers[provider], titles, query);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
-      if (!isTransientProviderError(error)) throw error;
+      if (isProviderInvariantError(error)) throw error;
       unavailable = error;
       continue;
     }
@@ -208,7 +212,7 @@ async function hydrateWithTransientFallback(
   try {
     return await hydrateReference(providers, reference, 'matched-provider-identity-not-found', searched);
   } catch (error) {
-    if (!(error instanceof Error) || !isTransientProviderError(error)) throw error;
+    if (!(error instanceof Error) || isProviderInvariantError(error)) throw error;
     const order = providerOrderFor(request);
     const start = Math.max(0, order.indexOf(reference.provider) + 1);
     let lastUnavailable: Error = error;
@@ -233,7 +237,7 @@ async function hydrateWithTransientFallback(
       try {
         return await hydrateReference(providers, fallbackReference, 'matched-provider-identity-not-found', fallbackCandidate);
       } catch (fallbackError) {
-        if (!(fallbackError instanceof Error) || !isTransientProviderError(fallbackError)) throw fallbackError;
+        if (!(fallbackError instanceof Error) || isProviderInvariantError(fallbackError)) throw fallbackError;
         lastUnavailable = fallbackError;
       }
     }
