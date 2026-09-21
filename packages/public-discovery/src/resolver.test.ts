@@ -142,6 +142,25 @@ describe('standalone provider resolver', () => {
     expect(ports['kitsu-manga'].hydrate).toHaveBeenCalledOnce();
   });
 
+  it('falls back from MangaUpdates to Kitsu after a method failure', async () => {
+    const ports = providers({ 'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target') });
+    ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 405'));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({
+      state: 'VERIFIED', profile: { candidate: { provider: 'kitsu-manga', externalId: '84' } },
+    });
+    expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
+  });
+
+  it('returns a retryable error when every manga search lane is unavailable', async () => {
+    const ports = providers();
+    ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 503'));
+    ports.mangadex.search.mockRejectedValueOnce(new Error('HTTP 429'));
+    ports['kitsu-manga'].search.mockRejectedValueOnce(new Error('TimeoutError'));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).rejects.toMatchObject({
+      message: 'TimeoutError', retryAt: expect.any(Number),
+    });
+  });
+
   it('does not publish one UNKNOWN lane while the other lane is unavailable', async () => {
     const ports = providers({ anilist: candidate('anilist', 'ANIME', '1', 'Target') });
     ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 429'));
