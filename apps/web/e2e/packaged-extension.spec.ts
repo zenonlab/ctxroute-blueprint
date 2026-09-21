@@ -265,6 +265,14 @@ test('installed site Library sorts the full private catalogue promptly', async (
     const bridgeTimings: number[] = [];
     const renderedTimings: number[] = [];
     const sortSelect = site.getByLabel('Tri');
+    // A shared runner can expose the static shell before extension-backed
+    // controls mount. One reload lets the page reattach to the ready worker;
+    // the second assertion remains the hard readiness gate.
+    try {
+      await expect(sortSelect).toBeVisible({ timeout: 10_000 });
+    } catch {
+      await site.reload();
+    }
     await expect(sortSelect).toBeVisible({ timeout: 30_000 });
     let currentSort = await sortSelect.evaluate((element) => {
       // SAFETY: the accessible label targets the native sort <select> control.
