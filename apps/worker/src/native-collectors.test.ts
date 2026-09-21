@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, handleNativeCollectorQueue, type NativeCollectorSignal } from './native-collectors';
+import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, handleNativeCollectorQueue, resolveWithDeadline, type NativeCollectorSignal } from './native-collectors';
 
 function message(body: NativeCollectorSignal | null, attempts = 1) {
   return { ack: vi.fn(), attempts, body, retry: vi.fn() };
@@ -100,5 +100,10 @@ describe('native collector queue', () => {
   it('keeps paginated pages distinct from provider HTTP requests', () => {
     expect(collectorCost({ rowsRead: 0, rowsWritten: 0 }, { anilist: 3, kitsu: 0, mangadex: 0, mangaupdates: 0 }, 2, 'changed', 2))
       .toMatchObject({ pagesRequested: 2, providerRequests: 3, provider: 'anilist' });
+  });
+
+  it('turns a hung discovery resolution into a retryable provider delay', async () => {
+    await expect(resolveWithDeadline(new Promise<never>(() => undefined), 1))
+      .rejects.toMatchObject({ name: 'Error', retryAt: expect.any(Number) });
   });
 });

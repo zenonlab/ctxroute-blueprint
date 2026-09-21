@@ -4,6 +4,7 @@ import {
   MangaUpdatesAgendaCollector,
   PublicAgendaProviderError,
   bindProviderTransport,
+  FavoriteProviderRetryError,
   createPublicDiscoveryProviders,
   createPublicDiscoveryResolver,
   runPublicDiscoveryBatch,
@@ -90,6 +91,7 @@ class PublicDiscoveryProcessingError extends Error {
 
 type NativeCollectorDisposition = 'ack-invalid' | 'ack-success' | 'retry' | 'retry-to-dlq';
 const nativeCollectorMaxRetryRequests = 8;
+const publicDiscoveryResolutionTimeoutMilliseconds = 30_000;
 
 interface NativeCollectorDiagnostic {
   readonly attempt: number;
@@ -103,6 +105,21 @@ function emitNativeCollectorDiagnostic(diagnostic: NativeCollectorDiagnostic): v
   const entry = JSON.stringify({ schemaVersion: 1, type: 'native-collector.queue', ...diagnostic });
   if (diagnostic.disposition === 'ack-success') console.log(entry);
   else console.warn(entry);
+}
+
+export async function resolveWithDeadline<TValue>(operation: Promise<TValue>, timeoutMilliseconds: number): Promise<TValue> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<TValue>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new FavoriteProviderRetryError(
+      'Public discovery resolution exceeded its bounded execution window.',
+      Date.now() + 60_000,
+    )), timeoutMilliseconds);
+  });
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
 }
 
 function randomToken(): string {
@@ -189,7 +206,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     now: () => new Date().toISOString(),
     resolver: {
       resolve: async (request) => {
-        try { return await resolver.resolve(request); }
+        try { return await resolveWithDeadline(resolver.resolve(request), publicDiscoveryResolutionTimeoutMilliseconds); }
         catch (error) {
           console.warn('public-discovery-provider-failed', providerFailureCode(error instanceof Error ? error : undefined));
           throw error;
