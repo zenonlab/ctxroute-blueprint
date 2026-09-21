@@ -108,11 +108,11 @@ afterEach(() => {
 });
 
 describe('WebBridgeProvider', () => {
-  it('reports a missing extension after the 1.5 second detection bound', async () => {
+  it('reports a missing extension after the five-second detection bound', async () => {
     vi.useFakeTimers();
     render(<WebBridgeProvider><Probe /></WebBridgeProvider>);
     expect(screen.getByTestId('bridge-status').textContent).toBe('loading:-');
-    await act(async () => vi.advanceTimersByTimeAsync(1_501));
+    await act(async () => vi.advanceTimersByTimeAsync(5_001));
     expect(screen.getByTestId('bridge-status').textContent).toBe('extension-missing:-');
   });
 
