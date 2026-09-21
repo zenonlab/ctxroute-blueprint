@@ -2,6 +2,8 @@
 scope:
   - .github/workflows/deploy-production.yml
   - apps/provider-gateway/deno.jsonc
+  - scripts/infra/cloudflare-driver.mjs
+  - scripts/infra/cloudflare-driver.test.mjs
   - docs/operations/cloudflare.md
   - docs/architecture/src/production-surface.architecture.json
   - docs/architecture/src/production-publication.dataflow.json
@@ -40,6 +42,13 @@ reçoit une configuration temporaire sans déclaration `routes`, ce qui publie l
 nouvelle version et ses déclencheurs sans appeler l’API de routes de zone. La
 route `tobirink.com/*` existante reste donc inchangée; cette option ne peut pas
 être ajoutée après la création du plan sans invalider son digest.
+
+La preuve `sourceDigest` du plan est calculée sur les entrées réellement livrées
+au Worker. Les identifiants de build générés par Next sont remplacés par une
+valeur canonique, y compris lorsqu’ils apparaissent dans les métadonnées
+`buildId` des sorties HTML/textuelles. Une sortie strictement différente reste
+donc détectée, tandis qu’un rebuild équivalent ne déclenche pas à tort
+`operation-preview-changed`.
 
 Les secrets `CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID` sont des secrets
 d’environnement GitHub. `PROVIDER_GATEWAY_HMAC_KEY` reste un secret runtime

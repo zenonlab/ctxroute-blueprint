@@ -116,12 +116,12 @@ async function test_worker_fingerprint_normalizes_next_build_ids_only() {
     await writeFile(resolve(workerDirectory, 'wrangler.jsonc'), '{}');
     await writeFile(resolve(workerDirectory, 'src/index.ts'), 'export default {}');
     await writeFile(resolve(outputDirectory, 'index.html'), '/_next/static/first-build-id/app.js first-build-id');
-    await writeFile(resolve(outputDirectory, '_next/static/first-build-id/app.js'), 'first-build-id');
+    await writeFile(resolve(outputDirectory, '_next/static/first-build-id/app.js'), '{"buildId":"first-build-id"}');
     const first = await fingerprintWorkerInputs({ workerDirectory });
     await rm(resolve(outputDirectory, '_next/static/first-build-id'), { recursive: true });
     await mkdir(resolve(outputDirectory, '_next/static/second-build-id'), { recursive: true });
     await writeFile(resolve(outputDirectory, 'index.html'), '/_next/static/second-build-id/app.js second-build-id');
-    await writeFile(resolve(outputDirectory, '_next/static/second-build-id/app.js'), 'second-build-id');
+    await writeFile(resolve(outputDirectory, '_next/static/second-build-id/app.js'), '{"buildId":"second-build-id"}');
     const second = await fingerprintWorkerInputs({ workerDirectory });
     assert.equal(first, second);
     await writeFile(resolve(outputDirectory, 'index.html'), 'changed application content');
