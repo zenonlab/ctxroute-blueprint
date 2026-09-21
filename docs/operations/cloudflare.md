@@ -476,7 +476,9 @@ r2:tobirink-public-releases/releases/current.json
 
 Before the first mutation, the gate verifies the plan schema and digest,
 freshness, account, resource allowlist, driver identity, current provider state,
-and a repeated dry-run. Any mismatch fails closed. When both operations are
+and a repeated dry-run. Wrangler's volatile dry-run text is excluded from the
+digest; the Worker source, checked-in config and generated static assets are
+fingerprinted instead. Any mismatch fails closed. When both operations are
 approved, D1 migrations run before release uploads, and the Worker deployment
 runs last. No CI workflow calls `infra:apply`.
 
