@@ -51,7 +51,11 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
   });
 
   it('hydrates the exact series route and rejects a foreign reference', async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify(series), { headers: { 'content-type': 'application/json' } }));
+    const hydratedSeries = {
+      ...series,
+      categories: [{ category: 'Fantasy', series_id: 12345, votes: 98, votes_plus: 100, votes_minus: 4, added_by: 59641381499 }],
+    };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(hydratedSeries), { headers: { 'content-type': 'application/json' } }));
     const adapter = new MangaUpdatesFavoriteProviderAdapter(fetcher);
     await expect(adapter.hydrate({ externalId: '12345', provider: 'mangaupdates' })).resolves.toMatchObject({ externalId: '12345' });
     expect(fetcher).toHaveBeenCalledWith(`${mangaUpdatesApiOrigin}/v1/series/12345`, expect.objectContaining({ method: 'GET' }));

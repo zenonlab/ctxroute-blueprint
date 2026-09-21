@@ -12,9 +12,12 @@ const mangaUpdatesImageSchema = z.object({
   url: z.object({ original: z.url().nullish(), thumb: z.url().nullish() }).passthrough(),
 }).passthrough();
 const mangaUpdatesSeriesSchema = z.object({
-  associated: z.array(z.object({ title: nonEmptyString }).strict()).max(16).optional().default([]),
-  categories: z.array(z.object({ category: nonEmptyString }).strict()).max(16).optional().default([]),
-  genres: z.array(z.object({ genre: nonEmptyString }).strict()).max(16).optional().default([]),
+  // MangaUpdates adds provider-owned metadata to these records on the detail
+  // route (for example votes and added_by). Keep the internal projection
+  // bounded while accepting additive upstream fields.
+  associated: z.array(z.object({ title: nonEmptyString }).passthrough()).max(16).optional().default([]),
+  categories: z.array(z.object({ category: nonEmptyString }).passthrough()).max(16).optional().default([]),
+  genres: z.array(z.object({ genre: nonEmptyString }).passthrough()).max(16).optional().default([]),
   image: mangaUpdatesImageSchema.optional(),
   year: z.union([z.number().int(), z.string()]).optional(), status: nonEmptyString.optional(),
   series_id: identifierSchema,
