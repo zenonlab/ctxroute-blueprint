@@ -144,7 +144,7 @@ describe('standalone provider resolver', () => {
 
   it('falls back from MangaUpdates to Kitsu after a method failure', async () => {
     const ports = providers({ 'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target') });
-    ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 405'));
+    ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 401'));
     await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({
       state: 'VERIFIED', profile: { candidate: { provider: 'kitsu-manga', externalId: '84' } },
     });

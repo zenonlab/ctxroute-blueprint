@@ -85,9 +85,9 @@ async function searchProvider(
 
 function isTransientProviderError(error: Error): boolean {
   if (error instanceof FavoriteProviderRetryError) return true;
-  if (error instanceof FavoriteProviderHttpError) return [403, 404, 405, 408, 425, 429, 500, 502, 503, 504].includes(error.status);
+  if (error instanceof FavoriteProviderHttpError) return [401, 403, 404, 405, 408, 425, 429, 500, 502, 503, 504].includes(error.status);
   if (!(error instanceof Error)) return false;
-  return /(?:abort|fetch failed|incomplete provider page|network|tim(?:e|ed out)|HTTP (?:403|404|405|408|425|429|500|502|503|504)\b)/iu.test(`${error.name}: ${error.message}`);
+  return /(?:abort|fetch failed|incomplete provider page|network|tim(?:e|d out)|HTTP (?:401|403|404|405|408|425|429|500|502|503|504)\b)/iu.test(`${error.name}: ${error.message}`);
 }
 
 function retryableProviderError(error: Error): FavoriteProviderRetryError {
