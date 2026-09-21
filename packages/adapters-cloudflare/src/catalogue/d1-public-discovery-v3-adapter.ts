@@ -222,8 +222,10 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       request_json = excluded.request_json, admission_priority = excluded.admission_priority,
       queue_signal_state = 'SENDING', queue_signal_lease_until = excluded.queue_signal_lease_until,
       retry_at = excluded.retry_at, updated_at = excluded.updated_at, purge_after = NULL
-    WHERE (public_discovery_requests_v3.state IN ('NOT_FOUND', 'AMBIGUOUS')
-        AND public_discovery_requests_v3.result_expires_at <= excluded.updated_at)
+    WHERE public_discovery_requests_v3.request_digest = excluded.request_digest
+      AND (public_discovery_requests_v3.state = 'FAILED'
+        OR (public_discovery_requests_v3.state IN ('NOT_FOUND', 'AMBIGUOUS')
+          AND public_discovery_requests_v3.result_expires_at <= excluded.updated_at))
     RETURNING state`)
       .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now, this.pendingLimit, priority, signalLeaseUntil)
       .first<{ state: string }>();
