@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, unlinkSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createCloudflareDriver, loadCloudflareConfig, validateCloudflareConfig } from './cloudflare-driver.mjs';
+import { createCloudflareDriver, fingerprintWorkerInputs, loadCloudflareConfig, validateCloudflareConfig } from './cloudflare-driver.mjs';
 
 const config = {
   worker: 'public-api',
@@ -102,6 +104,31 @@ async function test_worker_preview_ignores_volatile_wrangler_output_but_tracks_s
   sourceDigest = 'b'.repeat(64);
   const changed = await driver.preview(actions);
   assert.notDeepEqual(changed.worker, first.worker);
+}
+
+async function test_worker_fingerprint_normalizes_next_build_ids_only() {
+  const root = await mkdtemp(resolve(tmpdir(), 'tobirink-cloudflare-'));
+  const workerDirectory = resolve(root, 'worker');
+  const outputDirectory = resolve(root, 'web/out');
+  try {
+    await mkdir(resolve(workerDirectory, 'src'), { recursive: true });
+    await mkdir(resolve(outputDirectory, '_next/static/first-build-id'), { recursive: true });
+    await writeFile(resolve(workerDirectory, 'wrangler.jsonc'), '{}');
+    await writeFile(resolve(workerDirectory, 'src/index.ts'), 'export default {}');
+    await writeFile(resolve(outputDirectory, 'index.html'), '/_next/static/first-build-id/app.js first-build-id');
+    await writeFile(resolve(outputDirectory, '_next/static/first-build-id/app.js'), 'first-build-id');
+    const first = await fingerprintWorkerInputs({ workerDirectory });
+    await rm(resolve(outputDirectory, '_next/static/first-build-id'), { recursive: true });
+    await mkdir(resolve(outputDirectory, '_next/static/second-build-id'), { recursive: true });
+    await writeFile(resolve(outputDirectory, 'index.html'), '/_next/static/second-build-id/app.js second-build-id');
+    await writeFile(resolve(outputDirectory, '_next/static/second-build-id/app.js'), 'second-build-id');
+    const second = await fingerprintWorkerInputs({ workerDirectory });
+    assert.equal(first, second);
+    await writeFile(resolve(outputDirectory, 'index.html'), 'changed application content');
+    assert.notEqual(await fingerprintWorkerInputs({ workerDirectory }), first);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 }
 
 async function test_preserve_routes_deploy_uses_route_free_ephemeral_config() {
@@ -278,6 +305,7 @@ test('the driver derives operation targets from configuration', test_derive_oper
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
 test('worker preview ignores volatile Wrangler output but tracks sources', test_worker_preview_ignores_volatile_wrangler_output_but_tracks_sources);
+test('worker fingerprint normalizes Next build IDs only', test_worker_fingerprint_normalizes_next_build_ids_only);
 test('preserve-routes deploys with an ephemeral route-free config', test_preserve_routes_deploy_uses_route_free_ephemeral_config);
 test('the gateway secret is passed on stdin and redacted from results', test_gateway_secret_is_stdin_only_and_redacted);
 test('an absent or weak gateway secret fails before Wrangler', test_gateway_secret_fails_closed_before_wrangler);
