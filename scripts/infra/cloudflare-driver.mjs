@@ -218,25 +218,43 @@ async function runWebBuild({ workerDirectory }) {
 }
 
 export async function fingerprintWorkerInputs({ workerDirectory }) {
-  const roots = [resolve(workerDirectory, 'wrangler.jsonc'), resolve(workerDirectory, 'src'), resolve(workerDirectory, '../web/out')];
-  const buildIds = await generatedBuildIds(resolve(workerDirectory, '../web/out'));
-  const files = [];
-  for (const root of roots) await collectFiles(root, files);
-  files.sort((left, right) => left.localeCompare(right));
+  const entries = await fingerprintWorkerInputEntries({ workerDirectory });
   const hash = createHash('sha256');
-  for (const file of files) {
-    hash.update(normalizeGeneratedValue(file.slice(workerDirectory.length + 1), buildIds));
+  for (const entry of entries) {
+    hash.update(entry.path);
     hash.update('\0');
-    hash.update(normalizeGeneratedContent(await readFile(file), buildIds));
+    hash.update(entry.content);
     hash.update('\0');
   }
   return hash.digest('hex');
 }
 
+async function fingerprintWorkerInputEntries({ workerDirectory }) {
+  const roots = [resolve(workerDirectory, 'wrangler.jsonc'), resolve(workerDirectory, 'src'), resolve(workerDirectory, '../web/out')];
+  const buildIds = await generatedBuildIds(resolve(workerDirectory, '../web/out'));
+  const files = [];
+  for (const root of roots) await collectFiles(root, files);
+  files.sort((left, right) => left.localeCompare(right));
+  const entries = [];
+  for (const inputPath of files) entries.push({
+    path: normalizeGeneratedValue(inputPath.slice(workerDirectory.length + 1), buildIds),
+    content: normalizeGeneratedContent(await readFile(inputPath), buildIds),
+  });
+  return entries.sort((left, right) => left.path.localeCompare(right.path));
+}
+
 async function generatedBuildIds(outputDirectory) {
   const staticDirectory = resolve(outputDirectory, '_next/static');
   const entries = await readdir(staticDirectory, { withFileTypes: true });
-  return entries.filter(entry => entry.isDirectory() && entry.name !== 'chunks' && entry.name !== 'media').map(entry => entry.name);
+  const buildIds = new Set(entries.filter(entry => entry.isDirectory() && entry.name !== 'chunks' && entry.name !== 'media').map(entry => entry.name));
+  const files = [];
+  await collectFiles(outputDirectory, files);
+  for (const file of files) {
+    const content = await readFile(file);
+    if (content.includes(0)) continue;
+    for (const match of content.toString('utf8').matchAll(/"buildId":"([^"]+)"/gu)) buildIds.add(match[1]);
+  }
+  return [...buildIds].sort((left, right) => left.localeCompare(right));
 }
 
 function normalizeGeneratedValue(value, buildIds) {
