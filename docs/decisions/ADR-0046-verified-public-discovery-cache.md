@@ -98,11 +98,14 @@ fournisseur reste transitoire et ne devient jamais un `NOT_FOUND` implicite.
 Le composant portable de l’ADR-0047 lit les demandes v3 en attente via une source
 injectée. Il route la recherche vers AniList, MangaUpdates, MangaDex, Kitsu
 Anime ou Kitsu Manga selon le type média, applique le matcher versionné, puis
-hydrate l’identifiant exact retenu. Il produit exactement un résultat
-`VERIFIED`, `NOT_FOUND` ou `AMBIGUOUS`; une panne, un 403, un 429, une réponse
-incomplète ou un timeout reste `PENDING` avec une reprise bornée. Le Worker
-conditionne chaque publication au bail et au digest courants; il demeure
-l’unique auteur des tables publiques fiables.
+hydrate l’identifiant exact retenu. Dans une lane, une panne transitoire (403,
+404, 429, 5xx, timeout ou réponse incomplète) ouvre le fournisseur suivant;
+si toutes les lanes applicables échouent, la demande reste `PENDING` avec une
+reprise bornée. Une lane `UNKNOWN` ne publie jamais l’autre média lorsqu’une
+lane est indisponible. Il produit exactement un résultat `VERIFIED`, `NOT_FOUND`
+ou `AMBIGUOUS`; une panne effective ne devient jamais un `NOT_FOUND` implicite.
+Le Worker conditionne chaque publication au bail et au digest courants; il
+demeure l’unique auteur des tables publiques fiables.
 
 La clé D1 possède un index unique. Demande, prise de travail et publication sont
 idempotentes. Un seul collecteur peut posséder un bail de traitement actif; les

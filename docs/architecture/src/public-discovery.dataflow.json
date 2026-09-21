@@ -17,7 +17,7 @@
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "L’archive publiée teste la frontière extension→API en lecture seule; les canaries contrôlent admission et preuve sans contenu privé."
+        "note": "Lecture extension→API; le collecteur bascule après panne transitoire. Les canaries prouvent admission et traitement sans contenu privé."
       },
       {
         "id": "verified-refresh",
@@ -85,7 +85,7 @@
       "id": "collector",
       "type": "backend",
       "label": "Collecteur Worker",
-      "sublabel": "claim(20) · cadence différée",
+      "sublabel": "claim(20) · fallback · cadence",
       "stage": 3,
       "row": 1,
       "width": 140,
@@ -191,7 +191,7 @@
       "from": "transportPort",
       "to": "providers",
       "label": "Gateway HMAC → API bornée",
-      "classification": "provider ciblé · timeout · réponse bornée",
+      "classification": "fallback sur 403/429/5xx/timeout · réponse bornée",
       "variant": "emphasis",
       "route": "auto",
       "labelAt": [960, 600]
