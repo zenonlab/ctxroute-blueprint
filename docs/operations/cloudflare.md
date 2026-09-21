@@ -960,6 +960,19 @@ Un nouvel export et son hash sont nécessaires si la reprise est décalée ou si
 les comptes changent matériellement. Ne jamais copier le SQL, les titres, les
 digests de demande ou une URL d'export signée dans les logs ou artefacts CI.
 
+Le 21 septembre, un nouvel export complet a été conservé sous
+`build/backups/tobirink-public-pre-recovery-20260921.sql` (ignoré par Git,
+2 018 543 octets, SHA-256
+`34cf362b446d7993a68795eefe7f48093b69cf2ce0c8b0c43d7e1533d652db3e`).
+Son chargement SQLite en mémoire et `PRAGMA integrity_check` passent. Les états
+restent 371 `FAILED`, 88 `VERIFIED`, 14 `NOT_FOUND`, 3 `AMBIGUOUS`.
+Le test navigateur de l'archive Chrome publique 1.0.42 (SHA-256
+`54f7a3d57c752e909d7c342a15951ac96c84619bac497cc4575f0c2c140b674a`)
+obtient `200 MISS` depuis le service worker sur une clé synthétique. Un favori
+synthétique déclenche une admission que le test intercepte et simule : aucune
+demande n'est créée dans D1. Ce contrôle prouve la frontière réseau actuelle,
+pas la disponibilité des fournisseurs ni la récupération des favoris privés.
+
 La séquence de reprise est distincte de la livraison habituelle :
 
 1. Publier seulement le code Worker validé depuis `main` par le workflow
@@ -981,6 +994,19 @@ La séquence de reprise est distincte de la livraison habituelle :
    correspondance, MangaDex. Observer les réponses fournisseur, le passage
    `PENDING → VERIFIED` et l'écriture canonique D1. Ne pas conclure au succès
    d'un simple HTTP 200, d'une réponse `PENDING` ou du healthcheck gateway.
+   Préflight du 21 septembre, sans écriture : les clés v3 fixes ci-dessous
+   répondent toutes deux `200 MISS` et leurs payloads passent le schéma local.
+   La première utilise `ANIME`, l'empreinte `b` répétée 64 fois et les titres
+   publics `Cowboy Bebop`; la seconde utilise `MANGA`, l'empreinte `c` répétée
+   64 fois et les titres publics `One Piece`. Les deux portent
+   `parserVersion=recovery-canary-20260921`, `siteRulesVersion=canary-v1` et
+   `schemaVersion=3`, sans URL, dossier ou progression. Après confirmation,
+   soumettre au plus un POST `/v3/catalogue/discoveries/requests` par clé,
+   espacés d'au moins sept secondes; arrêter sur HTTP non-202, `429`, échec
+   Queue, absence d'appel fournisseur vérifiable ou perte d'un profil servi.
+   Lire ensuite ces seules clés jusqu'à un résultat terminal ou dix minutes,
+   sans resoumettre et sans réarmer les 371 échecs. Les éventuelles lignes
+   canari restent dans D1; leur suppression n'est pas un rollback automatique.
 4. Préparer un plan de réarmement séparé pour les seules lignes
    `FAILED/ATTEMPT_LIMIT` issues de cet incident, avec comptes par média,
    clauses conditionnelles sur l'état et le digest courants, lots bornés,
