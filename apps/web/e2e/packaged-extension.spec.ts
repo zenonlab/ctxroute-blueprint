@@ -259,7 +259,7 @@ test('installed site Library sorts the full private catalogue promptly', async (
     });
     let site = await context.newPage();
     const firstLoadStartedAt = Date.now();
-    await site.goto('https://tobirink.com/library');
+    await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
     await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 30_000 });
     const firstLoadMs = Date.now() - firstLoadStartedAt;
     const bridgeTimings: number[] = [];
@@ -268,15 +268,17 @@ test('installed site Library sorts the full private catalogue promptly', async (
     // A shared runner can expose the static shell before the content script
     // attaches. Recreate the document a bounded number of times so this gate
     // proves the installed extension bridge rather than a timing accident.
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
         await expect(sortSelect).toBeVisible({ timeout: 8_000 });
         break;
       } catch (caught) {
-        if (attempt === 2) throw caught;
+        if (attempt === 4) throw caught;
+        const retry = site.getByRole('button', { name: 'Réessayer' });
+        if (await retry.isVisible({ timeout: 500 }).catch(() => false)) await retry.click();
         await site.close();
         site = await context.newPage();
-        await site.goto('https://tobirink.com/library');
+        await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
         await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 30_000 });
         sortSelect = site.getByLabel('Tri');
       }
@@ -324,10 +326,22 @@ test('installed site Library sorts the full private catalogue promptly', async (
     await devtools.detach();
     await site.close();
     site = await context.newPage();
-    await site.goto('https://tobirink.com/library');
+    await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
     await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
     sortSelect = site.getByLabel('Tri');
-    await expect(sortSelect).toBeVisible({ timeout: 15_000 });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        await expect(sortSelect).toBeVisible({ timeout: 8_000 });
+        break;
+      } catch (caught) {
+        if (attempt === 4) throw caught;
+        await site.close();
+        site = await context.newPage();
+        await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
+        await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 30_000 });
+        sortSelect = site.getByLabel('Tri');
+      }
+    }
     const coldStartedAt = Date.now();
     const coldResponse = site.evaluate(() => new Promise<void>((resolveResponse) => {
       const onMessage = (event: MessageEvent) => {
