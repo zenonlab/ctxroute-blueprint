@@ -478,7 +478,8 @@ Before the first mutation, the gate verifies the plan schema and digest,
 freshness, account, resource allowlist, driver identity, current provider state,
 and a repeated dry-run. Wrangler's volatile dry-run text is excluded from the
 digest; the Worker source, checked-in config and generated static assets are
-fingerprinted instead. Any mismatch fails closed. When both operations are
+fingerprinted instead, with only the generated Next build identifier
+normalized. Any other mismatch fails closed. When both operations are
 approved, D1 migrations run before release uploads, and the Worker deployment
 runs last. No CI workflow calls `infra:apply`.
 

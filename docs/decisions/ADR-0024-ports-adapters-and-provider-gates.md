@@ -42,6 +42,8 @@ allowlists. Before mutation it repeats inspection and preview and rejects any
 state or dry-run drift. The Cloudflare driver executes Wrangler's dry-run but
 hashes a deterministic fingerprint of the checked-in Worker source, config and
 static assets instead of volatile Wrangler metadata. The Cloudflare driver
+normalizes only the generated Next build identifier while retaining all other
+paths and bytes in that fingerprint. The Cloudflare driver
 derives Worker, D1, and R2 resource names from the checked-in
 Worker configuration; product use cases and runtime adapters never import the
 operational driver.
