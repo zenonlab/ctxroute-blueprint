@@ -304,7 +304,7 @@ test('installed site Library sorts the full private catalogue promptly', async (
     }));
     await site.getByLabel('Tri').selectOption('TITLE_DESC');
     await coldResponse;
-    await expect(site.locator('a[data-variant="library"]').first()).toContainText('Synthetic 1399');
+    await expect(site.locator('a[data-variant="library"]').first()).toContainText('Synthetic 1399', { timeout: 15_000 });
     const workerRestartMs = Date.now() - coldStartedAt;
     process.stdout.write(`Installed site Library: worker restart sort ${workerRestartMs} ms.\n`);
     expect(workerRestartMs).toBeLessThan(5_000);
