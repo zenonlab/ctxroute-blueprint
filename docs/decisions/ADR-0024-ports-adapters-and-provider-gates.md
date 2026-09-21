@@ -39,8 +39,10 @@ does not deploy production automatically.
 The gate core is provider-neutral and owns canonical plan hashing, a maximum
 30-minute lifetime, exact approval-digest matching, and account/resource
 allowlists. Before mutation it repeats inspection and preview and rejects any
-state or dry-run drift. The Cloudflare driver alone translates those operations
-to Wrangler. It derives Worker, D1, and R2 resource names from the checked-in
+state or dry-run drift. The Cloudflare driver executes Wrangler's dry-run but
+hashes a deterministic fingerprint of the checked-in Worker source, config and
+static assets instead of volatile Wrangler metadata. The Cloudflare driver
+derives Worker, D1, and R2 resource names from the checked-in
 Worker configuration; product use cases and runtime adapters never import the
 operational driver.
 

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
-import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { readdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -59,7 +59,7 @@ export async function loadCloudflareConfig(path) {
   return { worker, d1, r2, queues: [...queueNames].sort().map(name => ({ name })) };
 }
 
-export function createCloudflareDriver({ config, retiredQueues = [], workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET], preserveRoutes = false }) {
+export function createCloudflareDriver({ config, retiredQueues = [], workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, fingerprintWorker = fingerprintWorkerInputs, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET], preserveRoutes = false }) {
   validateCloudflareConfig(config);
   validateRetiredQueues(config, retiredQueues);
   const operations = new Map([
@@ -103,7 +103,8 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
       const output = {};
       if (actions.some(action => action.kind === 'worker-deploy')) {
         await buildWorkerAssets({ workerDirectory });
-        output.worker = (await run(await deployArguments(workerDirectory, preserveRoutes, true), { cwd: workerDirectory })).trim();
+        await run(await deployArguments(workerDirectory, preserveRoutes, true), { cwd: workerDirectory });
+        output.worker = { dryRun: true, sourceDigest: await fingerprintWorker({ workerDirectory }) };
       }
       const artifacts = await Promise.all(actions.filter(isReleaseArtifactAction).map(async action => {
         const content = await read(action.source);
@@ -214,6 +215,37 @@ async function runWebBuild({ workerDirectory }) {
     encoding: 'utf8',
     maxBuffer: 4 * 1024 * 1024,
   });
+}
+
+async function fingerprintWorkerInputs({ workerDirectory }) {
+  const roots = [resolve(workerDirectory, 'wrangler.jsonc'), resolve(workerDirectory, 'src'), resolve(workerDirectory, '../web/out')];
+  const files = [];
+  for (const root of roots) await collectFiles(root, files);
+  files.sort((left, right) => left.localeCompare(right));
+  const hash = createHash('sha256');
+  for (const file of files) {
+    hash.update(file.slice(workerDirectory.length + 1));
+    hash.update('\0');
+    hash.update(await readFile(file));
+    hash.update('\0');
+  }
+  return hash.digest('hex');
+}
+
+async function collectFiles(path, files) {
+  const entries = await readdir(path, { withFileTypes: true }).catch(async error => {
+    if (error.code !== 'ENOTDIR') throw error;
+    return [null];
+  });
+  if (entries[0] === null) {
+    files.push(path);
+    return;
+  }
+  for (const entry of entries) {
+    const child = resolve(path, entry.name);
+    if (entry.isDirectory()) await collectFiles(child, files);
+    else if (entry.isFile()) files.push(child);
+  }
 }
 
 function resolveOperations(operations, names, config, releaseDirectory) {

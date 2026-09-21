@@ -61,11 +61,11 @@ async function test_preview_and_apply_translations() {
   const builds = [];
   const run = async args => { calls.push(args); return args.includes('--dry-run') ? 'bundle preview' : 'applied'; };
   const buildWorkerAssets = async options => { builds.push(options); };
-  const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run, buildWorkerAssets });
+  const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run, buildWorkerAssets, fingerprintWorker: async () => 'a'.repeat(64) });
   const actions = driver.resolveOperations(['worker-deploy', 'd1-migrate:CATALOGUE_DB']);
   const preview = await driver.preview(actions);
   assert.deepEqual(preview, {
-    worker: 'bundle preview',
+    worker: { dryRun: true, sourceDigest: 'a'.repeat(64) },
     actions: [
       { kind: 'worker-deploy', target: 'worker:public-api' },
       { kind: 'd1-migrate', target: 'd1:public-catalogue' },
@@ -83,6 +83,25 @@ async function test_preview_and_apply_translations() {
     { workerDirectory: '/worker' },
     { workerDirectory: '/worker' },
   ]);
+}
+
+async function test_worker_preview_ignores_volatile_wrangler_output_but_tracks_sources() {
+  let runCount = 0;
+  let sourceDigest = 'a'.repeat(64);
+  const driver = createCloudflareDriver({
+    config,
+    workerDirectory: '/worker',
+    run: async () => `volatile deployment metadata ${++runCount}`,
+    buildWorkerAssets: async () => {},
+    fingerprintWorker: async () => sourceDigest,
+  });
+  const actions = driver.resolveOperations(['worker-deploy']);
+  const first = await driver.preview(actions);
+  const second = await driver.preview(actions);
+  assert.deepEqual(second.worker, first.worker);
+  sourceDigest = 'b'.repeat(64);
+  const changed = await driver.preview(actions);
+  assert.notDeepEqual(changed.worker, first.worker);
 }
 
 async function test_preserve_routes_deploy_uses_route_free_ephemeral_config() {
@@ -258,6 +277,7 @@ function test_reject_invalid_r2_identifiers() {
 test('the driver derives operation targets from configuration', test_derive_operation_targets);
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
+test('worker preview ignores volatile Wrangler output but tracks sources', test_worker_preview_ignores_volatile_wrangler_output_but_tracks_sources);
 test('preserve-routes deploys with an ephemeral route-free config', test_preserve_routes_deploy_uses_route_free_ephemeral_config);
 test('the gateway secret is passed on stdin and redacted from results', test_gateway_secret_is_stdin_only_and_redacted);
 test('an absent or weak gateway secret fails before Wrangler', test_gateway_secret_fails_closed_before_wrangler);
