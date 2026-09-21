@@ -17,7 +17,7 @@
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "Le collecteur bascule après panne transitoire et reporte sans consommer d’essai; les canaries restent sans contenu privé."
+        "note": "Le collecteur bascule après panne transitoire et reporte sans consommer d’essai; canaries et E2E restent sans contenu privé."
       },
       {
         "id": "verified-refresh",

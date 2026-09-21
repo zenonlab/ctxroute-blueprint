@@ -17,7 +17,8 @@ le plan Cloudflare protégé, son digest et la vérification des deux
 téléchargements publics.
 
 Le scénario de tri installé sur 1 400 œuvres exige un passage rapide sous
-7,5 s sur le runner partagé et borne chacun des quatre tris sous 15 s. Cette
+7,5 s sur le runner partagé, borne chacun des quatre tris sous 15 s et laisse
+20 s au redémarrage à froid du service worker sur un runner chargé. Cette
 double limite conserve la preuve du chemin rapide sans confondre un pic
 ponctuel du runner partagé avec un dépassement du délai fonctionnel. La CI
 exécute les neuf scénarios Playwright séquentiellement sur ce runner pour
