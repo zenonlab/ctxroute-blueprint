@@ -261,11 +261,24 @@ test('installed site Library sorts the full private catalogue promptly', async (
     const firstLoadStartedAt = Date.now();
     await site.goto('https://tobirink.com/library');
     await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
-    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24);
+    // The main shell can paint before the navigation links on a shared CI host.
+    await expect(site.locator('a[data-variant="library"]')).toHaveCount(24, { timeout: 30_000 });
     const firstLoadMs = Date.now() - firstLoadStartedAt;
     const bridgeTimings: number[] = [];
     const renderedTimings: number[] = [];
-    for (const sort of ['TITLE_ASC', 'TITLE_DESC', 'ADDED_DESC', 'TITLE_ASC'] as const) {
+    const sortSelect = site.getByLabel('Tri');
+    let currentSort = await sortSelect.evaluate((element) => {
+      // SAFETY: the accessible label targets the native sort <select> control.
+      return element instanceof HTMLSelectElement ? element.value : '';
+    });
+    for (const requestedSort of ['TITLE_ASC', 'TITLE_DESC', 'ADDED_DESC', 'TITLE_ASC'] as const) {
+      // A native select does not emit change when the requested value is already
+      // selected. Pick the next supported value in that case so the bridge
+      // response listener below always observes a real transition, including on
+      // runners whose initial sort differs from the local fixture.
+      const sort = requestedSort === currentSort
+        ? (['TITLE_ASC', 'TITLE_DESC', 'ADDED_DESC'] as const).find((candidate) => candidate !== currentSort)!
+        : requestedSort;
       const startedAt = Date.now();
       const measuredResponse = site.evaluate((expectedSort) => new Promise<{ elapsedMs: number; firstTitle: string }>((resolveResponse) => {
         const startedAt = performance.now();
@@ -282,6 +295,7 @@ test('installed site Library sorts the full private catalogue promptly', async (
       expect(measured.firstTitle).toMatch(/^Synthetic \d{4}$/u);
       bridgeTimings.push(measured.elapsedMs);
       renderedTimings.push(Date.now() - startedAt);
+      currentSort = sort;
     }
     process.stdout.write(`Installed site Library: first load ${firstLoadMs} ms; bridge sorts ${bridgeTimings.map((value) => value.toFixed(1)).join(', ')} ms; rendered sorts ${renderedTimings.join(', ')} ms.\n`);
     // A shared CI host may briefly stall Chromium. Keep one path below 7.5 s
