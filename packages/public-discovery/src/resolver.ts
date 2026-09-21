@@ -131,6 +131,12 @@ async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, re
   return lanes;
 }
 
+function providerOrderFor(request: PublicDiscoveryClaimedRequest): readonly ResolutionProvider[] {
+  if (request.query.mediaKind === 'ANIME') return animeProviders;
+  if (request.query.mediaKind === 'MANGA' || request.query.mediaKind === 'MANHWA' || request.query.mediaKind === 'MANHUA') return mangaProviders;
+  return [];
+}
+
 type SelectedMatch =
   | { readonly kind: 'terminal'; readonly resolution: PublicDiscoveryTerminalResolution }
   | { readonly kind: 'matched'; readonly reference: PublicDiscoveryReferenceV3; readonly searched: ProviderCandidate | undefined };
@@ -188,6 +194,48 @@ async function hydrateReference(
   return verified(candidate);
 }
 
+async function hydrateWithTransientFallback(
+  providers: PublicDiscoveryProviderPorts,
+  request: PublicDiscoveryClaimedRequest,
+  reference: PublicDiscoveryReferenceV3,
+  searched: ProviderCandidate | undefined,
+): Promise<PublicDiscoveryTerminalResolution> {
+  try {
+    return await hydrateReference(providers, reference, 'matched-provider-identity-not-found', searched);
+  } catch (error) {
+    if (!(error instanceof Error) || !isTransientProviderError(error)) throw error;
+    const order = providerOrderFor(request);
+    const start = Math.max(0, order.indexOf(reference.provider) + 1);
+    let lastUnavailable: Error = error;
+    const titles = request.query.discoveryTitles.slice(0, 4);
+    const query = matchQueryFor(request, titles);
+    for (const provider of order.slice(start)) {
+      let lane: LaneDecision;
+      try {
+        lane = await searchLane(providers, [provider], titles, query);
+      } catch (fallbackError) {
+        if (!(fallbackError instanceof Error) || !isTransientProviderError(fallbackError)) throw fallbackError;
+        lastUnavailable = fallbackError;
+        continue;
+      }
+      if (lane.state !== 'MATCH' || lane.references.length !== 1) {
+        if (lane.unavailable !== undefined) lastUnavailable = lane.unavailable;
+        continue;
+      }
+      const fallbackReference = lane.references[0];
+      if (fallbackReference === undefined) continue;
+      const fallbackCandidate = lane.candidates.find((candidate) => candidate.provider === fallbackReference.provider && candidate.externalId === fallbackReference.externalId);
+      try {
+        return await hydrateReference(providers, fallbackReference, 'matched-provider-identity-not-found', fallbackCandidate);
+      } catch (fallbackError) {
+        if (!(fallbackError instanceof Error) || !isTransientProviderError(fallbackError)) throw fallbackError;
+        lastUnavailable = fallbackError;
+      }
+    }
+    throw lastUnavailable;
+  }
+}
+
 export function createPublicDiscoveryResolver(providers: PublicDiscoveryProviderPorts = createPublicDiscoveryProviders()) {
   return {
     async resolve(request: PublicDiscoveryClaimedRequest): Promise<PublicDiscoveryTerminalResolution> {
@@ -196,7 +244,7 @@ export function createPublicDiscoveryResolver(providers: PublicDiscoveryProvider
       const selected = selectMatch(await searchApplicableLanes(providers, request));
       return selected.kind === 'terminal'
         ? selected.resolution
-        : hydrateReference(providers, selected.reference, 'matched-provider-identity-not-found', selected.searched);
+        : hydrateWithTransientFallback(providers, request, selected.reference, selected.searched);
     },
   };
 }

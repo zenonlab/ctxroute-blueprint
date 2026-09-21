@@ -191,7 +191,7 @@
       "from": "transportPort",
       "to": "providers",
       "label": "Gateway HMAC → API bornée",
-      "classification": "fallback sur 403/429/5xx/timeout · réponse bornée",
+      "classification": "fallback recherche + hydratation sur erreur transitoire · réponse bornée",
       "variant": "emphasis",
       "route": "auto",
       "labelAt": [960, 600]
