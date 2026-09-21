@@ -58,11 +58,7 @@ type WithoutRequestId<Request> = Request extends { requestId: string } ? Omit<Re
 type WebRequestInput = WithoutRequestId<WebRequest>;
 
 const WebBridgeContext = createContext<WebBridgeContextValue | undefined>(undefined);
-// A packaged MV3 worker can need a few seconds to start on the shared
-// macOS runner after the public document and content script are created.
-// Keep the missing-extension state honest, but do not classify a slow worker
-// startup as a permanently absent extension.
-const detectionTimeoutMs = 5_000;
+const detectionTimeoutMs = 1_500;
 const requestTimeoutMs = 5_000;
 
 function requestId() {
