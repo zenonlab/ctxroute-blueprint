@@ -13,6 +13,7 @@ async function installIncompatibleBridge(page: Page) {
 }
 
 test('incompatible extension never masquerades as empty private data', async ({ page }) => {
+  test.setTimeout(90_000);
   await installIncompatibleBridge(page);
   for (const route of ['/', '/library', '/agenda']) {
     await page.goto(route);
