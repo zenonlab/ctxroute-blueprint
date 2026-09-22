@@ -164,6 +164,24 @@ test('allows the automatic Git workflow during discovery', () => {
   }
 });
 
+test('allows only an explicit derived-repository creation command during discovery', () => {
+  for (const command of [
+    'gh repo create ai-gaming-studio --private --template zenonlab/ctxroute-blueprint',
+    'gh repo create tristan-monticelli/ai-gaming-studio --template zenonlab/ctxroute-blueprint --public',
+  ]) {
+    const result = run({ cmd: command }, { toolName: 'exec_command' });
+    assert.doesNotMatch(result.stdout, /decision":"block/u, command);
+  }
+  for (const command of [
+    'gh repo create ai-gaming-studio --private',
+    'gh repo create ai-gaming-studio --private --template another/template',
+    'gh repo create ai-gaming-studio --private --template zenonlab/ctxroute-blueprint --source .',
+  ]) {
+    const result = run({ cmd: command }, { toolName: 'exec_command' });
+    assert.match(result.stdout, /read and validation commands/u, command);
+  }
+});
+
 test('rejects destructive branch replacement during discovery', () => {
   const result = run({ cmd: 'git switch -C perf/quiet-hooks' }, { toolName: 'exec_command' });
   assert.match(result.stdout, /read and validation commands/u);
