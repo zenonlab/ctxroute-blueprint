@@ -4,7 +4,9 @@ scope:
   - apps/provider-gateway/deno.jsonc
   - scripts/infra/cloudflare-driver.mjs
   - scripts/infra/cloudflare-driver.test.mjs
+  - scripts/infra/manga-canary.mjs
   - docs/operations/cloudflare.md
+  - docs/architecture/src/autonomous-delivery.dataflow.json
   - docs/architecture/src/production-surface.architecture.json
   - docs/architecture/src/production-publication.dataflow.json
 review: on-change
@@ -55,9 +57,32 @@ d’environnement GitHub. `PROVIDER_GATEWAY_HMAC_KEY` reste un secret runtime
 séparé du dépôt, présent côté Worker et gateway; aucune valeur secrète n’est
 versionnée. D1, Queue, R2 et les secrets fournisseur ne sont pas mutés par ce
 workflow. Les canaries et la promotion métier restent des contrôles distincts.
+Le workflow propose aussi un input manuel `run_manga_canary`, désactivé par
+défaut, qui réarme uniquement le digest exact du canari manga public `One
+Piece`, observe sa clé jusqu'à dix minutes et échoue si l'état terminal n'est
+pas `VERIFIED` avec une identité manga et une référence fournisseur cohérentes.
+Cette action ne réarme aucune autre ligne D1 et n'est jamais déclenchée par un
+push automatique.
 
 ## Conséquences
 
 Un échec de vérification ou de plan bloque la livraison. Le rollback sélectionne
 la révision Deno ou la version Worker précédente via leurs contrôles opérateur,
 sans supprimer les données D1, objets R2 ou messages Queue.
+## Audit de durcissement — 2026-09-19
+
+Le workflow de production est la barrière obligatoire pour Cloudflare : il ne
+s’exécute que sur `main` ou manuellement, attend `npm run verify`, exige un plan
+signé et temporaire, refuse toute action autre que
+`worker:tobirink-public-api`, conserve les routes, puis supprime le fichier de
+plan. Les actions GitHub sont épinglées sur `checkout@v5` et `setup-node@v5`.
+
+La livraison Deno reste exclusivement assurée par l’application GitHub App
+Deno existante. Le dépôt fournit comme preuves le commit `main`, le run de
+l’application et la probe publique `/healthz`; il ne prétend pas fabriquer un
+journal Deno absent et n’ajoute aucun mécanisme concurrent.
+
+Le contrôle post-déploiement ne conserve que les statuts HTTP et les identifiants
+de corrélation. D1, R2, Queues et la rotation des secrets sont explicitement
+hors périmètre et restent des opérations séparées, protégées par leurs propres
+plans et validations.

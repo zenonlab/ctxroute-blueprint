@@ -1019,10 +1019,13 @@ La séquence de reprise est distincte de la livraison habituelle :
    sans resoumettre et sans réarmer les 371 échecs. Les éventuelles lignes
    canari restent dans D1; leur suppression n'est pas un rollback automatique.
    Le canari du 21 septembre a confirmé `Cowboy Bebop → VERIFIED` via AniList.
-   `One Piece` a rencontré une panne MangaUpdates : son compteur runtime a
-   augmenté, tandis que MangaDex n'avait encore aucun appel observé et la clé
-   est restée `PENDING` avec backoff. Ce signal a motivé le fallback applicatif
-   désormais testé ; il ne justifie pas le réarmement des 371 anciennes lignes.
+   `One Piece` a rencontré une panne MangaUpdates et a ensuite atteint
+   `ATTEMPT_LIMIT`. Le workflow protégé expose maintenant l'input manuel
+   `run_manga_canary`; lorsqu'il vaut `true`, il soumet uniquement le digest
+   exact de cette clé, observe au plus quarante lectures espacées de quinze
+   secondes et exige `VERIFIED` avec une identité manga. Un push automatique ne
+   l'exécute jamais. Un état terminal négatif ou une réponse non-202 arrête le
+   job et ne réarme aucune autre ligne.
 4. Préparer un plan de réarmement séparé pour les seules lignes
    `FAILED/ATTEMPT_LIMIT` issues de cet incident, avec comptes par média,
    clauses conditionnelles sur l'état et le digest courants, lots bornés,

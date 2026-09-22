@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      run_manga_canary:
+        description: 'Réarmer et exécuter uniquement le canari manga One Piece après le déploiement'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -118,6 +124,10 @@ jobs:
           probe https://tobirink.com/library
           probe https://tobirink.com/download
           probe https://tobirink-provider-gateway.tobirink.deno.net/healthz
+
+      - name: Run bounded Manga canary
+        if: ${{ inputs.run_manga_canary == true }}
+        run: node scripts/infra/manga-canary.mjs
 
       - name: Remove temporary deployment plan
         if: ${{ always() }}
