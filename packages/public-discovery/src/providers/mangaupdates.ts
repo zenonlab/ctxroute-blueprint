@@ -12,9 +12,11 @@ const mangaUpdatesImageSchema = z.object({
   url: z.object({ original: z.url().nullish(), thumb: z.url().nullish() }).passthrough(),
 }).passthrough();
 const mangaUpdatesSeriesSchema = z.object({
-  associated: z.preprocess((value) => value ?? [], z.array(z.object({ title: nonEmptyString }).passthrough()).max(16)),
-  categories: z.preprocess((value) => value ?? [], z.array(z.object({ category: nonEmptyString }).passthrough()).max(16)),
-  genres: z.preprocess((value) => value ?? [], z.array(z.object({ genre: nonEmptyString }).passthrough()).max(16)),
+  // Search records are projected to a small candidate surface, but detail
+  // records legitimately contain hundreds of provider-owned categories.
+  associated: z.preprocess((value) => value ?? [], z.array(z.object({ title: nonEmptyString }).passthrough()).max(512)),
+  categories: z.preprocess((value) => value ?? [], z.array(z.object({ category: nonEmptyString }).passthrough()).max(512)),
+  genres: z.preprocess((value) => value ?? [], z.array(z.object({ genre: nonEmptyString }).passthrough()).max(64)),
   image: z.preprocess((value) => value ?? undefined, mangaUpdatesImageSchema.optional()),
   year: z.preprocess((value) => value ?? undefined, z.union([z.number().int(), z.string()]).optional()),
   status: z.preprocess((value) => value ?? undefined, nonEmptyString.optional()),
@@ -53,7 +55,7 @@ function candidate(series: MangaUpdatesSeries): ProviderCandidate {
   if (coverUrl != null) result.cover = { attribution: 'MangaUpdates', url: coverUrl };
   if (series.url !== undefined) result.canonicalUrl = series.url;
   if (series.genres.length > 0) result.genres = series.genres.map((item) => item.genre);
-  if (series.categories.length > 0) result.categories = series.categories.map((item) => item.category);
+  if (series.categories.length > 0) result.categories = series.categories.slice(0, 32).map((item) => item.category);
   const year = Number(series.year);
   if (Number.isSafeInteger(year) && year >= 1800 && year <= 3000) result.startYear = year;
   if (series.status !== undefined) {
