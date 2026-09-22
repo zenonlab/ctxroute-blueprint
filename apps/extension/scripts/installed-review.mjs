@@ -13,6 +13,7 @@ let extensionPath = fileURLToPath(new URL('../.output/chrome-mv3', import.meta.u
 const archive = process.argv[2];
 const previousArchive = process.argv[3];
 const favoritesExport = process.env.TOBIRINK_FAVORITES_EXPORT;
+const realRun = process.env.TOBIRINK_REAL_RUN === '1';
 
 function decodeBookmarkText(value) {
   return value
@@ -42,15 +43,15 @@ if (archive !== undefined) {
 }
 const profile = await mkdtemp(join(tmpdir(), 'tobirink-installed-review-'));
 const launchOptions = {
-  args: ['--enable-unsafe-extension-debugging', '--host-resolver-rules=MAP tobirink.com 127.0.0.1, MAP graphql.anilist.co 127.0.0.1, MAP api.mangaupdates.com 127.0.0.1'],
+  args: realRun ? ['--enable-unsafe-extension-debugging'] : ['--enable-unsafe-extension-debugging', '--host-resolver-rules=MAP tobirink.com 127.0.0.1, MAP graphql.anilist.co 127.0.0.1, MAP api.mangaupdates.com 127.0.0.1'],
   ignoreDefaultArgs: ['--disable-extensions'],
   channel: 'chromium', headless: true,
 };
 let context = await chromium.launchPersistentContext(profile, launchOptions);
 
 try {
-  await context.setOffline(true);
-  process.stdout.write(`Installed-test browser: ${context.browser()?.version()}\n`);
+  await context.setOffline(!realRun);
+  process.stdout.write(`Installed-test browser: ${context.browser()?.version()} mode=${realRun ? 'online' : 'offline'}\n`);
   let page = await context.newPage();
   const debugging = await context.browser().newBrowserCDPSession();
   const seederPath = await mkdtemp(join(tmpdir(), 'tobirink-bookmark-seeder-'));
@@ -95,9 +96,34 @@ try {
   const expectedObserved = exportedBookmarks?.length ?? 1532;
   assert.equal(status.counts.observed, expectedObserved);
   if (exportedBookmarks === undefined) assert.equal(status.counts.unsupported, 132);
-  process.stdout.write(`Installed offline diagnostics: source=${exportedBookmarks === undefined ? 'synthetic' : favoritesExport} counts=${JSON.stringify(status.counts)}\n`);
+  process.stdout.write(`Installed ${realRun ? 'online' : 'offline'} diagnostics: source=${exportedBookmarks === undefined ? 'synthetic' : favoritesExport} counts=${JSON.stringify(status.counts)}\n`);
   const catalogue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' }));
   assert.equal(catalogue.ok, true);
+  const diagnosticCodes = Object.entries((status.diagnostics?.events ?? []).reduce((counts, event) => {
+    const code = event.errorCode ?? event.code ?? event.operation ?? 'unknown';
+    counts[code] = (counts[code] ?? 0) + 1;
+    return counts;
+  }, {}));
+  process.stdout.write(`Installed diagnostic codes: ${JSON.stringify(diagnosticCodes)}\n`);
+  const resolutionReasons = await page.evaluate(() => new Promise((resolve, reject) => {
+    const opening = globalThis.indexedDB.open('tobirink-private');
+    opening.onerror = () => reject(new Error('Private database unavailable.'));
+    opening.onsuccess = () => {
+      const database = opening.result;
+      const request = database.transaction('favoriteSources', 'readonly').objectStore('favoriteSources').getAll();
+      request.onerror = () => reject(new Error('Favorite source diagnostics unavailable.'));
+      request.onsuccess = () => {
+        const counts = {};
+        for (const source of request.result) {
+          const reason = source.resolution?.kind === 'RETRYABLE' ? source.resolution.reason : source.resolution?.kind ?? 'UNRESOLVED';
+          counts[reason] = (counts[reason] ?? 0) + 1;
+        }
+        resolve(Object.entries(counts));
+      };
+      request.addEventListener('success', () => database.close(), { once: true });
+    };
+  }));
+  process.stdout.write(`Installed resolution reasons: ${JSON.stringify(resolutionReasons)}\n`);
   if (exportedBookmarks === undefined) {
     assert.equal(catalogue.snapshot.statistics.total, 1400);
     assert.ok(catalogue.snapshot.items.every((item) => item.state === 'retryable'));
@@ -106,7 +132,9 @@ try {
   }
   assert.equal(status.counts.blocked, 0);
   const queue = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'review.queue.read', version: 1 }));
-  assert.deepEqual(queue, { ok: true, snapshot: { items: [], status: 'pending' } });
+  assert.equal(queue.ok, true);
+  assert.equal(queue.snapshot.status, 'pending');
+  assert.equal(queue.snapshot.items.length, status.counts.review);
   const reviewCount = await page.evaluate(() => new Promise((resolve, reject) => {
     const opening = globalThis.indexedDB.open('tobirink-private');
     opening.onerror = () => reject(new Error('Private database unavailable.'));
@@ -119,7 +147,7 @@ try {
       transaction.oncomplete = () => database.close();
     };
   }));
-  assert.equal(reviewCount, 0);
+  assert.equal(reviewCount, status.counts.review);
   if (previousArchive !== undefined) {
     const oldVersion = await page.evaluate(() => globalThis.chrome.runtime.getManifest().version);
     await context.close();
@@ -146,7 +174,7 @@ try {
     }
     process.stdout.write(`Preserved profile upgrade ${oldVersion} -> ${version}: ${expectedObserved} sources retained.\n`);
   }
-  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: ${expectedObserved} imported bookmarks, ${status.counts.retryable} retryable, ${status.counts.unsupported} unsupported, zero blocked tasks and zero imported Review passed.\n`);
+  process.stdout.write(`Installed Chromium ${context.browser()?.version()}: ${expectedObserved} imported bookmarks, ${status.counts.resolved} resolved, ${status.counts.retryable} retryable, ${status.counts.unsupported} unsupported, zero blocked tasks and ${status.counts.review} Review passed.\n`);
 } finally {
   await context.close();
 }

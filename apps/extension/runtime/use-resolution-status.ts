@@ -35,7 +35,7 @@ export function useResolutionStatus(): ResolutionStatusProps {
       apply(value);
     }).catch(() => setState('error'));
   }, [apply]);
-  const onControl = useCallback((action: 'pause' | 'resume' | 'retry-blocked') => {
+  const onControl = useCallback((action: 'pause' | 'resume' | 'retry-blocked' | 'retry-provider-unavailable') => {
     setState('running');
     void writeResolutionControl(action).then(apply).catch(() => setState('error'));
   }, [apply]);

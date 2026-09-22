@@ -1,8 +1,8 @@
 import { createFavoriteObservation } from '@tobirink/domain';
 import { describe, expect, it, vi } from 'vitest';
-import { favoriteManualIdentityKey } from './favorite-identity-lookup';
+import { favoriteIdentityKey, favoriteManualIdentityKey } from './favorite-identity-lookup';
 import { parseFavoriteObservation } from './favorite-parser';
-import { requestPublicFavoriteDiscovery } from './public-discovery-resolution';
+import { requestPublicFavoriteDiscovery, requestPublicFavoriteDiscoveryRecovery } from './public-discovery-resolution';
 import { extractFavoriteSourceEvidence } from './source-evidence';
 
 const input = { sourceKey: 'manual-discovery', title: 'Synthetic Series', url: 'https://reader.invalid/anime/synthetic-series' };
@@ -18,6 +18,16 @@ describe('public favorite discovery request', () => {
     expect(resolveOrRequest).toHaveBeenCalledExactlyOnceWith(key, expect.objectContaining({
       discoveryTitles: ['synthetic series', 'syntheticseries'],
       explicitProviderReference: reference,
+      sourceTitles: ['synthetic series'],
+    }));
+  });
+
+  it('uses the explicit recovery port without changing the canonical query', async () => {
+    const requestRecovery = vi.fn(async () => ({ retryAt: '2026-09-15T00:10:00.000Z', state: 'PENDING' as const }));
+    const key = await favoriteIdentityKey(artifact);
+    await expect(requestPublicFavoriteDiscoveryRecovery({ resolveOrRequest: vi.fn(), requestRecovery }, key, artifact)).resolves.toMatchObject({ state: 'PENDING' });
+    expect(requestRecovery).toHaveBeenCalledExactlyOnceWith(key, expect.objectContaining({
+      discoveryTitles: ['synthetic series', 'syntheticseries'],
       sourceTitles: ['synthetic series'],
     }));
   });

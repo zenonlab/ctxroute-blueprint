@@ -201,7 +201,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
         return { published: receipt.published, replayed: receipt.replayed };
       },
     },
-    limit: 20,
+        limit: 5,
     nonce: () => crypto.randomUUID(),
     now: () => new Date().toISOString(),
     resolver: {

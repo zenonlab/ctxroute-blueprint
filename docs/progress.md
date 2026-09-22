@@ -288,6 +288,67 @@
 
 - [x] **Tracer les échecs et borner la concurrence de la pipeline** — DONE _(evidence: Runner application 63/63 et lanes fournisseur: événements bornés de succès, retry, queue-wait et échec provider; les erreurs ne contiennent pas le détail privé., Le runner groupe jusqu’à 4 claims indépendants et traite le groupe avec Promise.allSettled; un échec est persisté/retryé individuellement sans arrêter les autres workers., FavLib différentiel épinglé: 11 tests passés, audit local privé opt-in non activé; aucune exportation de favoris.)_
 
-## Automatiser la livraison Deno et Cloudflare depuis GitHub — ACTIVE
+## Automatiser la livraison Deno et Cloudflare depuis GitHub — DONE
 
-- [ ] **Ajouter la configuration Deno et le workflow Cloudflare protégé** — IN_PROGRESS _(evidence: Production-surface Archify mis à jour pour le mode de livraison à route conservée; npm run archify:validate -- architecture passe pour toutes les sources, dont production-surface 9/9 sans erreur ni avertissement., Le plan Cloudflare est désormais protégé par options.preserveRoutes=true dans le digest; un test infra dédié prouve la configuration éphémère sans routes et les 23 tests infra passent., npm run verify passe intégralement: 274 tests (273 succès, 1 skip), typechecks workspace, build Chrome/Firefox, intégration, npm audit 0 vulnérabilité et build docs.)_
+- [x] **Ajouter la configuration Deno et le workflow Cloudflare protégé** — DONE _(evidence: Commit a0c27df poussé fast-forward sur origin/main; .codex/config.toml est resté hors commit., Run GitHub Actions 35444241967 entièrement vert en 12m29s sur tobirink-mac-ci: checkout a0c27df, verify, plan Cloudflare et apply du seul worker:tobirink-public-api réussissent., Le plan de production exige options.preserveRoutes=true; l’apply GitHub ne réécrit donc pas l’API workers/routes qui avait bloqué le run précédent.)_
+
+## Auditer et durcir la livraison autonome — BLOCKED
+
+- [x] **Mettre à jour les actions et renforcer la preuve de livraison** — DONE _(evidence: Workflow now uses checkout@v5/setup-node@v5; it remains push-main/manual only, requires verify, validates one preserveRoutes Worker target, removes the temporary plan, and runs three post-deploy probes., Docs and ADR record the existing Deno GitHub App as the sole Deno mechanism, with commit/run/healthz evidence and no secret values., D1, R2, Queues and secret rotation are documented as separate protected operations; git diff --check passed.)_
+- [x] **Valider le dépôt et les probes publiques** — DONE _(evidence: npm run verify passed: 274 tests (273 pass, 1 skip), all workspace typechecks, Deno tests, infrastructure tests, Chrome/Firefox builds, integration, npm audit 0 vulnerabilities and Archify/docs validation., Public probes returned site root 200, /library 200 and Deno gateway /healthz 200; only status output was collected.)_
+- [ ] **Auditer, versionner et publier la preuve** — BLOCKED _(evidence: Archify validation and full npm run verify are green; git diff --check exits 0., The final scope is visible: workflow, project config, four delivery docs, ADR-0055, and the new dataflow; .codex/config.toml, .project/progress.json, and docs/progress.md remain uncommitted local changes., external: the repository PreToolUse guard rejects git add and git commit with 'Write blocked: use a traceable editing tool for project files; direct shell writes cannot verify associated Archify evidence and ADRs', including after the dataflow was declared, validated, and recorded in Progress. Therefore no commit or push was performed.)_
+
+## Refactoriser la pipeline Public Discovery D1 — DONE
+
+- [x] **Unifier les routes admission et refresh et fermer le cas Queue absente** — DONE _(evidence: Queue 10/10 et routes 21/21; typecheck Worker, lint et git diff --check verts., Queue absente: 503, signal UNSENT, retry 202/SENT; graphe D1 décrit déjà cette reprise.)_
+- [x] **Séparer recherche, matching, fallback et hydratation** — DONE _(evidence: Public Discovery 75/75, Queue Worker 10/10, typecheck portable, lint et diff verts., Erreur fournisseur sans fallback, UNKNOWN incomplet non publié, 405 MangaUpdates exact et identité hydratée discordante testés; Archify 9/9.)_
+- [x] **Factoriser les gardes D1 et certifier le refresh** — DONE _(evidence: D1 37/37, Worker 141/141, Public Discovery 75/75 et npm run verify entièrement verts., Refresh Queue absente: 503/UNSENT, ancien VERIFIED servi, reprise; gardes SQL statiques, faits canoniques partagés., Archify showcase 9/9, deliver et visual-check quatre tailles réussis; diff sans erreur.)_
+
+## Stabiliser les tests Agenda pour débloquer la livraison D1 — DONE
+
+- [x] **Fixer l’horloge dans trois tests de génération Agenda** — DONE _(evidence: PR #28 fusionnée dans main au commit f55d6f87; correction limitée aux trois horloges de fixtures., Tests ciblés 21/21 et npm run verify local verts., Workflow 35504036344 relancé: verify, plan et apply réussis; plan 30a29ac3 et Worker tobirink-public-api déployé en version 7fbcd9f8-269f-46e2-b562-c67e304967f3.)_
+
+## Corriger et préparer la publication Tobirink 1.0.42 — DONE
+
+- [x] **Fiabiliser packaging, version et manifeste 1.0.42** — DONE _(evidence: Chrome 300221 octets SHA-256 54f7a3d57c752e909d7c342a15951ac96c84619bac497cc4575f0c2c140b674a; Firefox 300262 octets SHA-256 061965f3ecfb0316751297602622b00ff4e1f55b017c73dd05272e22c6dfbe4e)_
+- [x] **Intégrer les builds, probes et E2E navigateur dans la CI** — DONE _(evidence: Playwright 9/9; build Web réussi; probes publiques HTTP 200)_
+- [x] **Mettre à jour les preuves et valider la candidate** — DONE _(evidence: npm run verify: 274 tests, 273 pass, 1 skip, typechecks, audit npm 0 vulnérabilité; Archify showcase validé; diff-check vert)_
+- [x] **Publier les deux ZIP 1.0.42 et avancer le pointeur protégé** — DONE _(evidence: Plan protégé 772a71e296835afa9e8aeac3fd4197c723cec09d7de41e8798f97df35f79401b appliqué avec exactement deux uploads R2 1.0.42 et worker:tobirink-public-api; preserveRoutes=true., Worker publié b25b2c41-081e-47ac-807c-f03d01eeab76., Chrome public 300221 octets SHA-256 54f7a3d57c752e909d7c342a15951ac96c84619bac497cc4575f0c2c140b674a; Firefox public 300262 octets SHA-256 061965f3ecfb0316751297602622b00ff4e1f55b017c73dd05272e22c6dfbe4e; hashes identiques aux candidats locaux.)_
+
+## Corriger la reconnaissance des favoris réels dans l’extension — DONE
+
+- [x] **Accepter les URLs ManhwaZ réelles sans suffixe de routage** — DONE _(evidence: Commit 5e33b98 pushed with bounded ManhwaZ public/index.php and chapter-0 routes, direct Anime-Sama routes, corroborated reader-route matching, AsuraScans/WeebCentral/YYZZBaby/FlameComics handling, and eligibility guardrails; Archify favorite-source-boundaries showcase 9/9 with 0 warnings., Fresh Chromium temporary profile recreated from the real export: 1,522 observed, 1,483 retryable/network, 39 unsupported, 0 review, 0 blocked. This is +34 recognized versus the initial 1,449; the remaining 39 are MangaDex Loading pages, catalog/list pages, dramas/videos, one PDF/image and utilities, not safely identifiable works., npm run verify passed after the change: 427 application tests, 152 extension tests, 141 Worker tests, 102 adapters-browser tests, 33 adapters-cloudflare tests, 14 contracts, 37 domain, 75 public-discovery, 129 UI; all typechecks/builds, npm audit 0 vulnerabilities, docs build and pre-push gates passed.)_
+
+## Réparer les tentatives Discovery sans appel fournisseur et préparer la reprise contrôlée — DONE
+
+- [x] **Différer les claims limités par cadence sans consommer les huit essais** — DONE _(evidence: npm run verify PASS (validate, typecheck, workspace tests, integration, audit, docs), Worker queue 13/13 tests incl. deferred regular+refresh and bounded D1 reservation; public Discovery diagram 9/9, git diff --check PASS)_
+- [x] **Auditer le correctif et préparer la reprise de production sans l’exécuter** — DONE _(evidence: Backup local vérifié: 2 019 796 octets, SHA-256 6ff390845441f79ac59f4cef18509d5ea0be9a03e0d96a43caac61c983b1f4b2., Lecture D1 distante sans écriture: 476 total, 371 FAILED, 88 VERIFIED, 14 NOT_FOUND, 3 AMBIGUOUS, zéro PROCESSING; changes=0 et rows_written=0., Runbook et ADR bornent le déploiement Worker, les canaris anime/manga, les seuils d’arrêt et le réarmement séparé; aucune mutation de reprise n’est exécutée.)_
+
+## Livrer le correctif Discovery via la CI protégée et contrôler la production — DONE
+
+- [x] **Fusionner PR #29 et vérifier le déploiement Worker protégé** — DONE _(evidence: PR #29 puis PR #31–#44 fusionnées; dernier commit main c6bcb571c06533d8459076e9d3680bde0494ede4., Run protégé 35543753246 réussi: packaging, 9 E2E, verify, plan et apply Cloudflare., Plan appliqué avec preserveRoutes=true et une seule cible worker:tobirink-public-api; Worker version 690dad6c-5317-449b-b419-8a7b464c4e5d.)_
+- [x] **Contrôler les routes et les reports de cadence sans nouvelle demande** — DONE _(evidence: Run protégé 35543753246: routes /, /library, /download et gateway /healthz en HTTP 200 après apply., Vérification publique: /download annonce 1.0.42; SHA-256 Chrome 54f7a3d57c752e909d7c342a15951ac96c84619bac497cc4575f0c2c140b674a et Firefox 061965f3ecfb0316751297602622b00ff4e1f55b017c73dd05272e22c6dfbe4e inchangés., Headers publics: pages cf-cache-status HIT; gateway GET /healthz cache-control no-store avec x-tobirink-gateway-request-id et x-deno-trace-id.)_
+
+## Aligner main sur la release immutable 1.0.42, déployer Discovery et vérifier l’extension réelle — ACTIVE
+
+- [x] **Intégrer la source exacte 1.0.42 et prouver la parité des ZIP** — DONE _(evidence: Chrome/Firefox local ZIP SHA-256 exactly match public immutable 1.0.42 downloads, 9/9 Playwright E2E pass with installed Chrome extension; isolated packaging and Archify/dataflow/docs checks pass, PR #30 contains only 13 audited release, test, workflow and documentation files; linked-worktree verify fixture limitation deferred to clean CI checkout)_
+- [x] **Pousser, fusionner et livrer par CI sans régression de version** — DONE _(evidence: PR #42–#44 fusionnées après stabilisation E2E; dernier main c6bcb571c06533d8459076e9d3680bde0494ede4., Run protégé 35543753246 réussi: 9 E2E, verify, plan/apply Worker et probes publiques., Worker version 690dad6c-5317-449b-b419-8a7b464c4e5d; /download et hashes publics Chrome/Firefox 1.0.42 conformes.)_
+- [x] **Tester l’extension dans un profil Chromium dédié avec favoris réels** — DONE _(evidence: Temporary Chromium profile run with the real export completed without touching the user's Choukky profile., Latest online observation: 1,522 observed; 65 resolved; 8 review; 39 unsupported; 994 admission-wait; 336 provider-unavailable; 63 public-pending; 14 internal; 3 rate-limited., ResolutionStatus now exposes distinct counters and an explicit provider-recovery action; extension 33 files/153 tests, typecheck and Chrome MV3 build pass.)_
+- [ ] **Prouver les canaris puis préparer et appliquer la reprise D1 bornée** — IN_PROGRESS _(evidence: Durable extension recovery added: batches of 20 candidates including failures, local cursor, 30s alarm continuation, per-item error isolation; extension 33 files/154 tests pass and typecheck passes., Isolated Chromium run with Downloads/favoris_20_09_2026.html imported 1,522 bookmarks with 0 lost, 0 blocked and 39 unsupported; offline mode correctly classified the remaining 1,483 as NETWORK., Queue target remains local-only: 5 claims, 10s batch timeout, 2 consumers; Worker Queue/routes 34/34 and provider fallback 57/57 pass., Docs validation, Archify dataflow showcase and git diff check pass; production still has the previous Queue configuration and D1 recovery remains unexecuted.)_
+
+## Déclarer le dataflow release 1.0.42 dans le registre produit — DONE
+
+- [x] **Ajouter la source autonomous-delivery et valider les dataflows** — DONE _(evidence: a758267 committed one-line dataflow registry; cherry-picked as 66ac51a, npm run archify:validate -- dataflow and npm run validate:architecture passed)_
+
+## Stabiliser la gate E2E 1.0.42 sur le runner partagé — DONE
+
+- [x] **Exécuter les neuf E2E séquentiellement sur le runner protégé** — DONE _(evidence: 9/9 Playwright E2E passed locally with --workers=1; release docs validated, PR #31 merged only workflow and release note; immutable 1.0.42 source/ZIP unchanged, New protected main run will decide deployment; no direct production mutation)_
+
+## Adapter le budget E2E au runner partagé sans masquer un timeout — DONE
+
+- [x] **Adapter le budget E2E au runner partagé sans masquer un timeout** — DONE _(evidence: Focused installed-extension E2E 1/1 passed; rendered sorts 132–159 ms and worker restart 432 ms., npm run validate:docs -- --all and git diff --check passed., Commit 13e464a (based on origin/main 522d79c) contains only the test budget and release documentation update; publication remains in the parent release-delivery goal.)_
+
+## Réparer l’hydratation MangaUpdates du canari manga — DONE
+
+- [x] **Accepter les champs enrichis et valider le correctif** — DONE _(evidence: 80/80 Public Discovery tests pass., Typecheck and Archify 9/9 pass., Full verify reaches only the known linked-worktree alternate-Git Sensor limitation after build artifacts are generated.)_
+- [x] **Publier par CI protégée et vérifier le canari existant** — DONE _(evidence: PR #83 merged and protected deployment 35717622100 succeeded on main SHA fe1ea01f5f6a38cb734a0676ccc25a2fd33c7cff., Manual protected workflow 35718614134 succeeded; exact One Piece manga canary is VERIFIED with MangaUpdates provider reference., Root cause fixed: nullable search fields plus live detail collections up to 344 categories/19 aliases are accepted and projected within the 32-category candidate contract.)_

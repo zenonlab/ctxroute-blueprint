@@ -69,5 +69,10 @@ export default {
     });
     await recover();
   },
-  scheduled: (controller: ScheduledController, env: NativeCollectorBindings) => enqueueAgendaRefresh(controller, env),
+  scheduled: (controller: ScheduledController, env: NativeCollectorBindings) => {
+    // The weekly Agenda trigger remains unchanged. The separate bounded wake
+    // repairs due Discovery rows when a previously sent Queue signal vanished.
+    if (controller.cron === '*/15 * * * *') return processPublicDiscoveryQueue(env).then(() => undefined);
+    return enqueueAgendaRefresh(controller, env);
+  },
 };

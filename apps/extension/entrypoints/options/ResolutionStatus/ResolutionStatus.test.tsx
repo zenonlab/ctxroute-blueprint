@@ -48,4 +48,11 @@ describe('ResolutionStatus', () => {
     expect(paused).toContain('Reprendre l’analyse');
     expect(paused).not.toContain('Votre bibliothèque locale est à jour.');
   });
+
+  it('offers provider recovery without presenting it as an automatic retry', () => {
+    const html = renderToStaticMarkup(<ResolutionStatus controller={{ paused: false, state: 'waiting-provider' }} counts={{ blocked: 0, observed: 336, processing: 0, resolved: 0, retryable: 336, review: 0, unsupported: 0, providerPaused: 336 }} diagnostics={{ enabled: false, events: [] }} inventory={{ status: 'complete' }} onControl={() => undefined} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
+    expect(html).toContain('Traitement fournisseur indisponible');
+    expect(html).toContain('Relancer les demandes épuisées');
+    expect(html).toContain('Attente de la réouverture des fournisseurs');
+  });
 });

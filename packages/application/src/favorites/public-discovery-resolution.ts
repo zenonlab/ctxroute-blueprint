@@ -38,3 +38,14 @@ export async function requestPublicFavoriteDiscovery(
   query.sourceFormat = hasFavoriteOvaMarker(sourceTitles) ? 'OVA' : 'NON_OVA';
   return port.resolveOrRequest(key, query);
 }
+
+export async function requestPublicFavoriteDiscoveryRecovery(
+  port: PublicDiscoveryRequestClientPort,
+  key: PublicDiscoveryKey,
+  artifact: FavoriteParseArtifact,
+  options?: { readonly explicitProviderReference?: FavoritePublicReference },
+): Promise<PublicDiscoveryReadState> {
+  if (port.requestRecovery === undefined) throw new Error('PUBLIC_DISCOVERY_RECOVERY_UNAVAILABLE');
+  const recoveryPort: PublicDiscoveryRequestClientPort = { ...port, resolveOrRequest: port.requestRecovery };
+  return requestPublicFavoriteDiscovery(recoveryPort, key, artifact, options);
+}

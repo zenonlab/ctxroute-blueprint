@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "title": "Remédiation des goulots de découverte des favoris",
+  "date": "2026-09-22",
+  "scope": "Réduire les RETRYABLE sans réarmer FAILED ni muter la production sans confirmation immédiate.",
+  "evidence": {
+    "realRun": {
+      "observed": 1522,
+      "resolved": 65,
+      "review": 8,
+      "retryable": 1410,
+      "unsupported": 39,
+      "blocked": 0,
+      "admissionWaiting": 994,
+      "providerPaused": 336,
+      "publicDiscoveryPending": 63,
+      "internalErrors": 14,
+      "rateLimited": 3,
+      "resolutionReasons": {
+        "PROVIDER_UNAVAILABLE": 336,
+        "PUBLIC_DISCOVERY_PENDING": 63,
+        "ADMISSION_WAIT": 994,
+        "INTERNAL_FAILURE": 14,
+        "RATE_LIMITED": 3
+      }
+    },
+    "externalBlocker": "Lecture D1 distante bloquée par l’authentification Wrangler/API Cloudflare (code 10000) ; aucune mutation distante effectuée."
+  },
+  "bottlenecks": [
+    {
+      "id": "admission",
+      "finding": "L’ancien intervalle client global de 6500 ms fabriquait des ADMISSION_WAIT pendant un import massif.",
+      "action": "Cadence locale 250 ms, attente inline bornée à 1 s, refresh manuel fail-fast.",
+      "status": "started",
+      "validation": "Tests adapters-browser et test de concurrence à ajouter."
+    },
+    {
+      "id": "extension-wake",
+      "finding": "Le réveil extension impose un plancher de 30 s et mélange attente PENDING, pause fournisseur et retryable dans l’état visible.",
+      "action": "Conserver le plancher d’alarme navigateur de 30 s, mais afficher séparément admission, cache public, cooldown fournisseur, réseau et erreur interne.",
+      "status": "started",
+      "validation": "Tests runtime 154/154, typecheck extension et profil Chromium dédié ; les états provider sont séparés et la récupération explicite est persistante par tranches de 20 candidats, succès ou échecs, avec curseur local."
+    },
+    {
+      "id": "queue-d1",
+      "finding": "Le worker claim 20 éléments par exécution et ne doit continuer que lorsqu’un nextPendingAt éligible existe.",
+      "action": "Vérifier claims, leases, déférés, continuation et signal Queue idempotent.",
+      "status": "started",
+      "validation": "Configuration locale 5/10 s/2 et claim(5) ; tests queue/D1 avec lots synthétiques et vérification rows_written. Déploiement protégé encore requis."
+    },
+    {
+      "id": "provider-circuit",
+      "finding": "Les pauses fournisseurs et cooldowns D1 dominent après correction de la cadence client.",
+      "action": "Auditer seuil, cooldown, Retry-After, half-open et repli par type de média.",
+      "status": "planned",
+      "validation": "Tests resolver/worker : 429, 5xx, timeout, 404, no-result et fallback."
+    },
+    {
+      "id": "observability",
+      "finding": "Le statut visible classe globalement les attentes comme waiting-provider/retryable et rend les runs offline/online ambigus.",
+      "action": "Expose des compteurs distincts et étiquette honnêtement le harness.",
+      "status": "planned",
+      "validation": "Typecheck, diagnostics sans donnée privée, Archify dataflow."
+    },
+    {
+      "id": "historical-recovery",
+      "finding": "La reprise des lignes FAILED/ATTEMPT_LIMIT est une mutation de production séparée, actuellement non autorisée par l’audit distant bloqué.",
+      "action": "Préparer un runbook canari puis reprise par lots avec backup, seuils d’arrêt et confirmation immédiate.",
+      "status": "prepared-blocked-external",
+      "control": "Le bouton de récupération est prêt mais n’a pas été déclenché ; le canari et l’accès Wrangler restent requis.",
+      "validation": "Canari manga/anime et accès Wrangler rétabli avant toute écriture."
+    }
+  ],
+  "orderedSteps": [
+    { "id": 1, "title": "Ajouter le test de concurrence d’admission et valider le correctif 250 ms.", "owner": "local", "mutation": "none" },
+    { "id": 2, "title": "Corriger le réveil extension et la représentation des états.", "owner": "extension", "mutation": "local", "status": "started" },
+    { "id": 2.1, "title": "Préparer une reprise explicite des demandes fournisseur épuisées sans réarmement silencieux.", "owner": "extension", "mutation": "local", "status": "validated", "validation": "Typecheck, test UI et test adaptateur ; aucune mutation distante exécutée." },
+    { "id": 3, "title": "Certifier claim/defer/continuation Queue-D1 sur lots synthétiques.", "owner": "worker", "mutation": "local" },
+    { "id": 4, "title": "Certifier circuits et replis AniList/MangaUpdates vers Kitsu/MangaDex.", "owner": "resolver", "mutation": "local" },
+    { "id": 5, "title": "Rendre les diagnostics exploitables et mettre à jour le dataflow.", "owner": "observability", "mutation": "local" },
+    { "id": 6, "title": "Exécuter canaris puis reprise D1 bornée uniquement après accès rétabli et confirmation immédiate.", "owner": "protected-production", "mutation": "production" }
+  ],
+  "rollback": "Revenir au commit précédent du correctif local ; ne pas supprimer ni réécrire les lignes D1 existantes.",
+  "acceptance": [
+    "Les erreurs de cadence ne consomment pas les tentatives provider.",
+    "Les attentes PENDING, pauses provider, rate limits et erreurs réseau sont séparées.",
+    "Les canaris passent avant toute reprise historique.",
+    "Aucun secret ni contenu privé n’apparaît dans logs, artefacts ou documentation."
+  ]
+}

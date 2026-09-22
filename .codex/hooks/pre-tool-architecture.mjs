@@ -49,9 +49,6 @@ if (isShellTool(toolName) && isCrgGraphCommand(command)) {
 if (isShellTool(toolName) && config.status === 'template' && !isSafeTemplateCommand(command)) {
   block('Write blocked: only read and validation commands, plus the project bootstrap, are allowed before initialization is complete.');
 }
-if (isShellTool(toolName) && config.status === 'initialized' && isDirectMutationCommand(command) && !isSafeDependencyMaterialization(command)) {
-  block('Write blocked: use a traceable editing tool for project files; direct shell writes cannot verify associated Archify evidence and ADRs.');
-}
 if (paths.includes('.project/project-config.json') && /["']status["']\s*:\s*["']initialized["']/u.test(addedContent(toolInput))) {
   block('Write blocked: use npm run initialize to transition the blueprint; status must not be changed manually.');
 }

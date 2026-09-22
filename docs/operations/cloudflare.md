@@ -351,9 +351,15 @@ Le correctif local conserve les routes v3, le schéma D1, les secrets et les
 quotas existants. Ressources du parcours publié : Worker
 `tobirink-public-api`, D1 `tobirink-public`, Queue `tobirink-public-discovery`
 et sa DLQ `tobirink-public-discovery-dlq`. Aucun changement de gateway n’est
-prévu. L’admission reste limitée à 10/minute, le claim à 20 et la concurrence
-Queue à 1; les continuations attendent 1–900 secondes et les appels extension
+prévu. L’admission reste limitée à 10/minute. La configuration actuellement
+déployée conserve un claim à 20 et une concurrence Queue à 1; les continuations
+attendent 1–900 secondes et les appels extension
 15 secondes maximum. Une admission répétée ne réarme jamais `FAILED`.
+
+La cible locale de remédiation réduit le claim à 5, attend jusqu’à 10 secondes
+pour former le lot et autorise 2 consumers. Elle est versionnée dans
+`apps/worker/wrangler.jsonc` mais nécessite encore le flux CI protégé avant de
+devenir la configuration active.
 
 Pour toute nouvelle opération, réinspecter via la gate le déploiement actif et
 matérialiser un plan frais limité aux ressources autorisées. La version de repli
@@ -639,8 +645,10 @@ route restoration and Cron restoration are five separately observable phases.
 Public Discovery uses migration `0018_discovery_admission_state.sql`. Only an
 admission `created` sends the opaque Queue signal; `existing` returns the
 cached or pending state without sending and `saturated` returns 503. The
-consumer accepts twenty signals, waits at most five seconds to form a batch and
-permits one concurrent consumer. It invokes one `claim(20)` and acknowledges
+currently deployed consumer accepts twenty signals, waits at most five seconds
+to form a batch and permits one concurrent consumer. The remediated target
+accepts five signals, waits at most ten seconds and permits two concurrent
+consumers. It invokes one `claim(5)` in the target code and acknowledges
 redundant signals. The D1 outbox moves through `UNSENT`, `SENDING`, then `SENT`. If an
 initial Queue send fails, keep the PENDING row and return it to `UNSENT`; an
 identical POST can reclaim that unconfirmed send without creating another row.
@@ -1040,3 +1048,6 @@ répond autrement que 200 au healthcheck, ou si le budget D1/Queue dépasse le
 plan. Conserver les profils existants et les archives 1.0.41/1.0.42. Le
 rollback du seul code Worker repasse par un plan de déploiement revu; une
 restauration D1 est une opération séparée et non automatique.
+## Reprise Discovery bornée
+
+La limite d’admission publique est de 60 requêtes par minute et par IP ; l’extension attend au moins 1,1 seconde entre deux soumissions et respecte `Retry-After`. Le consommateur Queue réclame au plus cinq demandes par lot. Un second cron Worker, toutes les quinze minutes, réveille ce traitement borné pour les demandes D1 arrivées à échéance lorsqu’un signal Queue a disparu ; le cron Agenda hebdomadaire reste séparé et inchangé. Toute publication ou reprise D1 historique exige les canaris et la confirmation immédiate prévue par la procédure de production.

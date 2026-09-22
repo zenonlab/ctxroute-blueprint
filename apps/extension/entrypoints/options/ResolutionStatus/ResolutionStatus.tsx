@@ -9,7 +9,7 @@ export interface ResolutionStatusProps {
   inventory?: { continuationAt?: string; startedAt?: string; status: 'not-started' | 'inventory' | 'presence' | 'complete' } | undefined;
   state: 'loading' | 'running' | 'ready' | 'error';
   onReconcile: () => void;
-  onControl: (action: 'pause' | 'resume' | 'retry-blocked') => void;
+  onControl: (action: 'pause' | 'resume' | 'retry-blocked' | 'retry-provider-unavailable') => void;
   onDiagnosticsToggle: () => void;
   onRefresh: () => void;
 }
@@ -41,9 +41,15 @@ const controllerLabels = {
 
 export function ResolutionStatus({ controller, counts, diagnostics, inventory, onControl, onDiagnosticsToggle, onReconcile, onRefresh, state }: ResolutionStatusProps) {
   const latestDiagnostic = diagnostics?.events.at(-1);
-  const waitingLabel = counts?.publicDiscoveryPending
-    ? counts.internalErrors ? 'Attente du cache public et reprise après erreur locale' : 'Attente des résultats du cache public'
-    : counts?.internalErrors ? 'Reprise après erreur locale' : 'Attente avant une nouvelle tentative';
+  const waitingLabel = counts?.admissionWaiting
+    ? 'Mise en file des demandes publiques'
+    : counts?.publicDiscoveryPending
+      ? counts.internalErrors ? 'Attente du cache public et reprise après erreur locale' : 'Attente des résultats du cache public'
+      : counts?.providerPaused || counts?.rateLimited
+        ? 'Attente de la réouverture des fournisseurs'
+        : counts?.networkErrors
+          ? 'Reprise après indisponibilité réseau'
+          : counts?.internalErrors ? 'Reprise après erreur locale' : 'Attente avant une nouvelle tentative';
   const inventoryLabel = inventory?.status === 'complete'
     ? 'Inventaire vérifié'
     : inventory?.status === 'presence'
@@ -99,6 +105,7 @@ export function ResolutionStatus({ controller, counts, diagnostics, inventory, o
         <Button disabled={state === 'loading' || state === 'running' || controller?.paused} onClick={onReconcile} variant="primary">{actionLabel}</Button>
         {controller ? <Button disabled={state === 'loading' || state === 'running'} onClick={() => onControl(controller.paused ? 'resume' : 'pause')}>{controller.paused ? 'Reprendre l’analyse' : 'Mettre en pause'}</Button> : null}
         {counts?.blocked ? <Button disabled={state === 'loading' || state === 'running' || controller?.paused} onClick={() => onControl('retry-blocked')}>Réessayer les tâches bloquées</Button> : null}
+        {counts?.providerPaused ? <Button disabled={state === 'loading' || state === 'running' || controller?.paused} onClick={() => onControl('retry-provider-unavailable')}>Relancer les demandes épuisées</Button> : null}
         <Button disabled={state === 'loading' || state === 'running'} onClick={onRefresh}>Actualiser l’état</Button>
       </div>
     </div>

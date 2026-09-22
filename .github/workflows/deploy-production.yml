@@ -78,6 +78,11 @@ jobs:
       - name: Verify repository
         run: npm run verify
 
+      - name: Collect aggregate Discovery diagnostics
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/infra/public-discovery-diagnostics.mjs
+
       - name: Create expiring Cloudflare plan
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

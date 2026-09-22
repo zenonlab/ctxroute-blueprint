@@ -3,14 +3,51 @@ import { z } from 'zod';
 
 export const favoriteResolutionContinuationAlarmName = 'tobirink-favorite-resolution-continuation-v1';
 export const favoriteResolutionContinuationMinimumDelayMs = 30_000;
+export const favoriteProviderRecoveryAlarmName = 'tobirink-provider-recovery-continuation-v1';
+export const favoriteProviderRecoveryMinimumDelayMs = 30_000;
+export const favoriteProviderRecoveryMaximumDurationMs = 15_000;
+export const favoriteProviderRecoveryMaximumAdmissions = 10;
+export const favoriteProviderRecoveryCursorKey = 'tobirink.favorite-provider-recovery.v1';
 export const favoriteResolutionControlKey = 'tobirink.favorite-resolution-control.v1';
 const favoriteResolutionControlSchema = z.strictObject({ paused: z.boolean(), version: z.literal(1) });
 type FavoriteResolutionControl = z.infer<typeof favoriteResolutionControlSchema>;
 type FavoriteResolutionControlValues = { [favoriteResolutionControlKey]?: FavoriteResolutionControl };
+const favoriteProviderRecoveryCursorSchema = z.strictObject({ afterId: z.string().min(1).optional(), retryAt: z.iso.datetime({ offset: false }).optional(), version: z.literal(1) });
+export type FavoriteProviderRecoveryCursor = z.infer<typeof favoriteProviderRecoveryCursorSchema>;
+type FavoriteProviderRecoveryCursorValues = { [favoriteProviderRecoveryCursorKey]?: FavoriteProviderRecoveryCursor };
 
 export interface FavoriteResolutionControlStorage {
   get(key: typeof favoriteResolutionControlKey): Promise<FavoriteResolutionControlValues>;
   set(value: { [favoriteResolutionControlKey]: FavoriteResolutionControl }): Promise<void>;
+}
+
+export interface FavoriteProviderRecoveryCursorStorage {
+  get(key: typeof favoriteProviderRecoveryCursorKey): Promise<FavoriteProviderRecoveryCursorValues>;
+  set(value: { [favoriteProviderRecoveryCursorKey]: FavoriteProviderRecoveryCursor } | { [favoriteProviderRecoveryCursorKey]: undefined }): Promise<void>;
+}
+
+export async function readFavoriteProviderRecoveryCursor(storage: FavoriteProviderRecoveryCursorStorage): Promise<FavoriteProviderRecoveryCursor | undefined> {
+  const value = (await storage.get(favoriteProviderRecoveryCursorKey))[favoriteProviderRecoveryCursorKey];
+  const parsed = favoriteProviderRecoveryCursorSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+export async function writeFavoriteProviderRecoveryCursor(storage: FavoriteProviderRecoveryCursorStorage, cursor: Omit<FavoriteProviderRecoveryCursor, 'version'> | undefined): Promise<void> {
+  if (cursor === undefined) {
+    await storage.set({ [favoriteProviderRecoveryCursorKey]: undefined });
+    return;
+  }
+  await storage.set({ [favoriteProviderRecoveryCursorKey]: { ...cursor, version: 1 } });
+}
+
+export async function restoreFavoriteProviderRecoveryContinuation(alarms: FavoriteResolutionAlarmPort, storage: FavoriteProviderRecoveryCursorStorage, now = Date.now): Promise<void> {
+  const cursor = await readFavoriteProviderRecoveryCursor(storage);
+  if (cursor === undefined) {
+    await alarms.clear(favoriteProviderRecoveryAlarmName);
+    return;
+  }
+  const retryAt = cursor.retryAt === undefined ? 0 : Date.parse(cursor.retryAt);
+  await alarms.create(favoriteProviderRecoveryAlarmName, { when: Math.max(now() + favoriteProviderRecoveryMinimumDelayMs, Number.isFinite(retryAt) ? retryAt : 0) });
 }
 
 export async function readFavoriteResolutionPaused(storage: FavoriteResolutionControlStorage): Promise<boolean> {

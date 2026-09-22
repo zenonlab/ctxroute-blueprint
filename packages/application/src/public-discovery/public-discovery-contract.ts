@@ -95,6 +95,7 @@ export interface PublicDiscoveryClientPort {
 export interface PublicDiscoveryRequestClientPort {
   setDeadline?(deadline: number): void;
   lookup?(keys: readonly PublicDiscoveryKey[]): Promise<readonly { key: PublicDiscoveryKey; state: PublicDiscoveryReadState }[]>;
+  requestRecovery?(key: PublicDiscoveryKey, query: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState>;
   requestRefresh?(key: PublicDiscoveryKey): Promise<Extract<PublicDiscoveryReadState, { state: 'VERIFIED' }>>;
   resolveOrRequest(key: PublicDiscoveryKey, query: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState>;
 }

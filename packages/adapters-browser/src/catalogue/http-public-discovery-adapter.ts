@@ -19,6 +19,10 @@ interface DiscoveryClockStorage {
   set(values: Record<string, number>): Promise<void>;
 }
 const admissionClockKey = 'public-discovery-admission-v1';
+// Admission is a lightweight D1 enqueue write. Stay below the public
+// 60/minute admission ceiling, including a small clock-skew margin.
+export const publicDiscoveryAdmissionIntervalMs = 1_100;
+const publicDiscoveryAdmissionMaximumInlineWaitMs = 1_100;
 const stateSchema = z.discriminatedUnion('state', [
   z.strictObject({ state: z.literal('MISS') }),
   z.strictObject({ retryAt: z.iso.datetime({ offset: false }), state: z.literal('PENDING') }),
@@ -61,11 +65,13 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     if (this.clockStorage !== undefined) await this.clockStorage.set({ [key]: value });
     this.clocks.set(key, value);
   }
-  private async reserveAdmission(): Promise<void> {
+  private async reserveAdmission(allowInlineWait = true): Promise<void> {
     const reserved = this.gate.catch(() => undefined).then(async () => {
       const next = await this.clock(admissionClockKey);
-      if (next > Date.now()) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(next).toISOString());
-      await this.saveClock(admissionClockKey, Date.now() + 6_500);
+      const waitMs = next - Date.now();
+      if (waitMs > 0 && (!allowInlineWait || waitMs > publicDiscoveryAdmissionMaximumInlineWaitMs)) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(next).toISOString());
+      if (waitMs > 0) await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+      await this.saveClock(admissionClockKey, Date.now() + publicDiscoveryAdmissionIntervalMs);
     });
     this.gate = reserved;
     return reserved;
@@ -119,7 +125,7 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
 
   async requestRefresh(input: PublicDiscoveryKey) {
     const key = publicDiscoveryKeySchema.parse(input);
-    await this.reserveAdmission();
+    await this.reserveAdmission(false);
     const state = await this.exchange(new URL('/v3/catalogue/discoveries/refreshes', this.origin).toString(), {
       body: JSON.stringify({ key, schemaVersion: 3 }), cache: 'no-store', credentials: 'omit',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
@@ -127,6 +133,23 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     if (state.state !== 'VERIFIED') throw new PublicDiscoveryError('INVALID_RESPONSE');
     this.cache.set(JSON.stringify(key), { expiresAt: Date.now() + 25_000, state });
     return state;
+  }
+
+  async requestRecovery(input: PublicDiscoveryKey, inputQuery: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState> {
+    const key = publicDiscoveryKeySchema.parse(input);
+    const query = publicDiscoveryQuerySchema.parse(inputQuery);
+    await this.reserveAdmission();
+    const admitted = await this.exchange(new URL('/v3/catalogue/discoveries/requests', this.origin).toString(), {
+      body: JSON.stringify({ key, query, schemaVersion: 3 }), cache: 'no-store', credentials: 'omit',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
+    }, stateSchema);
+    if (admitted.state === 'PENDING') {
+      const next = Math.max(Date.now() + 60_000, Date.parse(admitted.retryAt));
+      await this.saveClock(`public-discovery-pending-v1:${JSON.stringify(key)}`, next);
+      admitted.retryAt = new Date(next).toISOString();
+    }
+    this.cache.set(JSON.stringify(key), { expiresAt: Date.now() + 25_000, state: admitted });
+    return admitted;
   }
 
   async resolveOrRequest(input: PublicDiscoveryKey, inputQuery: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState> {

@@ -1,4 +1,4 @@
-import { applyConfirmedOrganizerPreview, createEncryptedBackup, parseOrganizerConfiguration, readLibraryPage, readLocalReleaseAgenda, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, restoreEncryptedBackup, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
+import { applyConfirmedOrganizerPreview, createEncryptedBackup, favoriteIdentityKey, parseOrganizerConfiguration, PublicDiscoveryError, readLibraryPage, readLocalReleaseAgenda, readOrganizerPreview, readPopupContext, readReviewQueue, restoreConfirmedOrganizerSnapshot, restoreEncryptedBackup, saveOrganizerConfiguration, scheduleAgendaPeriodNotifications } from '@tobirink/application';
 import {
   anilistSourceAdapter,
   mangaUpdatesSourceAdapter,
@@ -14,7 +14,8 @@ import {
   HttpPublicReleaseLoader,
 } from '@tobirink/adapters-browser';
 import { DexieFavoriteResolutionOutbox, DexieLocalReleaseAgenda, DexieOrganizerSnapshotStore, DexiePrivateRecoveryStore, DexiePublicReleaseGenerationCache, DexieTaskStore } from '@tobirink/adapters-indexeddb';
-import { isContentVisible, libraryId, workId } from '@tobirink/domain';
+import { favoriteSourceId, isContentVisible, libraryId, workId } from '@tobirink/domain';
+import type { FavoriteSourceId } from '@tobirink/domain';
 import { repairFavoriteLibraryProjection } from '../runtime/repair-library-projection';
 import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from '../runtime/local-review-runtime';
 import { readLocalSearchSnapshot } from '../runtime/local-search-runtime';
@@ -26,9 +27,9 @@ const configuredSiteOrigin = import.meta.env.WXT_PUBLIC_SITE_ORIGIN?.trim() || '
 import { createWebBridgeRuntime } from '../runtime/web-bridge-runtime';
 import { createWebBridgeRequestHandler } from '../runtime/web-bridge-adapter';
 import { createFavoriteResolutionRuntime, favoriteInventoryAuditAlarmName, favoriteInventoryAuditPeriodMinutes, subscribeFavoriteBookmarkMutations } from '../runtime/favorite-resolution-runtime';
-import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda, publicAgendaWindow } from '@tobirink/application';
+import { bundledFavoriteSiteRules, createFavoriteSiteAdapters, projectLocalReleaseAgenda, publicAgendaWindow, requestPublicFavoriteDiscoveryRecovery } from '@tobirink/application';
 import { WebExtensionDiagnostics } from '../runtime/extension-diagnostics';
-import { favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, readFavoriteResolutionPaused, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteResolutionPaused } from '../runtime/favorite-resolution-continuation';
+import { favoriteProviderRecoveryAlarmName, favoriteProviderRecoveryMaximumAdmissions, favoriteProviderRecoveryMaximumDurationMs, favoriteProviderRecoveryMinimumDelayMs, favoriteResolutionContinuationAlarmName, favoriteResolutionContinuationMinimumDelayMs, readFavoriteProviderRecoveryCursor, readFavoriteResolutionPaused, restoreFavoriteProviderRecoveryContinuation, restoreFavoriteResolutionContinuation, updateFavoriteResolutionContinuation, writeFavoriteProviderRecoveryCursor, writeFavoriteResolutionPaused } from '../runtime/favorite-resolution-continuation';
 import { createPublicDiscoveryRefreshRuntime } from '../runtime/public-discovery-refresh-runtime';
 import { createLocalAgendaQueue } from '../runtime/local-agenda-queue';
 
@@ -131,6 +132,64 @@ export default defineBackground({
       }
       await runFavoriteResolution(inventoryRequested);
     };
+    let providerRecoveryInFlight: Promise<number> | undefined;
+    const recoverProviderUnavailableFavorites = (): Promise<number> => {
+      if (providerRecoveryInFlight !== undefined) return providerRecoveryInFlight;
+      const recovery = async () => {
+      const cursor = await readFavoriteProviderRecoveryCursor(browser.storage.local);
+      let afterId: FavoriteSourceId | undefined = cursor?.afterId === undefined ? undefined : favoriteSourceId(cursor.afterId);
+      const deadline = Date.now() + favoriteProviderRecoveryMaximumDurationMs;
+      let recovered = 0;
+      let attempted = 0;
+      for (;;) {
+        const page = await privateStorage.storage.listFavoriteSources({ afterId, limit: 100 });
+        for (const source of page) {
+          if (Date.now() >= deadline) {
+            await writeFavoriteProviderRecoveryCursor(browser.storage.local, { afterId });
+            await browser.alarms.create(favoriteProviderRecoveryAlarmName, { when: Date.now() + favoriteProviderRecoveryMinimumDelayMs });
+            return recovered;
+          }
+          if (source.presence !== 'observed' || source.resolution?.kind !== 'RETRYABLE' || source.resolution.reason !== 'PROVIDER_UNAVAILABLE') {
+            afterId = source.id;
+            continue;
+          }
+          const artifact = (await privateStorage.storage.getFavoriteParseArtifact(source.id))?.artifact;
+          if (artifact === undefined) {
+            afterId = source.id;
+            continue;
+          }
+          attempted += 1;
+          try {
+            const key = await favoriteIdentityKey(artifact);
+            publicDiscovery.setDeadline(deadline);
+            await requestPublicFavoriteDiscoveryRecovery(publicDiscovery, key, artifact);
+            recovered += 1;
+            afterId = source.id;
+          } catch (error) {
+            const retryAt = error instanceof PublicDiscoveryError && error.retryAt !== undefined
+              ? error.retryAt : new Date(Date.now() + favoriteProviderRecoveryMinimumDelayMs).toISOString();
+            await writeFavoriteProviderRecoveryCursor(browser.storage.local, { afterId, retryAt });
+            await browser.alarms.create(favoriteProviderRecoveryAlarmName, { when: Math.max(Date.now() + favoriteProviderRecoveryMinimumDelayMs, Date.parse(retryAt)) });
+            return recovered;
+          } finally {
+            publicDiscovery.setDeadline(Infinity);
+          }
+          if (attempted >= favoriteProviderRecoveryMaximumAdmissions || Date.now() >= deadline) {
+            await writeFavoriteProviderRecoveryCursor(browser.storage.local, { afterId });
+            await browser.alarms.create(favoriteProviderRecoveryAlarmName, { when: Date.now() + favoriteProviderRecoveryMinimumDelayMs });
+            return recovered;
+          }
+        }
+        if (page.length < 100) {
+          await writeFavoriteProviderRecoveryCursor(browser.storage.local, undefined);
+          await browser.alarms.clear(favoriteProviderRecoveryAlarmName);
+          return recovered;
+        }
+      }
+      };
+      providerRecoveryInFlight = recovery().finally(() => { providerRecoveryInFlight = undefined; });
+      return providerRecoveryInFlight;
+    };
     browser.runtime.onInstalled.addListener(() => {
       void (async () => {
         await ensureReminderAlarm();
@@ -209,11 +268,19 @@ export default defineBackground({
       }, new Date()));
     };
     browser.runtime.onStartup.addListener(() => {
-      void Promise.all([ensureReminderAlarm(), ensureFavoriteInventoryAuditAlarm()]).then(() => Promise.all([resumeNotifications(), reconcileFavorites()])).catch(() => undefined);
+      void Promise.all([ensureReminderAlarm(), ensureFavoriteInventoryAuditAlarm(), restoreFavoriteProviderRecoveryContinuation(browser.alarms, browser.storage.local)])
+        .then(() => Promise.all([resumeNotifications(), reconcileFavorites()])).catch(() => undefined);
     });
     browser.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === reminderAlarmName || alarm.name === agendaNextAlarmName || alarm.name === agendaReconcileAlarmName) void Promise.all([resumeNotifications(), restoreFavoriteWake()]).catch(() => undefined);
       if (alarm.name === favoriteResolutionContinuationAlarmName) void reconcileFavorites().then(repairLibraryProjection).catch(() => undefined);
+      if (alarm.name === favoriteProviderRecoveryAlarmName) void (async () => {
+        if (await resolutionPaused()) return;
+        await privateStorage.ensureReady();
+        await recoverProviderUnavailableFavorites();
+        await reconcileFavorites();
+        await repairLibraryProjection();
+      })().catch(() => undefined);
       if (alarm.name === favoriteInventoryAuditAlarmName) void reconcileFavorites(true).then(repairLibraryProjection).catch(() => undefined);
     });
     browser.runtime.onMessage.addListener(async (value, sender) => {
@@ -261,6 +328,11 @@ export default defineBackground({
               await browser.alarms.clear(favoriteResolutionContinuationAlarmName);
             } else if (parsed.data.action === 'resume') {
               await writeFavoriteResolutionPaused(browser.storage.local, false);
+              await reconcileFavorites();
+              await repairLibraryProjection();
+            } else if (parsed.data.action === 'retry-provider-unavailable') {
+              if (await resolutionPaused()) throw new Error('FAVORITE_RESOLUTION_PAUSED');
+              await recoverProviderUnavailableFavorites();
               await reconcileFavorites();
               await repairLibraryProjection();
             } else {

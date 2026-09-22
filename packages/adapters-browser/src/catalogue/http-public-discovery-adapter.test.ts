@@ -91,6 +91,24 @@ describe('HttpPublicDiscoveryAdapter', () => {
     expect(JSON.stringify(bodies)).not.toMatch(/lease|consent|collective|bookmark|folder|progress/iu);
   });
 
+  it('paces concurrent admissions without converting short waits into retryable failures', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-14T12:00:00.000Z');
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => init.method === 'GET'
+      ? Response.json({ state: 'MISS' })
+      : Response.json({ retryAt: new Date(Date.now() + 60_000).toISOString(), state: 'PENDING' }, { status: 202 }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    const requests = [
+      adapter.resolveOrRequest({ ...key, fingerprint: '1'.repeat(64) }, { ...query, discoveryTitles: ['Frieren One'] }),
+      adapter.resolveOrRequest({ ...key, fingerprint: '2'.repeat(64) }, { ...query, discoveryTitles: ['Frieren Two'] }),
+      adapter.resolveOrRequest({ ...key, fingerprint: '3'.repeat(64) }, { ...query, discoveryTitles: ['Frieren Three'] }),
+    ];
+    const settled = Promise.all(requests);
+    await vi.runAllTimersAsync();
+    await expect(settled).resolves.toHaveLength(3);
+    expect(fetcher).toHaveBeenCalledTimes(6);
+    expect(fetcher.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(3);
+  });
+
   it('returns a full D1 profile without a second request', async () => {
     const profile = {
       candidate: { externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Frieren'] },
@@ -108,6 +126,16 @@ describe('HttpPublicDiscoveryAdapter', () => {
     await expect(adapter.resolveOrRequest(key, query)).resolves.toEqual({ reason: 'ATTEMPT_LIMIT', state: 'UNAVAILABLE' });
     expect(fetcher).toHaveBeenCalledOnce();
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/v3/catalogue/discoveries?'), expect.objectContaining({ method: 'GET' }));
+  });
+
+  it('rearms an unavailable request only through the explicit recovery method', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-18T12:00:00.000Z');
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
+      expect(init.method).toBe('POST');
+      return Response.json({ retryAt: new Date(Date.now() + 60_000).toISOString(), state: 'PENDING' }, { status: 202 });
+    });
+    await expect(new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher).requestRecovery(key, query)).resolves.toMatchObject({ state: 'PENDING' });
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 
   it('groups fifty reads, reuses the cached state and submits a bounded refresh', async () => {
