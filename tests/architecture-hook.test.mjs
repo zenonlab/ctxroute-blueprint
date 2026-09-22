@@ -179,21 +179,17 @@ test('blocks code outside declared directories after initialization', () => {
   assert.match(result.stdout, /outside declared directories/u);
 });
 
-test('blocks direct shell writes after initialization', () => {
+test('does not impose a direct shell-write gate after initialization', () => {
   const cwd = initializedWorkspace();
   const result = run({ cmd: 'touch src/service.rb' }, { cwd, toolName: 'exec_command' });
-  assert.match(result.stdout, /traceable editing tool/u);
+  assert.equal(result.stdout, '');
 });
 
-test('allows only script-free dependency materialization after initialization', () => {
+test('does not impose dependency-install command restrictions after initialization', () => {
   const cwd = initializedWorkspace();
-  for (const cmd of ['npm install --package-lock-only --ignore-scripts', 'npm ci --ignore-scripts', 'npx --yes npm@10.9.9 install --package-lock-only --ignore-scripts']) {
+  for (const cmd of ['npm install --package-lock-only --ignore-scripts', 'npm ci --ignore-scripts', 'npx --yes npm@10.9.9 install --package-lock-only --ignore-scripts', 'npm install', 'npm ci', 'npm ci --foreground-scripts', 'npm install --ignore-scripts']) {
     const result = run({ cmd }, { cwd, toolName: 'exec_command' });
-    assert.doesNotMatch(result.stdout, /decision":"block/u, cmd);
-  }
-  for (const cmd of ['npm install', 'npm ci', 'npm ci --foreground-scripts', 'npm install --ignore-scripts']) {
-    const result = run({ cmd }, { cwd, toolName: 'exec_command' });
-    assert.match(result.stdout, /traceable editing tool/u, cmd);
+    assert.equal(result.stdout, '', cmd);
   }
 });
 
@@ -205,11 +201,11 @@ test('allows read-only stderr discard after initialization', () => {
   }
 });
 
-test('keeps output and non-null stderr redirections blocked after initialization', () => {
+test('does not impose output-redirection command restrictions after initialization', () => {
   const cwd = initializedWorkspace();
   for (const cmd of ['rg -n service src > report.txt', 'rg -n service src 2> errors.log', 'rg -n service src 2>>/dev/null', 'rg -n service src 2>/dev/null > report.txt']) {
     const result = run({ cmd }, { cwd, toolName: 'exec_command' });
-    assert.match(result.stdout, /traceable editing tool/u, cmd);
+    assert.equal(result.stdout, '', cmd);
   }
 });
 
