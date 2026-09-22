@@ -37,6 +37,19 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     expect(result.candidates[0]).not.toHaveProperty('editorialStatus');
   });
 
+  it('accepts the larger category and alias collections returned by detail hydration', async () => {
+    const detail = {
+      ...series,
+      associated: Array.from({ length: 19 }, (_, index) => ({ title: `Alias ${index}` })),
+      categories: Array.from({ length: 344 }, (_, index) => ({ category: `Category ${index}` })),
+    };
+    const fetcher = vi.fn(async () => Response.json(detail));
+    const hydrated = await new MangaUpdatesFavoriteProviderAdapter(fetcher).hydrate({ provider: 'mangaupdates', externalId: '12345' });
+    expect(hydrated).toMatchObject({ externalId: '12345', displayTitle: 'Synthetic Series' });
+    expect(hydrated?.titles).toHaveLength(20);
+    expect(hydrated?.categories).toHaveLength(32);
+  });
+
   it('maps search results and exposes truncation', async () => {
     let requestInit: RequestInit | undefined;
     const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
