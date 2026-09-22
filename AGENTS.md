@@ -4,14 +4,15 @@
 
 While `.project/project-config.json` has `"status": "template"`, before writing product code, the agent must:
 
-1. Read every starter document and the complete user request.
-2. Identify goals, constraints, and genuinely missing information.
-3. Define language, runtime, frontend, backend, storage, tests, deployment, observability, security, and performance constraints in `docs/00-project-brief.md`.
-4. At the end of each architecture-relevant step, produce or update the product-only Archify JSON IR that best matches the result (`architecture`, `workflow`, `sequence`, `dataflow`, or `lifecycle`) and showcase-validate it. Never expose blueprint control-plane components in a product diagram; `all` selects only product sources.
-5. Choose the test strategy in `docs/02-quality-strategy.md`.
-6. Add required ADRs under `docs/decisions/`.
-7. Remove guide comments and placeholders, record only real decisions and commands, then change `.project/project-config.json` to `initialized`.
-8. Validate the complete structure, request confirmation before any deletion, and commit verified work automatically.
+1. Confirm this is the derived project's own Git repository and that `origin` is not `https://github.com/zenonlab/ctxroute-blueprint.git`. Use GitHub **Use this template** or create a new repository and set its remote before product initialization. If the checkout still points to the blueprint, do not write product code or push; ask for the derived repository URL.
+2. Read every starter document and the complete user request.
+3. Identify goals, constraints, and genuinely missing information.
+4. Define language, runtime, frontend, backend, storage, tests, deployment, observability, security, and performance constraints in `docs/00-project-brief.md`.
+5. At the end of each architecture-relevant step, produce or update the product-only Archify JSON IR that best matches the result (`architecture`, `workflow`, `sequence`, `dataflow`, or `lifecycle`) and showcase-validate it. Never expose blueprint control-plane components in a product diagram; `all` selects only product sources.
+6. Choose the test strategy in `docs/02-quality-strategy.md`.
+7. Add required ADRs under `docs/decisions/`.
+8. Remove guide comments and placeholders, record only real decisions and commands, then change `.project/project-config.json` to `initialized`.
+9. Validate the complete structure, request confirmation before any deletion, and commit verified work automatically.
 
 If the request already provides this information, use it directly and report only important missing decisions.
 
