@@ -249,6 +249,19 @@ test('pre-tool ADR protection applies only to tracked accepted decisions', () =>
   assert.match(tracked.stdout, /accepted ADR cannot be rewritten/u);
 });
 
+test('pre-tool ADR protection does not treat a staged new ADR as committed', () => {
+  const cwd = initializedWorkspace();
+  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+  const path = join(cwd, 'docs/decisions/ADR-0001-fixture.md');
+  writeFileSync(path, '---\nscope:\n  - src/**\nreview: on-change\n---\n# ADR\n\n- Status: accepted\n\n## Decision\n\nKeep it.\n\n## Consequences\n\nStable.\n');
+  git(cwd, ['init', '-q']);
+  git(cwd, ['config', 'user.email', 'fixture@example.invalid']);
+  git(cwd, ['config', 'user.name', 'Fixture']);
+  git(cwd, ['add', '.']);
+  const result = run({ file_path: 'docs/decisions/ADR-0001-fixture.md' }, { cwd });
+  assert.doesNotMatch(result.stdout, /accepted ADR cannot be rewritten/u);
+});
+
 test('pre-tool ADR protection validates reconstructed supersession patches', () => {
   const cwd = initializedWorkspace();
   mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
