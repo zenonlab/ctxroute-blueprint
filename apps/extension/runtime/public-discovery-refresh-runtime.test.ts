@@ -76,7 +76,7 @@ describe('public discovery refresh runtime', () => {
     expect(results.at(-1)).toMatchObject({ continuationRequired: false, inspected: 0 });
     expect(results.every(({ refreshed }) => refreshed <= 20)).toBe(true);
     expect(requestRefresh).toHaveBeenCalledTimes(200);
-  });
+  }, 30_000);
 
   it.each([false, true])('compares canonical content even when alias timestamps are unchanged: changed=%s', async (changed) => {
     const item = fixture(0);

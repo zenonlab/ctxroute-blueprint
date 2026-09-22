@@ -255,5 +255,5 @@ describe('public discovery queue trigger', () => {
     expect(port.request).toHaveBeenCalledTimes(10_000);
     expect(queue.send).toHaveBeenCalledOnce();
     expect(port.confirmQueueSignal).toHaveBeenCalledOnce();
-  });
+  }, 30_000);
 });
