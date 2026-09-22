@@ -16,16 +16,19 @@ const queries = {
 
 function execute(command) {
   const result = spawnSync('npm', [...common, command], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  if (result.status !== 0) throw new Error(`discovery-diagnostics-query-failed:${result.status ?? 'signal'}`);
-  const payload = JSON.parse(result.stdout);
+  if (result.status !== 0) return undefined;
+  let payload;
+  try { payload = JSON.parse(result.stdout); }
+  catch { return undefined; }
   const first = Array.isArray(payload) ? payload[0] : payload;
   return { meta: first?.meta ?? null, rows: first?.results ?? [] };
 }
 
 const results = Object.fromEntries(Object.entries(queries).map(([name, command]) => [name, execute(command)]));
+const unavailableD1Diagnostics = Object.entries(results).filter(([, value]) => value === undefined).map(([name]) => name);
 process.stdout.write(`${JSON.stringify({
   schemaVersion: 1,
   scope: 'aggregate-only',
-  d1: Object.fromEntries(Object.entries(results).map(([name, value]) => [name, { rows: value.rows, rowsRead: value.meta?.rows_read ?? null, rowsWritten: value.meta?.rows_written ?? null }])),
-  unavailable: ['extension-profile-counters', 'provider-latencies', 'worker-429-counts'],
+  d1: Object.fromEntries(Object.entries(results).flatMap(([name, value]) => value === undefined ? [] : [[name, { rows: value.rows, rowsRead: value.meta?.rows_read ?? null, rowsWritten: value.meta?.rows_written ?? null }]])),
+  unavailable: ['extension-profile-counters', 'provider-latencies', 'worker-429-counts', ...unavailableD1Diagnostics.map(name => `d1-${name}`)],
 })}\n`);
