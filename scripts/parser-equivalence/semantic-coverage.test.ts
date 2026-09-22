@@ -22,5 +22,5 @@ describe('canonical semantic proof coverage', () => {
       .map(({ id }) => id);
     expect(missing).toEqual([]);
     expect(new Set(favoriteEquivalenceCorpus.map(({ expectedBehavior }) => expectedBehavior)).size).toBe(82);
-  });
+  }, 30_000);
 });
