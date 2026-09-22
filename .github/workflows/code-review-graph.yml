@@ -25,7 +25,7 @@ jobs:
 
       - name: Analyze changes with pinned official CRG
         id: review
-        uses: tirth8205/code-review-graph@2c6dae32643572ee528eb9b77dbcc17f58f3a8c9 # v2.3.8
+        uses: tirth8205/code-review-graph@343ab7cea29d47a3e805381e09f8243a43d43d88 # v2.3.9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment: "false"
