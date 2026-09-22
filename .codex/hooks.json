@@ -52,8 +52,7 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex Stop",
-            "timeout": 120,
-            "additionalContextLimit": 1200
+            "timeout": 120
           }
         ]
       }
@@ -83,8 +82,7 @@
           {
             "type": "command",
             "command": "node ./.codex/hooks/lifecycle.mjs codex PreCompact",
-            "timeout": 15,
-            "additionalContextLimit": 1200
+            "timeout": 15
           }
         ]
       }

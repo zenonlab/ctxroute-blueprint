@@ -25,7 +25,11 @@ test('Codex and Claude expose the same six events and explicit hook lanes', () =
       assert.equal(handlers[0].command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event}`);
       assert.ok(handlers[0].timeout > 0, `${file} ${event} timeout`);
       assert.equal('statusMessage' in handlers[0], false, `${file} ${event} should remain quiet`);
-      if (harness === 'codex') assert.equal(handlers[0].additionalContextLimit, 1200, `${file} ${event} context limit`);
+      if (harness === 'codex') {
+        const supportsContext = !['PreCompact', 'Stop'].includes(event);
+        if (supportsContext) assert.equal(handlers[0].additionalContextLimit, 1200, `${file} ${event} context limit`);
+        else assert.equal('additionalContextLimit' in handlers[0], false, `${file} ${event} must not declare an unsupported context limit`);
+      }
       for (const maintenance of handlers.slice(1)) {
         assert.equal(maintenance.async, true, `${file} ${event} maintenance async`);
         assert.equal(maintenance.command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event} maintenance`);

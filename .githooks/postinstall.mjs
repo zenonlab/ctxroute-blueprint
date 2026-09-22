@@ -94,7 +94,9 @@ function inspectHarness(root, relativePath, harness, failures) {
     if ('statusMessage' in (entries[0] ?? {})) failures.push(`${relativePath} ${event} must not declare a noisy statusMessage.`);
     if (entries.some(entry => !Number.isFinite(entry.timeout) || entry.timeout <= 0)) failures.push(`${relativePath} ${event} handlers must declare explicit positive timeouts.`);
     if (harness === 'codex') {
-      if (entries[0]?.additionalContextLimit !== 1200) failures.push(`${relativePath} ${event} synchronous context limit must be 1200.`);
+      const supportsContext = !['PreCompact', 'Stop'].includes(event);
+      if (supportsContext && entries[0]?.additionalContextLimit !== 1200) failures.push(`${relativePath} ${event} synchronous context limit must be 1200.`);
+      if (!supportsContext && 'additionalContextLimit' in (entries[0] ?? {})) failures.push(`${relativePath} ${event} must not declare an unsupported synchronous context limit.`);
       if (entries.slice(1).some(entry => entry.additionalContextLimit !== 0)) failures.push(`${relativePath} ${event} maintenance context limit must be 0.`);
     }
   }
