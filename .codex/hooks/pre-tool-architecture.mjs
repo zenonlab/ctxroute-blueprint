@@ -262,21 +262,6 @@ function unquotedText(value) {
   return result;
 }
 
-function isDirectMutationCommand(value) {
-  const command = value.replace(/(?:^|\s)2\s*>\s*\/dev\/null(?=\s|$)/gu, ' ');
-  return /[>]|\b(?:rm|mv|cp|touch|mkdir|tee|truncate|dd|install|ci)\b|\bsed\s+-i\b|\bfind\b[^\n]*\s-(?:delete|exec)\b|\b(?:node|python|python3|ruby|perl)\s+-e\b/iu.test(command);
-}
-
-function isSafeDependencyMaterialization(value) {
-  const commands = splitSafeShellCommands(value);
-  if (!commands?.length) return false;
-  return commands.every(command => [
-    'npm install --package-lock-only --ignore-scripts',
-    'npm ci --ignore-scripts',
-    'npx --yes npm@10.9.9 install --package-lock-only --ignore-scripts',
-  ].includes(command));
-}
-
 function gitChangedFiles() {
   const files = new Set();
   for (const args of [
