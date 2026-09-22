@@ -3,6 +3,7 @@ import type { ProviderTransportPort } from '@tobirink/public-discovery';
 const requestByteLimit = 64 * 1024;
 const minimumSecretBytes = 32;
 const maximumSecretBytes = 256;
+const productUserAgent = 'TobiRink/1.0 (+https://tobirink.com)';
 
 type ProviderMethod = 'GET' | 'POST';
 type TransportFetch = (input: string, init: RequestInit) => Promise<Response>;
@@ -85,6 +86,12 @@ function rejectRedirect(response: Response): Response {
   return response;
 }
 
+function providerRequestHeaders(init: RequestInit): Headers {
+  const headers = new Headers(init.headers);
+  headers.set('User-Agent', productUserAgent);
+  return headers;
+}
+
 async function hmac(secret: string, value: string): Promise<string> {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { hash: 'SHA-256', name: 'HMAC' }, false, ['sign']);
   const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)));
@@ -96,7 +103,7 @@ export class DirectProviderTransportAdapter implements ProviderTransportPort {
 
   async fetch(target: string, init: RequestInit): Promise<Response> {
     if (!isAllowedProviderTarget(target, methodOf(init))) throw new TypeError('provider-transport-target');
-    return rejectRedirect(await this.fetcher(target, { ...init, cache: 'no-store', redirect: 'manual' }));
+    return rejectRedirect(await this.fetcher(target, { ...init, cache: 'no-store', headers: providerRequestHeaders(init), redirect: 'manual' }));
   }
 }
 

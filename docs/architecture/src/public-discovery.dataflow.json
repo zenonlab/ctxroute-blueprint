@@ -29,7 +29,7 @@
         "id": "boundaries",
         "label": "Frontières",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers"],
-        "note": "La gate route AniList et MangaUpdates via Deno; MangaDex et Kitsu restent directs."
+        "note": "La gate route AniList et MangaUpdates via Deno; MangaDex et Kitsu restent directs avec le User-Agent produit stable."
       }
     ]
   },

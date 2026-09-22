@@ -605,7 +605,10 @@ weekly triggers, no Agenda provider request is expected. The single Queue
 message opens two independent D1 lanes; each lane owns one fifteen-minute lease,
 a page checkpoint, `not_before`, and its last valid snapshot.
 
-AniList is paced at one HTTP request every three seconds and MangaUpdates at
+All Worker and gateway provider requests carry the stable product
+`User-Agent: TobiRink/1.0 (+https://tobirink.com)`; this is required for
+MangaDex and keeps the upstream request identifiable without forwarding user
+data. AniList is paced at one HTTP request every three seconds and MangaUpdates at
 one every six seconds. Count quota consumption in HTTP requests, including
 every pagination request. A `Retry-After` response becomes the per-message
 Queue retry delay, capped at twenty-four hours. Discovery search errors

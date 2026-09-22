@@ -10,7 +10,7 @@
         "id": "discovery-path",
         "label": "Discovery instantanée",
         "focus": ["extension", "worker", "queue", "transport", "gateway", "providers", "directProviders", "d1", "logs"],
-        "note": "Une demande v3 alimente la Queue; AniList et MangaUpdates traversent la gateway signée."
+        "note": "Queue; AniList/MU via gateway signée; chemins directs avec User-Agent produit."
       },
       {
         "id": "agenda-path",
@@ -136,7 +136,7 @@
     { "id": "worker-queue", "from": "worker", "to": "queue", "label": "enqueue / consume", "variant": "emphasis" },
     { "id": "worker-transport", "from": "worker", "to": "transport", "label": "fetch fournisseur" },
     { "id": "queue-transport", "from": "queue", "to": "transport", "label": "résolution asynchrone", "variant": "dashed" },
-    { "id": "direct-egress", "from": "transport", "to": "directProviders", "fromSide": "top", "toSide": "bottom", "label": "HTTPS direct", "variant": "emphasis", "labelAt": [773, 236] },
+    { "id": "direct-egress", "from": "transport", "to": "directProviders", "fromSide": "top", "toSide": "bottom", "label": "HTTPS direct · User-Agent", "variant": "emphasis", "labelAt": [773, 236] },
     { "id": "signed-gateway", "from": "transport", "to": "gateway", "label": "endpoints bloqués · HMAC", "variant": "security", "labelAt": [915, 336] },
     { "id": "provider-egress", "from": "gateway", "to": "providers", "label": "allowlist AniList + MU", "variant": "emphasis", "labelAt": [1260, 190] },
     { "id": "queue-sql", "from": "queue", "to": "d1", "label": "bail · publication", "labelAt": [915, 586] },
