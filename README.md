@@ -47,8 +47,10 @@ Prerequisites: Git, Node.js 22.18+, npm 10+, Python 3.10+, and uv 0.11.2.
 Python 3.12 is the reference runtime for official code-review-graph.
 
 1. Select **Use this template** on GitHub, create the product repository under
-   your account or organization, then clone that generated repository. Do not
-   clone `zenonlab/ctxroute-blueprint` to start a product.
+   your account or organization, then clone that generated repository. A
+   signed-in agent may instead run
+   `gh repo create <owner/repository> --private --template zenonlab/ctxroute-blueprint`.
+   Do not clone `zenonlab/ctxroute-blueprint` to start a product.
 2. Confirm the checkout has its own remote before setup or product work:
 
    ```sh

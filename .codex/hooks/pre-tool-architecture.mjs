@@ -214,8 +214,15 @@ function isSafeTemplateCommand(value) {
     if (/^sh\s+-n\s+\.githooks\/(?:pre-commit|pre-push|commit-msg)(?:\s+\.githooks\/(?:pre-commit|pre-push|commit-msg))*$/u.test(line)) return true;
     if (/^npm\s+run\s+sensor\s+--\s+--checklist(?:\s+--json)?$/u.test(line)) return true;
     if (/^node\s+\.githooks\/sensor\s+--checklist(?:\s+--json)?$/u.test(line)) return true;
+    if (isTemplateRepositoryCreationCommand(line)) return true;
     return /^(?:pwd|rg\b|ls\b|head\b|tail\b|wc\b|find\b|sed\s+-n\b|git\s+(?:status|diff|log|show|branch|remote|rev-parse|ls-files|fetch|pull|clone|add|commit|push)\b|gh\s+(?:auth\s+(?:status|switch)|api)\b|npm\s+(?:test|run\s+(?:setup(?::check)?|test|validate(?::[\w-]+)?))\b|node\s+--check\b)/u.test(line);
   });
+}
+
+function isTemplateRepositoryCreationCommand(line) {
+  const repository = '[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)?';
+  const template = 'zenonlab/ctxroute-blueprint';
+  return new RegExp(`^gh\\s+repo\\s+create\\s+${repository}\\s+(?:--private|--public)\\s+--template\\s+${template}$|^gh\\s+repo\\s+create\\s+${repository}\\s+--template\\s+${template}\\s+(?:--private|--public)$`, 'u').test(line);
 }
 
 function isCrgGraphCommand(value) {

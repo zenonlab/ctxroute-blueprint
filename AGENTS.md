@@ -4,7 +4,7 @@
 
 While `.project/project-config.json` has `"status": "template"`, before writing product code, the agent must:
 
-1. Confirm this is the derived project's own Git repository and that `origin` is not `https://github.com/zenonlab/ctxroute-blueprint.git`. Use GitHub **Use this template** or create a new repository and set its remote before product initialization. If the checkout still points to the blueprint, do not write product code or push; ask for the derived repository URL.
+1. Confirm this is the derived project's own Git repository and that `origin` is not `https://github.com/zenonlab/ctxroute-blueprint.git`. Use GitHub **Use this template** or create a new repository and set its remote before product initialization. In template mode, an authenticated agent may run the explicitly allowlisted `gh repo create <owner/repository> --private --template zenonlab/ctxroute-blueprint` command. If the checkout still points to the blueprint, do not write product code or push; create or request the derived repository URL.
 2. Read every starter document and the complete user request.
 3. Identify goals, constraints, and genuinely missing information.
 4. Define language, runtime, frontend, backend, storage, tests, deployment, observability, security, and performance constraints in `docs/00-project-brief.md`.
