@@ -56,7 +56,7 @@
     ]
   },
   "triggers": {
-    "crons": ["23 3 * * SUN", "*/15 * * * *"]
+    "crons": ["23 3 * * SUN", "37 3 * * *"]
   },
   "vars": {
     "PROVIDER_GATEWAY_ORIGIN": "https://tobirink-provider-gateway.tobirink.deno.net",

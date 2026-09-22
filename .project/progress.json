@@ -5318,6 +5318,43 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-d1-read-containment-20260922",
+      "title": "Endiguer les lectures D1 périodiques à vide",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "bound-discovery-recovery-cron",
+          "title": "Borner le réveil de secours Discovery",
+          "status": "DONE",
+          "acceptance": [
+            "Le Worker ne déclenche plus la récupération Discovery toutes les quinze minutes.",
+            "Un réveil quotidien conserve la reprise des signaux Queue perdus.",
+            "Les tests couvrent la séparation Agenda et secours Discovery."
+          ],
+          "files": [
+            "apps/worker/wrangler.jsonc",
+            "apps/worker/src/index.ts",
+            "apps/worker/src/index.test.ts",
+            "docs/architecture/src/public-discovery.dataflow.json"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run typecheck --workspace @tobirink/worker",
+            "npm run archify:validate -- public-discovery.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Root cause isolated: the 15-minute cron ran D1 claim, expiry and pending scans even with no Queue work.",
+            "Worker tests 147/147 and the worker typecheck pass with the daily rescue cron.",
+            "Archify public Discovery dataflow passes showcase validation with 0 errors and 0 warnings."
+          ]
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,37 @@
+{
+  "goalId": "goal-d1-read-containment-20260922",
+  "title": "Endiguer les lectures D1 périodiques à vide",
+  "approved": true,
+  "executionMode": "autonomous",
+  "modeOffered": true,
+  "steps": [
+    {
+      "id": "bound-discovery-recovery-cron",
+      "title": "Borner le réveil de secours Discovery",
+      "status": "IN_PROGRESS",
+      "acceptance": [
+        "Le Worker ne déclenche plus la récupération Discovery toutes les quinze minutes.",
+        "Un réveil quotidien conserve la reprise des signaux Queue perdus.",
+        "Les tests couvrent la séparation Agenda et secours Discovery."
+      ],
+      "files": [
+        "apps/worker/wrangler.jsonc",
+        "apps/worker/src/index.ts",
+        "apps/worker/src/index.test.ts",
+        "docs/architecture/src/public-discovery.dataflow.json"
+      ],
+      "commands": [
+        "npm run test:worker",
+        "npm run typecheck --workspace @tobirink/worker",
+        "npm run archify:validate -- public-discovery.dataflow",
+        "git diff --check"
+      ],
+      "evidence": []
+    }
+  ],
+  "validationEvidence": [
+    "Worker unit tests prove the daily bounded recovery trigger.",
+    "Worker typecheck and public Discovery dataflow validation pass.",
+    "Diff audit confirms no D1 data mutation or Queue purge."
+  ]
+}

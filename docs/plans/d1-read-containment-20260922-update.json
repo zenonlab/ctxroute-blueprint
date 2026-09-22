@@ -1,0 +1,10 @@
+{
+  "goalId": "goal-d1-read-containment-20260922",
+  "stepId": "bound-discovery-recovery-cron",
+  "status": "DONE",
+  "evidence": [
+    "Root cause isolated: the 15-minute cron ran D1 claim, expiry and pending scans even with no Queue work.",
+    "Worker tests 147/147 and the worker typecheck pass with the daily rescue cron.",
+    "Archify public Discovery dataflow passes showcase validation with 0 errors and 0 warnings."
+  ]
+}

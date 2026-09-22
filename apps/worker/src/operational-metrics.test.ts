@@ -3,7 +3,7 @@ import { instrumentAgendaR2, instrumentD1, instrumentProviderFetch } from './ope
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { D1PublicDiscoveryV3Adapter, R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
 import { enqueueAgendaRefresh, processAgendaQueue, recoverPendingAgenda, type NativeCollectorSignal } from './native-collectors';
-import worker from './index';
+import worker, { publicDiscoveryRecoveryCron } from './index';
 
 describe('operational metrics', () => {
   beforeEach(async () => applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS));
@@ -40,7 +40,7 @@ describe('operational metrics', () => {
     await expect(store.pendingSignal()).resolves.toBe('2026-09-20T03:23:00.000Z');
   });
 
-  it('uses the bounded Discovery wake without changing the weekly Agenda cron', async () => {
+  it('uses the daily bounded Discovery wake without changing the weekly Agenda cron', async () => {
     vi.useFakeTimers();
     vi.setSystemTime('2026-09-22T12:00:00.000Z');
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
@@ -49,7 +49,7 @@ describe('operational metrics', () => {
     await adapter.request({ key, query: { discoveryTitles: ['Recovery fixture'], mediaKind: 'ANIME', sourceTitles: ['Recovery fixture'] }, requestDigest: 'd'.repeat(64), schemaVersion: 3 }, now);
     await env.PUBLIC_DB.prepare('UPDATE public_discovery_requests_v3 SET retry_at = ?1 WHERE fingerprint = ?2').bind('2026-09-22T12:05:00.000Z', key.fingerprint).run();
     const send = vi.fn(async (_body: NativeCollectorSignal, _options?: { contentType?: string; delaySeconds?: number }) => undefined);
-    await worker.scheduled({ scheduledTime: Date.parse(now), cron: '*/15 * * * *', noRetry: vi.fn() }, { ...env, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: Object.assign(Object.create(null), { send }) });
+    await worker.scheduled({ scheduledTime: Date.parse(now), cron: publicDiscoveryRecoveryCron, noRetry: vi.fn() }, { ...env, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: Object.assign(Object.create(null), { send }) });
     expect(send).toHaveBeenCalledOnce();
     expect(send).toHaveBeenCalledWith({ type: 'public-discovery-ready', version: 1 }, expect.objectContaining({ contentType: 'json' }));
     expect(send.mock.calls[0]?.[1]?.delaySeconds).toBeGreaterThan(0);
