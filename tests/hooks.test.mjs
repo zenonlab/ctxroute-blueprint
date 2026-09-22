@@ -31,7 +31,7 @@ test('Codex and Claude expose the same six events and explicit hook lanes', () =
         assert.equal(maintenance.command, `node ./.codex/hooks/lifecycle.mjs ${harness} ${event} maintenance`);
       }
     }
-    assert.deepEqual(Object.keys(config.hookLanes).sort(), ['maintenance', 'manual', 'synchronous']);
+    if (harness === 'codex') assert.deepEqual(Object.keys(config).sort(), ['description', 'hooks']);
     assert.equal(config.hooks.PostToolUse[0].matcher, 'apply_patch|Edit|Write|exec_command|Bash|Shell');
   }
 });
@@ -293,10 +293,9 @@ test('structural hook validation rejects context, matcher, parity, and async cov
   const parityRoot = hookConfigurationFixture();
   const claudePath = join(parityRoot, '.claude/settings.json');
   const claude = JSON.parse(readFileSync(claudePath, 'utf8'));
-  claude.hookModules.manual = [];
   claude.hooks.UserPromptSubmit[0].hooks.pop();
   writeFileSync(claudePath, JSON.stringify(claude));
-  assert.match(inspectHookConfiguration(parityRoot).join('\n'), /module classifications|maintenance lifecycle handler|lane contracts/u);
+  assert.match(inspectHookConfiguration(parityRoot).join('\n'), /maintenance lifecycle handler|lane contracts/u);
 });
 
 test('postinstall diagnoses a missing CTXRoute installation', () => {
