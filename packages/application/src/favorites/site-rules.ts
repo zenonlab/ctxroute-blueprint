@@ -34,33 +34,36 @@ type MutableSourceEvidence = { -readonly [Key in keyof SourceEvidence]: SourceEv
 
 function numberValue(segment: Extract<Segment, { kind: 'number' }>, value: string): number | undefined {
   if (segment.format === 'id-chapter') {
-    const match = /^\d{1,12}-chapter-(\d{1,6}(?:\.\d{1,3})?)$/u.exec(value);
-    const number = match === null ? NaN : Number(match[1]);
+    const match = /^\d{1,12}-chapter-(\d{1,6}(?:[.,-]\d{1,3})?)$/u.exec(value);
+    const number = match === null ? NaN : Number(match[1]?.replace(/[,-]/gu, '.') ?? 'NaN');
     return number >= 0 && number <= segment.maximum ? number : undefined;
   }
   const prefix = segment.prefix ?? '';
   if (!value.startsWith(prefix)) return undefined;
   const raw = value.slice(prefix.length);
-  if (!/^\d{1,6}(?:\.\d{1,3})?$/u.test(raw)) return undefined;
-  const number = Number(raw);
-  return number > 0 && number <= segment.maximum ? number : undefined;
+  if (!/^\d{1,6}(?:[.,-]\d{1,3})?$/u.test(raw)) return undefined;
+  const number = Number(raw.replace(',', '.').split('-')[0] ?? 'NaN');
+  const allowsZero = segment.prefix === 'chapter-';
+  return (number > 0 || allowsZero && number === 0) && number <= segment.maximum ? number : undefined;
 }
 
 function matches(segment: Segment, value: string): boolean {
   if (segment.kind === 'literal') return segment.values.includes(value);
   if (segment.kind === 'number') return numberValue(segment, value) !== undefined;
-  if (segment.prefix === 'opaque-5' && !/^[a-z0-9]{5}-.{2,250}$/u.test(value)) return false;
+  if (segment.prefix === 'opaque-5' && !/^[a-z0-9]{4,5}-.{2,250}$/u.test(value)) return false;
   return value.length >= 2 && value.length <= 256 && /\p{L}/u.test(value) && !/[\s/?#\\]/u.test(value);
 }
 
 interface RuleIdentityValue { readonly slug: string; readonly transformations: readonly FavoriteIdentityTransformation[] }
 
 function identityValue(segment: Extract<Segment, { kind: 'identity' }>, raw: string): RuleIdentityValue | undefined {
-  const withoutPrefix = segment.prefix === 'opaque-5' ? raw.slice(6) : raw;
+  const opaque = segment.prefix === 'opaque-5' ? /^([a-z0-9]{4,5})-(.+)$/u.exec(raw) : undefined;
+  const withoutPrefix = opaque?.[2] ?? raw;
   if (segment.routingSuffixDigits === undefined) return { slug: withoutPrefix, transformations: [] };
   const match = /^(.+)[-_.](0\d{2})$/u.exec(withoutPrefix);
   const slug = match?.[1];
-  if (slug === undefined || !/\p{L}/u.test(slug)) return undefined;
+  if (slug === undefined) return { slug: withoutPrefix, transformations: [] };
+  if (!/\p{L}/u.test(slug)) return undefined;
   return { slug, transformations: ['numeric-routing-suffix'] };
 }
 
@@ -114,10 +117,10 @@ export const bundledFavoriteSiteRules: FavoriteSiteRules = favoriteSiteRulesSche
   schemaVersion: 1, version: 3,
   rules: [...['https://anime-sama.fr', 'https://anime-sama.si'].flatMap((origin, index) => [
     { id: `anime-sama-${index}-identity`, identitySegment: 1, mediaKind: 'UNKNOWN', origin, segments: [catalogue, identity] },
-    ...[false, true].flatMap((withLanguage) => [
-      { id: `anime-sama-${index}-anime-${withLanguage}`, identitySegment: 1, mediaKind: 'ANIME', origin, seasonSegment: 2, segments: [catalogue, identity, { kind: 'number', maximum: 99, prefix: 'saison' }, ...(withLanguage ? [language] : [])] },
-      { id: `anime-sama-${index}-scan-${withLanguage}`, identitySegment: 1, mediaKind: 'MANGA', origin, segments: [catalogue, identity, { kind: 'literal', values: ['scan', 'scans'] }, ...(withLanguage ? [language] : [])] },
-    ]),
+    ...['catalogue', 'anime'].flatMap((category) => [false, true].flatMap((withLanguage) => [
+      { id: `anime-sama-${index}-${category}-anime-${withLanguage}`, identitySegment: 1, mediaKind: 'ANIME', origin, seasonSegment: 2, segments: [{ kind: 'literal', values: [category] }, identity, { kind: 'number', maximum: 99, prefix: 'saison' }, ...(withLanguage ? [language] : [])] },
+      ...(category === 'catalogue' ? [{ id: `anime-sama-${index}-scan-${withLanguage}`, identitySegment: 1, mediaKind: 'MANGA', origin, segments: [catalogue, identity, { kind: 'literal', values: ['scan', 'scans'] }, ...(withLanguage ? [language] : [])] }] : []),
+    ])),
   ]),
   ...[false, true].map((withChapter) => {
     const rule = {
@@ -126,11 +129,12 @@ export const bundledFavoriteSiteRules: FavoriteSiteRules = favoriteSiteRulesSche
     };
     return withChapter ? { ...rule, release: { kind: 'chapter', segment: 2 } } : rule;
   }),
-  ...['https://manhwaz.com', 'https://www.manhwaz.com'].flatMap((origin, originIndex) => [false, true].map((withChapter) => {
+  ...['https://manhwaz.com', 'https://www.manhwaz.com'].flatMap((origin, originIndex) => [false, true].flatMap((withPublicPrefix) => [false, true].map((withChapter) => {
+    const prefix = withPublicPrefix ? [{ kind: 'literal', values: ['public'] }, { kind: 'literal', values: ['index.php'] }] : [];
     const rule = {
-      id: `manhwaz-webtoon-${originIndex}-${withChapter}`, origin, identitySegment: 1, mediaKind: 'MANHWA',
-      segments: [{ kind: 'literal', values: ['webtoon'] }, { kind: 'identity', routingSuffixDigits: 3 }, ...(withChapter ? [{ kind: 'number', maximum: 100_000, prefix: 'chapter-' }] : [])],
+      id: `manhwaz-webtoon-${originIndex}-${withPublicPrefix}-${withChapter}`, origin, identitySegment: prefix.length + 1, mediaKind: 'MANHWA',
+      segments: [...prefix, { kind: 'literal', values: ['webtoon'] }, { kind: 'identity', routingSuffixDigits: 3 }, ...(withChapter ? [{ kind: 'number', maximum: 100_000, prefix: 'chapter-' }] : [])],
     };
-    return withChapter ? { ...rule, release: { kind: 'chapter', segment: 2 } } : rule;
-  }))],
+    return withChapter ? { ...rule, release: { kind: 'chapter', segment: prefix.length + 2 } } : rule;
+  })) )],
 });

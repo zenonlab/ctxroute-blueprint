@@ -101,6 +101,8 @@ actifs sans modifier les clés ni perdre les demandes déjà matérialisées.
 
 La Queue supprime l’attente de cadence : un cache miss programme le traitement
 dès la création `PENDING`. Le test réel confirme qu’AniList répond 403 depuis
-l’egress Cloudflare direct mais réussit via la gateway Deno signée. Le dépôt
+l’egress Cloudflare direct mais réussit via la gateway Deno signée. Les appels
+directs conservés pour MangaDex et Kitsu portent le `User-Agent` produit stable
+exigé par les amonts; cette règle ne transmet aucune donnée privée. Le dépôt
 principal conserve toute l’implémentation; le dépôt public n’est plus un
 rollback opérationnel.

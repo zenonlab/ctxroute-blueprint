@@ -605,7 +605,10 @@ weekly triggers, no Agenda provider request is expected. The single Queue
 message opens two independent D1 lanes; each lane owns one fifteen-minute lease,
 a page checkpoint, `not_before`, and its last valid snapshot.
 
-AniList is paced at one HTTP request every three seconds and MangaUpdates at
+All Worker and gateway provider requests carry the stable product
+`User-Agent: TobiRink/1.0 (+https://tobirink.com)`; this is required for
+MangaDex and keeps the upstream request identifiable without forwarding user
+data. AniList is paced at one HTTP request every three seconds and MangaUpdates at
 one every six seconds. Count quota consumption in HTTP requests, including
 every pagination request. A `Retry-After` response becomes the per-message
 Queue retry delay, capped at twenty-four hours. Discovery search errors
@@ -924,6 +927,23 @@ Keep the core unchanged. Implement another driver with the same `inspect`,
 `preview`, and `apply` boundary, add it at the command composition root, and run
 the shared negative contract suite. Provider SDKs and commands stay in that
 driver; application use cases and HTTP routes do not change.
+## Contrôle final de livraison
+
+La livraison autonome standard vérifie après l’apply Cloudflare :
+
+- `https://tobirink.com/` → HTTP 200 ;
+- `https://tobirink.com/library` → HTTP 200 ;
+- `https://tobirink-provider-gateway.tobirink.deno.net/healthz` → HTTP 200.
+
+Le contrôle ne journalise pas les corps de réponse. Il affiche seulement le
+statut et, lorsqu’il existe, l’identifiant de requête/corrélation fourni par les
+en-têtes. La gateway Deno est déployée par son application GitHub App existante
+sur `main`; aucun token Deno n’est ajouté au workflow Cloudflare.
+
+Les mutations D1, R2, Queues et les rotations de `PROVIDER_GATEWAY_HMAC_KEY`
+restent hors de cette livraison et exigent chacune leur propre plan, allowlist,
+validation et preuve. Elles ne doivent pas être ajoutées au job standard pour
+contourner cette séparation.
 
 ## Reprise Discovery après épuisement artificiel des tentatives — 2026-09-20
 
@@ -933,10 +953,16 @@ Le snapshot distant en lecture seule compte 476 demandes v3 : 88 `VERIFIED`
 2 manhua, 33 manhwa et 114 médias inconnus. Les logs Queue montrent des lots
 `acceptedResults=0`, `providerRequests=0` : une réservation de cadence trop
 éloignée consommait quand même les essais pris au claim. La correction
-versionnée diffère ces claims sans consommer d'essai et ne transforme ni `403`,
+versionnée diffère ces claims sans consommer d’essai et ne transforme ni `403`,
 ni timeout, ni fournisseur indisponible en `NOT_FOUND`.
 
-Avant tout changement de production, conserver l'export D1 complet du
+Une relecture distante effectuée le 20 septembre après ce snapshot confirme
+toujours 476 demandes, sans écriture (`changes=0`, `rows_written=0`) : 371
+`FAILED`, 88 `VERIFIED`, 14 `NOT_FOUND` et 3 `AMBIGUOUS`, sans ligne
+`PROCESSING`. Cette différence d’état est observée seulement ; elle ne vaut
+pas autorisation de réarmer les échecs.
+
+Avant tout changement de production, conserver l’export D1 complet du
 20 septembre sous `build/backups/tobirink-public-pre-discovery-cadence-20260920.sql`
 (ignoré par Git, SHA-256
 `6ff390845441f79ac59f4cef18509d5ea0be9a03e0d96a43caac61c983b1f4b2`,
@@ -1011,21 +1037,3 @@ répond autrement que 200 au healthcheck, ou si le budget D1/Queue dépasse le
 plan. Conserver les profils existants et les archives 1.0.41/1.0.42. Le
 rollback du seul code Worker repasse par un plan de déploiement revu; une
 restauration D1 est une opération séparée et non automatique.
-
-## Contrôle final de livraison
-
-La livraison autonome standard vérifie après l’apply Cloudflare :
-
-- `https://tobirink.com/` → HTTP 200 ;
-- `https://tobirink.com/library` → HTTP 200 ;
-- `https://tobirink-provider-gateway.tobirink.deno.net/healthz` → HTTP 200.
-
-Le contrôle ne journalise pas les corps de réponse. Il affiche seulement le
-statut et, lorsqu’il existe, l’identifiant de requête/corrélation fourni par les
-en-têtes. La gateway Deno est déployée par son application GitHub App existante
-sur `main`; aucun token Deno n’est ajouté au workflow Cloudflare.
-
-Les mutations D1, R2, Queues et les rotations de `PROVIDER_GATEWAY_HMAC_KEY`
-restent hors de cette livraison et exigent chacune leur propre plan, allowlist,
-validation et preuve. Elles ne doivent pas être ajoutées au job standard pour
-contourner cette séparation.

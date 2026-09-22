@@ -17,6 +17,8 @@ export interface FavoriteSourceAdapter {
   analyze(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl): SourceEvidence | undefined;
 }
 
+type MutableSourceEvidence = { -readonly [Key in keyof SourceEvidence]: SourceEvidence[Key] };
+
 const categoryKinds: Readonly<Record<string, FavoriteMediaKind>> = Object.freeze({
   anime: 'ANIME', comic: 'MANGA', manga: 'MANGA', manhua: 'MANHUA', manhwa: 'MANHWA', scan: 'MANGA', webtoon: 'MANHWA',
 });
@@ -25,10 +27,12 @@ const structuralSegments = new Set([
   'anime', 'chapter', 'chapitre', 'comic', 'episode', 'manga', 'manhua', 'manhwa',
   'read', 'saison', 'scan', 'season', 'series', 'title', 'volume', 'watch', 'webtoon',
 ]);
-const releasePattern = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
-const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
-const numericReleasePattern = /^(\d{3,12})[-_.](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,]\d+)?)$/iu;
+const releasePattern = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)$/iu;
+const attachedReleasePattern = /^(.+?)[-_](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)$/iu;
+const numericReleasePattern = /^(\d{3,12})[-_.](chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)$/iu;
 const localizedReleaseSuffixPattern = /(?:^|[-_.])(\d+(?:[.,]\d+)?)[-_.](?:vostfr|vf|vo|sub|dub)$/iu;
+const titleIdentityOrigins = new Set(['https://www.adkami.com']);
+const titleRouteOrigins = new Set(['https://mangakakalot.so', 'https://www.japscan.lol', 'https://www.japscan.me', 'https://arenascan.com', 'https://www.asurascans.com']);
 
 interface StructuralIdentity { readonly slug: string; readonly transformed: boolean }
 
@@ -38,9 +42,15 @@ function comparableIdentity(value: string): string {
 
 function bookmarkCorroboratesSlug(observedTitle: string, stableSlug: string): boolean {
   const slugKey = comparableIdentity(stableSlug);
-  return slugKey.length > 0 && segmentFavoriteTitle(observedTitle).segments
+  const exactSegment = slugKey.length > 0 && segmentFavoriteTitle(observedTitle).segments
     .filter((segment) => !segment.excluded)
     .some((segment) => comparableIdentity(segment.cleaned) === slugKey);
+  if (exactSegment) return true;
+  const slugTokens = normalizeFavoriteTitle(stableSlug).significantTokens;
+  const titleTokens = normalizeFavoriteTitle(observedTitle).significantTokens;
+  if (slugTokens.length < 2 || titleTokens.length < 2) return false;
+  const matched = slugTokens.filter(token => titleTokens.some(titleToken => titleToken === token || token.length > 4 && (titleToken === `${token}s` || token === `${titleToken}s`))).length;
+  return matched >= 2 && matched / slugTokens.length >= 0.7;
 }
 
 function stripLeadingRoutingIdentifier(slug: string, release: SourceEvidence['release'], observedTitle: string): StructuralIdentity {
@@ -74,6 +84,58 @@ function common(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl) {
   return { key: input.sourceKey, origin: url.origin, path: url.pathname } as const;
 }
 
+function knownNumericRouteEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl): SourceEvidence | undefined {
+  if (!titleIdentityOrigins.has(url.origin) || url.decodedSegments[0]?.toLowerCase() !== 'anime' || !/^\d+$/u.test(url.decodedSegments[1] ?? '')) return undefined;
+  const title = segmentFavoriteTitle(input.title, new URL(url.origin).hostname).cleanedTitle.replace(/\s*[|·-]\s*episode$/iu, '').trim();
+  if (!/\p{L}{2}/u.test(title) || /^(?:episode|épisode|watch|read)$/iu.test(title)) return undefined;
+  return createSourceEvidence({
+    ...common(input, url), aliases: [{ provenance: 'aligned-bookmark-segment', value: title }], diagnostics: [],
+    mediaKind: 'ANIME', proofs: ['CATEGORY_PATH'], sourceAdapter: 'known-numeric-route-v1', strategy: 'exact-origin', title,
+  });
+}
+
+function knownTitleRouteEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl): SourceEvidence | undefined {
+  if (!titleRouteOrigins.has(url.origin)) return undefined;
+  const segments = url.decodedSegments;
+  const isJapScan = (url.origin === 'https://www.japscan.lol' || url.origin === 'https://www.japscan.me') && segments[0] === 'lecture-en-ligne';
+  const isMangaKakalot = url.origin === 'https://mangakakalot.so' && segments[0] === 'reading';
+  const isArenaScan = url.origin === 'https://arenascan.com' && (segments[0] === 'manga' || segments.length === 1);
+  const isAsuraScan = url.origin === 'https://www.asurascans.com' && segments.length === 1 && /-chapter-\d+/iu.test(segments[0] ?? '') && !/^\d{6,12}-/u.test(segments[0] ?? '');
+  if (!isJapScan && !isMangaKakalot && !isArenaScan && !isAsuraScan) return undefined;
+  const rawSlug = isJapScan || isMangaKakalot ? segments[1] : segments[0] === 'manga' ? segments[1] : segments[0];
+  if (rawSlug === undefined) return undefined;
+  const stableSlug = isArenaScan ? rawSlug.replace(/-\d+(?:-\d+)?$/u, '') : isAsuraScan ? rawSlug.replace(/-chapter-\d+.*$/iu, '') : rawSlug;
+  if (stableSlug.length < 3 || !/\p{L}{2}/u.test(stableSlug) || !bookmarkCorroboratesSlug(input.title, stableSlug)) return undefined;
+  const title = displayTitle(stableSlug);
+  const chapter = isAsuraScan ? rawSlug.match(/-chapter-(\d+(?:[.,]\d+)?)/iu)?.[1] : undefined;
+  const evidence: MutableSourceEvidence = {
+    ...common(input, url), aliases: [{ provenance: 'stable-url-slug', value: title }], canonicalUrl: `${url.origin}/${(isJapScan || isMangaKakalot ? segments.slice(0, 2) : isArenaScan && segments[0] === 'manga' ? segments.slice(0, 2) : [stableSlug]).join('/')}`,
+    diagnostics: [], mediaKind: 'MANGA', proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], rawSlug, sourceAdapter: 'known-title-route-v1', stableSlug, strategy: 'exact-origin', title,
+  };
+  if (chapter !== undefined) evidence.release = { kind: 'chapter', provenance: 'URL_SLUG_SUFFIX', raw: `chapter-${chapter}`, value: Number(chapter.replace(',', '.')) };
+  return createSourceEvidence(evidence);
+}
+
+function titleDerivedMangaEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavoriteUrl): SourceEvidence | undefined {
+  const segments = url.decodedSegments;
+  const isWeebCentral = url.origin === 'https://weebcentral.com' && segments.length === 2 && segments[0] === 'chapters' && /^[0-9A-Z]{20,30}$/u.test(segments[1] ?? '');
+  const isYyzzBaby = url.origin === 'https://www.yyzzbaby.com' && segments.length === 2 && segments[0] === 'statuses' && /^\d+\.html$/u.test(segments[1] ?? '');
+  const isFlameComics = url.origin === 'https://flamecomics.xyz' && segments.length === 3 && segments[0] === 'series' && /^\d+$/u.test(segments[1] ?? '') && /^[a-z0-9]+$/u.test(segments[2] ?? '');
+  if (!isWeebCentral && !isYyzzBaby && !isFlameComics) return undefined;
+  const analysis = segmentFavoriteTitle(input.title, url.host);
+  const rawSlug = segments.at(-1);
+  if (rawSlug === undefined) return undefined;
+  const title = isWeebCentral
+    ? analysis.segments.filter(segment => !segment.excluded).map(segment => segment.cleaned).find(value => /\p{L}{2}/u.test(value)) ?? ''
+    : isFlameComics ? analysis.cleanedTitle.replace(/\s+-\s+chapter\s+\d+(?:\s+-\s+flame\s+comics)?$/iu, '').replace(/\s+-\s+flame\s+comics$/iu, '') : analysis.cleanedTitle;
+  const stableSlug = normalizeFavoriteTitle(title).normalized.replace(/\s+/gu, '-');
+  if (stableSlug.length < 3 || normalizeFavoriteTitle(title).significantTokens.length < 2) return undefined;
+  return createSourceEvidence({
+    ...common(input, url), aliases: [{ provenance: 'aligned-bookmark-segment', value: title }], canonicalUrl: url.url, diagnostics: [], mediaKind: 'MANGA',
+    proofs: ['CATEGORY_PATH', 'TITLE_SLUG'], rawSlug, sourceAdapter: 'known-title-derived-route-v1', stableSlug, strategy: 'exact-origin', title,
+  });
+}
+
 function rejectedEvidence(input: FavoriteSourceEvidenceInput, disposition: FavoriteUrlDisposition, sourceAdapter = 'generic-url', strategy: SourceEvidence['strategy'] = 'generic'): SourceEvidence {
   return createSourceEvidence({ aliases: [], diagnostics: [], disposition, key: input.sourceKey, mediaKind: 'UNKNOWN', proofs: [], sourceAdapter, strategy });
 }
@@ -104,7 +166,7 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     const label = decoded[identityIndex - 1] ?? '';
     const rawNumber = decoded[identityIndex] ?? '';
     releaseSuffix = `${label}/${rawNumber}`;
-    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(',', '.')) };
+    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(/[,-]/gu, '.')) };
     identityIndex -= 2;
   }
   const numericRelease = numericReleasePattern.exec(decoded[identityIndex] ?? '');
@@ -112,14 +174,14 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     const label = numericRelease[2] ?? '';
     const rawNumber = numericRelease[3] ?? '';
     releaseSuffix = numericRelease[0];
-    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(',', '.')) };
+    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(/[,-]/gu, '.')) };
     identityIndex -= 1;
   }
   const separated = releasePattern.exec(decoded[identityIndex] ?? '');
   if (separated !== null) {
     identityIndex -= 1;
     releaseSuffix = separated[0];
-    release = { kind: releaseKind(separated[1] ?? ''), provenance: 'URL_PATH', raw: separated[0], value: Number((separated[2] ?? '').replace(',', '.')) };
+    release = { kind: releaseKind(separated[1] ?? ''), provenance: 'URL_PATH', raw: separated[0], value: Number((separated[2] ?? '').replace(/[,-]/gu, '.')) };
   }
   const seasonTail = /^(?:season|saison|s)[-_]?([1-9]\d?)$/iu.exec(decoded[identityIndex] ?? '');
   if (seasonTail !== null) identityIndex -= 1;
@@ -137,6 +199,16 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
     };
     identityIndex -= 1;
   }
+  const nestedNumericId = /^\d{1,12}$/u.test(decoded.at(-1) ?? '');
+  const nestedCategory = decoded[decoded.length - 4]?.toLowerCase();
+  const nestedRelease = /^(chapter|chapitre|chap|ch|episode|ep|volume|vol)[-_]?(\d+(?:[.,-]\d+)?)(?:[-_].+)?$/iu.exec(decoded.at(-2) ?? '');
+  if (nestedNumericId && nestedCategory !== undefined && categoryKinds[nestedCategory] !== undefined && nestedRelease !== null) {
+    const label = nestedRelease[1] ?? '';
+    const rawNumber = nestedRelease[2] ?? '';
+    releaseSuffix = nestedRelease[0];
+    release = { kind: releaseKind(label), provenance: 'URL_PATH', raw: releaseSuffix, value: Number(rawNumber.replace(/[,-]/gu, '.')) };
+    identityIndex = decoded.length - 3;
+  }
   const corroborated = decoded.slice(0, identityIndex + 1)
     .map((slug, index) => ({ slug, index }))
     .filter(({ slug }) => !structuralSegments.has(slug.toLowerCase()) && /\p{L}{2}/u.test(slug) && bookmarkCorroboratesSlug(input.title, slug));
@@ -149,7 +221,7 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
   if (attached !== null) {
     stableSlug = attached[1];
     releaseSuffix = `${attached[2] ?? ''}-${attached[3] ?? ''}`;
-    release = { kind: releaseKind(attached[2] ?? ''), provenance: 'URL_SLUG_SUFFIX', raw: releaseSuffix, value: Number((attached[3] ?? '').replace(',', '.')) };
+    release = { kind: releaseKind(attached[2] ?? ''), provenance: 'URL_SLUG_SUFFIX', raw: releaseSuffix, value: Number((attached[3] ?? '').replace(/[,-]/gu, '.')) };
     raw[identityIndex] = encodeURIComponent(stableSlug ?? '');
   }
   const structuralIdentity = stableSlug === undefined
@@ -219,6 +291,12 @@ function genericEvidence(input: FavoriteSourceEvidenceInput, url: EligibleFavori
 export function extractFavoriteSourceEvidence(input: FavoriteSourceEvidenceInput, adapters: readonly FavoriteSourceAdapter[] = []): SourceEvidence {
   const qualification = qualifyFavoriteUrl(input.url);
   if (qualification.kind === 'REJECTED') return rejectedEvidence(input, qualification.disposition);
+  const knownNumericRoute = knownNumericRouteEvidence(input, qualification);
+  if (knownNumericRoute !== undefined) return knownNumericRoute;
+  const knownTitleRoute = knownTitleRouteEvidence(input, qualification);
+  if (knownTitleRoute !== undefined) return knownTitleRoute;
+  const titleDerivedRoute = titleDerivedMangaEvidence(input, qualification);
+  if (titleDerivedRoute !== undefined) return titleDerivedRoute;
   const applicable = adapters.filter((adapter) => adapter.origins.includes(qualification.origin));
   if (applicable.length > 1) {
     return createSourceEvidence({ ...common(input, qualification), aliases: [], diagnostics: ['SOURCE_ADAPTER_CONFLICT'], key: input.sourceKey, mediaKind: 'UNKNOWN', proofs: [], sourceAdapter: 'conflict', strategy: 'exact-origin' });

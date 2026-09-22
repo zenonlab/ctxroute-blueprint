@@ -11,12 +11,14 @@ const anilist = 'https://graphql.anilist.co';
 
 describe('provider transport adapter gate', () => {
   it('selects the isolated direct adapter by default', async () => {
-    const fetcher = vi.fn(async () => Response.json({ ok: true }));
+    let requestInit: RequestInit | undefined;
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => { requestInit = init; return Response.json({ ok: true }); });
     const transport = createProviderTransportAdapter({}, { fetcher });
     expect(transport).toBeInstanceOf(DirectProviderTransportAdapter);
 
     await transport.fetch(anilist, { body: '{}', method: 'POST' });
     expect(fetcher).toHaveBeenCalledExactlyOnceWith(anilist, expect.objectContaining({ cache: 'no-store', redirect: 'manual' }));
+    expect(new Headers(requestInit?.headers).get('User-Agent')).toBe('TobiRink/1.0 (+https://tobirink.com)');
   });
 
   it('refuses arbitrary direct targets before network access', async () => {
@@ -97,6 +99,15 @@ describe('provider transport adapter gate', () => {
       'https://kitsu.io/api/edge/anime?filter%5Btext%5D=Naruto&page%5Blimit%5D=1',
     ]);
     expect(requiresProviderGateway('https://api.mangaupdates.com/v1/releases/search', 'POST')).toBe(true);
+  });
+
+  it('sets the product User-Agent on direct manga providers', async () => {
+    const requests: RequestInit[] = [];
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => { requests.push(init); return Response.json({ ok: true }); });
+    const transport = createProviderTransportAdapter({ PROVIDER_TRANSPORT_MODE: 'direct' }, { fetcher });
+    await transport.fetch('https://api.mangadex.org/manga?title=Naruto&limit=1', { method: 'GET' });
+    await transport.fetch('https://kitsu.io/api/edge/manga?filter%5Btext%5D=Naruto&page%5Blimit%5D=1', { method: 'GET' });
+    for (const request of requests) expect(new Headers(request.headers).get('User-Agent')).toBe('TobiRink/1.0 (+https://tobirink.com)');
   });
 
   it('rejects redirects explicitly in both transports', async () => {

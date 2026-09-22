@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Tobirink — import réel des favoris et résolution locale",
+    "output": "real-favorite-resolution.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 1100],
+    "views": [
+      {
+        "id": "local-import",
+        "label": "Import local",
+        "focus": ["browserFavorites", "inventory", "sourceEvidence", "privateStore", "libraryView"],
+        "note": "Les 1 538 favoris sont lus par lots, parsés localement et projetés sans attendre le réseau."
+      },
+      {
+        "id": "public-resolution",
+        "label": "Résolution publique",
+        "focus": ["sourceEvidence", "privateStore", "publicWorker", "publicD1", "providerQueue"],
+        "note": "Seules des clés d’identité bornées quittent l’extension; la résolution fournisseur reste dans la Queue."
+      },
+      {
+        "id": "retry-and-review",
+        "label": "Reprise et Review",
+        "focus": ["privateStore", "publicWorker", "publicD1", "review", "diagnostics"],
+        "note": "PENDING, admission limitée et Review sont conservés localement plutôt que perdus dans la bibliothèque."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Navigateur" },
+    { "label": "Preuve locale" },
+    { "label": "État privé" },
+    { "label": "Public Discovery v3" },
+    { "label": "Projection" }
+  ],
+  "nodes": [
+    { "id": "browserFavorites", "type": "external", "label": "Favoris Chrome", "sublabel": "titres + URLs", "stage": 0, "row": 0, "width": 150, "tag": "1 538 entrées" },
+    { "id": "inventory", "type": "backend", "label": "Inventaire borné", "sublabel": "bookmark batches × 100", "stage": 0, "row": 4, "width": 150, "tag": "reprise automatique" },
+    { "id": "sourceEvidence", "type": "security", "label": "Preuve de source", "sublabel": "ManhwaZ · Comix · MangaBTT · MangaDex", "stage": 1, "row": 0, "width": 170, "tag": "aucun fetch fournisseur" },
+    { "id": "privateStore", "type": "database", "label": "IndexedDB privé", "sublabel": "FavoriteSource + artefacts + tâches", "stage": 2, "row": 0, "width": 170, "tag": "autorité locale" },
+    { "id": "publicWorker", "type": "cloud", "label": "Worker Public Discovery", "sublabel": "HTTPS v3 sans owner", "stage": 3, "row": 0, "width": 170, "tag": "lookup / request" },
+    { "id": "publicD1", "type": "database", "label": "Cache public D1", "sublabel": "MISS · PENDING · VERIFIED", "stage": 3, "row": 2, "width": 170, "tag": "lecture 200" },
+    { "id": "providerQueue", "type": "messagebus", "label": "Queue + collecteur", "sublabel": "providers isolés", "stage": 3, "row": 4, "width": 170, "tag": "admission contrôlée" },
+    { "id": "libraryView", "type": "frontend", "label": "Library locale", "sublabel": "Work + projection provisoire", "stage": 4, "row": 0, "width": 170, "tag": "visible avant hydratation" },
+    { "id": "review", "type": "frontend", "label": "Review manuelle", "sublabel": "candidats / identité explicite", "stage": 4, "row": 2, "width": 170, "tag": "choix contrôlé" },
+    { "id": "diagnostics", "type": "database", "label": "Diagnostic local", "sublabel": "états + codes bornés", "stage": 4, "row": 4, "width": 170, "tag": "100 événements" }
+  ],
+  "flows": [
+    { "from": "browserFavorites", "to": "inventory", "label": "lots", "classification": "local browser API", "variant": "emphasis", "route": "straight", "labelDy": 53 },
+    { "from": "inventory", "to": "sourceEvidence", "label": "titres + URLs", "classification": "local only", "variant": "emphasis", "route": "bottom-channel", "labelAt": [205, 420] },
+    { "from": "sourceEvidence", "to": "privateStore", "label": "artefacts", "classification": "transaction privée", "variant": "security", "route": "straight", "labelDy": 53 },
+    { "from": "privateStore", "to": "publicWorker", "label": "clés bornées", "classification": "HTTPS v3", "variant": "security", "route": "straight", "labelDy": 53 },
+    { "from": "publicWorker", "to": "publicD1", "label": "état", "classification": "cache public", "variant": "emphasis", "route": "vertical-channel", "labelAt": [875, 300] },
+    { "from": "publicD1", "to": "providerQueue", "label": "claim + profil", "classification": "opaque queue signal · publication atomique", "variant": "security", "route": "straight", "labelDy": 53 }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Résultat observé", "items": ["Les favoris sont tous comptés dès l’inventaire", "Les URLs reconnues gagnent une identité locale avant le réseau", "La Library ne confond pas préparation et Work résolu"] },
+    { "dot": "cyan", "title": "Frontière réseau", "items": ["Aucune URL brute ni donnée privée n’est envoyée", "Public Discovery expose un cache PENDING/VERIFIED", "La Queue seule appelle les fournisseurs"] },
+    { "dot": "rose", "title": "Reprise fidèle", "items": ["ADMISSION_WAIT et PROVIDER_UNAVAILABLE restent retryables", "IDENTITY_MISSING reste explicite quand l’URL est hors règle", "Les décisions Review sont séparées du scan automatique"] }
+  ]
+}

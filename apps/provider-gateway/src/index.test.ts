@@ -125,11 +125,13 @@ Deno.test('classifies gateway and AniList authentication failures without sensit
   assert(!JSON.stringify(upstreamLog).includes('graphql.anilist.co'));
 });
 
-Deno.test('forwards MangaUpdates and rejects direct-only provider targets', async () => {
+Deno.test('forwards MangaUpdates with a product User-Agent and rejects direct-only provider targets', async () => {
   let target = '';
+  let init: RequestInit | undefined;
   const handler = createProviderGatewayHandler({
-    fetcher: (input) => {
+    fetcher: (input, requestInit) => {
       target = input;
+      init = requestInit;
       return Promise.resolve(Response.json({ data: [] }));
     },
     nonceStore: memoryNonceStore(),
@@ -142,6 +144,7 @@ Deno.test('forwards MangaUpdates and rejects direct-only provider targets', asyn
   }));
   assert(response.status === 200);
   assert(target === 'https://api.mangaupdates.com/v1/series/search');
+  assert(new Headers(init?.headers).get('user-agent') === 'TobiRink/1.0 (+https://tobirink.com)');
   assert(isAllowedProviderTarget('https://api.mangaupdates.com/v1/releases/search', 'POST'));
   assert(!isAllowedProviderTarget('https://api.mangadex.org/manga?title=Naruto&limit=1', 'GET'));
   assert(!isAllowedProviderTarget('https://kitsu.io/api/edge/anime?filter%5Btext%5D=Naruto&page%5Blimit%5D=1', 'GET'));

@@ -29,7 +29,7 @@
         "id": "boundaries",
         "label": "Frontières",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers"],
-        "note": "La gate route AniList et MangaUpdates via Deno; MangaDex et Kitsu restent directs."
+        "note": "La gate route AniList et MangaUpdates via Deno; MangaDex et Kitsu restent directs avec le User-Agent produit stable."
       }
     ]
   },
@@ -191,7 +191,7 @@
       "from": "transportPort",
       "to": "providers",
       "label": "Gateway HMAC → API bornée",
-      "classification": "fallback recherche + hydratation · projection tolérante aux champs amont · report borné",
+      "classification": "fallback recherche + hydratation sur erreur fournisseur · report borné sans essai consommé",
       "variant": "emphasis",
       "route": "auto",
       "labelAt": [960, 600]

@@ -81,6 +81,37 @@ describe('favorite source evidence U-01…U-10', () => {
   it.each(['synthetic-series/chapter-12', 'synthetic-series-chapter-12', 'synthetic-series/chapter/12'])('recognizes root release evidence without inventing a media type: %s', path => {
     expect(extractFavoriteSourceEvidence(input('root-release', `https://fixtures.tobirink.invalid/${path}`))).toMatchObject({ mediaKind: 'UNKNOWN', stableSlug: 'synthetic-series', release: { value: 12, kind: 'chapter' } });
   });
+  it.each([
+    ['https://mangaclash.com/manga/quest-supremacy/chapter-70-1', 'quest-supremacy', 70.1],
+    ['https://mangaeffect.com/manga/oshi-no-ko/chapter-145', 'oshi-no-ko', 145],
+    ['https://shieldmanga.net/manga/bones/chapter-3-5/', 'bones', 3.5],
+  ])('recognizes a hyphenated chapter number used by manga readers: %s', (url, stableSlug, value) => {
+    expect(extractFavoriteSourceEvidence(input('hyphenated-chapter', url))).toMatchObject({ mediaKind: 'MANGA', stableSlug, release: { kind: 'chapter', value } });
+  });
+  it('uses the bookmark title only for ADKami numeric anime routes', () => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'adkami-anime', title: 'Kakushigoto - Episode 1 vostfr - ADKami', url: 'https://www.adkami.com/anime/3759/1/1/2/1/' })).toMatchObject({
+      mediaKind: 'ANIME', proofs: ['CATEGORY_PATH'], sourceAdapter: 'known-numeric-route-v1', title: 'Kakushigoto',
+    });
+    expect(extractFavoriteSourceEvidence(input('numeric-generic', 'https://fixtures.tobirink.invalid/anime/3759'))).toMatchObject({ disposition: 'URL_IDENTITY_UNRESOLVED' });
+  });
+  it.each([
+    ['https://www.japscan.lol/lecture-en-ligne/fire-punch/30/8.html', 'fire-punch'],
+    ['https://mangakakalot.so/reading/shangri-la-frontier-kusoge-hunter-kamige-ni-idoman-to-su/1109960', 'shangri-la-frontier-kusoge-hunter-kamige-ni-idoman-to-su'],
+    ['https://arenascan.com/high-society-31/', 'high-society'],
+  ])('accepts a corroborated manga route on %s', (url, stableSlug) => {
+    const slugTitle = stableSlug.replaceAll('-', ' ');
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'bounded-reader-route', title: slugTitle, url })).toMatchObject({ mediaKind: 'MANGA', sourceAdapter: 'known-title-route-v1', stableSlug });
+  });
+  it.each([
+    ['https://weebcentral.com/chapters/01JJ2EBCSNET6TN5V9JDJMAQR0', 'Episode 17 | Childhood Friend Complex (Eunhi) | Weeb Central'],
+    ['https://www.yyzzbaby.com/statuses/18285290.html', 'Dead Mount Death Play Chapter 84'],
+    ['https://flamecomics.xyz/series/148/091191e0899443b3', 'Destined Murderer - Pack of Lies (1) - Chapter 15 - Flame Comics'],
+  ])('accepts a known title-derived manga route on %s', (url, title) => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'title-derived-route', title, url })).toMatchObject({ mediaKind: 'MANGA', sourceAdapter: 'known-title-derived-route-v1' });
+  });
+  it('accepts an AsuraScans slug with an attached chapter', () => {
+    expect(extractFavoriteSourceEvidence({ sourceKey: 'asura-route', title: 'Reformation of the Deadbeat Noble Chapter 81 - Asura Scans', url: 'https://www.asurascans.com/reformation-of-the-deadbeat-noble-chapter-81-a-flame-that-keeps-burning/' })).toMatchObject({ mediaKind: 'MANGA', release: { kind: 'chapter', value: 81 }, stableSlug: 'reformation-of-the-deadbeat-noble' });
+  });
   it.each(['watch?v=synthetic', 'blog/ordinary-link'])('still rejects explicitly excluded links: %s', path => {
     expect(extractFavoriteSourceEvidence(input('ordinary', `https://fixtures.tobirink.invalid/${path}`)).disposition).toBe('URL_IDENTITY_UNRESOLVED');
   });
@@ -114,6 +145,16 @@ describe('favorite source evidence U-01…U-10', () => {
       release: { kind: 'chapter', value: 67 },
       stableSlug: 'a-wannabe-golden-gangster',
       title: 'a wannabe golden gangster',
+    });
+  });
+  it('recognizes a numeric reader tail after a chapter route', () => {
+    expect(extractFavoriteSourceEvidence({
+      sourceKey: 'bookmark-mangabtt',
+      title: 'Read Ikitsuku Saki wa Yuusha ka Maou ka Chapter 7-eng-li Online | MangaBTT',
+      url: 'https://mangabtt.com/manga/ikitsuku-saki-wa-yuusha-ka-maou-ka/chapter-7-eng-li/411818',
+    })).toMatchObject({
+      mediaKind: 'MANGA', release: { kind: 'chapter', value: 7 }, stableSlug: 'ikitsuku-saki-wa-yuusha-ka-maou-ka',
+      title: 'ikitsuku saki wa yuusha ka maou ka',
     });
   });
   it('falls back to the human title when a routing-prefixed slug is not corroborated', () => {

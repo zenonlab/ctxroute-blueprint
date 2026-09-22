@@ -3,6 +3,7 @@ const responseByteLimit = 512 * 1024;
 const replayWindowMs = 60_000;
 const minimumSecretBytes = 32;
 const maximumSecretBytes = 256;
+const productUserAgent = 'TobiRink/1.0 (+https://tobirink.com)';
 
 type ProviderMethod = 'GET' | 'POST';
 type ProviderFetch = (input: string, init: RequestInit) => Promise<Response>;
@@ -190,6 +191,7 @@ function providerHeaders(envelope: GatewayEnvelope): Headers {
   const origin = new URL(envelope.target).origin;
   const headers = new Headers({
     Accept: 'application/json',
+    'User-Agent': productUserAgent,
   });
   if (envelope.method === 'POST') headers.set('Content-Type', 'application/json');
   if (origin === 'https://graphql.anilist.co') {
