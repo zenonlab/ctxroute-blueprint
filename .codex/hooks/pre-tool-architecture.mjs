@@ -319,8 +319,8 @@ function gitChangedFiles(root) {
 function acceptedTrackedAdr(path, root) {
   if (!/^docs\/decisions\/ADR-(?!0000-).+\.md$/u.test(path) || !existsSync(resolve(root, path))) return false;
   try {
-    execFileSync('git', ['ls-files', '--error-unmatch', '--', path], { cwd: root, stdio: 'ignore' });
-    return /^- Status:\s*accepted\s*$/imu.test(parseAdr(readFileSync(resolve(root, path), 'utf8'), path).body);
+    const committed = execFileSync('git', ['show', `HEAD:${path}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    return /^- Status:\s*accepted\s*$/imu.test(parseAdr(committed, path).body);
   } catch {
     return false;
   }
