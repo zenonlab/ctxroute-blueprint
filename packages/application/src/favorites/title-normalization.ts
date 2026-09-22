@@ -87,23 +87,24 @@ function editThreshold(left: string, right: string): number {
 export function isWithinFavoriteEditDistance(left: string, right: string): boolean {
   const limit = editThreshold(left, right);
   if (limit === 0 || Math.abs(left.length - right.length) > limit) return false;
-  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  let previous = new Map<number, number>();
+  for (let rightIndex = 0; rightIndex <= Math.min(right.length, limit); rightIndex += 1) previous.set(rightIndex, rightIndex);
   for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
-    const current = Array.from({ length: right.length + 1 }, () => limit + 1);
-    current[0] = leftIndex;
-    const start = Math.max(1, leftIndex - limit);
+    const current = new Map<number, number>();
+    const start = Math.max(0, leftIndex - limit);
     const end = Math.min(right.length, leftIndex + limit);
-    let rowMinimum = leftIndex;
-    for (let rightIndex = start; rightIndex <= end; rightIndex += 1) {
-      const insertion = (current[rightIndex - 1] ?? limit + 1) + 1;
-      const deletion = (previous[rightIndex] ?? limit + 1) + 1;
-      const substitution = (previous[rightIndex - 1] ?? limit + 1) + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1);
+    if (start === 0) current.set(0, leftIndex);
+    let rowMinimum = limit + 1;
+    for (let rightIndex = Math.max(1, start); rightIndex <= end; rightIndex += 1) {
+      const insertion = (current.get(rightIndex - 1) ?? limit + 1) + 1;
+      const deletion = (previous.get(rightIndex) ?? limit + 1) + 1;
+      const substitution = (previous.get(rightIndex - 1) ?? limit + 1) + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1);
       const distance = Math.min(insertion, deletion, substitution);
-      current[rightIndex] = distance;
+      current.set(rightIndex, distance);
       rowMinimum = Math.min(rowMinimum, distance);
     }
     if (rowMinimum > limit) return false;
     previous = current;
   }
-  return (previous[right.length] ?? limit + 1) <= limit;
+  return (previous.get(right.length) ?? limit + 1) <= limit;
 }
