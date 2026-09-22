@@ -58,6 +58,28 @@ async function test_inspect_read_only_resources() {
   assert.equal(calls.some(args => args.includes('apply') || args[0] === 'deploy'), false);
 }
 
+async function test_worker_inspection_does_not_require_unrelated_storage_permissions() {
+  const calls = [];
+  const driver = createCloudflareDriver({
+    config,
+    workerDirectory: '/worker',
+    run: async args => {
+      calls.push(args);
+      if (args[0] === 'whoami') return '{"accounts":[{"id":"account-1"}]}';
+      return '{"versions":[]}';
+    },
+  });
+  const actions = driver.resolveOperations(['worker-deploy']);
+  const state = await driver.inspect('account-1', actions);
+  assert.deepEqual(state.migrations, []);
+  assert.deepEqual(state.buckets, []);
+  assert.deepEqual(state.queues, { configured: [], output: '' });
+  assert.deepEqual(calls, [
+    ['whoami', '--account', 'account-1', '--json'],
+    ['deployments', 'status', '--name', 'public-api', '--json'],
+  ]);
+}
+
 async function test_preview_and_apply_translations() {
   const calls = [];
   const builds = [];
@@ -303,6 +325,7 @@ function test_reject_invalid_r2_identifiers() {
 
 test('the driver derives operation targets from configuration', test_derive_operation_targets);
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
+test('worker-only inspection excludes unrelated D1, R2 and Queue reads', test_worker_inspection_does_not_require_unrelated_storage_permissions);
 test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
 test('worker preview ignores volatile Wrangler output but tracks sources', test_worker_preview_ignores_volatile_wrangler_output_but_tracks_sources);
 test('worker fingerprint normalizes Next build IDs only', test_worker_fingerprint_normalizes_next_build_ids_only);

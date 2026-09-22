@@ -83,7 +83,7 @@ function normalizeOptions(options) {
 export async function applyApprovedPlan({ driver, plan, approvedDigest, accountId, resourceAllowlist, now }) {
   if (!isDriver(driver) || driver.id !== plan?.driverId) throw new Error('driver-mismatch');
   const verified = assertApplicablePlan({ plan, approvedDigest, accountId, resourceAllowlist, now });
-  const currentInspection = await driver.inspect(verified.accountId);
+  const currentInspection = await driver.inspect(verified.accountId, verified.actions);
   if (digest(currentInspection) !== verified.inspectionDigest) throw new Error('provider-state-changed');
   const currentPreview = await driver.preview(verified.actions);
   if (digest(currentPreview) !== verified.previewDigest) throw new Error('operation-preview-changed');

@@ -79,23 +79,36 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
     resolveOperations(operationNames) {
       return resolveOperations(operations, operationNames, config, releaseDirectory).map(({ kind, target }) => ({ kind, target }));
     },
-    async inspect(accountId) {
+    async inspect(accountId, requestedActions) {
       requiredString(accountId, 'account-id');
+      const actions = requestedActions === undefined
+        ? [...operations.values()]
+        : materializeActions(operations, requestedActions, config, releaseDirectory);
+      const requiresWorker = requestedActions === undefined || actions.some(action => action.kind === 'worker-deploy' || action.kind === 'worker-secret-set');
+      const requiresD1 = requestedActions === undefined || actions.some(action => action.kind === 'd1-migrate');
+      const requiredBuckets = actions
+        .filter(action => action.kind === 'r2-publish' || action.kind === 'r2-release-snapshot' || action.kind === 'r2-release-pointer')
+        .map(action => action.bucket)
+        .filter((bucket, index, buckets) => buckets.indexOf(bucket) === index);
+      const inspectedBuckets = requestedActions === undefined
+        ? config.r2
+        : config.r2.filter(bucket => requiredBuckets.includes(bucket.name));
+      const requiresQueues = config.queues.length > 0 && (requestedActions === undefined || actions.some(action => action.kind === 'queue-create' || action.kind === 'queue-delete'));
       const [identity, deployment, migrations, buckets, queues] = await Promise.all([
         run(['whoami', '--account', accountId, '--json'], { cwd: workerDirectory }),
-        run(['deployments', 'status', '--name', config.worker, '--json'], { cwd: workerDirectory }),
-        Promise.all(config.d1.map(database => run(['d1', 'migrations', 'list', database.binding, '--remote'], { cwd: workerDirectory }))),
-        Promise.all(config.r2.map(bucket => run(['r2', 'bucket', 'info', bucket.name, '--json'], { cwd: workerDirectory }))),
-        config.queues.length === 0 ? Promise.resolve('') : run(['queues', 'list'], { accountId, cwd: workerDirectory }),
+        requiresWorker ? run(['deployments', 'status', '--name', config.worker, '--json'], { cwd: workerDirectory }) : Promise.resolve('{}'),
+        requiresD1 ? Promise.all(config.d1.map(database => run(['d1', 'migrations', 'list', database.binding, '--remote'], { cwd: workerDirectory }))) : Promise.resolve([]),
+        Promise.all(inspectedBuckets.map(bucket => run(['r2', 'bucket', 'info', bucket.name, '--json'], { cwd: workerDirectory }))),
+        requiresQueues ? run(['queues', 'list'], { accountId, cwd: workerDirectory }) : Promise.resolve(''),
       ]);
       return {
         driverId: DRIVER_ID,
         accountId,
         identity: parseJson(identity, 'invalid-whoami-response'),
-        deployment: parseJson(deployment, 'invalid-deployment-response'),
-        migrations: config.d1.map((database, index) => ({ binding: database.binding, name: database.name, output: migrations[index].trim() })),
-        buckets: config.r2.map((bucket, index) => ({ binding: bucket.binding, name: bucket.name, info: parseJson(buckets[index], 'invalid-r2-response') })),
-        queues: { configured: config.queues.map(queue => queue.name), output: queues.trim() },
+        deployment: requiresWorker ? parseJson(deployment, 'invalid-deployment-response') : null,
+        migrations: requiresD1 ? config.d1.map((database, index) => ({ binding: database.binding, name: database.name, output: migrations[index].trim() })) : [],
+        buckets: inspectedBuckets.map((bucket, index) => ({ binding: bucket.binding, name: bucket.name, info: parseJson(buckets[index], 'invalid-r2-response') })),
+        queues: { configured: requiresQueues ? config.queues.map(queue => queue.name) : [], output: queues.trim() },
       };
     },
     async preview(requestedActions) {
