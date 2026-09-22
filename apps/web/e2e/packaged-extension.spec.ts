@@ -326,7 +326,10 @@ test('installed site Library sorts the full private catalogue promptly', async (
     // Wake the restarted MV3 worker before opening the public document. On a
     // shared runner Chromium can otherwise let the page's first handshake
     // expire while the extension worker is still being recreated.
-    await privateLibrary.evaluate(() => chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }));
+    await privateLibrary.evaluate(() => Promise.race([
+      chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }).then(() => true).catch(() => false),
+      new Promise<boolean>((resolveWake) => setTimeout(() => resolveWake(false), 5_000)),
+    ]));
     await site.close();
     site = await context.newPage();
     await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
