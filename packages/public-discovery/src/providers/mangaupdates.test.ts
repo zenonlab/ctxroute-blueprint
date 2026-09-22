@@ -17,6 +17,26 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     expect(result.candidates[0]).not.toHaveProperty('cover');
   });
 
+  it('accepts the nullable optional fields returned by the live MangaUpdates API', async () => {
+    const liveRecord = {
+      ...series,
+      associated: null,
+      categories: null,
+      image: null,
+      status: null,
+      title: 'One Piece',
+      type: 'Manga',
+      url: null,
+      year: '1997',
+    };
+    const fetcher = vi.fn(async () => Response.json({ results: [{ record: liveRecord }], total_hits: 1 }));
+    const result = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ limit: 20, provider: 'mangaupdates', titles: ['One Piece'] });
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]).toMatchObject({ displayTitle: 'One Piece', externalId: '12345', mediaKind: 'MANGA', startYear: 1997, titles: ['One Piece'] });
+    expect(result.candidates[0]).not.toHaveProperty('cover');
+    expect(result.candidates[0]).not.toHaveProperty('editorialStatus');
+  });
+
   it('maps search results and exposes truncation', async () => {
     let requestInit: RequestInit | undefined;
     const fetcher = vi.fn(async (_input: string, init: RequestInit) => {

@@ -12,18 +12,16 @@ const mangaUpdatesImageSchema = z.object({
   url: z.object({ original: z.url().nullish(), thumb: z.url().nullish() }).passthrough(),
 }).passthrough();
 const mangaUpdatesSeriesSchema = z.object({
-  // MangaUpdates adds provider-owned metadata to these records on the detail
-  // route (for example votes and added_by). Keep the internal projection
-  // bounded while accepting additive upstream fields.
-  associated: z.array(z.object({ title: nonEmptyString }).passthrough()).max(16).optional().default([]),
-  categories: z.array(z.object({ category: nonEmptyString }).passthrough()).max(16).optional().default([]),
-  genres: z.array(z.object({ genre: nonEmptyString }).passthrough()).max(16).optional().default([]),
-  image: mangaUpdatesImageSchema.optional(),
-  year: z.union([z.number().int(), z.string()]).optional(), status: nonEmptyString.optional(),
+  associated: z.preprocess((value) => value ?? [], z.array(z.object({ title: nonEmptyString }).passthrough()).max(16)),
+  categories: z.preprocess((value) => value ?? [], z.array(z.object({ category: nonEmptyString }).passthrough()).max(16)),
+  genres: z.preprocess((value) => value ?? [], z.array(z.object({ genre: nonEmptyString }).passthrough()).max(16)),
+  image: z.preprocess((value) => value ?? undefined, mangaUpdatesImageSchema.optional()),
+  year: z.preprocess((value) => value ?? undefined, z.union([z.number().int(), z.string()]).optional()),
+  status: z.preprocess((value) => value ?? undefined, nonEmptyString.optional()),
   series_id: identifierSchema,
   title: nonEmptyString,
   type: nonEmptyString,
-  url: z.url().optional(),
+  url: z.preprocess((value) => value ?? undefined, z.url().optional()),
 }).passthrough();
 const mangaUpdatesResultSchema = z.object({ record: mangaUpdatesSeriesSchema }).passthrough();
 const mangaUpdatesSearchSchema = z.object({ results: z.array(mangaUpdatesResultSchema).max(favoriteProviderInspectionLimit), total_hits: z.number().int().nonnegative() }).passthrough();
