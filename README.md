@@ -46,22 +46,34 @@ deliberately and verify the result.
 Prerequisites: Git, Node.js 22.18+, npm 10+, Python 3.10+, and uv 0.11.2.
 Python 3.12 is the reference runtime for official code-review-graph.
 
-1. Select **Use this template** on GitHub, then clone the generated repository.
-2. Bootstrap and verify the workspace:
+1. Select **Use this template** on GitHub, create the product repository under
+   your account or organization, then clone that generated repository. Do not
+   clone `zenonlab/ctxroute-blueprint` to start a product.
+2. Confirm the checkout has its own remote before setup or product work:
+
+   ```sh
+   git remote get-url origin
+   ```
+
+   The URL must be the new product repository, never
+   `https://github.com/zenonlab/ctxroute-blueprint.git`. If this checkout was
+   copied instead of generated from the template, create the repository first,
+   set `origin` to it, and push there before continuing.
+3. Bootstrap and verify the workspace:
 
    ```sh
    npm run setup
    ```
 
-3. In Codex, open `/hooks` and approve the six workspace definitions. Claude
+4. In Codex, open `/hooks` and approve the six workspace definitions. Claude
    reads the tracked `.claude/settings.json` configuration directly.
-4. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
+5. Ask the agent to read [`AGENTS.md`](AGENTS.md) and
    [`CLAUDE.md`](CLAUDE.md), then initialize the project from your requirements.
-5. Review the generated [project brief](docs/00-project-brief.md),
+6. Review the generated [project brief](docs/00-project-brief.md),
    [technology decisions](docs/01-technology-decisions.md),
    [ADRs](docs/decisions/README.md), [architecture](docs/architecture/README.md),
    and [quality strategy](docs/02-quality-strategy.md).
-6. Approve starter-file cleanup only after initialization is complete.
+7. Approve starter-file cleanup only after initialization is complete.
    Verified project commits are then created automatically.
 
 While `.project/project-config.json` has status `template`, governance blocks

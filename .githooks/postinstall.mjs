@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -63,16 +63,8 @@ export function inspectGlobalCtxrouteHooks(configPath = join(process.env.CODEX_H
 function inspectHarness(root, relativePath, harness, failures) {
   const config = readJson(join(root, relativePath), failures, relativePath);
   if (!config) return null;
-  if (config?.hookLanes?.synchronous !== 'host-blocking' || config?.hookLanes?.maintenance !== 'host-async'
-    || !Array.isArray(config?.hookLanes?.manual) || !config.hookLanes.manual.includes('.codex/hooks/archify-preview.mjs')) {
-    failures.push(`${relativePath} must declare synchronous, maintenance, and manual lanes.`);
-  }
-  const declaredModules = Object.values(config?.hookModules ?? {}).flat();
-  const actualModules = existsSync(join(root, '.codex', 'hooks'))
-    ? readdirSync(join(root, '.codex', 'hooks')).filter(name => name.endsWith('.mjs')).sort()
-    : [];
-  if (new Set(declaredModules).size !== declaredModules.length || JSON.stringify([...declaredModules].sort()) !== JSON.stringify(actualModules)) {
-    failures.push(`${relativePath} must classify every hook module exactly once.`);
+  if (harness === 'codex' && JSON.stringify(Object.keys(config).sort()) !== JSON.stringify(['description', 'hooks'])) {
+    failures.push(`${relativePath} must contain only Codex-supported top-level fields: description and hooks.`);
   }
   const actualEvents = Object.keys(config?.hooks ?? {});
   if (actualEvents.length !== lifecycleEvents.length || lifecycleEvents.some(event => !actualEvents.includes(event))) {
@@ -102,7 +94,9 @@ function inspectHarness(root, relativePath, harness, failures) {
     if ('statusMessage' in (entries[0] ?? {})) failures.push(`${relativePath} ${event} must not declare a noisy statusMessage.`);
     if (entries.some(entry => !Number.isFinite(entry.timeout) || entry.timeout <= 0)) failures.push(`${relativePath} ${event} handlers must declare explicit positive timeouts.`);
     if (harness === 'codex') {
-      if (entries[0]?.additionalContextLimit !== 1200) failures.push(`${relativePath} ${event} synchronous context limit must be 1200.`);
+      const supportsContext = !['PreCompact', 'Stop'].includes(event);
+      if (supportsContext && entries[0]?.additionalContextLimit !== 1200) failures.push(`${relativePath} ${event} synchronous context limit must be 1200.`);
+      if (!supportsContext && 'additionalContextLimit' in (entries[0] ?? {})) failures.push(`${relativePath} ${event} must not declare an unsupported synchronous context limit.`);
       if (entries.slice(1).some(entry => entry.additionalContextLimit !== 0)) failures.push(`${relativePath} ${event} maintenance context limit must be 0.`);
     }
   }
@@ -111,8 +105,6 @@ function inspectHarness(root, relativePath, harness, failures) {
 
 function inspectHarnessParity(codex, claude, failures) {
   if (!codex || !claude) return;
-  if (JSON.stringify(codex.hookLanes) !== JSON.stringify(claude.hookLanes)) failures.push('Codex and Claude hook lanes must remain identical.');
-  if (JSON.stringify(codex.hookModules) !== JSON.stringify(claude.hookModules)) failures.push('Codex and Claude hook module classifications must remain identical.');
   for (const event of lifecycleEvents) {
     const codexEntries = codex.hooks[event].flatMap(group => group.hooks ?? []);
     const claudeEntries = claude.hooks[event].flatMap(group => group.hooks ?? []);

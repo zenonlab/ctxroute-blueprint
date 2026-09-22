@@ -1,15 +1,4 @@
 {
-  "hookLanes": {
-    "synchronous": "host-blocking",
-    "maintenance": "host-async",
-    "manual": [".codex/hooks/archify-preview.mjs"]
-  },
-  "hookModules": {
-    "entrypoints": ["lifecycle.mjs"],
-    "handlers": ["ctxroute-reset.mjs", "mission-context.mjs", "post-tool-audit.mjs", "post-tool-crg.mjs", "post-tool-sensor.mjs", "pre-tool-architecture.mjs", "problem-memory.mjs", "stop-review.mjs", "worker-restitution.mjs", "worktree-reconcile.mjs"],
-    "libraries": ["decision-memory.mjs", "host-policy-adapter.mjs", "lifecycle-contract.mjs", "path-extraction.mjs", "resolved-policy.mjs"],
-    "manual": ["archify-preview.mjs", "ctxroute.mjs"]
-  },
   "hooks": {
     "SessionStart": [
       {

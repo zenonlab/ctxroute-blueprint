@@ -44,6 +44,10 @@ These are template constraints, not product architecture choices. A derived
 project may adapt them only through the approved initialization and cleanup
 process.
 
+Before that initialization, the derived project must have its own Git
+repository and `origin`; it must not develop or push product work through the
+`zenonlab/ctxroute-blueprint` remote.
+
 ### Local orchestration boundary
 
 The blueprint control plane is a local Node.js tool exposed through stdio MCP,
