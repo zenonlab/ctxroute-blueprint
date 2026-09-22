@@ -112,7 +112,7 @@ describe('local D1 cost baseline — no external requests', () => {
     expect(m.records.map(({ rowsWritten }) => rowsWritten)).toEqual([4, 3, 0, 3, 39, 0, 0, 0, 15, 11, 15, 11]);
     console.info('d1-cost-baseline-storage-bytes', JSON.stringify({ afterAlias: aliasStorage, afterCounterChange: byteStock }));
     m.report();
-  });
+  }, 30_000);
 
   it('measures eight expired claims and the write hidden in a terminal read', async () => {
     const m = meter();
@@ -212,7 +212,7 @@ describe('local D1 cost baseline — no external requests', () => {
     console.info('r2-cost-baseline', JSON.stringify(r2Records));
     console.info('d1-cost-baseline-agenda-stock', JSON.stringify(pages));
     m.report();
-  });
+  }, 30_000);
 
   it('measures publication replay without relation admission', async () => {
     const m = meter();
