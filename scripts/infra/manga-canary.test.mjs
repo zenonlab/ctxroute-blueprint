@@ -1,7 +1,9 @@
 /* global Response */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runDiscoveryCanaries } from './manga-canary.mjs';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import { canaryFailureCode, createCostObservation, runDiscoveryCanaries, runObservedDiscoveryCanaries, startCostObserver } from './manga-canary.mjs';
 
 function fixtureFetcher({ initial = 'MISS', admission = 'PENDING', terminal = 'VERIFIED', admissionStatus = 202 } = {}) {
   const admitted = new Map();
@@ -64,4 +66,203 @@ test('an indefinitely pending request stops at the finite observation budget', a
   await assert.rejects(runDiscoveryCanaries({ fetcher: fixture.fetcher, wait: () => { waits += 1; }, report: () => {} }), /observation-timeout-ANIME/u);
   assert.equal(waits, 40);
   assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, 1);
+});
+
+function cost(overrides = {}) {
+  return { schemaVersion: 1, type: 'worker.cost', task: 'discovery', provider: 'anilist', result: 'changed',
+    pagesRequested: 0, providerRequests: 2, acceptedResults: 1, durationMs: 80, retries: 1,
+    providerTransportDurationMs: 60, provider429s: 1, providerHttpErrors: 1, providerNetworkErrors: 0,
+    d1RowsRead: 10, d1RowsWritten: 3, queueSends: 1, queueFailures: 0, ...overrides };
+}
+
+function tailFrame(...events) {
+  return JSON.stringify({ event: { request: { url: 'https://private.invalid', headers: { authorization: 'private-secret' } } },
+    logs: [{ message: ['private title and payload', ...events.map(row => JSON.stringify(row))] }],
+    exceptions: [{ message: 'private error' }] }, null, 4) + '\n';
+}
+
+test('chunked pretty JSON and UTF-8 are aggregated with a closed, redacted Discovery summary', () => {
+  const observation = createCostObservation();
+  const bytes = Buffer.from('CLI banner é\n' + tailFrame(cost({ title: 'private } \\" title é', url: 'https://private.invalid' }))
+    + tailFrame(cost({ task: 'agenda', providerRequests: 900 }), cost({ task: 'discovery-lookup', provider: 'none', providerRequests: 0 })));
+  for (const byte of bytes) observation.push(Buffer.from([byte]));
+  observation.finish();
+  const summary = observation.snapshot();
+  assert.equal(summary.observedEvents, 2);
+  assert.equal(summary.providerRequests, 2);
+  assert.equal(summary.provider429s, 2);
+  assert.equal(summary.providerTransportDurationMs, 120);
+  assert.equal(summary.d1RowsRead, 20);
+  assert.equal(summary.queueSends, 2);
+  assert.equal(summary.retries, 2);
+  assert.equal(summary.results.changed, 2);
+  assert.doesNotMatch(JSON.stringify(summary), /private|title|url|https|authorization|secret|payload|exceptions/iu);
+});
+
+test('observer rejects malformed costs, truncated frames and more than 1 MiB without leaking content', () => {
+  for (const overrides of [{ providerRequests: -1 }, { provider: 'private-secret' }, { provider429s: 0.5 }, { providerTransportDurationMs: undefined }]) {
+    const observation = createCostObservation();
+    assert.throws(() => observation.push(tailFrame(cost(overrides))), /^Error: discovery-canary-observer-invalid-cost$/u);
+  }
+  const truncated = createCostObservation();
+  truncated.push('{"logs":[');
+  assert.throws(() => truncated.finish(), /observer-truncated/u);
+  const overflow = createCostObservation();
+  assert.throws(() => overflow.push(Buffer.alloc(1024 * 1024 + 1)), /observer-byte-limit/u);
+});
+
+function fakeTail() {
+  const child = new EventEmitter();
+  child.pid = 12345;
+  child.stdout = new PassThrough();
+  const launches = [];
+  const kills = [];
+  return { child, launches, kills, platform: 'linux',
+    spawnProcess: (...args) => { launches.push(args); return child; },
+    killProcess: (pid, signal) => { kills.push([pid, signal]); child.stdout.end(); child.emit('close', 0); },
+  };
+}
+
+test('tail uses only the pinned npm command, discards stderr, disables disk logs and closes its own group', async () => {
+  const fake = fakeTail();
+  const observer = startCostObserver(fake);
+  fake.child.stdout.write(tailFrame(cost()));
+  assert.equal(observer.snapshot().providerRequests, 2);
+  const [command, args, options] = fake.launches[0];
+  assert.equal(command, 'npm');
+  assert.deepEqual(args, ['exec', '--no', '--', 'wrangler', 'tail', 'tobirink-public-api', '--config', 'apps/worker/wrangler.jsonc', '--format', 'json', '--search', 'worker.cost']);
+  assert.deepEqual(options.stdio, ['ignore', 'pipe', 'ignore']);
+  assert.equal(options.detached, true);
+  assert.equal(options.env.WRANGLER_WRITE_LOGS, 'false');
+  assert.equal(options.env.WRANGLER_LOG_SANITIZE, 'true');
+  assert.equal(options.env.WRANGLER_OUTPUT_FILE_PATH, undefined);
+  assert.equal(options.env.WRANGLER_OUTPUT_FILE_DIRECTORY, undefined);
+  await observer.close();
+  await observer.close();
+  assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
+});
+
+test('observed canaries start the observer first and certify only measured provider traffic', async () => {
+  const fake = fakeTail();
+  const fixture = fixtureFetcher();
+  const reports = [];
+  let waits = 0;
+  const signals = new EventEmitter();
+  const results = await runObservedDiscoveryCanaries({
+    fetcher: async (...args) => { assert.equal(fake.launches.length, 1); return fixture.fetcher(...args); },
+    wait: () => {}, report: row => reports.push(row), signals,
+    observerFactory: () => startCostObserver(fake),
+    observationWait: () => { if (++waits === 2) fake.child.stdout.write(tailFrame(cost())); },
+  });
+  assert.equal(results.length, 2);
+  assert.equal(waits, 2);
+  assert.equal(reports.at(-1).state, 'COMPLETE');
+  assert.equal(reports.at(-1).scope, 'discovery-traffic-window');
+  assert.equal(reports.at(-1).providerRequests, 2);
+  assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
+  assert.equal(signals.listenerCount('SIGTERM'), 0);
+  assert.doesNotMatch(JSON.stringify(reports), /private|title|https|secret|payload/iu);
+});
+
+test('empty observer or no provider calls fails certification and always closes the child', async () => {
+  for (const rows of [[], [cost({ provider: 'none', providerRequests: 0 })]]) {
+    const fake = fakeTail();
+    const fixture = fixtureFetcher();
+    const reports = [];
+    await assert.rejects(runObservedDiscoveryCanaries({ ...fixture, wait: () => {}, report: row => reports.push(row),
+      observerFactory: () => startCostObserver(fake), observationWait: () => { if (rows.length) fake.child.stdout.write(tailFrame(...rows)); },
+    }), /observer-no-events|observer-no-provider-calls/u);
+    assert.equal(reports.at(-1).state, 'INCOMPLETE');
+    assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
+  }
+});
+
+test('canary failure and observer exit abort certification, redact errors and clean up', async () => {
+  for (const failure of ['canary', 'observer']) {
+    const fake = fakeTail();
+    const fixture = fixtureFetcher({ admissionStatus: 429 });
+    const reports = [];
+    await assert.rejects(runObservedDiscoveryCanaries({ ...fixture, wait: () => {}, report: row => reports.push(row),
+      observerFactory: () => startCostObserver(fake), observationWait: () => {
+        if (failure === 'observer') fake.child.emit('error', new Error('private secret url https://private.invalid'));
+      },
+    }), failure === 'observer' ? /observer-failed/u : /submit-http-429/u);
+    assert.equal(reports.at(-1).state, 'INCOMPLETE');
+    assert.doesNotMatch(JSON.stringify(reports), /private|https|secret/iu);
+    assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
+  }
+});
+
+test('wall-clock budget and interruption abort ongoing work and remove signal handlers', async () => {
+  for (const mode of ['budget', 'signal']) {
+    const fake = fakeTail();
+    const signals = new EventEmitter();
+    await assert.rejects(runObservedDiscoveryCanaries({ report: () => {}, signals, budgetMs: 5,
+      observerFactory: () => startCostObserver(fake), observationWait: () => {
+        if (mode === 'signal') signals.emit('SIGTERM');
+        return new Promise(() => {});
+      },
+    }), /observer-budget|observer-interrupted/u);
+    assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
+    assert.equal(signals.listenerCount('SIGTERM'), 0);
+    assert.equal(signals.listenerCount('SIGINT'), 0);
+  }
+});
+
+test('HTTP refresh costs need no transport fields, unlike actual Queue provider work', () => {
+  const observation = createCostObservation();
+  observation.push(tailFrame({ schemaVersion: 1, type: 'worker.cost', task: 'discovery-refresh', provider: 'none', result: 'changed',
+    pagesRequested: 0, providerRequests: 0, acceptedResults: 0, durationMs: 3, retries: 0, d1RowsRead: 4, d1RowsWritten: 1 }));
+  observation.finish();
+  assert.equal(observation.snapshot().observedEvents, 1);
+  assert.equal(observation.snapshot().providerTransportDurationMs, 0);
+});
+
+test('late invalid or truncated logs during termination prevent a complete certificate', async () => {
+  for (const late of ['{"logs":[', tailFrame(cost({ providerRequests: -1 }))]) {
+    const fake = fakeTail();
+    const fixture = fixtureFetcher();
+    const reports = [];
+    const observerFactory = () => startCostObserver({ ...fake, killProcess: (pid, signal) => {
+      fake.child.stdout.write(late);
+      fake.killProcess(pid, signal);
+    } });
+    await assert.rejects(runObservedDiscoveryCanaries({ ...fixture, wait: () => {}, report: row => reports.push(row), observerFactory,
+      observationWait: () => { fake.child.stdout.write(tailFrame(cost())); },
+    }), /observer-truncated|observer-invalid-cost/u);
+    assert.equal(reports.at(-1).state, 'INCOMPLETE');
+    assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
+  }
+});
+
+test('CLI errors are closed codes, including a hostile error imitating their prefix', () => {
+  assert.equal(canaryFailureCode(new Error('discovery-canary-submit-http-429')), 'discovery-canary-submit-http-429');
+  for (const message of ['private-secret', 'discovery-canary-private-secret', 'https://private.invalid', 'discovery-canary-observer-failed\nprivate']) {
+    assert.equal(canaryFailureCode(new Error(message)), 'discovery-canary-failed');
+  }
+});
+
+test('an unresponsive child is force-closed only in the recorded group', async () => {
+  const fake = fakeTail();
+  const observer = startCostObserver({ ...fake, killProcess: (pid, signal) => {
+    fake.kills.push([pid, signal]);
+    if (signal === 'SIGKILL') { fake.child.stdout.end(); fake.child.emit('close', null); }
+  } });
+  await observer.close();
+  assert.deepEqual(fake.kills, [[-12345, 'SIGTERM'], [-12345, 'SIGKILL']]);
+});
+
+test('an unexpected tail exit fails immediately without certifying or launching requests', async () => {
+  const fake = fakeTail();
+  const fixture = fixtureFetcher();
+  const reports = [];
+  await assert.rejects(runObservedDiscoveryCanaries({ ...fixture, report: row => reports.push(row),
+    observerFactory: () => startCostObserver(fake), observationWait: () => {
+      fake.child.stdout.end(); fake.child.emit('close', 1);
+      return new Promise(() => {});
+    },
+  }), /observer-exited/u);
+  assert.equal(fixture.calls.length, 0);
+  assert.equal(reports.at(-1).state, 'INCOMPLETE');
+  assert.equal(fake.kills.length, 0);
 });

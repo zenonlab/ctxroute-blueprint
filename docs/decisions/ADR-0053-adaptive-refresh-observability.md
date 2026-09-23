@@ -8,6 +8,8 @@ scope:
   - apps/worker/src/native-collectors.test.ts
   - apps/worker/src/catalogue/public-discovery-routes.ts
   - apps/worker/src/catalogue/public-discovery-routes.test.ts
+  - scripts/infra/manga-canary.mjs
+  - scripts/infra/manga-canary.test.mjs
   - docs/operations/cloudflare.md
   - docs/architecture/src/agenda-release.dataflow.json
   - docs/architecture/src/public-discovery.dataflow.json
@@ -59,6 +61,25 @@ finis, entiers et non négatifs, puis retire tout champ non déclaré. Les champ
 transport sont optionnels pour les événements HTTP sans appel fournisseur;
 aucune URL, aucun corps et aucun message d’erreur n’est sérialisé pour les
 calculer. Un événement invalide est omis sans modifier l’issue métier.
+
+Le canari de livraison active facultativement `--observe` sur la CI POSIX pour ouvrir un
+`wrangler tail --format json --search worker.cost` avant les deux admissions
+fraîches. Le wrapper ne conserve ni n’émet les logs bruts, ignore stderr et
+désactive leur écriture Wrangler sur disque. Il valide les événements, ne
+résume que les tâches Discovery et borne le flux reçu à 1 Mio, la fenêtre à
+24 minutes et la fermeture du groupe enfant créé à trois secondes. Tout
+échec du tail, flux invalide ou incomplet, absence d’événement ou absence
+d’appel fournisseur interdit une certification verte. La fin du canari,
+son échec ou une interruption ferme uniquement le groupe npm/Wrangler créé.
+
+Le format JSON de Wrangler ne fournit pas de signal de connexion prêt : les
+trois secondes de stabilisation avant le canari ne prouvent pas sa connexion.
+Cinq secondes de drainage final laissent arriver les derniers événements.
+Le résumé porte sur le trafic Discovery de cette fenêtre, éventuellement
+concurrent et échantillonné par Cloudflare; ce n’est ni une attribution aux
+deux œuvres ni une mesure exacte de leur coût individuel. Aucun identifiant
+de corrélation, titre ou URL n’est ajouté. Sans `--observe`, le canari garde
+son comportement HTTP seul et ne prétend pas mesurer les fournisseurs.
 
 Compter les appels au point où le transport reçoit l’URL fournisseur, avant la
 sélection du chemin direct ou gateway. Pour Agenda, incrémenter séparément

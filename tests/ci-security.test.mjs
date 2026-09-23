@@ -37,3 +37,13 @@ test('local verification retains the complete quality boundary', () => {
   }
   assert.equal(read('.github/code-review-graph-constraints.txt').trim().endsWith('code-review-graph==2.3.8'), true);
 });
+
+test('fresh production canaries require bounded provider observation', () => {
+  const workflow = read('.github/workflows/deploy-production.yml');
+  const canaryStep = workflow.split('- name: Run fresh bounded anime and manga canaries')[1]?.split('- name:')[0];
+  assert.ok(canaryStep);
+  assert.match(canaryStep, /inputs\.run_manga_canary == true/u);
+  assert.match(canaryStep, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/u);
+  assert.match(canaryStep, /node scripts\/infra\/manga-canary\.mjs --observe/u);
+  assert.doesNotMatch(canaryStep, /DEN[O0].*TOKEN|continue-on-error/u);
+});

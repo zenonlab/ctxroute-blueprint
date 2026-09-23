@@ -129,7 +129,10 @@ jobs:
 
       - name: Run fresh bounded anime and manga canaries
         if: ${{ inputs.run_manga_canary == true }}
-        run: node scripts/infra/manga-canary.mjs
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/infra/manga-canary.mjs --observe
 
       - name: Remove temporary deployment plan
         if: ${{ always() }}

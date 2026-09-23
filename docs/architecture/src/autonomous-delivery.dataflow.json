@@ -18,14 +18,14 @@
     { "id": "verify", "type": "security", "label": "npm run verify", "sublabel": "tests + builds + audit", "stage": 1, "row": 1, "tag": "obligatoire" },
     { "id": "cloudflarePlan", "type": "cloud", "label": "Plan Cloudflare", "sublabel": "dry-run + digest stable", "stage": 2, "row": 1, "tag": "fail closed" },
     { "id": "workerApply", "type": "backend", "label": "Worker public", "sublabel": "Canaris neufs manuels", "stage": 3, "row": 1, "tag": "MISS → PENDING → VERIFIED" },
-    { "id": "publicProbes", "type": "external", "label": "Probes publiques", "sublabel": "/ + /library + /healthz", "stage": 4, "row": 0, "tag": "HTTP 200" },
+    { "id": "publicProbes", "type": "external", "label": "Preuves production", "sublabel": "HTTP + appels canaris", "stage": 4, "row": 0, "tag": "24 min · mesure exigée" },
     { "id": "denoApp", "type": "backend", "label": "Deno GitHub App", "sublabel": "gateway depuis main", "stage": 3, "row": 2, "tag": "mécanisme unique" }
   ],
   "flows": [
     { "id": "commitToVerify", "from": "mainCommit", "to": "verify", "label": "déclenche", "classification": "contrôlé", "variant": "emphasis" },
     { "id": "verifyToPlan", "from": "verify", "to": "cloudflarePlan", "label": "autorise le plan", "classification": "précondition", "variant": "security" },
     { "id": "planToWorker", "from": "cloudflarePlan", "to": "workerApply", "label": "digest + cible unique", "classification": "allowlist", "variant": "security", "labelAt": [638, 314] },
-    { "id": "workerToProbes", "from": "workerApply", "to": "publicProbes", "label": "statut + trace ID", "classification": "preuve publique", "variant": "default", "labelAt": [920, 205] },
+    { "id": "workerToProbes", "from": "workerApply", "to": "publicProbes", "label": "statuts + worker.cost", "classification": "agrégats expurgés", "variant": "default", "labelAt": [920, 205] },
     { "id": "denoToProbes", "from": "denoApp", "to": "publicProbes", "label": "/healthz", "classification": "preuve publique", "variant": "default", "labelAt": [930, 350] }
   ]
 }

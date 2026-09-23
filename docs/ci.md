@@ -87,6 +87,15 @@ propriété (reproductibilité) et restent obligatoires. L'input historique
 `run_manga_canary` exécute désormais deux admissions neuves, anime et manga,
 avec preuve `MISS → PENDING → VERIFIED`, au plus quarante lectures par média.
 Il refuse le cache chaud et n'effectue aucun réarmement historique.
+
+L'option `--observe` utilise le jeton Cloudflare existant uniquement dans cette
+étape protégée pour observer `worker.cost`. Elle publie les compteurs agrégés de
+la fenêtre Discovery, jamais les événements bruts. Une fenêtre sans événement
+ou sans appel fournisseur échoue : un `VERIFIED` seul ne certifie pas le passage
+fournisseur. La fenêtre est bornée à vingt-quatre minutes et le processus
+d'observation est arrêté à la sortie. Ces totaux peuvent inclure d'autres
+demandes concurrentes ; ils ne constituent pas une attribution par œuvre.
+
 ## Diagnostic Discovery agrégé
 
 Avant le plan Cloudflare, la CI protégée exécute
