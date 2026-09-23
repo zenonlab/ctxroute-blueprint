@@ -164,13 +164,19 @@ describe('public discovery indexed query cost', () => {
     if (publicationSql === undefined) throw new Error('Publication title guard must be exercised.');
     const canonicalGuard = publicationSql.slice(publicationSql.lastIndexOf('AND NOT EXISTS') + 4);
     const explainGuard = `EXPLAIN QUERY PLAN SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
-      CROSS JOIN catalogue_canonical_titles_v1 AS existing ON existing.normalized_title = proposed.value
+      CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value
       WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`;
     expect(canonicalGuard.replace(/\s+/gu, ' ')).toBe(explainGuard.slice('EXPLAIN QUERY PLAN SELECT 1 WHERE '.length).replace(/\s+/gu, ' '));
     const plan = await env.PUBLIC_DB.prepare(explainGuard)
       .bind(JSON.stringify(['fresh alpha', 'fresh beta', 'fresh gamma', 'fresh delta']), favoriteTitlePreparationVersion, 'anime', 'work_publication_cost_200001')
       .all<{ detail: string }>();
     expect(plan.results.some(({ detail }) => detail.includes('normalization_version=? AND normalized_title=? AND media_kind=?'))).toBe(true);
+    const titleGuardPlan = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN SELECT 1
+      FROM catalogue_canonical_titles_v1
+      WHERE normalization_version = ?1 AND normalized_title = ?2 AND media_kind = ?3 AND work_id <> ?4`)
+      .bind(favoriteTitlePreparationVersion, 'fresh alpha', 'anime', 'work_publication_cost_200001').all<{ detail: string }>();
+    console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'canonical-title-index', details: titleGuardPlan.results.map(({ detail }) => detail) }));
+    expect(titleGuardPlan.results.some(({ detail }) => detail.includes('sqlite_autoindex_catalogue_canonical_titles_v1_1'))).toBe(true);
     console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'canonical-publication-guard', details: plan.results.map(({ detail }) => detail) }));
     expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_titles WHERE work_id = ?1').bind('work_publication_cost_200001').first())
       .toEqual({ count: 4 });
