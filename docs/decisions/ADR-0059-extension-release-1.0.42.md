@@ -11,15 +11,15 @@ scope:
 review: on-change
 revised: true
 ---
-# ADR-0059 — Publication reproductible de l'extension 1.0.42
+# ADR-0059 — Publication reproductible de l'extension 1.0.43
 
 - Status: accepted
 - Date: 2026-09-20
 
 ## Context
 
-La candidate 1.0.42 doit corriger la preuve de packaging et d'exécution sans
-réécrire les archives publiques 1.0.41. Une archive locale ne doit pas pouvoir
+La candidate 1.0.43 doit corriger la convergence des favoris sans
+réécrire les archives publiques 1.0.42. Une archive locale ne doit pas pouvoir
 être transférée si sa taille ou son hash diverge du manifeste produit.
 
 ## Decision
@@ -33,11 +33,11 @@ comparées byte à byte.
 La pipeline installe Chromium Playwright et exécute les neuf scénarios E2E
 existants, puis vérifie les probes publiques `/`, `/library`, `/download`
 et gateway `/healthz`. La gate Cloudflare recalcule les artefacts avant tout
-upload et n'autorise que les deux objets R2 1.0.42 et le pointeur correspondant.
+upload et n'autorise que les deux objets R2 1.0.43 et le pointeur correspondant.
 
 ## Consequences
 
-Les ZIP 1.0.41 restent immuables et servent de rollback. Une divergence de
+Les ZIP 1.0.42 restent immuables et servent de rollback. Une divergence de
 manifestes, d'octets, de hash ou de taille bloque avant mutation distante.
 L'avancement du pointeur est une opération séparée et protégée, après preuve
 des deux téléchargements publics.

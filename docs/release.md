@@ -1,5 +1,18 @@
 # Extension packaging and rollback
 
+## Publication corrective 1.0.43 — 23 septembre 2026
+
+Les archives immuables `1.0.43` ont été produites par le packager verrouillé,
+puis publiées avant tout déplacement du pointeur de téléchargement. Le plan R2
+`58db40c0f36c76250f721c3f9e606528b051dde77f7dfcfd284d8ddd1b6394e0` ne
+contenait que les deux objets versionnés. Les téléchargements publics ont été
+comparés aux candidats locaux : Chrome
+`e7da7e4e16172bbb5207dff12c4b286d5b0b9b6e9bfb49ec8d584901ac22d0e7`
+(302455 octets) et Firefox
+`3be3a0c9c43d8d83199582e3a6c1c1c74c3895023f06641d0eaa01fe3c2e0af1`
+(302496 octets). Le pointeur `1.0.43` est livré séparément par la CI Worker ;
+les archives `1.0.42` restent immuables pour le rollback.
+
 ## Candidate corrective 1.0.42 — 20 septembre 2026
 
 La candidate `1.0.42` conserve les archives publiques immuables `1.0.41`.
