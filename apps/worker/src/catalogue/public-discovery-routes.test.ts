@@ -219,9 +219,11 @@ describe('verified public discovery cache', () => {
 
   it('rate-limits public reads before touching D1 and uses a separate bucket', async () => {
     const limiter = { limit: vi.fn(async () => ({ success: false })) };
+    const readLimiter = { limit: vi.fn(async () => ({ success: false })) };
     const app = createPublicDiscoveryApp({
       publicDiscoveryV3: new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB),
       rateLimiter: limiter,
+      readRateLimiter,
     });
     const getResponse = await app.request(`https://tobirink.test/v3/catalogue/discoveries?fingerprint=${'a'.repeat(64)}&mediaKind=ANIME&parserVersion=5&siteRulesVersion=3`);
     const postResponse = await app.request('https://tobirink.test/v3/catalogue/discoveries/lookup', {
@@ -230,9 +232,10 @@ describe('verified public discovery cache', () => {
     });
     expect(getResponse.status).toBe(429);
     expect(postResponse.status).toBe(429);
-    expect(limiter.limit).toHaveBeenCalledTimes(2);
-    expect(limiter.limit).toHaveBeenNthCalledWith(1, { key: 'read:unknown' });
-    expect(limiter.limit).toHaveBeenNthCalledWith(2, { key: 'read:unknown' });
+    expect(readLimiter.limit).toHaveBeenCalledTimes(2);
+    expect(readLimiter.limit).toHaveBeenNthCalledWith(1, { key: 'read:unknown' });
+    expect(readLimiter.limit).toHaveBeenNthCalledWith(2, { key: 'read:unknown' });
+    expect(limiter.limit).not.toHaveBeenCalled();
   });
 
   it('returns explicit admission outcomes and claims exact references before precise and ambiguous searches', async () => {
