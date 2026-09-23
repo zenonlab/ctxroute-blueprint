@@ -19,7 +19,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-14
-- Revised: 2026-09-15
+- Revised: 2026-09-23
 
 ## Contexte
 
@@ -47,6 +47,35 @@ et publie seulement des objets JSON validés. Il ne transporte jamais `Request`,
 Le package porte le matching borné et les adaptateurs AniList, MangaUpdates,
 MangaDex, Kitsu Anime et Kitsu Manga. Leur composition appartient au consumer
 Worker natif; les anciens clients HTTP/OIDC et CLI de collecte sont retirés.
+
+Le résolveur suit les curseurs de recherche réels : quatre alias distincts au
+maximum, quatre pages par alias, vingt candidats par enveloppe et vingt-cinq
+candidats comparables conservés par fournisseur. Les candidats sans preuve
+de similarité ne remplissent pas ce dernier budget; chaque nouvelle page est
+inspectée avant conservation, pour ne pas masquer une identité exacte après
+les vingt-cinq premiers résultats bruts. Une preuve exacte permet toujours
+une sortie anticipée. Le matching approximatif et `NOT_FOUND` exigent des
+enveloppes complètes, non tronquées et sans curseur restant.
+
+Le budget de recherche de vingt secondes est partagé par les fournisseurs,
+alias et fallbacks d'une résolution. Un curseur absent ou répété, une réponse
+incomplète ou une borne atteinte produit `incomplete-provider-search`, jamais
+un cache négatif. Cette erreur consomme un essai du bail existant; elle ne
+devient pas un report de cadence sans essai. Après huit échecs, le contrat D1
+expose toujours `UNAVAILABLE/ATTEMPT_LIMIT`, récupérable explicitement. Une
+véritable cadence ou réponse `429` conserve son échéance et son report sans
+consommation d'essai. Le timeout HTTP reste indépendant et l'appel déjà en
+vol n'est pas annulé par le budget du résolveur; aucune nouvelle page n'est
+démarrée après son expiration.
+
+Les curseurs restent locaux à une exécution : aucun checkpoint de pagination
+n'est ajouté à D1 dans ce correctif. Le gate attend déjà les créneaux de huit
+secondes ou moins, ce qui permet la page suivante sans refaire la page une
+en cadence normale. Un vrai report sous contention peut néanmoins recommencer
+la recherche au réveil. Une reprise durable inter-baux demanderait une
+évolution séparée du contrat et des mesures de contention; elle n'est pas
+déclarée acquise. Les limites structurelles, elles, épuisent les essais au
+lieu de recommencer indéfiniment sans les compter.
 
 Le package expose un export public stable, un test avec ports mémoire et un
 contrôle d’isolation qui échoue sur tout import `@tobirink/*` ou identifiant

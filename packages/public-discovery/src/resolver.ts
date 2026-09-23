@@ -1,6 +1,6 @@
 import { publicDiscoveryCandidateSchema } from './contracts.js';
 import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoveryTerminalResolution } from './contracts.js';
-import { FavoriteProviderRetryError, inspectFavoriteTitleCandidates } from './provider-kit.js';
+import { favoriteProviderInspectionLimit, FavoriteProviderRetryError, inspectFavoriteTitleCandidates } from './provider-kit.js';
 import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit.js';
 import { AniListFavoriteProviderAdapter } from './providers/anilist.js';
 import { KitsuFavoriteProviderAdapter } from './providers/kitsu.js';
@@ -37,6 +37,12 @@ interface MutableTitleMatchQuery {
 }
 const animeProviders = ['anilist', 'kitsu-anime'] as const;
 const mangaProviders = ['mangaupdates', 'mangadex', 'kitsu-manga'] as const;
+const searchPageLimit = 4;
+const searchDurationMilliseconds = 20_000;
+
+class IncompleteProviderSearchError extends Error {
+  constructor(reason: string) { super(`incomplete-provider-search:${reason}`); }
+}
 
 function candidateKey(candidate: ProviderCandidate): string { return `${candidate.provider}:${candidate.externalId}`; }
 
@@ -67,20 +73,54 @@ async function searchProvider(
   port: FavoriteProviderPort,
   titles: readonly string[],
   matchQuery: FavoriteTitleMatchQuery,
+  deadline: number,
 ): Promise<LaneDecision> {
   const candidates = new Map<string, ProviderCandidate>();
-  for (const title of titles.slice(0, 4)) {
-    const envelope = await port.search({ limit: 20, provider, titles: [title] });
-    if (envelope.provider !== provider) throw new Error('provider-envelope-mismatch');
-    for (const candidate of envelope.candidates) candidates.set(candidateKey(candidate), candidate);
-    const bounded = [...candidates.values()].slice(0, 25);
-    const early = matchCandidates(bounded, matchQuery, false);
-    if (early) return early;
+  for (const title of [...new Set(titles)].slice(0, 4)) {
+    let cursor = '1';
+    const seen = new Set(['1']);
+    for (let page = 0; page < searchPageLimit; page += 1) {
+      const envelope = await searchBeforeDeadline(port, { cursor, limit: 20, provider, titles: [title] }, deadline);
+      if (envelope.provider !== provider) throw new Error('provider-envelope-mismatch');
+      if (envelope.candidates.length > 20) throw new IncompleteProviderSearchError('candidate-page-limit');
+      // An exact identity may be accepted without exhausting every fuzzy result.
+      // Inspect each page before retaining candidates, so a later exact match is not sliced away.
+      const early = matchCandidates(envelope.candidates, matchQuery, false);
+      if (early) return early;
+      for (const candidate of envelope.candidates) {
+        if (inspectFavoriteTitleCandidates(matchQuery, [candidate]).candidateReferences.length === 0) continue;
+        candidates.set(candidateKey(candidate), candidate);
+        if (candidates.size > favoriteProviderInspectionLimit) throw new IncompleteProviderSearchError('candidate-limit');
+      }
+      if (envelope.complete && !envelope.truncated && envelope.nextCursor === undefined) break;
+      const next = envelope.nextCursor;
+      if (envelope.complete || next === undefined || !/^[1-9]\d{0,4}$/u.test(next) || seen.has(next)) {
+        throw new IncompleteProviderSearchError('cursor');
+      }
+      if (page + 1 === searchPageLimit) throw new IncompleteProviderSearchError('page-limit');
+      seen.add(next);
+      cursor = next;
+    }
   }
-  const bounded = [...candidates.values()].slice(0, 25);
+  const bounded = [...candidates.values()];
   const final = matchCandidates(bounded, matchQuery, true);
   if (!final) throw new Error('provider-matching-decision-missing');
   return final;
+}
+
+async function searchBeforeDeadline(
+  port: FavoriteProviderPort,
+  query: Parameters<FavoriteProviderPort['search']>[0],
+  deadline: number,
+): ReturnType<FavoriteProviderPort['search']> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new IncompleteProviderSearchError('deadline');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new IncompleteProviderSearchError('deadline')), remaining);
+  });
+  try { return await Promise.race([port.search(query), timeout]); }
+  finally { clearTimeout(timer); }
 }
 
 function isTransientProviderError(error: Error): boolean {
@@ -104,17 +144,20 @@ async function searchLane(
   order: readonly ResolutionProvider[],
   titles: readonly string[],
   query: FavoriteTitleMatchQuery,
+  deadline: number,
 ): Promise<LaneDecision> {
   const inspected: ProviderCandidate[] = [];
   let unavailable: Error | undefined;
   for (const provider of order) {
     let result: LaneDecision;
     try {
-      result = await searchProvider(provider, providers[provider], titles, query);
+      result = await searchProvider(provider, providers[provider], titles, query, deadline);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       if (isProviderInvariantError(error)) throw error;
-      unavailable = error;
+      // Bounded incomplete searches consume an attempt; do not turn them into
+      // cadence-only deferrals that could restart page one without limit.
+      if (!(unavailable instanceof IncompleteProviderSearchError)) unavailable = error;
       continue;
     }
     inspected.push(...result.candidates);
@@ -124,18 +167,20 @@ async function searchLane(
   return unavailable === undefined ? result : { ...result, unavailable };
 }
 
-async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, request: PublicDiscoveryClaimedRequest): Promise<readonly LaneDecision[]> {
+async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, request: PublicDiscoveryClaimedRequest, deadline: number): Promise<readonly LaneDecision[]> {
   const titles = request.query.discoveryTitles.slice(0, 4);
   const query = matchQueryFor(request, titles);
   const lanes = request.query.mediaKind === 'ANIME'
-    ? [await searchLane(providers, animeProviders, titles, query)]
+    ? [await searchLane(providers, animeProviders, titles, query, deadline)]
     : request.query.mediaKind !== 'UNKNOWN'
-      ? [await searchLane(providers, mangaProviders, titles, query)]
+      ? [await searchLane(providers, mangaProviders, titles, query, deadline)]
       : [
-          await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }),
-          await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }),
+          await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }, deadline),
+          await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }, deadline),
         ];
-  const unavailable = lanes.find((lane) => lane.unavailable !== undefined)?.unavailable;
+  const unavailable = lanes.find((lane) => lane.unavailable instanceof IncompleteProviderSearchError)?.unavailable
+    ?? lanes.find((lane) => lane.unavailable !== undefined)?.unavailable;
+  if (unavailable instanceof IncompleteProviderSearchError) throw unavailable;
   if (unavailable !== undefined) throw retryableProviderError(unavailable);
   return lanes;
 }
@@ -208,6 +253,7 @@ async function hydrateWithTransientFallback(
   request: PublicDiscoveryClaimedRequest,
   reference: PublicDiscoveryReferenceV3,
   searched: ProviderCandidate | undefined,
+  deadline: number,
 ): Promise<PublicDiscoveryTerminalResolution> {
   try {
     return await hydrateReference(providers, reference, 'matched-provider-identity-not-found', searched);
@@ -221,14 +267,14 @@ async function hydrateWithTransientFallback(
     for (const provider of order.slice(start)) {
       let lane: LaneDecision;
       try {
-        lane = await searchLane(providers, [provider], titles, query);
+        lane = await searchLane(providers, [provider], titles, query, deadline);
       } catch (fallbackError) {
         if (!(fallbackError instanceof Error) || !isTransientProviderError(fallbackError)) throw fallbackError;
-        lastUnavailable = fallbackError;
+        if (!(lastUnavailable instanceof IncompleteProviderSearchError)) lastUnavailable = fallbackError;
         continue;
       }
       if (lane.state !== 'MATCH' || lane.references.length !== 1) {
-        if (lane.unavailable !== undefined) lastUnavailable = lane.unavailable;
+        if (lane.unavailable !== undefined && !(lastUnavailable instanceof IncompleteProviderSearchError)) lastUnavailable = lane.unavailable;
         continue;
       }
       const fallbackReference = lane.references[0];
@@ -238,9 +284,10 @@ async function hydrateWithTransientFallback(
         return await hydrateReference(providers, fallbackReference, 'matched-provider-identity-not-found', fallbackCandidate);
       } catch (fallbackError) {
         if (!(fallbackError instanceof Error) || isProviderInvariantError(fallbackError)) throw fallbackError;
-        lastUnavailable = fallbackError;
+        if (!(lastUnavailable instanceof IncompleteProviderSearchError)) lastUnavailable = fallbackError;
       }
     }
+    if (lastUnavailable instanceof IncompleteProviderSearchError) throw lastUnavailable;
     throw retryableProviderError(lastUnavailable);
   }
 }
@@ -250,10 +297,11 @@ export function createPublicDiscoveryResolver(providers: PublicDiscoveryProvider
     async resolve(request: PublicDiscoveryClaimedRequest): Promise<PublicDiscoveryTerminalResolution> {
       const explicit = request.query.explicitProviderReference;
       if (explicit !== undefined) return hydrateReference(providers, explicit, 'exact-provider-identity-not-found');
-      const selected = selectMatch(await searchApplicableLanes(providers, request));
+      const deadline = Date.now() + searchDurationMilliseconds;
+      const selected = selectMatch(await searchApplicableLanes(providers, request, deadline));
       return selected.kind === 'terminal'
         ? selected.resolution
-        : hydrateWithTransientFallback(providers, request, selected.reference, selected.searched);
+        : hydrateWithTransientFallback(providers, request, selected.reference, selected.searched, deadline);
     },
   };
 }

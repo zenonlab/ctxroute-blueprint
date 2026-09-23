@@ -88,6 +88,7 @@
       "id": "match",
       "type": "security",
       "label": "Matching",
+      "sublabel": "4 pages/alias · 20 s",
       "stage": 3,
       "row": 3,
       "width": 140
@@ -167,8 +168,8 @@
     {
       "id": "ops",
       "type": "security",
-      "label": "Reprise ops",
-      "sublabel": "aucun réarmement client",
+      "label": "Reprise explicite",
+      "sublabel": "sans boucle automatique",
       "stage": 0,
       "row": 4,
       "width": 140,
@@ -445,7 +446,7 @@
       "id": "queue-claim",
       "from": "queue",
       "to": "claim",
-      "label": "claim(20)",
+      "label": "claim(5)",
       "variant": "emphasis",
       "route": "straight",
       "labelAt": [
@@ -589,7 +590,7 @@
       "id": "search-retry",
       "from": "search",
       "to": "retry",
-      "label": "403/429/timeout/incomplet (page)/panne",
+      "label": "panne / 429 / recherche incomplète",
       "variant": "security",
       "route": "auto",
       "labelAt": [
