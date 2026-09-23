@@ -11,7 +11,7 @@
     "frontend": "WXT 0.21.x extension entrypoints with React 19 and CSS Modules",
     "backend": "One Hono Cloudflare Worker for anonymous public capabilities plus an isolated HMAC-authenticated Deno provider gateway; no Rails backend in v1",
     "storage": "Private state in IndexedDB through a Dexie adapter; optional anonymous public data in D1 through a repository adapter",
-    "deployment": "Deterministic WXT browser packages and separately approved Cloudflare and Deno inspect-plan-apply operations; no automatic production deployment",
+    "deployment": "Deterministic WXT candidates with a separate published pointer; protected main CI verifies and plans Worker deployment; Deno GitHub App deploys the gateway; direct production mutations require exact operational confirmation",
     "observability": "Provider-neutral TelemetryPort, structured bounded collector and gateway logs, Workers Logs and traces, and no remote extension telemetry by default",
     "security": "Local-first privacy, least-privilege MV3 permissions, strict CSP, Zod validation at trust boundaries, provider isolation, and explicit operational approval",
     "performance": "Local UI response under 200 ms, no unbounded background startup, target extension package below 1.5 MB compressed, and optional API p95 below 300 ms"

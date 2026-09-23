@@ -18,9 +18,9 @@
   public catalogue and connected local projections, and an optional edge API.
   The site is not a general-purpose web application and has no account,
   authentication, private storage access, Review route, or radio surface.
-- Local release candidate: `1.0.40`; the extension package sets WXT manifests
+- Local release candidate: `1.0.44`; the extension package sets WXT manifests
   and local ZIP names. The independently controlled public download pointer
-  remains `1.0.39` until the candidate's publication is separately approved.
+  remains `1.0.43` until the candidate's immutable archives are published and verified.
 
 ## Discovery context
 
@@ -40,8 +40,10 @@
   notifications, storage and messaging APIs; browser sync for a bounded
   snapshot of provider IDs only;
   optional Cloudflare Workers, D1, R2 and Images through owned adapters.
-- Team and ownership: one product owner working step-by-step with agents; every
-  mutation and operational action requires scoped approval.
+- Team and ownership: one product owner authorizes bounded autonomous plans;
+  agents implement, verify, document, commit and push the approved work.
+  Destructive operations and direct production mutations require immediate
+  confirmation of their exact targets.
 - Risk and compliance: browsing history, library content, and progress are
   private. No remote telemetry or private-data upload is enabled by default.
 - Deployment environments: unpacked extension in development, deterministic
@@ -67,8 +69,8 @@
   24 LTS for product tooling. The inherited control plane keeps its Node 22.13+
   compatibility floor until a separately approved migration.
 - Delivery: deterministic browser packages, manual installation preserving the
-  browser profile, no automatic production deployment, and rollback to the prior
-  extension package or Worker version.
+  browser profile, protected autonomous Worker delivery from `main`, the existing
+  Deno GitHub App, and rollback to the prior extension package or Worker version.
 
 ## Inherited governance baseline
 
@@ -114,9 +116,11 @@ not become runtime dependencies of Tobirink.
 - Tests: Vitest for domain and contracts, Vitest Browser Mode for UI, Playwright
   for Chromium extension journeys, Firefox packaging smoke with `web-ext`, and
   Workers integration tests in `workerd`.
-- Deployment: WXT-generated browser artifacts and separately approved
-  Cloudflare and Deno gates with inspect, plan, and apply phases. GitHub Actions
-  is not an active runtime or release gate.
+- Deployment: WXT-generated browser artifacts with a separate public version
+  pointer; GitHub Actions verifies the repository then inspects, plans and
+  applies the exact Worker target. Deno uses its existing GitHub App only.
+  R2 publication, secrets, billing, permissions and direct data mutations are
+  outside that automatic Worker lane and require their own confirmed plan.
 - WebBridge delivery: release packaging pins the exact non-secret site origin
   `https://tobirink.com` into both manifests and refuses an origin or version
   mismatch before producing an archive.

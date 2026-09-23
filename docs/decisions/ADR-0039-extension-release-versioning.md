@@ -14,7 +14,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-11
-- Revised: 2026-09-14
+- Revised: 2026-09-23
 
 ## Context
 
@@ -119,6 +119,12 @@ for the two R2 objects and `worker:tobirink-public-api`; the deployed Worker
 version was `2905a076-d107-4a29-8408-f24f86c97555`.
 
 ## Consequences
+
+La candidate locale `1.0.44` corrige le receiver et les clés de reprise,
+les continuations MV3 et les scans de projection. `1.0.43` étant déjà publiée,
+ses ZIP restent immuables. Le pointeur Web reste `1.0.43` pendant la
+certification; aucun résultat local n'atteste une publication R2. Le lockfile
+porte la même version candidate que le manifeste extension.
 
 `1.0.39` livre la reprise R2/Queue, les modèles D1 courants et la propagation
 locale des corrections, avec ETag par page et invalidation des annonces et
