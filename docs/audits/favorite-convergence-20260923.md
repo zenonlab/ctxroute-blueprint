@@ -87,6 +87,17 @@ Les canaris protégés exigent maintenant une observation bornée des métriques
 sans appel fournisseur reste en échec. Ces agrégats décrivent le trafic de la
 fenêtre, pas le coût attribuable individuellement à chaque canari.
 
+L'audit des 1,5 à 1,8 million de lectures D1 a distingué les lignes parcourues
+des appels SQL : la fenêtre bornée comptait environ 14 700 requêtes, soit une
+moyenne d'environ 120 lignes examinées par requête. Les diagnostics CI ne
+représentaient que quelques milliers de lignes. La pression venait donc des
+scans historiques, des réveils Queue/cron et des routes publiques `GET` et
+`lookup`, qui n'étaient pas limitées par IP et pouvaient être interrogées par
+un polling ou un crawler sans admission. Le regroupement `readMany` est déjà
+déployé ; les deux routes de lecture utilisent désormais le bucket séparé
+`read:<ip>` et renvoient `429` avant D1. Régression Worker : 25/25 tests ciblés
+et typecheck vert.
+
 Les workflows protégés `35863844924` et `35864161437` ont réussi. Le second a
 déployé la version Worker `7c5c56a4-38da-4781-a6a8-5f548f417624` et vérifié deux
 clés neuves `MISS → PENDING → VERIFIED` : anime en 47 174 ms, manga en 91 310 ms.

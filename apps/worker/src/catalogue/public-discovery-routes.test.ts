@@ -217,6 +217,24 @@ describe('verified public discovery cache', () => {
     expect(JSON.stringify(events)).not.toContain(keys[0]?.fingerprint);
   });
 
+  it('rate-limits public reads before touching D1 and uses a separate bucket', async () => {
+    const limiter = { limit: vi.fn(async () => ({ success: false })) };
+    const app = createPublicDiscoveryApp({
+      publicDiscoveryV3: new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB),
+      rateLimiter: limiter,
+    });
+    const getResponse = await app.request(`https://tobirink.test/v3/catalogue/discoveries?fingerprint=${'a'.repeat(64)}&mediaKind=ANIME&parserVersion=5&siteRulesVersion=3`);
+    const postResponse = await app.request('https://tobirink.test/v3/catalogue/discoveries/lookup', {
+      body: JSON.stringify({ keys: [discoveryKey('b')], schemaVersion: 3 }),
+      headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(getResponse.status).toBe(429);
+    expect(postResponse.status).toBe(429);
+    expect(limiter.limit).toHaveBeenCalledTimes(2);
+    expect(limiter.limit).toHaveBeenNthCalledWith(1, { key: 'read:unknown' });
+    expect(limiter.limit).toHaveBeenNthCalledWith(2, { key: 'read:unknown' });
+  });
+
   it('returns explicit admission outcomes and claims exact references before precise and ambiguous searches', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const now = '2026-09-16T12:00:00.000Z';
