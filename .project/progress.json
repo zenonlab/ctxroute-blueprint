@@ -5474,9 +5474,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Nouveau Worker bb203bc déployé en version 457fe842-1245-4b03-b5a8-a8504c5da2a8 par run CI 35869562460; canaris frais anime VERIFIED 122383 ms et manga VERIFIED 47729 ms, 19 appels fournisseur, 0 HTTP/réseau/429, 6024 lectures/76 écritures D1 et 3 Queue sends.",
-            "Audit a détecté un N+1 sur lookup de 50 clés (100–150 RPC D1); readMany est maintenant groupé par json_each avec régression Worker 24/24 et métrique à 50 lectures nominales, typecheck adapters-cloudflare vert; ADR-0062 et dataflow mis à jour.",
-            "Deno local: 13 tests et deno check passent avec Deno 2.7.1; révision distante toujours non attestée par absence de session Deno. Lot 1522 non lancé, budget D1/Queue réservé par prudence."
+            "Après déploiement 321cee3, run canari 35871874729 réussi : anime et manga VERIFIED en 31,5 s et 30,8 s; 4 appels fournisseur, 0 429/HTTP/réseau, 4 535 lectures D1, 31 écritures, 2 Queue sends.",
+            "Test Chromium en ligne 8 favoris, candidate seule 1.0.44, session tobirink-installed-review-oKOCZz : 8 observés, identité et Library conservées pendant redémarrage service worker/navigateur; après 33 s les 8 restent PROVIDER_UNAVAILABLE, 0 admission/processing/429, aucun progrès. Test interrompu selon borne d'arrêt, sans mutation distante; il révèle des clés déjà indisponibles et ne certifie pas la convergence.",
+            "Lookup N+1 corrigé par readMany JSON1 groupé; commit 763ba13 puis docs/progress 321cee3 poussés sur main. Full 1522 interdit aujourd'hui par budget D1/Queue et absence de budget réservé; R2 non publié; Deno distant non attesté."
           ]
         }
       ]

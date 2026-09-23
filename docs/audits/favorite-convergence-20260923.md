@@ -187,3 +187,11 @@ quatre colonnes d’identité dans une requête JSON1 groupée; la régression W
 de 50 clés reste dans le budget de lecture nominal. Les transitions expirées
 sont réévaluées uniquement pour les lignes qui atteignent effectivement la
 borne d’essais.
+Après le déploiement `321cee3`, le canari frais a de nouveau traversé les deux
+médias : anime en 31,5 s et manga en 30,8 s, quatre appels fournisseur, zéro
+429/erreur HTTP-réseau, 4 535 lectures D1, 31 écritures et deux émissions
+Queue. Un essai installé en ligne limité à huit favoris avec la candidate seule
+`1.0.44` a conservé les huit sources et la Library après les redémarrages, mais
+les huit clés sont restées `PROVIDER_UNAVAILABLE` sans admission ni progression
+à 33 s. Il a été arrêté selon la borne d'arrêt; ce résultat ne certifie ni la
+convergence ni le plein profil et aucune reprise historique n'a été lancée.
