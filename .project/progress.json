@@ -5474,8 +5474,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Architecture view favorite-convergence.architecture.json added as product-only Archify source with MV3, private IndexedDB, Worker, D1, Queue, bounded collector and providers; npm run archify:validate -- architecture and npm run validate:architecture pass showcase with 0 errors/0 warnings.",
-            "D1 grouped lookup correction remains pushed on main; production canary run 35871874729 passed after deployment. Online eight-favorite run remains explicitly incomplete with all eight PROVIDER_UNAVAILABLE and no load escalation."
+            "PR #84 merged as 65709ee0; protected run 35875116944 succeeded and deployed Worker version cb7d12f3-ec95-4f98-a52a-741dde75a996 with only worker:tobirink-public-api.",
+            "Public read routes now use a separate 60/min/IP bucket before D1; regression 25/25, full npm run verify green, Archify architecture validation 0 errors/0 warnings.",
+            "Fresh canaries and extension publication were skipped because no canary/publication inputs were provided; online profile convergence remains unverified."
           ]
         }
       ]
