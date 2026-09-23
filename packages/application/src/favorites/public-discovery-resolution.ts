@@ -2,7 +2,8 @@ import type { FavoriteParseArtifact } from '@tobirink/domain';
 import type { PublicDiscoveryKey } from '../public-discovery';
 import type { PublicDiscoveryRequestClientPort } from '../public-discovery';
 import type { PublicDiscoveryQuery, PublicDiscoveryReadState } from '@tobirink/public-discovery';
-import type { FavoritePublicReference } from './favorite-identity-lookup';
+import { favoriteIdentityKey, favoriteManualIdentityKey, favoritePublicReferenceSchema } from './favorite-identity-lookup';
+import type { FavoriteIdentityLookupPort, FavoritePublicReference } from './favorite-identity-lookup';
 import { favoriteProviderDiscoveryTitles, hasFavoriteOvaMarker, hasFavoritePreSerializationMarker, normalizeFavoriteTitle } from './title-normalization';
 
 function cleanedTitles(artifact: FavoriteParseArtifact): readonly string[] {
@@ -15,6 +16,22 @@ function cleanedTitles(artifact: FavoriteParseArtifact): readonly string[] {
     if (normalized.length > 0 && !unique.has(normalized)) unique.set(normalized, title);
   }
   return [...unique.values()];
+}
+
+/** The runner, its cache prefetch and explicit recovery must address the same request. */
+export async function preparePublicFavoriteDiscoveryIdentity(artifact: FavoriteParseArtifact, synchronized?: FavoriteIdentityLookupPort) {
+  let reference = artifact.sourceEvidence.explicitProviderReference;
+  if (reference === undefined && synchronized !== undefined && artifact.identityKey !== undefined) {
+    const syncKey = await favoriteIdentityKey(artifact);
+    try {
+      const results = await synchronized.lookup([syncKey]);
+      const result = results.length === 1 ? results[0] : undefined;
+      if (result?.kind === 'FOUND' && result.fingerprint === syncKey.fingerprint && result.references.length === 1
+        && (artifact.mediaKind === 'UNKNOWN' || artifact.mediaKind === result.mediaKind)) reference = favoritePublicReferenceSchema.parse(result.references[0]);
+    } catch { /* Sync is a hint; unavailable hints do not block local proof. */ }
+  }
+  const key = reference === undefined ? await favoriteIdentityKey(artifact) : await favoriteManualIdentityKey(artifact, reference);
+  return { key, reference };
 }
 
 export async function requestPublicFavoriteDiscovery(
@@ -46,6 +63,6 @@ export async function requestPublicFavoriteDiscoveryRecovery(
   options?: { readonly explicitProviderReference?: FavoritePublicReference },
 ): Promise<PublicDiscoveryReadState> {
   if (port.requestRecovery === undefined) throw new Error('PUBLIC_DISCOVERY_RECOVERY_UNAVAILABLE');
-  const recoveryPort: PublicDiscoveryRequestClientPort = { ...port, resolveOrRequest: port.requestRecovery };
+  const recoveryPort: PublicDiscoveryRequestClientPort = { resolveOrRequest: port.requestRecovery.bind(port) };
   return requestPublicFavoriteDiscovery(recoveryPort, key, artifact, options);
 }

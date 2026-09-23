@@ -1,7 +1,7 @@
-import { favoriteIdentityKey, favoriteSourceIdentity, importFavoriteSources, reconcileFavoriteSourcePresencePageForInventory, runFavoriteResolutionSlice } from '@tobirink/application';
+import { favoriteIdentityKey, favoriteSourceIdentity, importFavoriteSources, preparePublicFavoriteDiscoveryIdentity, reconcileFavoriteSourcePresencePageForInventory, runFavoriteResolutionSlice } from '@tobirink/application';
 import type { BookmarkImportPort, FavoriteIdentityLookupPort, FavoriteInventoryCheckpoint, FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, FavoriteResolutionOutboxPort, FavoriteSourceAdapter, PublicDiscoveryRequestClientPort, ResolutionProvider, StoragePort } from '@tobirink/application';
 import { createFavoriteSource } from '@tobirink/domain';
-import type { FavoriteSourceId, LibraryId } from '@tobirink/domain';
+import type { FavoriteParseArtifact, FavoriteSourceId, LibraryId } from '@tobirink/domain';
 import { normalizeBookmarks } from '@tobirink/adapters-browser';
 import type { BookmarkMutation } from '@tobirink/adapters-browser';
 import type { ExtensionDiagnosticsPort } from './extension-diagnostics';
@@ -85,23 +85,27 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
     const page = await dependencies.storage.listFavoriteSources({ afterId: cacheScanAfterId, limit: 50 });
     cacheScanAfterId = page.length === 50 ? page.at(-1)?.id : undefined;
     const keys = new Map<string, Awaited<ReturnType<typeof favoriteIdentityKey>>>();
+    const artifacts: FavoriteParseArtifact[] = [];
     for (const source of page) {
       if (source.presence !== 'observed' || (source.resolution !== undefined && source.resolution.kind !== 'RETRYABLE')) continue;
       const artifact = (await dependencies.storage.getFavoriteParseArtifact(source.id))?.artifact;
-      if (artifact?.identityKey !== undefined) {
-        const key = await favoriteIdentityKey(artifact);
-        keys.set(key.fingerprint, key);
+      if (artifact !== undefined && (artifact.identityKey !== undefined || artifact.sourceEvidence.explicitProviderReference !== undefined)) {
+        artifacts.push(artifact);
+        if (artifact.identityKey !== undefined) {
+          const key = await favoriteIdentityKey(artifact);
+          keys.set(key.fingerprint, key);
+        }
       }
     }
-    if (keys.size === 0) return;
-    const prepared = [...keys.values()];
-    for (let offset = 0; offset < prepared.length; offset += 50) {
-      const batch = prepared.slice(offset, offset + 50);
-      await Promise.allSettled([
-        dependencies.publicDiscovery?.lookup?.(batch),
-        dependencies.synchronized?.lookup(batch),
-      ]);
+    if (artifacts.length === 0) return;
+    const hints = keys.size === 0 ? undefined : await dependencies.synchronized?.lookup([...keys.values()]).catch(() => undefined);
+    const synchronized = hints === undefined ? undefined : { lookup: async (input: Parameters<FavoriteIdentityLookupPort['lookup']>[0]) => hints.filter((result) => input.some((key) => key.fingerprint === result.fingerprint)) };
+    const publicKeys = new Map<string, Awaited<ReturnType<typeof favoriteIdentityKey>>>();
+    for (const artifact of artifacts) {
+      const { key } = await preparePublicFavoriteDiscoveryIdentity(artifact, synchronized);
+      publicKeys.set(key.fingerprint, key);
     }
+    await dependencies.publicDiscovery?.lookup?.([...publicKeys.values()]).catch(() => undefined);
     await dependencies.diagnostics?.record({ operation: 'cache-prepare', durationMs: Math.min(3_600_000, Math.max(0, Date.now() - startedAt)), outcome: 'complete', runId: 'cache-prepare', stage: 'transport' });
   };
   const runOnce = (runId: string, inventoryRequested: boolean) => dependencies.ensureReady()

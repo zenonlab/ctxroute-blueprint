@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { favoriteIdentityKey, importFavoriteSources } from '@tobirink/application';
+import { favoriteIdentityKey, importFavoriteSources, requestPublicFavoriteDiscoveryRecovery } from '@tobirink/application';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import type { PublicDiscoveryKey } from '@tobirink/application';
 import { HttpPublicDiscoveryAdapter } from './http-public-discovery-adapter';
@@ -11,6 +11,17 @@ const query = { discoveryTitles: ['Frieren'], mediaKind: 'ANIME' as const, sourc
 
 describe('HttpPublicDiscoveryAdapter', () => {
   afterEach(() => vi.useRealTimers());
+  it('preserves the real adapter receiver through the application recovery use case', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([{ bookmarkId: 'receiver', folderPath: [], order: 0, state: 'eligible', title: 'Synthetic Series', url: 'https://reader.invalid/anime/synthetic-series' }], storage, '2026-09-23T12:00:00.000Z');
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    const record = await storage.getFavoriteParseArtifact(source!.id);
+    const identity = await favoriteIdentityKey(record!.artifact);
+    const fetcher = vi.fn(async () => Response.json({ state: 'PENDING', retryAt: new Date(Date.now() + 60_000).toISOString() }, { status: 202 }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    await expect(requestPublicFavoriteDiscoveryRecovery(adapter, identity, record!.artifact)).resolves.toMatchObject({ state: 'PENDING' });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
   it('uses the remaining wake time and aborts HTTP before the wake expires', async () => {
     vi.useFakeTimers(); vi.setSystemTime('2026-09-18T12:00:00.000Z');
     let signal: AbortSignal | null | undefined;
@@ -26,6 +37,16 @@ describe('HttpPublicDiscoveryAdapter', () => {
     expect(signal?.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(1); await assertion;
     expect(signal?.aborted).toBe(true);
+  });
+  it('does not spend its remaining wake budget sleeping for an admission reservation', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-23T12:00:00.000Z');
+    const fetcher = vi.fn(async () => Response.json({ state: 'PENDING', retryAt: '2026-09-23T12:05:00.000Z' }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    await adapter.requestRecovery(key, query);
+    adapter.setDeadline(Date.now() + 500);
+    await expect(adapter.requestRecovery({ ...key, fingerprint: 'b'.repeat(64) }, query)).rejects.toMatchObject({ code: 'ADMISSION_WAIT' });
+    expect(Date.now()).toBe(Date.parse('2026-09-23T12:00:00.000Z'));
+    expect(fetcher).toHaveBeenCalledOnce();
   });
   it('keeps Retry-After across restart and refuses requests outside the wake budget', async () => {
     vi.useFakeTimers(); vi.setSystemTime('2026-09-18T12:00:00.000Z');

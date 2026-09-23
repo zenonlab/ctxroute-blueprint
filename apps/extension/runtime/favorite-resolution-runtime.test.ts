@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { claimTask, isTaskAvailable } from '@tobirink/application';
-import type { FavoriteResolutionClaim } from '@tobirink/application';
-import { HttpPublicDiscoveryAdapter } from '@tobirink/adapters-browser';
+import { claimTask, isTaskAvailable, preparePublicFavoriteDiscoveryIdentity } from '@tobirink/application';
+import type { FavoriteResolutionClaim, PublicDiscoveryKey } from '@tobirink/application';
+import { anilistSourceAdapter, HttpPublicDiscoveryAdapter } from '@tobirink/adapters-browser';
 import { publicDiscoveryLookupSubmissionSchema } from '@tobirink/public-discovery';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { libraryId } from '@tobirink/domain';
@@ -88,6 +88,32 @@ describe('createFavoriteResolutionRuntime', () => {
     expect(lookup.mock.calls[0]?.[0]).toHaveLength(50);
     await reconcile();
     expect(lookup.mock.calls[1]?.[0]).toHaveLength(1);
+  });
+
+  it.each(['exact', 'synchronized'] as const)('prepares the canonical %s key with one grouped lookup', async (mode) => {
+    const storage = new MemoryStoragePort();
+    const reference = { provider: 'anilist' as const, externalId: '123' };
+    const synchronized = { lookup: vi.fn(async (keys: readonly { fingerprint: string }[]) => keys.map(({ fingerprint }) => ({ fingerprint, kind: 'FOUND' as const, mediaKind: 'ANIME' as const, references: [reference] }))) };
+    const lookup = vi.fn(async (_keys: readonly PublicDiscoveryKey[]) => undefined);
+    const client = new HttpPublicDiscoveryAdapter('https://tobirink.com', async (_input, init) => {
+      const body = publicDiscoveryLookupSubmissionSchema.parse(JSON.parse(String(init.body)));
+      await lookup(body.keys);
+      return Response.json(body.keys.map((key) => ({ key, state: { state: 'UNAVAILABLE', reason: 'ATTEMPT_LIMIT' } })));
+    });
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [{ bookmarkId: 'exact-prefetch', folderPath: [], order: 0, title: 'Synthetic Series', url: mode === 'exact' ? 'https://anilist.co/anime/123' : 'https://reader.invalid/anime/synthetic-series' }] }) },
+      candidates: unavailableCandidates, ensureReady: async () => ({ schemaVersion: 12 }), hydration: emptyHydration,
+      libraryId: libraryId('library_primary'), now: () => new Date().toISOString(),
+      outbox: { block: vi.fn(), claimNext: async () => undefined, nextAvailableAt: async () => undefined, retry: vi.fn() },
+      publicDiscovery: client, sourceAdapters: [anilistSourceAdapter], storage,
+      synchronized: mode === 'synchronized' ? synchronized : undefined, token: () => 'exact-prefetch',
+    });
+    await reconcile();
+    const source = (await storage.listFavoriteSources({ limit: 1 }))[0]!;
+    const artifact = (await storage.getFavoriteParseArtifact(source.id))!.artifact;
+    const expected = await preparePublicFavoriteDiscoveryIdentity(artifact, mode === 'synchronized' ? synchronized : undefined);
+    expect(lookup).toHaveBeenCalledExactlyOnceWith([expected.key]);
+    if (mode === 'synchronized') expect(synchronized.lookup).toHaveBeenCalledTimes(2); // One batch plus this explicit expected-key check.
   });
 
   it('continues a 1401-bookmark inventory from its checkpoint until the final batch', async () => {

@@ -69,6 +69,7 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     const reserved = this.gate.catch(() => undefined).then(async () => {
       const next = await this.clock(admissionClockKey);
       const waitMs = next - Date.now();
+      if (Math.max(Date.now(), next) + 1_000 > this.deadline) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(Math.max(next, Date.now() + 30_000)).toISOString());
       if (waitMs > 0 && (!allowInlineWait || waitMs > publicDiscoveryAdmissionMaximumInlineWaitMs)) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(next).toISOString());
       if (waitMs > 0) await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
       await this.saveClock(admissionClockKey, Date.now() + publicDiscoveryAdmissionIntervalMs);

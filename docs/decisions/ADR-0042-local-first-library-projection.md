@@ -3,6 +3,8 @@ scope:
   - packages/application/src/library/library-catalogue-contract.ts
   - packages/application/src/library/read-library-catalogue.ts
   - packages/application/src/library/project-pending-favorites.ts
+  - packages/application/src/library/index.ts
+  - apps/extension/runtime/repair-library-projection.ts
   - packages/contracts/src/web-bridge.ts
   - apps/extension/runtime/library-catalogue-messages.ts
   - apps/extension/runtime/local-library-catalogue-runtime.ts
@@ -23,7 +25,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-12
-- Revised: 2026-09-13
+- Revised: 2026-09-23
 
 ## Context
 
@@ -81,6 +83,24 @@ traitent immédiatement chaque création, modification, déplacement ou suppress
 La maintenance publique ne relance pas cet inventaire : elle parcourt son propre
 curseur de sources observées, lit D1 par cinquante clés et remplace uniquement
 une hydratation dont la version vérifiée a changé.
+
+La réparation de Library appartient au module de projection applicatif; le
+runtime extension ne conserve qu'une réexportation de compatibilité. Les
+alarmes ordinaires de résolution et de récupération fournisseur ne lancent pas
+ce scan global : le commit de résolution met déjà `FavoriteSource`, `Work`
+et `Library` à jour transactionnellement. Les chemins explicites ci-dessus
+gardent la réparation complète, idempotente et additive, sans suppression de
+source, de Work, de progression ou de décision humaine.
+
+Ce contrôle lit une fois la Library puis les sources par pages de cent. Une
+page sans source observée `RESOLVED` dont le Work manque à la Library n'ouvre
+aucune transaction d'écriture. Une page possiblement réparable est relue dans
+la transaction avec la Library courante; un détachement ou changement de
+décision intervenu depuis le premier passage est donc respecté. Les Work
+manquants sont dédupliqués puis chargés par `getWorks`, jamais unitairement.
+Seuls les Work existants sont ajoutés; aucun autre agrégat n'est réécrit.
+L'absence de transaction ne prétend pas éliminer les lectures des pages lors
+d'une réparation explicite; les réveils ordinaires, eux, ne la déclenchent plus.
 
 ## Consequences
 

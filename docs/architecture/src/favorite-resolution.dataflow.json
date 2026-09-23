@@ -464,6 +464,8 @@
         "Réponses paginées obsolètes ignorées après tout changement de requête",
         "Tri par titre, ajout, année, progression ou popularité comparable",
         "Bootstrap sans scan du catalogue; lectures Work/progression par fenêtres ≤ 100",
+        "Projection applicative atomique pendant la résolution; aucun rescan aux alarmes ordinaires",
+        "Réparation explicite par pages de 100 : aucune transaction sans ajout potentiel, relecture groupée avant écriture",
         "Genres typés et totaux éditoriaux explicites uniquement",
         "Sync sans titre privé; D1 sert seulement les fiches vérifiées par le consumer",
         "URL fournisseur locale; R2 exige licence ou domaine public"

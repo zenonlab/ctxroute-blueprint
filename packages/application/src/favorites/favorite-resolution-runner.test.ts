@@ -203,16 +203,19 @@ describe('runFavoriteResolutionSlice', () => {
 
   it('keeps an unavailable public discovery retryable without searching providers', async () => {
     const { storage, outbox, task } = await fixture();
+    await storage.putFavoriteResolutionTask({ ...task, attempt: 7 });
     const search = vi.fn(async () => { throw new Error('provider search must not run'); });
+    const requestRecovery = vi.fn(async () => { throw new Error('automatic rearm must not run'); });
     const result = await runFavoriteResolutionSlice({
       candidates: candidatePorts({ search }), hydration: hydrationPorts(unusedHydration),
       libraryId: libraryId('library_primary'), now: () => now, outbox,
-      publicDiscovery: { resolveOrRequest: async () => ({ reason: 'ATTEMPT_LIMIT', state: 'UNAVAILABLE' }) },
+      publicDiscovery: { requestRecovery, resolveOrRequest: async () => ({ reason: 'ATTEMPT_LIMIT', state: 'UNAVAILABLE' }) },
       storage, token: () => 'public-unavailable',
     });
     expect(result).toMatchObject({ blocked: 0, completed: 0, retried: 1 });
     expect(search).not.toHaveBeenCalled();
-    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT' });
+    expect(requestRecovery).not.toHaveBeenCalled();
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'RETRY_AT', attempt: 7, availableAt: '2026-09-07T12:15:00.000Z' });
     expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'PROVIDER_UNAVAILABLE' });
   });
 

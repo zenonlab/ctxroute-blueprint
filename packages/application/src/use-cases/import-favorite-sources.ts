@@ -36,7 +36,7 @@ export function favoriteSourceIdentity(bookmarkId: string): FavoriteSourceId {
   return favoriteSourceId(`source_${encodedBookmarkIdentity(bookmarkId)}`);
 }
 
-function resolutionTaskIdentity(bookmarkId: string): string {
+export function favoriteResolutionTaskIdentity(bookmarkId: string): string {
   return `favorite-resolution_${encodedBookmarkIdentity(bookmarkId)}`;
 }
 
@@ -58,10 +58,10 @@ export async function importFavoriteSources(
           ? previousSource.matchedWorkId
           : undefined;
         const existingSource = previousSource === undefined ? undefined
-          : await correctImportedReview(session, previousSource, resolutionTaskIdentity(favorite.bookmarkId), importedAt);
+          : await correctImportedReview(session, previousSource, favoriteResolutionTaskIdentity(favorite.bookmarkId), importedAt);
         const corrected = existingSource !== previousSource;
         const existingArtifact = existingSource === undefined ? undefined : await session.getFavoriteParseArtifact(id);
-        const existingTask = await session.getFavoriteResolutionTask(resolutionTaskIdentity(favorite.bookmarkId));
+        const existingTask = await session.getFavoriteResolutionTask(favoriteResolutionTaskIdentity(favorite.bookmarkId));
         let source = createFavoriteSource({
           ...existingSource,
           bookmarkId: favorite.bookmarkId,
@@ -122,7 +122,7 @@ export async function importFavoriteSources(
           }
         }
         const task = createDurableTask({
-          id: resolutionTaskIdentity(favorite.bookmarkId),
+          id: favoriteResolutionTaskIdentity(favorite.bookmarkId),
           idempotencyKey: `favorite-resolution:${source.id}:${artifact.semanticFingerprint}`,
           kind: 'favorite-resolution',
           lane: 'routing',

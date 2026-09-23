@@ -31,7 +31,7 @@
           "d1",
           "collector"
         ],
-        "note": "Sans identité produit ni appairage : claim atomique PENDING, IDs proposés, puis promotion VERIFIED par le consumer Queue natif."
+        "note": "L’extension lit ou admet une demande publique; seul le consumer Queue natif interroge les fournisseurs et publie sous bail."
       },
       {
         "id": "presentation",
@@ -237,7 +237,7 @@
       "id": "http",
       "from": "resolution",
       "to": "worker",
-      "label": "empreintes / claims publics",
+      "label": "lecture / admission publique",
       "labelAt": [
         750,
         450
@@ -252,16 +252,10 @@
       "labelAt": [1105, 434]
     },
     {
-      "id": "provider",
-      "from": "resolution",
-      "to": "providers",
-      "label": "bail D1 ou ID exact · données bornées"
-    },
-    {
       "id": "verify-provider",
-      "from": "providers",
-      "to": "collector",
-      "label": "profil officiel borné",
+      "from": "collector",
+      "to": "providers",
+      "label": "transport fournisseur borné",
       "labelAt": [1105, 174],
       "variant": "security"
     },
@@ -269,7 +263,7 @@
       "id": "promote",
       "from": "collector",
       "to": "worker",
-      "label": "promotion signée",
+      "label": "publication sous bail",
       "fromSide": "right",
       "toSide": "top",
       "via": [[1370, 125], [1370, 320], [955, 320]],

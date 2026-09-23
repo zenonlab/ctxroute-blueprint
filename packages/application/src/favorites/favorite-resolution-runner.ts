@@ -1,7 +1,7 @@
 import { createFavoriteSource, createProviderCandidate, createWork, workId } from '@tobirink/domain';
 import type { FavoriteParseArtifact, FavoriteResolutionResult, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
 import type { StoragePort } from '../ports/storage-port';
-import { favoriteIdentityKey, favoriteManualIdentityKey, favoritePublicReferenceSchema, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
+import { favoriteIdentityKey, favoritePublicReferenceSchema, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
 import type { FavoriteIdentityLookupPort } from './favorite-identity-lookup';
 import { blockTask, parseFavoriteResolutionTaskPayload, retryTask } from '../tasks';
 import type { DurableTask, FavoriteResolutionOutboxPort } from '../tasks';
@@ -18,7 +18,7 @@ import type { FavoriteSearchCheckpointPort } from './provider-search-checkpoint'
 import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPorts, ResolutionProvider } from './provider-ports';
 import type { PublicDiscoveryRequestClientPort } from '../public-discovery';
 import { PublicDiscoveryError } from '../public-discovery';
-import { requestPublicFavoriteDiscovery } from './public-discovery-resolution';
+import { preparePublicFavoriteDiscoveryIdentity, requestPublicFavoriteDiscovery } from './public-discovery-resolution';
 
 // Cheap local/terminal tasks may drain in one wake; the time budget remains
 // authoritative for provider I/O and MV3 suspension safety.
@@ -270,16 +270,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     const query: MutableFavoriteTitleMatchQuery = { sourceTitles: titles, sourceFormat: hasFavoriteOvaMarker(titles) ? 'OVA' : 'NON_OVA', preSerialization: hasFavoritePreSerializationMarker(titles) };
     if (artifact.mediaKind !== 'UNKNOWN') query.mediaKind = artifact.mediaKind;
     if (artifact.season !== undefined && artifact.seasonEvidence?.conflict !== true) query.explicitSeason = artifact.season;
-    let reference = explicit;
-    if (reference === undefined && dependencies.synchronized !== undefined && artifact.identityKey !== undefined) {
-      const syncKey = await favoriteIdentityKey(artifact);
-      try {
-        const results = await dependencies.synchronized.lookup([syncKey]);
-        const result = results.length === 1 ? results[0] : undefined;
-        if (result?.kind === 'FOUND' && result.fingerprint === syncKey.fingerprint && result.references.length === 1
-          && (artifact.mediaKind === 'UNKNOWN' || artifact.mediaKind === result.mediaKind)) reference = favoritePublicReferenceSchema.parse(result.references[0]);
-      } catch { /* Sync is a hint; unavailable hints do not block local proof. */ }
-    }
+    const { key: identityKey, reference } = await preparePublicFavoriteDiscoveryIdentity(artifact, dependencies.synchronized);
     let cached = reference === undefined ? undefined : await dependencies.storage.getWork(favoriteCandidateWorkId(reference));
     if (reference !== undefined && cached === undefined) {
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${reference.provider}:${reference.externalId}`));
@@ -302,7 +293,6 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       });
       return 'completed';
     }
-    const identityKey = reference === undefined ? await favoriteIdentityKey(artifact) : await favoriteManualIdentityKey(artifact, reference);
     let discovery;
     const admissionStartedAt = Date.now();
     await dependencies.trace?.({ operation: 'admission', outcome: 'started' });
@@ -322,7 +312,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     });
     if (discovery.state === 'MISS') return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PUBLIC_DISCOVERY_PENDING');
     if (discovery.state === 'PENDING') return deferClaimWithoutAttempt(dependencies, task, token, discovery.retryAt);
-    if (discovery.state === 'UNAVAILABLE') return retryClaim(dependencies, task, token, new Date(timestamp(dependencies.now()) + 60_000).toISOString(), 'PROVIDER_UNAVAILABLE');
+    if (discovery.state === 'UNAVAILABLE') return deferClaimWithoutAttempt(dependencies, task, token, new Date(timestamp(dependencies.now()) + favoriteProviderPolicy.negativeTtlMs).toISOString(), 'PROVIDER_UNAVAILABLE');
     if (discovery.state === 'NOT_FOUND') {
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'NOT_FOUND' }, 'review:d1-not-found');
       return 'completed';
