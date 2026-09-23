@@ -1,9 +1,10 @@
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
+import { FavoriteProviderRetryError, type FavoriteProviderPort, type ProviderCandidateEnvelope } from '@tobirink/public-discovery';
 import { HttpPublicDiscoveryAdapter } from '../../../../packages/adapters-browser/src/catalogue/http-public-discovery-adapter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
-import { handleNativeCollectorQueue, processPublicDiscoveryQueue, type NativeCollectorSignal } from '../native-collectors';
+import { createBudgetedDiscoveryResolver, handleNativeCollectorQueue, processPublicDiscoveryQueue, type NativeCollectorSignal } from '../native-collectors';
 
 function key(marker: string) {
   return { fingerprint: marker.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
@@ -13,9 +14,218 @@ function submission(marker: string, title: string) {
   return { key: key(marker), query: { discoveryTitles: [title], mediaKind: 'ANIME' as const, sourceTitles: [title] }, schemaVersion: 3 as const };
 }
 
+function countedD1(database: D1Database, limit: number) {
+  let calls = 0;
+  const originals = new WeakMap<D1PreparedStatement, D1PreparedStatement>();
+  const spend = () => {
+    calls += 1;
+    if (calls > limit) throw new Error(`D1_TEST_INVOCATION_LIMIT: ${calls}/${limit}`);
+  };
+  const wrap = (statement: D1PreparedStatement): D1PreparedStatement => {
+    // SAFETY: the counter delegates every statement operation to the real D1
+    // binding, and batches unwrap these exact instances before execution.
+    const wrapped = {
+      all: <T = never>() => { spend(); return statement.all<T>(); },
+      bind: (...values: Parameters<D1PreparedStatement['bind']>) => wrap(statement.bind(...values)),
+      first: <T = never>(column?: string) => {
+        spend(); return column === undefined ? statement.first<T>() : statement.first<T>(column);
+      },
+      raw: <T = never[]>(options?: { columnNames?: boolean }) => {
+        spend(); return options?.columnNames === true ? statement.raw<T>({ columnNames: true }) : statement.raw<T>();
+      },
+      run: <T = never>() => { spend(); return statement.run<T>(); },
+    } as D1PreparedStatement;
+    originals.set(wrapped, statement);
+    return wrapped;
+  };
+  return {
+    calls: () => calls,
+    // SAFETY: preserve all D1 methods while counting the real operations used
+    // by the consumer; no SQL result or collector behavior is synthesized.
+    database: {
+      // Count a whole transaction as ONE call: a conservative lower bound.
+      batch: <T = unknown>(statements: D1PreparedStatement[]) => {
+        spend(); return database.batch<T>(statements.map(statement => originals.get(statement) ?? statement));
+      },
+      dump: () => database.dump(),
+      exec: (query: string) => { spend(); return database.exec(query); },
+      prepare: (query: string) => wrap(database.prepare(query)),
+      withSession: (constraint?: D1SessionBookmark | D1SessionConstraint) => database.withSession(constraint),
+    } as D1Database,
+  };
+}
+
 beforeEach(async () => applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS));
 
 describe('public discovery queue trigger', () => {
+  it('overrides a resolver-converted budget error and defers later claims without calling any provider', async () => {
+    const provider: FavoriteProviderPort = { search: vi.fn(), hydrate: vi.fn() };
+    const providers = { anilist: provider, mangaupdates: provider, mangadex: provider, 'kitsu-anime': provider, 'kitsu-manga': provider };
+    const resolver = createBudgetedDiscoveryResolver(providers, () => 43, () => 5);
+    const request = { ...submission('2', 'Synthetic blocked budget'), attempt: 1, requestDigest: 'b'.repeat(64) };
+    await expect(resolver.resolve(request)).rejects.toThrow('public-discovery-invocation-budget');
+    await expect(resolver.resolve(request)).rejects.toBeInstanceOf(FavoriteProviderRetryError);
+    expect(provider.search).not.toHaveBeenCalled();
+    expect(provider.hydrate).not.toHaveBeenCalled();
+  });
+
+  it('bounds greedy pagination under 50 calls and terminalizes an over-budget first work after eight attempts', async () => {
+    const runtime = await env.PUBLIC_DB.prepare(`SELECT provider, next_allowed_at AS nextAllowed, active_until AS activeUntil,
+      consecutive_failures AS failures, circuit_open_until AS circuitOpen, updated_at AS updated
+      FROM public_discovery_provider_runtime`).all<{
+        provider: string; nextAllowed: number; activeUntil: number; failures: number; circuitOpen: number; updated: string;
+      }>();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-05T00:00:00.000Z'));
+    const discoveryKey = { ...key('b'), fingerprint: 'b0d6e7'.padStart(64, '0'), mediaKind: 'UNKNOWN' as const };
+    const titles = ['Absent Alpha', 'Absent Bravo', 'Absent Charlie', 'Absent Delta'];
+    const port = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(String(input));
+      vi.setSystemTime(Date.now() + 1_001);
+      if (url.hostname === 'graphql.anilist.co' || url.hostname === 'api.mangaupdates.com') return Response.json({}, { status: 503 });
+      expect(url.hostname).toBe('kitsu.io');
+      const offset = Number(url.searchParams.get('page[offset]'));
+      const data = Array.from({ length: 20 }, (_value, index) => ({
+        id: String(offset + index + 1), type: 'anime',
+        attributes: { canonicalTitle: 'Completely Different Resource', abbreviatedTitles: [], slug: 'different-resource', subtype: 'TV', titles: {} },
+      }));
+      return Response.json({ data, links: { next: offset < 60 ? 'https://kitsu.io/next' : null }, meta: { count: 80 } });
+    });
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = { metrics: async () => metrics, send: vi.fn(async () => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    try {
+      await port.request({ key: discoveryKey, query: { discoveryTitles: titles, sourceTitles: titles, mediaKind: 'UNKNOWN' }, requestDigest: 'e'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
+      for (let attempt = 1; attempt <= 8; attempt += 1) {
+        const measured = countedD1(env.PUBLIC_DB, 50);
+        const report = await processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_TRANSPORT_MODE: 'direct' });
+        expect(report).toMatchObject({ claimed: 1, failed: 1, deferred: 0, published: 0, continuationScheduled: true });
+        expect(measured.calls()).toBeLessThanOrEqual(50);
+        expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, result_json AS result FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+          .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PROCESSING', attempts: attempt, result: null });
+        vi.setSystemTime(Date.now() + 16 * 60_000);
+      }
+      expect(queue.send).toHaveBeenCalledTimes(8);
+      const measured = countedD1(env.PUBLIC_DB, 50);
+      expect(await processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_TRANSPORT_MODE: 'direct' }))
+        .toMatchObject({ claimed: 0, continuationScheduled: false });
+      expect(measured.calls()).toBeLessThanOrEqual(50);
+      await expect(port.read(discoveryKey, new Date().toISOString())).resolves.toEqual({ state: 'UNAVAILABLE', reason: 'ATTEMPT_LIMIT' });
+      expect(queue.send).toHaveBeenCalledTimes(8);
+      expect(provider).toHaveBeenCalledTimes(8 * 18);
+      expect(warn.mock.calls).toEqual(Array.from({ length: 8 }, () => ['public-discovery-provider-failed', 'public-discovery-invocation-budget']));
+    } finally {
+      provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
+      await env.PUBLIC_DB.batch(runtime.results.map(row => env.PUBLIC_DB.prepare(`UPDATE public_discovery_provider_runtime
+        SET next_allowed_at = ?1, active_until = ?2, consecutive_failures = ?3, circuit_open_until = ?4, updated_at = ?5 WHERE provider = ?6`)
+        .bind(row.nextAllowed, row.activeUntil, row.failures, row.circuitOpen, row.updated, row.provider)));
+    }
+  });
+
+  it.each([false, true])('retains a late port reservation until settlement and closes its old resolver (settled first: %s)', async (settledFirst) => {
+    vi.useFakeTimers();
+    let used = 25;
+    let settlePort: (envelope: ProviderCandidateEnvelope) => void;
+    const pending = new Promise<ProviderCandidateEnvelope>(resolve => { settlePort = resolve; });
+    const candidate = { externalId: '919191', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Synthetic late budget'] };
+    const provider: FavoriteProviderPort = { search: vi.fn(() => pending), hydrate: vi.fn(async () => candidate) };
+    const providers = { anilist: provider, mangaupdates: provider, mangadex: provider, 'kitsu-anime': provider, 'kitsu-manga': provider };
+    const resolver = createBudgetedDiscoveryResolver(providers, () => used, () => 5, 10);
+    const request = { ...submission('1', 'Synthetic late budget'), attempt: 1, requestDigest: 'a'.repeat(64) };
+    const settle = async () => {
+      settlePort({ candidates: [candidate], complete: true, digest: 'synthetic-late-budget', provider: 'anilist', truncated: false });
+      await vi.advanceTimersByTimeAsync(0);
+    };
+    try {
+      const first = expect(resolver.resolve(request)).rejects.toBeInstanceOf(FavoriteProviderRetryError);
+      await vi.advanceTimersByTimeAsync(10);
+      await first;
+      used = 29;
+      if (settledFirst) await settle();
+      const next = resolver.resolve({ ...request, query: { ...request.query, explicitProviderReference: { provider: 'anilist', externalId: candidate.externalId } } });
+      if (settledFirst) await expect(next).resolves.toMatchObject({ state: 'VERIFIED' });
+      else await expect(next).rejects.toBeInstanceOf(FavoriteProviderRetryError);
+      await settle();
+      expect(provider.search).toHaveBeenCalledOnce();
+      expect(provider.hydrate).toHaveBeenCalledTimes(settledFirst ? 1 : 0);
+    } finally { await settle(); vi.useRealTimers(); }
+  });
+
+  it.each([1_000, 50, 21])('preserves real Queue progress under a D1 binding cap of %i', async (bindingCap) => {
+    const port = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const scenario = bindingCap === 1_000 ? 0 : bindingCap === 50 ? 1 : 2;
+    const count = bindingCap === 21 ? 2 : 5;
+    const markers = Array.from({ length: count }, (_value, index) => (100 + index + 5 * scenario).toString(16).padStart(64, '0'));
+    const titles = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].slice(0, count).map(name => `Synthetic ${['Baseline', 'Capped', 'Failure'][scenario]} Budget ${name}`);
+    const media = titles.map((title, index) => ({
+      id: index + 1 + 5 * scenario, type: 'ANIME', format: 'TV', genres: [], synonyms: [], siteUrl: `https://anilist.co/anime/${index + 1 + 5 * scenario}`,
+      title: { romaji: title, english: title, native: null }, coverImage: { extraLarge: null, large: null, medium: null },
+    }));
+    const runtime = await env.PUBLIC_DB.prepare(`SELECT next_allowed_at AS nextAllowed, active_until AS activeUntil,
+      consecutive_failures AS failures, circuit_open_until AS circuitOpen, updated_at AS updated
+      FROM public_discovery_provider_runtime WHERE provider = 'anilist'`).first<{
+        nextAllowed: number; activeUntil: number; failures: number; circuitOpen: number; updated: string;
+      }>();
+    expect(runtime).not.toBeNull();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 1 + scenario)));
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      expect(String(input)).toBe('https://graphql.anilist.co');
+      const request = JSON.parse(String(init?.body));
+      const candidate = media.find(value => request.variables.search === value.title.romaji || request.variables.id === value.id);
+      expect(candidate).toBeDefined();
+      // Advance only the fixture clock; preserve the real D1 cadence gate.
+      vi.setSystemTime(Date.now() + 3_001);
+      return Response.json({ data: request.query.includes('FavoriteSearch')
+        ? { Page: { pageInfo: { hasNextPage: false }, media: [candidate] } } : { Media: candidate } });
+    });
+    try {
+      for (const [index, title] of titles.entries()) {
+        const request = submission('1', title);
+        request.key.fingerprint = markers[index]!;
+        await port.request({ ...request, requestDigest: markers[index]! }, new Date().toISOString());
+      }
+      const metrics = { backlogBytes: 0, backlogCount: 0 };
+      const queue = { metrics: async () => metrics, send: vi.fn(async () => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+      if (bindingCap === 21) {
+        // The second publication fails before its transaction. The first
+        // successful receipt must still be counted in the failure metrics.
+        const measured = countedD1(env.PUBLIC_DB, bindingCap);
+        await expect(processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_TRANSPORT_MODE: 'direct' }))
+          .rejects.toMatchObject({ metrics: { acceptedResults: 1, result: 'failed' } });
+        expect(measured.calls()).toBe(22);
+        return;
+      }
+      let verified = 0;
+      const callCounts: number[] = [];
+      for (let wake = 0; wake < 5 && verified < 5; wake += 1) {
+        const measured = countedD1(env.PUBLIC_DB, bindingCap);
+        queue.send.mockClear();
+        await processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_TRANSPORT_MODE: 'direct' });
+        callCounts.push(measured.calls());
+        expect(measured.calls()).toBeLessThanOrEqual(50);
+        const states = await env.PUBLIC_DB.prepare('SELECT state, claim_token_hash AS claim, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint IN (?1, ?2, ?3, ?4, ?5)')
+          .bind(...markers).all<{ state: string; claim: string | null; attempts: number }>();
+        expect(states.results).toHaveLength(5);
+        expect(states.results.every(row => row.state === 'VERIFIED' || (row.state === 'PENDING' && row.claim === null))).toBe(true);
+        expect(states.results.every(row => row.attempts <= 1)).toBe(true);
+        verified = states.results.filter(row => row.state === 'VERIFIED').length;
+        if (verified < 5) expect(queue.send).toHaveBeenCalledOnce();
+        vi.setSystemTime(Date.now() + 3_001);
+      }
+      expect(verified).toBe(5);
+      expect(callCounts).toEqual([45, 14]);
+      expect(provider).toHaveBeenCalledTimes(10);
+      console.info(JSON.stringify({ type: 'local-discovery-invocation-budget', bindingCap, d1Calls: callCounts, providerCalls: provider.mock.calls.length }));
+    } finally {
+      provider.mockRestore(); vi.useRealTimers();
+      await env.PUBLIC_DB.prepare(`UPDATE public_discovery_provider_runtime SET next_allowed_at = ?1,
+        active_until = ?2, consecutive_failures = ?3, circuit_open_until = ?4, updated_at = ?5 WHERE provider = 'anilist'`)
+        .bind(runtime!.nextAllowed, runtime!.activeUntil, runtime!.failures, runtime!.circuitOpen, runtime!.updated).run();
+    }
+  });
+
   it('requeues a cadence-deferred claim at its deadline without using a provider attempt', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const request = { ...submission('c', 'Cadence deferred work'), requestDigest: 'd'.repeat(64) };
@@ -54,7 +264,9 @@ describe('public discovery queue trigger', () => {
     expect((await adapter.requestRefresh(request.key, now)).outcome).toBe('created');
     const claimed = await adapter.claimBatch({ claimToken: 'g'.repeat(48), tokenDigest: 'g'.repeat(64), now, leaseUntil: '2026-09-20T12:15:00.000Z', limit: 1 });
     expect(claimed.requests[0]?.attempt).toBe(1);
-    await adapter.deferClaim(claimed.requests[0]!, 'g'.repeat(64), '2026-09-20T12:00:08.000Z', now);
+    const measuredDefer = countedD1(env.PUBLIC_DB, 2);
+    await new D1PublicDiscoveryV3Adapter(measuredDefer.database).deferClaim(claimed.requests[0]!, 'g'.repeat(64), '2026-09-20T12:00:08.000Z', now);
+    expect(measuredDefer.calls()).toBe(2);
     expect(await env.PUBLIC_DB.prepare('SELECT state, refresh_state AS refreshState, refresh_attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
       .bind(request.key.fingerprint).first()).toEqual({ state: 'VERIFIED', refreshState: 'PENDING', attempts: 0 });
     await expect(adapter.read(request.key, now)).resolves.toMatchObject({ state: 'VERIFIED', profile: { workId: 'work_anilist_999998' } });

@@ -9,6 +9,7 @@ scope:
   - apps/worker/src/catalogue/**
   - apps/worker/src/releases/**
   - apps/worker/src/native-collectors.ts
+  - apps/worker/src/operational-metrics.ts
   - apps/provider-gateway/**
   - docs/systems/favorite-resolution-rebuild-pipeline.md
   - docs/systems/agenda-recovery-plan.md
@@ -88,6 +89,31 @@ Chaque résolution possède aussi une deadline applicative de trente secondes :
 si un transport amont ou une opération d’infrastructure reste suspendu, le
 claim est différé comme une erreur fournisseur retryable au lieu de rester
 `PROCESSING` jusqu’à l’expiration du bail de quinze minutes.
+Le budget d'une invocation Discovery conserve `claim(5)` et compte les appels
+D1 avant exécution, indépendamment des métriques de lignes `worker.cost`.
+Un batch D1 constitue un appel RPC, sans confondre ce nombre avec ses statements
+SQL ni avec ses lignes lues/écrites. Avant chaque opération publique fournisseur
+`search` ou `hydrate`, la composition Worker exige
+`appels consommés + réserves en cours + 4 + 7 + 2 × autres claims restants + 1 <= 50`.
+Les quatre appels couvrent la réservation de cadence, son éventuelle relecture,
+le succès et un éventuel échec; sept couvrent la publication ou le report de
+l'œuvre courante (mutuellement exclusifs), deux par autre claim restant
+couvrent les reports de refresh, et un couvre la continuation D1.
+La réserve d'une opération fournisseur n'est libérée qu'au settlement réel,
+même après la deadline. Une résolution fermée ne démarre plus d'autre port;
+les opérations déjà lancées conservent leur réserve jusqu'à leur terminaison.
+Un refus de budget ferme les appels fournisseur du lot. Les demandes suivantes
+sont différées sans consommer d'essai. Si la première œuvre du claim épuise le
+budget d'une invocation fraîche, elle suit l'échec borné consommant l'essai,
+avec continuation au bail et terminalisation après huit tentatives; sinon elle
+est différée pour disposer d'une invocation fraîche. Le refus garde un état
+local discriminé, prioritaire sur une conversion d'erreur ou un résultat tardif
+du resolver : il ne peut jamais publier `NOT_FOUND` ni créer un réarmement infini.
+Son diagnostic fermé est `public-discovery-invocation-budget`, distinct d'une
+panne fournisseur et sans contenu métier. Le compteur couvre les méthodes de
+la binding utilisées par les collecteurs; `withSession()` reste un passthrough
+non compté, jamais utilisé dans cette composition. Le passage à des sessions
+exigerait d'étendre ce compteur avant de conserver la garantie de budget.
 Après le lot, une lecture des demandes restantes conserve une continuation
 Queue retardée de 1 à 900 secondes, même après un claim vide. L’échec de cet
 envoi conserve le signal entrant par retry. Le claim ordonne

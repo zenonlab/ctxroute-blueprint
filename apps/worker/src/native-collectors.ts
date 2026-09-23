@@ -9,7 +9,10 @@ import {
   createPublicDiscoveryResolver,
   runPublicDiscoveryBatch,
   type PublicDiscoveryBatchReport,
+  type PublicDiscoveryClaimedRequest,
+  type PublicDiscoveryProviderPorts,
   type PublicDiscoveryResultBatch,
+  type FavoriteProviderPort,
 } from '@tobirink/public-discovery';
 import { D1AgendaCollectionAdapter, type AgendaLaneClaim } from './releases/public-release-collectors';
 import { createProviderTransportAdapter, type ProviderTransportBindings } from './provider-transport-adapter';
@@ -92,9 +95,17 @@ class PublicDiscoveryProcessingError extends Error {
   }
 }
 
-type NativeCollectorDisposition = 'ack-invalid' | 'ack-success' | 'retry' | 'retry-to-dlq';
+type NativeCollectorDisposition = 'ack-invalid' | 'ack-success' | 'ack-forwarded' | 'retry' | 'retry-to-dlq';
 const nativeCollectorMaxRetryRequests = 8;
 const publicDiscoveryResolutionTimeoutMilliseconds = 30_000;
+
+class PublicDiscoveryInvocationBudgetError extends Error {
+  constructor() { super('public-discovery-invocation-budget'); this.name = 'PublicDiscoveryInvocationBudgetError'; }
+}
+
+class PublicDiscoveryInvocationBudgetRetryError extends FavoriteProviderRetryError {
+  constructor() { super('public-discovery-invocation-budget', Date.now() + 1_000); this.name = 'PublicDiscoveryInvocationBudgetRetryError'; }
+}
 
 interface NativeCollectorDiagnostic {
   readonly attempt: number;
@@ -106,7 +117,7 @@ interface NativeCollectorDiagnostic {
 
 function emitNativeCollectorDiagnostic(diagnostic: NativeCollectorDiagnostic): void {
   const entry = JSON.stringify({ schemaVersion: 1, type: 'native-collector.queue', ...diagnostic });
-  if (diagnostic.disposition === 'ack-success') console.log(entry);
+  if (diagnostic.disposition === 'ack-success' || diagnostic.disposition === 'ack-forwarded') console.log(entry);
   else console.warn(entry);
 }
 
@@ -123,6 +134,63 @@ export async function resolveWithDeadline<TValue>(operation: Promise<TValue>, ti
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+export function createBudgetedDiscoveryResolver(
+  providers: PublicDiscoveryProviderPorts,
+  usedCalls: () => number,
+  claimedCount: () => number,
+  timeoutMilliseconds = publicDiscoveryResolutionTimeoutMilliseconds,
+) {
+  let completed = 0;
+  let outstanding = 0;
+  let exhausted = false;
+  const deferred = () => new PublicDiscoveryInvocationBudgetRetryError();
+  return {
+    async resolve(request: PublicDiscoveryClaimedRequest) {
+      const first = completed === 0;
+      const scope = { closed: false, exceeded: false };
+      const operation = async <T>(run: () => Promise<T>): Promise<T> => {
+        if (scope.closed) throw new Error('public-discovery-resolution-closed');
+        // Publication (7) also covers this claim's alternative defer (2).
+        // Reserve two for each OTHER claim, plus nextPendingAt (1).
+        const otherClaims = Math.max(0, claimedCount() - completed - 1);
+        if (exhausted || usedCalls() + outstanding + 4 + 7 + 2 * otherClaims + 1 > 50) {
+          scope.exceeded = true;
+          exhausted = true;
+          throw new PublicDiscoveryInvocationBudgetError();
+        }
+        outstanding += 4;
+        try { return await run(); }
+        finally { outstanding -= 4; }
+      };
+      const wrap = (provider: FavoriteProviderPort): FavoriteProviderPort => ({
+        search: query => operation(() => provider.search(query)),
+        hydrate: reference => operation(() => provider.hydrate(reference)),
+      });
+      try {
+        if (exhausted) throw deferred();
+        const resolver = createPublicDiscoveryResolver({
+          anilist: wrap(providers.anilist), mangaupdates: wrap(providers.mangaupdates), mangadex: wrap(providers.mangadex),
+          'kitsu-anime': wrap(providers['kitsu-anime']), 'kitsu-manga': wrap(providers['kitsu-manga']),
+        });
+        const result = await resolveWithDeadline(resolver.resolve(request), timeoutMilliseconds);
+        // The portable resolver may have caught a port error or returned a
+        // fallback. A local budget refusal must override either outcome.
+        if (scope.exceeded) throw new PublicDiscoveryInvocationBudgetError();
+        return result;
+      } catch (error) {
+        if (scope.exceeded) {
+          if (first) throw new PublicDiscoveryInvocationBudgetError();
+          throw deferred();
+        }
+        throw error;
+      } finally {
+        scope.closed = true;
+        completed += 1;
+      }
+    },
+  };
 }
 
 function randomToken(): string {
@@ -148,6 +216,7 @@ function providerFetch(bindings: NativeCollectorBindings) {
 
 function providerFailureCode(error: Error | undefined): string {
   if (error === undefined) return 'provider-unknown';
+  if (error instanceof PublicDiscoveryInvocationBudgetError || error instanceof PublicDiscoveryInvocationBudgetRetryError) return 'public-discovery-invocation-budget';
   if (/^provider-(gateway|transport)-/u.test(error.message)) {
     return error.message.slice(0, 80);
   }
@@ -186,30 +255,34 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   const port = new D1PublicDiscoveryV3Adapter(d1.database);
   let activeToken = '';
   let activeTokenDigest = '';
-  const resolver = createPublicDiscoveryResolver(createPublicDiscoveryProviders(
+  let claimedCount = 0;
+  const resolver = createBudgetedDiscoveryResolver(createPublicDiscoveryProviders(
     providers.fetch,
     new D1ProviderRuntimeControl(d1.database),
-  ));
+  ), d1.calls, () => claimedCount);
   const report = await runPublicDiscoveryBatch({
     gateway: {
       claim: async (limit) => {
         activeToken = randomToken();
         activeTokenDigest = await digest(activeToken);
         const now = new Date();
-        return port.claimBatch({ claimToken: activeToken, leaseUntil: new Date(now.valueOf() + 15 * 60_000).toISOString(), limit, now: now.toISOString(), tokenDigest: activeTokenDigest });
+        const claimed = await port.claimBatch({ claimToken: activeToken, leaseUntil: new Date(now.valueOf() + 15 * 60_000).toISOString(), limit, now: now.toISOString(), tokenDigest: activeTokenDigest });
+        claimedCount = claimed.requests.length;
+        return claimed;
       },
       defer: (request, retryAt, now) => port.deferClaim(request, activeTokenDigest, retryAt, now),
       publish: async (batch: PublicDiscoveryResultBatch) => {
         const receipt = await port.publishBatch(batch, await digest(activeToken), await digest(JSON.stringify(batch.results)), new Date().toISOString());
+        acceptedResults += receipt.published;
         return { published: receipt.published, replayed: receipt.replayed };
       },
     },
-        limit: 5,
+    limit: 5,
     nonce: () => crypto.randomUUID(),
     now: () => new Date().toISOString(),
     resolver: {
       resolve: async (request) => {
-        try { return await resolveWithDeadline(resolver.resolve(request), publicDiscoveryResolutionTimeoutMilliseconds); }
+        try { return await resolver.resolve(request); }
         catch (error) {
           console.warn('public-discovery-provider-failed', providerFailureCode(error instanceof Error ? error : undefined));
           throw error;
@@ -217,7 +290,6 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       },
     },
   });
-  acceptedResults = report.published;
   const nextPendingAt = await port.nextPendingAt();
   if (nextPendingAt !== undefined) {
     const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(nextPendingAt) - Date.now()) / 1_000)));
@@ -311,9 +383,9 @@ export async function processAgendaQueue(bindings: NativeCollectorBindings, sche
 
 export async function handleNativeCollectorQueue(
   messages: readonly QueueMessagePort[],
-  processors: { readonly agenda: (scheduledFor: string) => Promise<AgendaProcessingReceipt>; readonly discovery: () => Promise<DiscoveryProcessingReport>; readonly recovery?: () => Promise<void> },
+  processors: { readonly agenda: (scheduledFor: string) => Promise<AgendaProcessingReceipt>; readonly discovery: () => Promise<DiscoveryProcessingReport>; readonly recovery?: () => Promise<void>; readonly forward?: (signal: NativeCollectorSignal) => Promise<void> },
 ): Promise<void> {
-  const discoveryMessages: QueueMessagePort[] = [];
+  const groups: { signal: NativeCollectorSignal; messages: QueueMessagePort[] }[] = [];
   for (const message of messages) {
     const parsedSignal = nativeCollectorSignalSchema.safeParse(message.body);
     if (!parsedSignal.success) {
@@ -322,10 +394,39 @@ export async function handleNativeCollectorQueue(
       continue;
     }
     const signal = parsedSignal.data;
+    const group = groups.find(candidate => candidate.signal.type === signal.type
+      && (signal.type !== 'agenda-refresh' || (candidate.signal.type === 'agenda-refresh' && candidate.signal.scheduledFor === signal.scheduledFor)));
+    if (group) group.messages.push(message);
+    else groups.push({ signal, messages: [message] });
+  }
+  const [selected, ...deferredGroups] = groups;
+  if (!selected) return;
+  // Each collector owns one D1 invocation budget. Preserve other signal groups
+  // durably before acknowledging them instead of spending their retry attempts.
+  for (const group of deferredGroups) {
+    const [leader, ...duplicates] = group.messages;
+    if (!leader) continue;
+    try {
+      if (!processors.forward) throw new Error('collector-forward-unavailable');
+      await processors.forward(group.signal);
+      leader.ack();
+      emitNativeCollectorDiagnostic({ attempt: Math.max(1, leader.attempts), disposition: 'ack-forwarded', messageType: group.signal.type });
+    } catch {
+      const retryDelaySeconds = Math.min(60 * (2 ** Math.max(0, leader.attempts - 1)), 60 * 60);
+      leader.retry({ delaySeconds: retryDelaySeconds });
+      emitNativeCollectorDiagnostic({ attempt: Math.max(1, leader.attempts), code: 'collector-forward-failed',
+        disposition: leader.attempts > nativeCollectorMaxRetryRequests ? 'retry-to-dlq' : 'retry', messageType: group.signal.type, retryDelaySeconds });
+    }
+    for (const duplicate of duplicates) duplicate.ack();
+  }
+  const discoveryMessages: QueueMessagePort[] = [];
+  for (const [index, message] of selected.messages.entries()) {
+    const signal = selected.signal;
     if (signal.type === 'public-discovery-ready') {
       discoveryMessages.push(message);
       continue;
     }
+    if (index > 0) { message.ack(); continue; }
     const startedAt = Date.now();
     try {
       if (signal.type === 'agenda-recovery') {

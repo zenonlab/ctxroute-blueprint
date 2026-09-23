@@ -31,7 +31,7 @@ annoncer un succès.
 Émettre pour chaque décision Queue un objet JSON borné contenant seulement le
 type de signal, le numéro de tentative, la disposition et, en échec, un code
 classifié ainsi que le délai. Les seules dispositions sont `ack-success`,
-`ack-invalid`, `retry` et `retry-to-dlq`. Aucun payload, titre, identifiant,
+`ack-forwarded`, `ack-invalid`, `retry` et `retry-to-dlq`. Aucun payload, titre, identifiant,
 URL ou corps fournisseur ne peut entrer dans ce diagnostic.
 
 Réduire les échecs Agenda aux lanes `anilist`, `mangaupdates`, à leur forme
@@ -53,6 +53,21 @@ Compléter la décision de Queue par l’événement de coût fermé de l’ADR-
 La disposition explique le contrôle de livraison; `worker.cost` mesure la tâche
 une seule fois avec appels HTTP réels, résultats acceptés, issue, durée,
 retries et métriques D1. Aucun des deux événements ne porte de contenu métier.
+
+Un lot Queue n'exécute qu'un traitement : Discovery, reprise Agenda ou un
+rafraîchissement Agenda donné. Le premier signal valide sélectionne ce
+traitement et les signaux identiques sont regroupés. Les autres groupes sont
+renvoyés une seule fois dans la Queue, avec une seconde de délai, avant
+l'acquittement de leurs messages. Ce report d'ordonnancement ne consomme pas
+les retries du traitement. Si le renvoi échoue, le premier message conserve
+un retry borné; les doublons n'ajoutent pas de traitement concurrent.
+`ack-forwarded` distingue ce renvoi d'une exécution réussie. Aucun contenu de
+signal n'est ajouté aux diagnostics. Le cron hebdomadaire Agenda reste inchangé.
+
+Cette isolation empêche plusieurs collecteurs de cumuler leurs dépenses D1
+dans une même invocation. La borne de 50 appels du traitement Discovery
+inclut ses publications, reports et continuation; elle ne certifie pas à elle
+seule le coût interne d'un traitement Agenda.
 
 ## Conséquences
 

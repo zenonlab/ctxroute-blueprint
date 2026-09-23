@@ -69,6 +69,7 @@ export default {
       agenda: (scheduledFor) => processAgendaQueue(env, scheduledFor),
       discovery: () => processPublicDiscoveryQueue(env),
       recovery: recover,
+      forward: async (signal) => { await env.PUBLIC_DISCOVERY_QUEUE.send(signal, { contentType: 'json', delaySeconds: 1 }); },
     });
     await recover();
   },

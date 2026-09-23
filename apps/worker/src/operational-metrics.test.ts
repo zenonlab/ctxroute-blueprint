@@ -114,6 +114,11 @@ describe('operational metrics', () => {
     await metrics.database.batch([metrics.database.prepare('INSERT value')]);
     expect(statement.first).not.toHaveBeenCalled();
     expect(metrics.snapshot()).toEqual({ rowsRead: 9, rowsWritten: 3 });
+    expect(metrics.calls()).toBe(3);
+    statement.all.mockRejectedValueOnce(new Error('synthetic-d1-unavailable'));
+    await expect(metrics.database.prepare('SELECT unavailable').first()).rejects.toThrow('synthetic-d1-unavailable');
+    expect(metrics.calls()).toBe(4);
+    expect(metrics.snapshot()).toEqual({ rowsRead: 9, rowsWritten: 3 });
   });
 
   it('counts real provider HTTP requests by bounded provider name', async () => {

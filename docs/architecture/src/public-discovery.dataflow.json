@@ -17,7 +17,7 @@
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "La Queue réveille le collecteur : claim et expiration lisent les index actifs. Le secours quotidien reprend les signaux perdus."
+        "note": "Le claim(5) respecte 50 appels D1 avec réserves fournisseur, publication et reports; le secours quotidien reprend les signaux perdus."
       },
       {
         "id": "verified-refresh",
@@ -85,11 +85,11 @@
       "id": "collector",
       "type": "backend",
       "label": "Collecteur Worker",
-      "sublabel": "claim · fallback · 30 s",
+      "sublabel": "claim(5) · budget D1 · 30 s",
       "stage": 3,
       "row": 1,
       "width": 140,
-      "tag": "différé sans essai · 30 s max"
+      "tag": "50 appels · réserves maintenues"
     },
     {
       "id": "transportPort",
@@ -182,7 +182,7 @@
       "from": "collector",
       "to": "transportPort",
       "label": "réservation ou report",
-      "classification": "Retry-After · report sans essai · deadline 30 s",
+      "classification": "4 appels réservés jusqu’au settlement · Retry-After · deadline 30 s",
       "variant": "security",
       "route": "auto",
       "labelAt": [740, 428]

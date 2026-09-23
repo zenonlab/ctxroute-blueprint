@@ -10,7 +10,7 @@
         "id": "discovery-path",
         "label": "Discovery instantanée",
         "focus": ["extension", "worker", "queue", "transport", "gateway", "providers", "directProviders", "d1", "logs"],
-        "note": "Queue; AniList/MU via gateway signée; chemins directs avec User-Agent produit."
+        "note": "Un traitement par invocation Queue; les autres signaux sont renvoyés durablement avant acquittement. AniList/MU passent par Deno."
       },
       {
         "id": "agenda-path",
@@ -71,7 +71,7 @@
       "id": "queue",
       "type": "messagebus",
       "label": "Cloudflare Queue",
-      "sublabel": "Retries journalisés · DLQ après 8",
+      "sublabel": "Un traitement · doublons regroupés",
       "pos": [650, 480],
       "size": [220, 72]
     },

@@ -68,6 +68,58 @@ describe('native collector queue', () => {
     expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toMatchObject({ code: 'public-discovery-partial', disposition: 'retry', retryDelaySeconds: 900 });
   });
 
+  it('runs only the first signal group and forwards the others before acknowledging them', async () => {
+    const info = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const discoveryItem = message({ type: 'public-discovery-ready', version: 1 });
+    const agendaItems = Array.from({ length: 2 }, () => message({ scheduledFor: '2026-09-23T00:00:00.000Z', type: 'agenda-refresh', version: 1 }));
+    const recoveryItem = message({ type: 'agenda-recovery', version: 1 });
+    const forward = vi.fn(async () => {
+      expect(recoveryItem.ack).not.toHaveBeenCalled();
+    }).mockImplementationOnce(async () => {
+      expect(agendaItems.every(item => item.ack.mock.calls.length === 0)).toBe(true);
+    });
+    const processors = { agenda: vi.fn(), recovery: vi.fn(), forward,
+      discovery: vi.fn(async () => ({ claimed: 1, failed: 0, published: 1, replayed: 0 })) };
+
+    await handleNativeCollectorQueue([discoveryItem, ...agendaItems, recoveryItem], processors);
+
+    expect(processors.discovery).toHaveBeenCalledOnce();
+    expect(processors.agenda).not.toHaveBeenCalled();
+    expect(processors.recovery).not.toHaveBeenCalled();
+    expect(forward.mock.calls).toEqual([[agendaItems[0]!.body], [recoveryItem.body]]);
+    for (const item of [discoveryItem, ...agendaItems, recoveryItem]) {
+      expect(item.ack).toHaveBeenCalledOnce(); expect(item.retry).not.toHaveBeenCalled();
+    }
+    expect(info.mock.calls.map(([entry]) => JSON.parse(String(entry)))).toContainEqual(expect.objectContaining({ disposition: 'ack-forwarded', messageType: 'agenda-refresh' }));
+  });
+
+  it('coalesces identical Agenda signals without dropping another scheduled generation', async () => {
+    const items = Array.from({ length: 2 }, () => message({ scheduledFor: '2026-09-23T00:00:00.000Z', type: 'agenda-refresh', version: 1 }));
+    const next = message({ scheduledFor: '2026-09-24T00:00:00.000Z', type: 'agenda-refresh', version: 1 });
+    const discovery = message({ type: 'public-discovery-ready', version: 1 });
+    const agenda = vi.fn(async () => ({ changed: false, count: 0, revision: 'unchanged' }));
+    const processors = { agenda, discovery: vi.fn(), forward: vi.fn(async () => undefined) };
+    await handleNativeCollectorQueue([...items, next, discovery], processors);
+    expect(agenda).toHaveBeenCalledExactlyOnceWith('2026-09-23T00:00:00.000Z');
+    expect(processors.discovery).not.toHaveBeenCalled();
+    expect(processors.forward.mock.calls).toEqual([[next.body], [discovery.body]]);
+    for (const item of [...items, next, discovery]) expect(item.ack).toHaveBeenCalledOnce();
+  });
+
+  it('keeps one retryable signal when forwarding fails and never starts another collector', async () => {
+    const selected = message({ type: 'agenda-recovery', version: 1 });
+    const deferred = Array.from({ length: 2 }, () => message({ type: 'public-discovery-ready', version: 1 }));
+    const processors = { agenda: vi.fn(), discovery: vi.fn(), recovery: vi.fn(async () => undefined),
+      forward: vi.fn(async () => { throw new Error('queue-unavailable'); }) };
+    await handleNativeCollectorQueue([selected, ...deferred], processors);
+    expect(processors.recovery).toHaveBeenCalledOnce();
+    expect(processors.discovery).not.toHaveBeenCalled();
+    expect(deferred[0]!.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 60 });
+    expect(deferred[0]!.ack).not.toHaveBeenCalled();
+    expect(deferred[1]!.ack).toHaveBeenCalledOnce();
+    expect(selected.ack).toHaveBeenCalledOnce();
+  });
+
   it('runs Agenda and applies bounded exponential retry', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const item = message({ scheduledFor: '2026-09-15T14:00:00.000Z', type: 'agenda-refresh', version: 1 }, 3);
