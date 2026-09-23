@@ -23,7 +23,7 @@
         "id": "verified-refresh",
         "label": "Fiche VERIFIED échue",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "La fiche VERIFIED reste servie pendant qu’un état de refresh orthogonal reconstruit une demande depuis ses références publiques."
+        "note": "VERIFIED reste servi pendant le refresh; les gardes de publication parcourent les titres proposés puis la clé canonique complète."
       },
       {
         "id": "boundaries",

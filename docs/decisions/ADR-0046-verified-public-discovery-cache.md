@@ -167,6 +167,14 @@ attribuée à une autre œuvre du même type rejette atomiquement la publication
 Le même titre reste permis entre anime et manga. Un rejeu terminal fiable
 matérialise l’index manquant sans rappeler de fournisseur.
 
+Les gardes canoniques de publication et de rejeu parcourent d'abord la liste
+bornée `json_each` des titres proposés, puis recherchent la clé primaire
+complète `(normalization_version, normalized_title, media_kind)` grâce à un
+`CROSS JOIN` explicite. Le plan inverse ne contraignait que la version et
+relisait tous ses titres pour chaque écriture. Les prédicats de conflit,
+l'ordre des paramètres, les gardes de bail et le batch atomique restent
+inchangés; aucun index ni migration n'est ajouté.
+
 Au plus 5 000 demandes peuvent être simultanément `PENDING` ou `PROCESSING`.
 Cette borne est vérifiée dans la même instruction SQL pour une nouvelle clé,
 un réarmement `FAILED` ou une réponse négative expirée redevenant active.
@@ -254,6 +262,15 @@ coût de production. Les tests couvrent la priorité globale, l’exclusivité d
 baux, les tentatives expirées et la conservation du profil pendant un refresh.
 `EXPLAIN QUERY PLAN` confirme l’usage des index actifs existants, sans migration
 ni nouvel index; le tri des candidats actifs demeure nécessaire.
+
+Sur une seconde fixture locale de 582 œuvres et 2 328 titres canoniques, une
+publication de quatre titres passe de 151 379 à 111 lectures D1 avec les
+39 écritures inchangées. Son rejeu passe de 58 231 à 51 lectures sans écriture;
+un conflit de titre passe de 58 118 à 41 lectures, toujours sans aucune écriture.
+La régression workerd couvre la vraie publication, le rejeu, le conflit et le
+plan extrait de la garde SQL réellement préparée : la recherche utilise les
+trois colonnes de la clé canonique. Ces coûts sont ceux de cette fixture, pas
+un multiplicateur du volume de demandes en production.
 
 D1 reçoit immédiatement une ligne `PENDING` après le premier miss accepté,
 puis un résultat terminal seulement après le traitement Queue. Les lectures suivantes

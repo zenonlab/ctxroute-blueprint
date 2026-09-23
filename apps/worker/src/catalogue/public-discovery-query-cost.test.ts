@@ -1,6 +1,7 @@
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { favoriteTitlePreparationVersion } from '@tobirink/application';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { instrumentD1 } from '../operational-metrics';
 
 const now = '2026-09-23T12:00:00.000Z';
@@ -19,7 +20,37 @@ beforeAll(async () => {
     SELECT printf('%064x', 100000 + n), 'ANIME', '5', '3', printf('%064x', n), '{}',
       'NOT_FOUND', '{"reason":"synthetic-terminal","state":"NOT_FOUND"}', ?1, ?1, ?1, ?1, ?2
     FROM fixture`).bind(expired, future).run();
+  await env.PUBLIC_DB.prepare('INSERT INTO catalogue_revisions(revision, published_at) VALUES (1, ?1)').bind(expired).run();
+  await env.PUBLIC_DB.prepare(`WITH RECURSIVE fixture(n) AS (
+      SELECT 1 UNION ALL SELECT n + 1 FROM fixture WHERE n < 582
+    ) INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision)
+    SELECT 'work_cost_' || n, 'anime', 'Synthetic catalogue ' || n, 1 FROM fixture`).run();
+  await env.PUBLIC_DB.prepare(`INSERT INTO catalogue_canonical_titles_v1(
+      normalization_version, normalized_title, media_kind, work_id, created_at)
+    SELECT ?1, 'synthetic catalogue ' || substr(work_id, 11) || ' alias ' || proposed.value, 'anime', work_id, ?2
+    FROM catalogue_works CROSS JOIN json_each('[1,2,3,4]') AS proposed`)
+    .bind(favoriteTitlePreparationVersion, expired).run();
+  await env.PUBLIC_DB.prepare(`INSERT INTO catalogue_external_references(provider, external_id, work_id)
+    SELECT 'anilist', work_id, work_id FROM catalogue_works`).run();
 });
+
+async function claimedPublication(id: number, titles: string[]) {
+  const key = { fingerprint: fingerprint(id), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
+  const requestDigest = 'd'.repeat(64);
+  await env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v3(
+      fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
+      state, claim_token_hash, lease_until, attempt_count, retry_at, created_at, updated_at)
+    VALUES (?1, 'ANIME', '5', '3', ?2, '{}', 'PROCESSING', ?3, ?4, 1, ?5, ?5, ?5)`)
+    .bind(key.fingerprint, requestDigest, 'c'.repeat(64), leaseUntil, now).run();
+  return {
+    claimToken: 'c'.repeat(48), nonce: crypto.randomUUID(), schemaVersion: 3 as const, verifiedAt: now,
+    results: [{ key, requestDigest, resolution: { state: 'VERIFIED' as const, profile: {
+      workId: `work_publication_cost_${id}`,
+      candidate: { displayTitle: titles[0], externalId: `publication-${id}`, mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles },
+      references: [{ provider: 'anilist' as const, externalId: `publication-${id}` }],
+    } } }],
+  };
+}
 
 describe('public discovery indexed query cost', () => {
   it('does not scan terminal history during an empty Queue wake', async () => {
@@ -90,5 +121,51 @@ describe('public discovery indexed query cost', () => {
       .bind(fingerprint(7)).first()).toEqual({ token: 'e'.repeat(64), lease: future });
     await expect(adapter.read({ fingerprint: fingerprint(3), mediaKind: 'ANIME', parserVersion: '5', siteRulesVersion: '3' }, now))
       .resolves.toMatchObject({ state: 'VERIFIED', profile: { workId: 'work_query_cost_3' } });
+  });
+
+  it('bounds publication and replay reads by proposed titles rather than catalogue size', async () => {
+    const batch = await claimedPublication(200001, ['Fresh alpha', 'Fresh beta', 'Fresh gamma', 'Fresh delta']);
+    const measured = instrumentD1(env.PUBLIC_DB);
+    const statements = vi.spyOn(measured.database, 'prepare');
+    const adapter = new D1PublicDiscoveryV3Adapter(measured.database);
+    expect(await adapter.publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now)).toEqual({ published: 1, replayed: 0 });
+    const publication = measured.snapshot();
+    const replayMeasured = instrumentD1(env.PUBLIC_DB);
+    expect(await new D1PublicDiscoveryV3Adapter(replayMeasured.database).publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now))
+      .toEqual({ published: 0, replayed: 1 });
+    const replay = replayMeasured.snapshot();
+    console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'publication-and-replay', catalogueWorks: 582, canonicalTitles: 2328, publication, replay }));
+    expect(publication.rowsRead).toBeLessThan(400);
+    expect(replay.rowsRead).toBeLessThan(100);
+    expect(replay.rowsWritten).toBe(0);
+    const publicationSql = statements.mock.calls.find(([sql]) => sql.startsWith('INSERT OR IGNORE INTO catalogue_titles('))?.[0];
+    if (publicationSql === undefined) throw new Error('Publication title guard must be exercised.');
+    const canonicalGuard = publicationSql.slice(publicationSql.lastIndexOf('AND NOT EXISTS') + 4);
+    const explainGuard = `EXPLAIN QUERY PLAN SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
+      CROSS JOIN catalogue_canonical_titles_v1 AS existing ON existing.normalized_title = proposed.value
+      WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`;
+    expect(canonicalGuard.replace(/\s+/gu, ' ')).toBe(explainGuard.slice('EXPLAIN QUERY PLAN SELECT 1 WHERE '.length).replace(/\s+/gu, ' '));
+    const plan = await env.PUBLIC_DB.prepare(explainGuard)
+      .bind(JSON.stringify(['fresh alpha', 'fresh beta', 'fresh gamma', 'fresh delta']), favoriteTitlePreparationVersion, 'anime', 'work_publication_cost_200001')
+      .all<{ detail: string }>();
+    expect(plan.results.some(({ detail }) => detail.includes('normalization_version=? AND normalized_title=? AND media_kind=?'))).toBe(true);
+    console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'canonical-publication-guard', details: plan.results.map(({ detail }) => detail) }));
+    expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_titles WHERE work_id = ?1').bind('work_publication_cost_200001').first())
+      .toEqual({ count: 4 });
+  });
+
+  it('rejects a canonical conflict without any catalogue or terminal write at bounded cost', async () => {
+    const batch = await claimedPublication(200002, ['Fresh conflict-free alias', 'synthetic catalogue 582 alias 4']);
+    const measured = instrumentD1(env.PUBLIC_DB);
+    await expect(new D1PublicDiscoveryV3Adapter(measured.database).publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now))
+      .rejects.toThrow('stale-public-discovery-result');
+    const cost = measured.snapshot();
+    console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'publication-conflict', catalogueWorks: 582, canonicalTitles: 2328, ...cost }));
+    expect(cost.rowsWritten).toBe(0);
+    expect(cost.rowsRead).toBeLessThan(400);
+    expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_works WHERE work_id = ?1').bind('work_publication_cost_200002').first())
+      .toEqual({ count: 0 });
+    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(fingerprint(200002)).first())
+      .toEqual({ state: 'PROCESSING' });
   });
 });
