@@ -282,6 +282,59 @@ describe('verified public discovery cache', () => {
     await expect(saturated.json()).resolves.toEqual({ error: 'discovery-capacity-unavailable' });
   });
 
+  it.each(['FAILED', 'NOT_FOUND', 'AMBIGUOUS'] as const)('keeps %s outside the active-request ceiling until capacity is available', async (state) => {
+    const active = await env.PUBLIC_DB.prepare(`SELECT COUNT(*) AS count FROM public_discovery_requests_v3
+      WHERE state IN ('PENDING', 'PROCESSING')`).first<{ count: number }>();
+    const limit = (active?.count ?? 0) + 2;
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB, limit);
+    const send = vi.fn(async () => undefined);
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue: { send } });
+    const prefix = { FAILED: '10', NOT_FOUND: '20', AMBIGUOUS: '30' }[state];
+    const testKey = (marker: string) => ({ ...discoveryKey(marker), fingerprint: prefix + marker.repeat(62) });
+    const submit = (marker: string) => app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+      body: JSON.stringify({ key: testKey(marker), query: { discoveryTitles: [`Work ${marker}`], mediaKind: 'ANIME', sourceTitles: [`Work ${marker}`] }, schemaVersion: 3 }),
+      headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    const terminalKey = testKey('d');
+    expect((await submit('d')).status).toBe(202);
+    const terminal = state === 'FAILED' ? null : JSON.stringify(state === 'NOT_FOUND'
+      ? { reason: 'no-match', state }
+      : { candidates: [{ externalId: '1', provider: 'anilist' }, { externalId: '2', provider: 'anilist' }], reason: 'multiple-matches', state });
+    const expiredAt = '2026-01-01T00:00:00.000Z';
+    await env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3 SET
+      state = ?2, attempt_count = ?3, failure_reason = ?4, failed_at = ?5,
+      result_json = ?6, verified_at = ?7, result_expires_at = ?7
+      WHERE fingerprint = ?1`)
+      .bind(terminalKey.fingerprint, state, state === 'FAILED' ? 8 : 1,
+        state === 'FAILED' ? 'ATTEMPT_LIMIT' : null, state === 'FAILED' ? expiredAt : null,
+        terminal, state === 'FAILED' ? null : expiredAt).run();
+    const before = await env.PUBLIC_DB.prepare('SELECT * FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(terminalKey.fingerprint).first();
+    expect((await submit('a')).status).toBe(202);
+    expect((await submit('b')).status).toBe(202);
+    const signals = send.mock.calls.length;
+    expect((await submit('a')).status).toBe(202);
+    expect(send).toHaveBeenCalledTimes(signals);
+    expect((await submit('c')).status).toBe(503);
+
+    const saturated = await submit('d');
+    expect(saturated.status).toBe(503);
+    await expect(saturated.json()).resolves.toEqual({ error: 'discovery-capacity-unavailable' });
+    expect(send).toHaveBeenCalledTimes(signals);
+    expect(await env.PUBLIC_DB.prepare('SELECT * FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(terminalKey.fingerprint).first()).toEqual(before);
+    expect(await env.PUBLIC_DB.prepare(`SELECT COUNT(*) AS count FROM public_discovery_requests_v3
+      WHERE state IN ('PENDING', 'PROCESSING')`).first()).toEqual({ count: limit });
+
+    await env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3 SET state = 'FAILED',
+      attempt_count = 8, failure_reason = 'ATTEMPT_LIMIT', failed_at = ?2 WHERE fingerprint = ?1`)
+      .bind(testKey('a').fingerprint, expiredAt).run();
+    expect((await submit('d')).status).toBe(202);
+    expect(send).toHaveBeenCalledTimes(signals + 1);
+    expect(await env.PUBLIC_DB.prepare(`SELECT state, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1`)
+      .bind(terminalKey.fingerprint).first()).toEqual({ attempts: 0, state: 'PENDING' });
+    expect(await env.PUBLIC_DB.prepare(`SELECT COUNT(*) AS count FROM public_discovery_requests_v3
+      WHERE state IN ('PENDING', 'PROCESSING')`).first()).toEqual({ count: limit });
+  });
+
   it('keeps the retired-route test harness capable of exercising claim and publication', async () => {
     const key = discoveryKey('f');
     const v3 = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);

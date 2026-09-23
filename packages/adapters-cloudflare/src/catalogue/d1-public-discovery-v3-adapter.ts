@@ -179,15 +179,16 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       state = 'FAILED', failure_reason = 'ATTEMPT_LIMIT', failed_at = ?1,
       claim_token_hash = NULL, lease_until = NULL, retry_at = ?1, updated_at = ?1,
       purge_after = ?3
-      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3
-        WHERE state = 'PROCESSING' AND attempt_count >= 8 AND lease_until <= ?1
+      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_pending
+        WHERE state IN ('PENDING', 'PROCESSING')
+          AND state = 'PROCESSING' AND attempt_count >= 8 AND lease_until <= ?1
         ORDER BY updated_at, fingerprint LIMIT ?2)
       RETURNING fingerprint`).bind(now, limit, futureIso(now, failedRetentionMilliseconds)).all();
     await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       refresh_state = 'IDLE', refresh_attempt_count = 0,
       claim_token_hash = NULL, lease_until = NULL, updated_at = ?1
-      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3
-        WHERE state = 'VERIFIED' AND refresh_state = 'PROCESSING'
+      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_refresh_claim
+        WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING') AND refresh_state = 'PROCESSING'
           AND refresh_attempt_count >= 8 AND lease_until <= ?1
         ORDER BY updated_at, fingerprint LIMIT ?2)
       RETURNING fingerprint`).bind(now, limit).all();
@@ -212,7 +213,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       queue_signal_state, queue_signal_lease_until
     ) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7, ?9, 'SENDING', ?10
     WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3
-      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4)
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+        AND state IN ('PENDING', 'PROCESSING'))
       OR (SELECT COUNT(*) FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_pending
         WHERE state IN ('PENDING', 'PROCESSING')) < ?8
     ON CONFLICT(fingerprint, media_kind, parser_version, rules_version) DO UPDATE SET
@@ -238,6 +240,9 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     const row = await this.row(request.key);
     if (!row) return { outcome: 'saturated' };
     if (row.requestDigest !== request.requestDigest) throw new Error('public-discovery-request-conflict');
+    // A terminal row needs a free slot just like a new key. Active replays do not.
+    if (row.state === 'FAILED' || ((row.state === 'NOT_FOUND' || row.state === 'AMBIGUOUS')
+      && row.resultExpiresAt !== null && row.resultExpiresAt <= now)) return { outcome: 'saturated' };
     const resumedSignal = created === null
       ? await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
           queue_signal_state = 'SENDING', queue_signal_lease_until = ?7, updated_at = ?6
@@ -320,11 +325,16 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       attempt_count = CASE WHEN state = 'VERIFIED' THEN attempt_count ELSE attempt_count + 1 END,
       refresh_attempt_count = CASE WHEN state = 'VERIFIED' THEN refresh_attempt_count + 1 ELSE refresh_attempt_count END,
       retry_at = ?2, updated_at = ?3
-      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3
-        WHERE (((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
-            AND attempt_count < 8)
-          OR (state = 'VERIFIED' AND ((refresh_state = 'PENDING' AND retry_at <= ?3)
-            OR (refresh_state = 'PROCESSING' AND lease_until <= ?3)) AND refresh_attempt_count < 8)
+      WHERE rowid IN (SELECT rowid FROM (
+        SELECT rowid, admission_priority, updated_at, fingerprint
+        FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_claim_priority
+        WHERE state IN ('PENDING', 'PROCESSING') AND attempt_count < 8
+          AND ((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
+        UNION ALL
+        SELECT rowid, admission_priority, updated_at, fingerprint
+        FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_refresh_claim
+        WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING') AND refresh_attempt_count < 8
+          AND ((refresh_state = 'PENDING' AND retry_at <= ?3) OR (refresh_state = 'PROCESSING' AND lease_until <= ?3)))
         ORDER BY admission_priority, updated_at, fingerprint LIMIT ?4)
       RETURNING request_json AS requestJson, result_json AS resultJson, request_digest AS requestDigest,
         state, attempt_count AS attemptCount, refresh_attempt_count AS refreshAttemptCount,

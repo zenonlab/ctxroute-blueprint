@@ -23,7 +23,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-14
-- Revised: 2026-09-15
+- Revised: 2026-09-23
 - Supersedes: le protocole Collectif, les owners et les confirmations humaines de l’ADR-0043; l’identité collective de l’ADR-0044
 
 ## Contexte
@@ -82,8 +82,8 @@ identifiant et n’appelle aucun fournisseur. Une seconde soumission de la même
 clé doit porter le même digest de requête; un contenu différent est refusé au
 lieu d’écraser le travail existant.
 
-Le consumer reçoit jusqu’à vingt signaux à la fois mais exécute un seul
-`claim(20)` par lot; chaque résultat vérifié est publié dès sa disponibilité.
+Le consumer reçoit jusqu’à cinq signaux à la fois mais exécute un seul
+`claim(5)` par lot; chaque résultat vérifié est publié dès sa disponibilité.
 Chaque résolution possède aussi une deadline applicative de trente secondes :
 si un transport amont ou une opération d’infrastructure reste suspendu, le
 claim est différé comme une erreur fournisseur retryable au lieu de rester
@@ -93,6 +93,14 @@ Queue retardée de 1 à 900 secondes, même après un claim vide. L’échec de 
 envoi conserve le signal entrant par retry. Le claim ordonne
 les demandes par référence fournisseur exacte, média précis, puis recherche
 ambiguë, avant l’ancienneté et l’empreinte.
+La sélection réunit deux branches disjointes sur les index partiels existants :
+demandes actives et refreshs actifs. Le tri global et le `LIMIT` restent dans
+la même instruction atomique de claim. L’expiration des huitièmes tentatives
+utilise également ces index; elle ne parcourt pas l’historique terminal.
+`nextPendingAt()` conserve le minimum des échéances sur les seuls index actifs.
+Le nombre de lectures dépend donc encore du travail actif à examiner, pas
+seulement du nombre de demandes retournées : `claim(5)` n’est pas une garantie
+de cinq lignes lues.
 Si la réservation de cadence ou un `429` impose une attente avant tout résultat
 fournisseur, le collecteur libère le bail, remet la demande (ou son refresh)
 à `PENDING` jusqu’à cette échéance et restitue la tentative prise au claim.
@@ -128,13 +136,15 @@ interdites.
 
 Une huitième tentative dont le bail expire passe en état D1 interne `FAILED` et
 la lecture publique renvoie `UNAVAILABLE`. Aucun polling de l’extension ne
-réarme cette demande. Le POST d’admission ordinaire conserve aussi cet état et
-ses tentatives : une resoumission de transport ne constitue pas une autorisation
-de réinitialisation. Une intervention opérationnelle distincte est nécessaire.
+réarme cette demande. La reprise explicite peut resoumettre le POST d’admission
+avec la même clé et le même digest. La transition conditionnelle remet alors
+les tentatives à zéro seulement si une place est disponible; un digest différent
+reste un conflit. Une demande déjà active ne perd jamais ses tentatives ni son
+bail lors d’une resoumission.
 
 Le client conserve dans `storage.local` une cadence commune aux admissions et
-refreshs, avec au moins 6,5 secondes entre deux réservations. La limite serveur
-reste 10/minute. Un `429` expose `Retry-After`, conservé après redémarrage.
+refreshs, avec au moins 1,1 seconde entre deux réservations. La limite serveur
+reste 60/minute par IP. Un `429` expose `Retry-After`, conservé après redémarrage.
 Une échéance PENDING durable empêche qu’une lecture repousse indéfiniment sa
 resoumission. Chaque HTTP expire au plus tard après 15 secondes, corps compris,
 ou à l’échéance du réveil si elle arrive avant. Au moins une seconde restante
@@ -158,8 +168,12 @@ Le même titre reste permis entre anime et manga. Un rejeu terminal fiable
 matérialise l’index manquant sans rappeler de fournisseur.
 
 Au plus 5 000 demandes peuvent être simultanément `PENDING` ou `PROCESSING`.
-Une nouvelle clé au-delà de cette borne reçoit `503`; une clé existante reste
-lisible et rejouable. Après terminalisation, `request_json` devient `{}` et le
+Cette borne est vérifiée dans la même instruction SQL pour une nouvelle clé,
+un réarmement `FAILED` ou une réponse négative expirée redevenant active.
+À capacité pleine, ces admissions reçoivent `503` sans modifier la ligne ni
+émettre de signal Queue. Une clé déjà active reste lisible et rejouable sans
+occuper une place supplémentaire; un résultat terminal frais reste lisible.
+Après terminalisation, `request_json` devient `{}` et le
 résultat terminal est conservé comme cache. Une migration de backfill applique
 la même minimisation aux lignes terminales antérieures, sans modifier les
 demandes `PENDING`, `PROCESSING` ou `FAILED` nécessaires à une reprise. Les
@@ -229,6 +243,17 @@ la transmission de l’empreinte devinable et des identifiants publics; retirer
 une UI maison ne retire pas cette obligation de transparence.
 
 ## Conséquences
+
+Sur la fixture workerd du 23 septembre 2026 contenant 1 024 lignes terminales,
+un réveil vide (expiration, claim et prochaine échéance) passe de 3 088 à
+18 lignes D1 lues, sans écriture. Avec dix lignes de travail mixtes, quatre
+claims dont deux concurrents et la lecture de continuation passent de
+12 524 à 175 lectures; les vingt écritures restent identiques. Ces mesures
+`D1Result.meta` sont locales et propres à la fixture, pas une projection de
+coût de production. Les tests couvrent la priorité globale, l’exclusivité des
+baux, les tentatives expirées et la conservation du profil pendant un refresh.
+`EXPLAIN QUERY PLAN` confirme l’usage des index actifs existants, sans migration
+ni nouvel index; le tri des candidats actifs demeure nécessaire.
 
 D1 reçoit immédiatement une ligne `PENDING` après le premier miss accepté,
 puis un résultat terminal seulement après le traitement Queue. Les lectures suivantes

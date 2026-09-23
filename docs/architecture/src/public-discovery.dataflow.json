@@ -17,7 +17,7 @@
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "La Queue réveille le collecteur; un secours quotidien ne traite que les signaux perdus. Canaries et E2E restent sans contenu privé."
+        "note": "La Queue réveille le collecteur : claim et expiration lisent les index actifs. Le secours quotidien reprend les signaux perdus."
       },
       {
         "id": "verified-refresh",
@@ -146,7 +146,7 @@
       "from": "worker",
       "to": "publicD1",
       "label": "lecture ou création atomique",
-      "classification": "4 + 4 titres · 5 000 actifs max",
+      "classification": "5 000 actifs max · reprise incluse",
       "variant": "security",
       "route": "straight",
       "labelAt": [423, 204]
@@ -173,7 +173,7 @@
       "from": "queue",
       "to": "collector",
       "label": "lot de signaux disponible",
-      "classification": "claim(20) · bail D1 conditionnel",
+      "classification": "claim(5) · bail D1 conditionnel",
       "variant": "emphasis",
       "route": "straight",
       "labelAt": [638, 480]
