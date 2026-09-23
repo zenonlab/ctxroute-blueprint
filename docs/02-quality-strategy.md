@@ -30,8 +30,10 @@ data are forbidden in fixtures and artifacts.
 
 The inherited `npm run validate` remains mandatory. Product commands will be
 added to the root gate only when they exist and have a stable local contract.
-The repository currently relies on verified local commit and push gates; no
-GitHub Actions workflow is an active source of release evidence.
+Verified local commit and push gates are complemented by the protected
+production workflow on `main`, as defined by ADR-0055. CI and installed-profile
+convergence remain distinct evidence; a successful deployment cannot certify
+the user's Library.
 
 ## Decision rule
 
@@ -107,7 +109,7 @@ browser or `workerd` test when platform behavior is the risk.
   blob, proves zero replacements after wrong-passphrase and tamper failures,
   and verifies that the R2 adapter rejects plaintext before storage access.
 - Every extension message and external payload is rejected on schema mismatch.
-- WebBridge release packages must contain the current candidate version `1.0.31`, the exact
+- WebBridge release packages must contain the candidate version declared in `apps/extension/package.json`, the exact
   `https://tobirink.com/*` content-script match and the same
   `externally_connectable` match before their SHA-256 is recorded.
 - Public Discovery tests prouvent les admissions D1 `created`, `existing` et
@@ -152,7 +154,7 @@ browser or `workerd` test when platform behavior is the risk.
 - Manifest permissions correspond to documented user flows. The only host
   permission is the configured TobiRink origin; no provider origin, domain
   wildcard, DNR ruleset or undocumented origin is accepted.
-- The packaged-Chrome Playwright journey unpacks the produced `1.0.31` ZIP into
+- The packaged-Chrome Playwright journey unpacks the produced candidate ZIP into
   an isolated profile, creates a synthetic bookmark through the real extension,
   proves Public Discovery cache-first resolution and production WebBridge rendering, then
   reloads the private library offline without injecting a bridge mock.
@@ -270,6 +272,50 @@ browser or `workerd` test when platform behavior is the risk.
   pagination bounds for compatibility.
 
 ## Favorite correction acceptance
+
+### Certification Chromium isolée et reprenable
+
+`apps/extension/scripts/installed-review.mjs` garde deux modes distincts. Par
+défaut, le corpus synthétique reste entièrement hors ligne, avec réseau fermé
+au niveau Chromium. `TOBIRINK_REAL_RUN=1` exige `TOBIRINK_FAVORITES_EXPORT` et
+refuse toute admission de fixture synthétique. L'export reste privé et local;
+seules les ancres HTTP(S) avec titre non vide sont importables. Les exclusions
+structurelles sont conservées et comptées, pas retirées pour améliorer le bilan.
+
+`TOBIRINK_INSTALLED_BOOKMARK_LIMIT` sélectionne un préfixe borné pour le petit
+lot préalable; son absence conserve toutes les entrées importables. Le budget
+`TOBIRINK_INSTALLED_BUDGET_SECONDS` vaut 240 secondes hors ligne et 600 secondes
+en ligne par défaut, au plus 1 800 secondes par invocation.
+`TOBIRINK_INSTALLED_OBSERVE_SECONDS` choisit jusqu'à douze échéances, à l'intérieur
+de ce budget. Les observations publient uniquement comptes, motifs fermés,
+types média et statistiques Library. Aucun titre, URL, identifiant d'œuvre,
+empreinte d'intégrité ou chemin de l'export ne rejoint stdout ou le rapport.
+Le statut est sondé toutes les cinq secondes sans boucle de réconciliation;
+les alarmes natives doivent assurer la poursuite.
+
+Le scénario arrête le service worker, redémarre Chromium avec le même profil
+temporaire et vérifie l'identité de l'extension. Une ancienne archive facultative
+permet l'upgrade dans le même dossier décompressé, sans forcer le mode hors
+ligne si le test est en ligne. Les sources privées, Work et membres Library
+antérieurs sont conservés; les décisions humaines ne changent pas et la
+progression ne régresse pas. Les valeurs de comparaison restent en mémoire.
+Le rapport distingue corpus synthétique et copie d'export de favoris : aucune
+base privée d'origine n'est copiée. Des ensembles de décisions humaines ou de
+progression vides ne prouvent pas la conservation du profil personnel.
+Les descripteurs de reprise et rapports locaux sont enregistrés en `0600`
+sous `build/installed-review/`, ignoré par Git. Aucun profil personnel n'est
+ouvert; `TOBIRINK_INSTALLED_SESSION` réutilise seulement un jeton temporaire
+généré par le harness, sans réimporter les favoris.
+
+`converged` exige inventaire complet, nombre attendu de sources conservé,
+zéro traitement, reprise, blocage ou état indéterminé, et aucun Work résolu
+manquant de la Library. `REVIEW_REQUIRED` et exclusions motivées ne sont pas
+transformés artificiellement en identités résolues. Si la fenêtre se termine
+avec du travail restant, le verdict est `incomplete` et le code de sortie `2`;
+le profil demeure disponible. La réussite hors ligne est nommée explicitement
+`offline-regression-passed`, jamais une preuve de convergence fournisseur.
+
+### Régressions et références historiques
 
 La référence du 18 septembre compare aussi les entrées brutes titre + URL :
 l’extracteur URL FavLib épinglé calcule sa propre source dans le sandbox du

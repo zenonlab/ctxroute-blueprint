@@ -66,7 +66,10 @@ background matérialise cette échéance par une alarme MV3 ponctuelle nommée �
 date exacte, avec le plancher navigateur de 30 secondes. Il efface l’alarme si
 aucune tâche ne reste. Recréer le même nom remplace l’alarme existante et
 empêche leur multiplication. L’alarme relance le runtime idempotent depuis les
-états IndexedDB puis répare la projection locale. À chaque évaluation du service
+états IndexedDB; le commit de résolution met à jour la projection locale dans
+la même transaction. La réparation globale reste réservée à l'installation,
+la restauration, l'audit périodique et aux demandes explicites (ADR-0042).
+À chaque évaluation du service
 worker, le background relit le checkpoint et l’échéance de l’outbox puis restaure
 l’alarme nommée. L’alarme périodique des notifications sert de contrôle de
 présence : elle réarme cette échéance si le navigateur a perdu l’alarme, sans
