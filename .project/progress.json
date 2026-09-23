@@ -5435,10 +5435,11 @@
             "npm run package:extension -- --verify-isolated"
           ],
           "evidence": [
-            "npm run verify complet exécuté deux fois, dernière sortie0 /tmp/tobirink-finish-final-verify-20260923.log; infra65/65, tests permanents harness10/10, Web E2E9pass/1skip réseau facultatif; lints/typechecks/Archify showcase verts.",
-            "Chromium installé: upgrade1.0.43→1.0.44 puis arrêts SW/navigateur,8sources/8Library conservées; verdict offline-regression-passed et converged:false. Rapport distingue copieexport et profilpersonnel noncertifié; décisions/progressionfixturevides.",
-            "Canaris neufs exigent désormais observationprovider bornée et expurgée; R2 conflit/retryidentique/authindisponible testés, relecture avantPUT; commits77cc5f3,a009ae9,49f1d6c. Aucune nouvellepermission/dépendance ni écritureproduction.",
-            "Archives1.0.44isoléesidentiques; mesuresD1/projectionprécédentes confirmées. Limites: R2pasCASatomique, abonnementQueue/révisionDeno nonattestés; preuveonline au step release."
+            "Troisième npm run verify complet réussi après corrections D1 et CI : Worker 170 tests, infra 71 tests, types, Deno, navigateur, lints, sécurité, couverture et Archify verts. Log local : /tmp/tobirink-d1-budget-verify-20260923.log. Dernières assertions ciblées : 48/48 et tests CI 4/4 verts.",
+            "Commit 9ecc5db : gardes canoniques par clé primaire complète, sans migration. Fixture 582 œuvres / 2 328 titres : publication 151 379 → 111 lectures, 39 écritures inchangées ; rejeu 58 231 → 51 et conflit 58 118 → 41, sans écriture.",
+            "Régression consumer réel + D1 : avant 54 appels et rejet au 51e ; après cinq œuvres convergent en deux réveils de 45 puis 14 appels, exactement dix HTTP. Reports sans essai, réserves tardives, refresh à deux RPC, huit essais jusqu’au terminal et succès partiel mesuré sont testés.",
+            "Queue mixte isolée à un traitement par invocation ; doublons regroupés, autres groupes renvoyés avant acquittement, échec de renvoi récupérable. Aucun cron, abonnement ni permission modifié. Diagnostics de renvoi distincts des coûts collecteur.",
+            "Conservation de la copie privée des 1 522 favoris testée hors ligne après upgrade et redémarrages ; ce n’est pas une preuve de convergence en ligne ni de copie de la base personnelle. Certification distante et livraison restent au step release."
           ]
         },
         {
@@ -5473,8 +5474,11 @@
             "git diff --check"
           ],
           "evidence": [
-            "Préparation pushmain du résultatvalidé; runnerproductionenligneetlibre,mainreste3e145af. Pointeurpublic1.0.43; aucune archive historique touchée.",
-            "CLI et UI Deno sans authentification exploitable pour attesterrévision/KV; demandeconnexionenvoyée au user. Pasd'inférence depuishealth200. Canaris/petitlot/1522etpublicationR2 restentàprouver."
+            "Premier push main 0fb15bd livré : CI 35863844924 et 35864161437 réussies. Worker actuel 7c5c56a4-38da-4781-a6a8-5f548f417624. Canaris neufs anime VERIFIED en 47 s et manga en 91 s ; 24 appels fournisseurs sans 429 ni erreur HTTP/réseau. Fenêtre concurrente : 106 769 lectures / 90 écritures D1.",
+            "Copie privée 1 522 hors ligne : upgrade 1.0.43 → 1.0.44, arrêts du service worker et du navigateur, puis reprise du même profil isolé. Zéro perte, 1 483 NETWORK + 39 IDENTITY_MISSING, zéro traitement restant ; Library provisoire, aucune résolution réseau revendiquée.",
+            "Cloudflare lu sans mutation : Workers Free, Queue active, consumer 5 / 10 s / 8 retries / concurrence 2. D1 du 23 septembre 00:00–13:35 UTC : environ 1,77 M lectures et 16,27 k écritures sur cette base, pas un budget global exact.",
+            "Corrections supplémentaires locales validées : 9ecc5db pour jointures D1, e33b5b0 pour budget et isolation Queue. Voie CI R2 optionnelle testée, désactivée par défaut ; hashes locaux 1.0.44 inchangés. Nouvelle livraison Worker puis canaris et petits lots en ligne à effectuer.",
+            "Deno demande toujours la connexion utilisateur pour attester la révision routée / KV. ZIP 1.0.44 non publiés, pointeur 1.0.43, historiques FAILED non réarmés. Aucun changement de permission ni d’abonnement."
           ]
         }
       ]

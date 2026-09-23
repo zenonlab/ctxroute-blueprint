@@ -2,8 +2,11 @@
 
 ## État
 
-Corrections locales vérifiées; livraison et convergence du profil réel non
-encore certifiées. Candidate extension `1.0.44`, pointeur public `1.0.43`.
+Premier lot corrigé, vérifié et déployé par CI depuis `0fb15bd`; canaris neufs
+anime et manga réussis. Deux limites D1 supplémentaires identifiées pendant
+la mesure de production sont corrigées et vérifiées localement, avant nouvelle
+livraison. La convergence du profil
+réel n'est pas encore certifiée. Candidate extension `1.0.44`, pointeur public `1.0.43`.
 Les versions publiées ne sont pas remplacées et les données privées ne sont
 ni committées ni jointes aux artefacts CI.
 
@@ -34,9 +37,13 @@ ni consommation d'essais lors d'une simple lecture.
 | --- | ---: | ---: |
 | Réveil Queue vide, 1 024 terminaux | 3 088 lignes D1 lues | 18 |
 | Quatre claims et continuation, même historique | 12 524 lignes D1 lues | 175 |
+| Publication, 582 œuvres et 2 328 titres canoniques | 151 379 lignes D1 lues | 111 |
+| Rejeu de cette publication | 58 231 lignes D1 lues | 51 |
+| Conflit de titre canonique, même catalogue | 58 118 lignes D1 lues | 41 |
 | Réparation de 1 522 sources en attente | 16 transactions et 1 522 relectures individuelles | 16 pages, une lecture Library, zéro transaction/relecture individuelle |
 
-Les écritures des scénarios D1 restent respectivement zéro et vingt. Ces
+Les écritures restent zéro pour le réveil vide, vingt pour les quatre claims,
+39 pour la publication et zéro pour son rejeu ou le conflit. Ces
 mesures portent sur des fixtures workerd, pas sur une facture Cloudflare ni
 sur une limite universelle : les requêtes parcourent encore les actifs utiles.
 
@@ -48,10 +55,12 @@ budgets performance, audit de dépendances et diagrammes. L'audit npm ne signale
 aucune vulnérabilité. Les tests Web E2E donnent neuf succès et un test réseau
 public facultatif ignoré; cette omission n'est pas une preuve de production.
 Une seconde exécution complète après les contrôles de livraison est verte;
-la suite infra contient désormais 65 tests, tous réussis.
+la suite infra contient désormais 71 tests, tous réussis. Une troisième
+vérification complète passe après les corrections de coût et de budget D1,
+avec 170 tests Worker et les contrôles de livraison optionnelle R2.
 
 Suites directement concernées : application 430, extension 170, adaptateurs
-navigateur 106, composant Discovery 96, Worker 158 et gateway Deno 13 tests.
+navigateur 106, composant Discovery 96, Worker 170 et gateway Deno 13 tests.
 Le runtime local Deno testé est `2.7.1`; le déploiement distant de ce code reste
 une preuve distincte. Les nouveaux diagrammes passent les neuf contrôles
 showcase, sans erreur ni avertissement de composition.
@@ -64,10 +73,27 @@ attendues. Aucune décision humaine ni progression n'était présente dans cette
 fixture : ce résultat ne certifie pas la base privée du profil personnel.
 Les contrôles du harness sont pérennisés dans les tests de packaging.
 
+Le même parcours a ensuite conservé les 1 522 favoris issus de l'export privé
+après mise à jour, arrêt du service worker, redémarrage du navigateur et reprise
+du même profil temporaire. Le premier budget de 240 secondes termine
+explicitement incomplet; la reprise atteint zéro source en traitement après
+163 secondes supplémentaires : 1 483 erreurs réseau attendues hors ligne et
+39 exclusions `IDENTITY_MISSING`. Les 1 483 entrées Library sont provisoires,
+avec zéro Work résolu. Ce test vérifie la conservation et la poursuite, pas la
+convergence en ligne ni la copie de la base privée originale.
+
 Les canaris protégés exigent maintenant une observation bornée des métriques
 `worker.cost`, sans conservation des événements bruts. Une fenêtre vide ou
 sans appel fournisseur reste en échec. Ces agrégats décrivent le trafic de la
 fenêtre, pas le coût attribuable individuellement à chaque canari.
+
+Les workflows protégés `35863844924` et `35864161437` ont réussi. Le second a
+déployé la version Worker `7c5c56a4-38da-4781-a6a8-5f548f417624` et vérifié deux
+clés neuves `MISS → PENDING → VERIFIED` : anime en 47 174 ms, manga en 91 310 ms.
+La fenêtre observée de 147 471 ms contient 24 appels fournisseur, deux résultats
+acceptés, quatre émissions Queue, aucune erreur Queue, aucun 429 ni échec
+HTTP/réseau fournisseur. Ses 106 769 lectures et 90 écritures D1 incluent le
+trafic concurrent; elles motivent l'examen complémentaire du coût de publication.
 
 Les worktrees locaux sont conservés, exclus du seul audit du dépôt parent par
 `/.worktrees/`. Un test garantit qu'une vraie source hors des racines déclarées
@@ -95,21 +121,48 @@ peut recommencer; une borne structurelle consomme désormais un essai et finit
 en échec contrôlé, pas en faux `NOT_FOUND`. Le secours Discovery quotidien
 n'est pas une garantie de reprise immédiate lors d'une perte totale de Queue.
 
-La configuration Wrangler des consommateurs est inchangée par rapport au
-dernier `main` publié. Le déploiement Worker la réapplique néanmoins; le plan
-inclut maintenant l'inventaire Queue. Cet inventaire ne certifie pas les
-réglages distants ni l'abonnement du compte, et aucune modification tarifaire
-n'est autorisée par la livraison.
+La configuration Wrangler des consommateurs est inchangée. L'interface
+Cloudflare authentifiée confirme le plan Workers Free, la Queue active et les
+réglages distants : lot de cinq, attente maximale de dix secondes, concurrence
+deux, huit retries et DLQ configurée. Le relevé ponctuel affiche 1 102 opérations
+Queue sur 10 000 dans la journée. Les métriques D1 sur 24 heures indiquent
+3,66 millions de lectures et 18,58 milliers d'écritures; cette fenêtre glissante
+ne mesure pas le budget journalier UTC restant. Une seconde lecture, bornée
+au 23 septembre de 00:00 à 13:35 UTC, donne environ 1,77 million de lectures
+et 16,27 milliers d'écritures pour cette base. Ce relevé reste arrondi et ne
+couvre pas d'autres bases éventuelles. Aucun abonnement ni réglage distant
+n'a été changé.
+
+Les principales jointures de garde canonique ont été corrigées dans `9ecc5db` :
+elles recherchent désormais les titres proposés par leur clé primaire complète,
+sans migration ni retrait de garde d'identité. Un autre test, avec le vrai consumer
+et D1 local soumis à une limite de 50 appels, reproduisait un dépassement au
+51e appel pour cinq résolutions simples. Ces demandes convergent désormais
+sur deux réveils de 45 puis 14 appels D1, avec exactement dix HTTP et reports
+sans consommation d'essai ni recherche répétée.
+Les tests incluent les opérations encore en vol après deadline, le report de
+refresh, la pagination coûteuse et huit essais conduisant à `UNAVAILABLE`
+sans faux `NOT_FOUND`. Un succès publié avant une erreur ultérieure reste
+compté dans les métriques. Les canaris précédents ne suffisent pas à certifier
+ces corrections nouvelles : leur redéploiement et mesure précèdent le lot en ligne.
+
+Le traitement de signaux mixtes est également couvert : le premier groupe
+valide s'exécute seul, les doublons sont regroupés et les autres groupes sont
+renvoyés durablement avant acquittement. Une panne de renvoi conserve un signal
+en retry. Cela évite de cumuler Agenda et Discovery dans la même invocation;
+le cron hebdomadaire ne change pas. Les renvois sont visibles comme
+`ack-forwarded`; ils ne sont pas inclus dans les compteurs `worker.cost` des
+collecteurs, qui ne constituent donc pas un total absolu des opérations Queue.
 
 La lecture de la révision Deno n'est pas encore authentifiée : ni les statuts
 GitHub disponibles ni `/healthz` ne donnent le SHA routé en production ou une
 preuve KV. L'interface Deno demande une connexion. Les treize tests locaux du
 correctif anti-rejeu ne doivent pas être présentés comme son déploiement.
 
-La certification distante requiert encore les canaris anime et manga neufs
-`MISS → PENDING → VERIFIED`, leurs compteurs fournisseurs/D1/Queue, puis un
-petit lot installé et la copie des 1 522 favoris, avec mise à jour conservant
-l'identité et redémarrages du service worker et du navigateur. L'export privé
+La certification distante requiert encore une nouvelle mesure des canaris
+après les deux corrections D1, puis un petit lot installé et la copie des
+1 522 favoris en ligne, avec mise à jour conservant l'identité et redémarrages
+du service worker et du navigateur. L'export privé
 contient bien 1 522 favoris importables; il n'a pas été publié. Les 39
 exclusions structurelles restent hors des réparations d'identité prouvées.
 
@@ -118,3 +171,11 @@ opération directe sur celles-ci ou publication R2 hors du workflow automatique
 attend son plan frais, ses cibles exactes et la confirmation immédiate prévue
 par la doctrine. Le pointeur public n'avance qu'après vérification des deux
 archives téléchargées.
+
+La voie CI optionnelle de publication existe désormais : désactivée sur les
+pushes, elle exige un dispatch sur `main` avec canaris réussis, puis un plan
+R2 séparé limité aux deux objets candidats. Les SHA-256 et tailles des octets
+locaux et publics doivent correspondre. Une publication partielle conserve
+l'objet réussi et le pointeur précédent; la reprise saute l'objet identique.
+Les deux actions GitHub sont figées aux commits de leurs versions v5 actuelles,
+sans changement de permission. Cette voie n'a pas encore été déclenchée.
