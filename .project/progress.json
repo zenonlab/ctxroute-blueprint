@@ -5474,8 +5474,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Architecture view favorite-convergence.architecture.json added as product-only Archify source with MV3, private IndexedDB, Worker, D1, Queue, bounded collector and providers; npm run archify:validate -- architecture and npm run validate:architecture pass showcase with 0 errors/0 warnings.",
-            "D1 grouped lookup correction remains pushed on main; production canary run 35871874729 passed after deployment. Online eight-favorite run remains explicitly incomplete with all eight PROVIDER_UNAVAILABLE and no load escalation."
+            "Worker canary run 35875863436 completed successfully: fresh anime and manga VERIFIED with 4 provider requests, 0 retries/429s and 4,501 D1 rows read.",
+            "The existing temporary online session tobirink-installed-review-oKOCZz is preserved, but its private bookmark export input is not present in the workspace; installed-review refuses online resume without that explicit export.",
+            "No synthetic export was substituted, no 1,522-favorite online convergence was claimed, no historical FAILED rows were rearmed, and extension archives remain unpublished."
           ]
         }
       ]
