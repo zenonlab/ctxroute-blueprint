@@ -5474,9 +5474,8 @@
             "git diff --check"
           ],
           "evidence": [
-            "Après déploiement 321cee3, run canari 35871874729 réussi : anime et manga VERIFIED en 31,5 s et 30,8 s; 4 appels fournisseur, 0 429/HTTP/réseau, 4 535 lectures D1, 31 écritures, 2 Queue sends.",
-            "Test Chromium en ligne 8 favoris, candidate seule 1.0.44, session tobirink-installed-review-oKOCZz : 8 observés, identité et Library conservées pendant redémarrage service worker/navigateur; après 33 s les 8 restent PROVIDER_UNAVAILABLE, 0 admission/processing/429, aucun progrès. Test interrompu selon borne d'arrêt, sans mutation distante; il révèle des clés déjà indisponibles et ne certifie pas la convergence.",
-            "Lookup N+1 corrigé par readMany JSON1 groupé; commit 763ba13 puis docs/progress 321cee3 poussés sur main. Full 1522 interdit aujourd'hui par budget D1/Queue et absence de budget réservé; R2 non publié; Deno distant non attesté."
+            "Architecture view favorite-convergence.architecture.json added as product-only Archify source with MV3, private IndexedDB, Worker, D1, Queue, bounded collector and providers; npm run archify:validate -- architecture and npm run validate:architecture pass showcase with 0 errors/0 warnings.",
+            "D1 grouped lookup correction remains pushed on main; production canary run 35871874729 passed after deployment. Online eight-favorite run remains explicitly incomplete with all eight PROVIDER_UNAVAILABLE and no load escalation."
           ]
         }
       ]

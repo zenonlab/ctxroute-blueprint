@@ -101,6 +101,7 @@
       "docs/architecture/src/adaptive-public-refresh-continuation.workflow.json",
       "docs/architecture/src/provider-operations.lifecycle.json",
       "docs/architecture/src/public-pipeline.architecture.json"
+      ,"docs/architecture/src/favorite-convergence.architecture.json"
     ],
     "internalDocuments": [
       "docs/architecture/src/blueprint.architecture.json",

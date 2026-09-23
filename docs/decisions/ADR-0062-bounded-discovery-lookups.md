@@ -2,6 +2,8 @@
 scope:
   - packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts
   - apps/worker/src/catalogue/public-discovery-routes.test.ts
+  - docs/architecture/src/favorite-convergence.architecture.json
+  - .project/project-config.json
   - docs/audits/favorite-convergence-20260923.md
 review: on-change
 revised: true

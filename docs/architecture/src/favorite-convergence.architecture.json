@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "TobiRink favorite convergence boundaries",
+    "quality_profile": "showcase",
+    "viewBox": [1120, 680],
+    "views": [
+      {
+        "id": "recovery-path",
+        "label": "Recovery path",
+        "focus": ["extension", "worker", "d1", "queue", "collector", "providers"],
+        "note": "Follow a favorite from durable extension state through bounded admission and provider hydration."
+      },
+      {
+        "id": "private-state",
+        "label": "Private state",
+        "focus": ["extension", "indexeddb", "library"],
+        "note": "Inspect local identity, restart retention, and Library projection separately from public work."
+      }
+    ]
+  },
+  "components": [
+    { "id": "extension", "type": "frontend", "label": "MV3 extension", "sublabel": "cursor · alarm · 1.1 s admission", "tag": "1.0.44", "pos": [40, 270], "size": [150, 76] },
+    { "id": "indexeddb", "type": "database", "label": "Private IndexedDB", "sublabel": "sources · works · Library", "tag": "restart-safe", "pos": [40, 470], "size": [150, 76] },
+    { "id": "worker", "type": "cloud", "label": "Discovery Worker", "sublabel": "lookup · admission · lease", "tag": "D1-first", "pos": [270, 270], "size": [150, 76] },
+    { "id": "d1", "type": "database", "label": "Cloudflare D1", "sublabel": "grouped lookup ≤50", "tag": "four-key identity", "pos": [500, 150], "size": [150, 76] },
+    { "id": "queue", "type": "messagebus", "label": "Discovery Queue", "sublabel": "signal · retry · DLQ", "tag": "one treatment / invocation", "pos": [500, 390], "size": [150, 76] },
+    { "id": "collector", "type": "backend", "label": "Bounded collector", "sublabel": "claim(5) · budget 50 RPC", "tag": "partial success measured", "pos": [730, 390], "size": [150, 76] },
+    { "id": "providers", "type": "external", "label": "Provider APIs", "sublabel": "cadences · gateway/direct", "tag": "no extension calls", "pos": [960, 390], "size": [150, 76] },
+    { "id": "library", "type": "frontend", "label": "Library projection", "sublabel": "resolved work or reason", "tag": "honest terminal state", "pos": [270, 470], "size": [150, 76] }
+  ],
+  "connections": [
+    { "id": "extension-worker", "from": "extension", "to": "worker", "label": "lookup / submit", "variant": "emphasis" },
+    { "id": "extension-indexeddb", "from": "extension", "to": "indexeddb", "label": "cursor + status", "fromSide": "bottom", "toSide": "top", "labelAt": [210, 430] },
+    { "id": "worker-d1", "from": "worker", "to": "d1", "label": "grouped read / atomic write", "variant": "emphasis" },
+    { "id": "worker-queue", "from": "worker", "to": "queue", "label": "admit signal", "fromSide": "bottom", "toSide": "top" },
+    { "id": "queue-collector", "from": "queue", "to": "collector", "label": "claim + lease", "variant": "emphasis" },
+    { "id": "collector-providers", "from": "collector", "to": "providers", "label": "bounded search / hydrate", "variant": "emphasis", "labelDy": -30 },
+    { "id": "extension-library", "from": "extension", "to": "library", "label": "local projection", "fromSide": "bottom", "toSide": "top", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "What is bounded", "items": ["Public lookup accepts at most 50 keys and uses one grouped D1 read", "Collector invocations reserve D1 work before provider calls"] },
+    { "dot": "amber", "title": "What remains honest", "items": ["UNAVAILABLE and structural exclusions stay visible", "Private source identity never enters Worker diagnostics"] }
+  ]
+}
