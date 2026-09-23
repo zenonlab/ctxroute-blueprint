@@ -4,10 +4,19 @@ Tobirink does not expose Wrangler as a release command. Every provider change
 starts from the repository-owned gate, while the extension and Worker runtime
 remain independent of this operational path.
 
-## Candidate extension 1.0.42 — préparation locale
+## Candidate 1.0.44 — certification en cours
 
-La version source et le pointeur Web sont alignés sur `1.0.42`, tandis que
-les archives publiques `1.0.41` restent intactes. La séquence locale est :
+La candidate locale est `1.0.44`; le pointeur publié reste `1.0.43`.
+La [certification du 23 septembre](../audits/favorite-convergence-20260923.md)
+sépare corrections, preuves locales, mesures de coût et validations distantes
+restantes. Aucun canari de cache chaud ne suffit à prouver une nouvelle collecte.
+Les sections datées ci-dessous sont des preuves historiques, pas une
+description de la version actuellement active.
+
+## Historique extension 1.0.42
+
+Lors de cette livraison, la version source et le pointeur Web ont été alignés
+sur `1.0.42`, sans modifier les archives `1.0.41`. La séquence locale était :
 
     npm ci --ignore-scripts
     npm run postinstall --workspace @tobirink/extension

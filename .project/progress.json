@@ -5355,6 +5355,129 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-finish-favorite-convergence-20260923",
+      "title": "Fermer les défauts de convergence, certifier le parcours et livrer la nouvelle extension",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "critical-path",
+          "title": "Corriger les six défauts reproduits avec régressions réelles",
+          "status": "DONE",
+          "acceptance": [
+            "Chaque défaut F1–F6 est reproduit avant correctif puis couvert par un test réussi avec la vraie composition concernée.",
+            "Identité et requête de reprise identiques au chemin normal, reprise durable après pause/redémarrage, recherche incomplète jamais déclarée absente.",
+            "Réarmement respecte 5000 actifs et nonce Deno couvre toute la fenêtre de validité.",
+            "Diff audité, documents/diagrammes concernés alignés et commits fonctionnels validés."
+          ],
+          "files": [
+            "packages/application/src/favorites/**",
+            "packages/application/src/index.ts",
+            "packages/adapters-browser/src/catalogue/**",
+            "apps/extension/wxt-entrypoints/background.ts",
+            "apps/extension/runtime/**",
+            "packages/public-discovery/src/**",
+            "packages/adapters-cloudflare/src/catalogue/**",
+            "apps/worker/src/**",
+            "apps/provider-gateway/src/**",
+            "docs/decisions/**",
+            "docs/architecture/src/**"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run test:contracts",
+            "npm test --workspaces --if-present",
+            "npm run typecheck",
+            "npm run archify:validate -- dataflow"
+          ],
+          "evidence": [
+            "F1-F6 reproduits par régressions rouges puis corrigés. Receiver/identité partagés; recovery durable 15s/10 + Retry-After/restarts; recherche incomplète jamais NOT_FOUND; capacité D1 respectée; nonce Deno valide jusqu'à borne inclusive.",
+            "Suites vertes: application430, extension170, adapters-browser106, public-discovery96, Worker152, Deno13. Typechecks ciblés et lints runtime verts; ADRs et diagrammes showcase9/9 actualisés. Intégration vrai adaptateur→PENDING→redémarrage→runner→Work+Library RESOLVED.",
+            "Commits fonctionnels 8ebf88e,648ffc4,664e186 et lot extension vérifié. Aucun déploiement ni réarmement distant réalisé; certification installée en cours au step suivant."
+          ]
+        },
+        {
+          "id": "certification",
+          "title": "Rendre les diagnostics et tests de convergence représentatifs et borner le travail répétitif",
+          "status": "DONE",
+          "acceptance": [
+            "Le test obligatoire passe de l'admission à la Library à travers les vrais adaptateurs et couvre attente/429/interruption/reprise.",
+            "Diagnostics agrégés corrects et absence de mesure déclarée comme telle; coût D1/projection mesuré sur corpus représentatif.",
+            "Périmètre local des gates corrigé sans suppression de travail ni --no-verify; contrôle complet vert.",
+            "Aucune nouvelle plateforme ni permission ni donnée privée dans les artefacts; commits ciblés vérifiés."
+          ],
+          "files": [
+            "scripts/infra/**",
+            "scripts/release/**",
+            "scripts/integration-check.mjs",
+            ".githooks/**",
+            ".gitignore",
+            ".project/project-config.json",
+            "package.json",
+            "apps/extension/scripts/**",
+            "apps/extension/runtime/**",
+            "apps/web/e2e/**",
+            "apps/worker/src/**",
+            "packages/adapters-cloudflare/src/catalogue/**",
+            "apps/worker/migrations/**",
+            ".github/workflows/deploy-production.yml",
+            "docs/**"
+          ],
+          "commands": [
+            "npm run test:infra",
+            "npm run test:e2e --workspace @tobirink/web",
+            "npm run verify",
+            "npm run archify:validate -- dataflow",
+            "npm run package:extension -- --verify-isolated"
+          ],
+          "evidence": [
+            "npm run verify complet exécuté deux fois, dernière sortie0 /tmp/tobirink-finish-final-verify-20260923.log; infra65/65, tests permanents harness10/10, Web E2E9pass/1skip réseau facultatif; lints/typechecks/Archify showcase verts.",
+            "Chromium installé: upgrade1.0.43→1.0.44 puis arrêts SW/navigateur,8sources/8Library conservées; verdict offline-regression-passed et converged:false. Rapport distingue copieexport et profilpersonnel noncertifié; décisions/progressionfixturevides.",
+            "Canaris neufs exigent désormais observationprovider bornée et expurgée; R2 conflit/retryidentique/authindisponible testés, relecture avantPUT; commits77cc5f3,a009ae9,49f1d6c. Aucune nouvellepermission/dépendance ni écritureproduction.",
+            "Archives1.0.44isoléesidentiques; mesuresD1/projectionprécédentes confirmées. Limites: R2pasCASatomique, abonnementQueue/révisionDeno nonattestés; preuveonline au step release."
+          ]
+        },
+        {
+          "id": "release",
+          "title": "Certifier les canaris et le profil temporaire puis publier et vérifier la nouvelle version",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Worker/Deno compatibles validés avant nouvelle extension; canaris anime+manga sur clés nouvelles avec preuve de traversée fournisseur.",
+            "Petit lot puis copie privée des1522favoris testés; identité/données préservées lors upgrade et progression après arrêt MV3/navigateur.",
+            "Nouvelle version1.0.44 si disponible, hashes publics Chrome/Firefox comparés avant pointeur;1.0.42 et1.0.43 intactes.",
+            "Réarmements directs historiques ou autres mutations à fort impact seulement après confirmation immédiate ciblée; jamais de DONE sans preuve.",
+            "Commits/push autorisés par le user et documentation/Progress alignés sur les résultats réellement prouvés."
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "apps/web/published-extension.json",
+            "scripts/infra/**",
+            ".github/workflows/deploy-production.yml",
+            "docs/release.md",
+            "docs/operations/**",
+            "docs/decisions/**",
+            "docs/architecture/src/**",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run package:extension",
+            "npm run package:extension -- --verify-isolated",
+            "npm run test:e2e --workspace @tobirink/web",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Préparation pushmain du résultatvalidé; runnerproductionenligneetlibre,mainreste3e145af. Pointeurpublic1.0.43; aucune archive historique touchée.",
+            "CLI et UI Deno sans authentification exploitable pour attesterrévision/KV; demandeconnexionenvoyée au user. Pasd'inférence depuishealth200. Canaris/petitlot/1522etpublicationR2 restentàprouver."
+          ]
+        }
+      ]
     }
   ]
 }
