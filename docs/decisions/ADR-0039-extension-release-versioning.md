@@ -122,6 +122,16 @@ proof of object absence. These checks reuse the deployment token and request
 no permission or billing mutation. Wrangler offers no conditional-put flag:
 the final read narrows, but does not atomically eliminate, races with an
 independent writer; the release workflow must remain single-writer.
+The protected production workflow offers `publish_extension`, false by default.
+It requires a manual dispatch on `main` with fresh canaries enabled; this is
+checked before Worker mutation. After successful canaries, a separate expiring
+plan permits exactly the Chrome and Firefox objects derived from the candidate
+version. Local bytes must match both manifest hashes and sizes before planning.
+Public downloads then require HTTP 200, ZIP content type, immutable caching,
+matching sizes and hashes, within thirty seconds total and 5 MiB per archive.
+The workflow neither changes the web pointer nor gains repository write access.
+Partial publication fails closed, retains the immutable successful object and
+leaves the previous pointer; a fresh plan safely resumes identical objects.
 Publishing a new archive remains behind the Cloudflare infrastructure gate. The
 1.0.34 plan digest was `d272ac3e68ac5b2a2a05f792fbdf95b18ffc5e99fd9fdc22e38ec04c0cdd78df`
 for the two R2 objects and `worker:tobirink-public-api`; the deployed Worker

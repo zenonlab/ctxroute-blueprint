@@ -10,6 +10,11 @@ on:
         required: false
         default: false
         type: boolean
+      publish_extension:
+        description: 'Publier les deux archives candidates immuables après les canaris (sans avancer le pointeur Web)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -24,12 +29,15 @@ jobs:
     # production lane on the explicitly registered, online runner only.
     runs-on: [self-hosted, macOS, ARM64, cloudflare-ci]
     environment: production
+    env:
+      TOBIRINK_PUBLISH_EXTENSION: ${{ inputs.publish_extension }}
+      TOBIRINK_RUN_MANGA_CANARY: ${{ inputs.run_manga_canary }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: npm
@@ -50,6 +58,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
+
+      - name: Check extension publication preconditions
+        run: node --input-type=module -e "import { assertExtensionPublicationContext } from './scripts/infra/cloudflare-driver.mjs'; assertExtensionPublicationContext();"
 
       - name: Prepare extension generated types
         run: npm run postinstall --workspace @tobirink/extension
@@ -134,7 +145,32 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/infra/manga-canary.mjs --observe
 
+      - name: Publish and verify immutable extension archives
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish_extension == true && inputs.run_manga_canary == true }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          EXTENSION_VERSION="$(node --input-type=module -e "import { assertExtensionPublicationContext, readExtensionPublicationCandidate } from './scripts/infra/cloudflare-driver.mjs'; if (!assertExtensionPublicationContext()) process.exit(1); process.stdout.write((await readExtensionPublicationCandidate()).version);")"
+          npm run --silent infra:plan -- \
+            --provider cloudflare \
+            --account "$CLOUDFLARE_ACCOUNT_ID" \
+            --operation r2-publish:tobirink-chrome-mv3-"$EXTENSION_VERSION".zip \
+            --operation r2-publish:tobirink-firefox-mv3-"$EXTENSION_VERSION".zip > .ctxroute-extension-publication-plan.json
+          EXTENSION_PLAN_DIGEST="$(node --input-type=module -e "import { readFile } from 'node:fs/promises'; import { assertExtensionPublicationPlan, readExtensionPublicationCandidate } from './scripts/infra/cloudflare-driver.mjs'; const plan = JSON.parse(await readFile('.ctxroute-extension-publication-plan.json', 'utf8')); assertExtensionPublicationPlan(plan, await readExtensionPublicationCandidate(), process.env.CLOUDFLARE_ACCOUNT_ID); process.stdout.write(plan.digest);")"
+          npm run --silent infra:apply -- \
+            --provider cloudflare \
+            --plan .ctxroute-extension-publication-plan.json \
+            --approve "$EXTENSION_PLAN_DIGEST" \
+            --account "$CLOUDFLARE_ACCOUNT_ID" \
+            --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-"$EXTENSION_VERSION".zip \
+            --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-"$EXTENSION_VERSION".zip
+          node --input-type=module -e "import { readExtensionPublicationCandidate, verifyExtensionPublication } from './scripts/infra/cloudflare-driver.mjs'; console.log(JSON.stringify(await verifyExtensionPublication(await readExtensionPublicationCandidate())));"
+
       - name: Remove temporary deployment plan
         if: ${{ always() }}
         shell: bash
-        run: rm -f .ctxroute-production-plan.json
+        run: rm -f .ctxroute-production-plan.json .ctxroute-extension-publication-plan.json

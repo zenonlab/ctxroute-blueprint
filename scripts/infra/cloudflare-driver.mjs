@@ -6,10 +6,98 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { isReleaseArtifactAction, releaseMutationArguments, releaseRevisionFromActions, resolveReleaseAction, validateReleaseJson, validateReleasePair } from './release-snapshot-operation.mjs';
+import { assertApplicablePlan } from './provider-gate-core.mjs';
 
 const execFileAsync = promisify(execFile);
 const DRIVER_ID = 'cloudflare-wrangler';
 const PROVIDER_GATEWAY_SECRET = 'PROVIDER_GATEWAY_HMAC_KEY';
+const extensionArchiveLimit = 5 * 1024 * 1024;
+
+export function assertExtensionPublicationContext(environment = process.env) {
+  if ([undefined, '', 'false'].includes(environment.TOBIRINK_PUBLISH_EXTENSION)) return false;
+  if (environment.TOBIRINK_PUBLISH_EXTENSION !== 'true'
+    || environment.GITHUB_EVENT_NAME !== 'workflow_dispatch'
+    || environment.GITHUB_REF !== 'refs/heads/main'
+    || environment.TOBIRINK_RUN_MANGA_CANARY !== 'true') throw new Error('extension-publication-preconditions');
+  return true;
+}
+
+export async function readExtensionPublicationCandidate({ read = readFile } = {}) {
+  const extensionRoot = fileURLToPath(new URL('../../apps/extension', import.meta.url));
+  const { version } = JSON.parse(await read(resolve(extensionRoot, 'package.json'), 'utf8'));
+  const manifest = JSON.parse(await read(resolve(extensionRoot, '.output/packages/release-manifest.json'), 'utf8'));
+  if (version !== String(version) || version.length > 32 || !/^\d+\.\d+\.\d+$/u.test(version)
+    || manifest.schemaVersion !== 1 || manifest.version !== version || manifest.siteOrigin !== 'https://tobirink.com'
+    || !Array.isArray(manifest.artifacts) || manifest.artifacts.length !== 2) throw new Error('extension-publication-manifest');
+  const artifacts = [];
+  for (const browser of ['chrome', 'firefox']) {
+    const artifact = `tobirink-${browser}-mv3-${version}.zip`;
+    const record = manifest.artifacts.find(item => item.artifact === artifact && item.target === `${browser}-mv3`);
+    if (!record || record.version !== version || record.manifest?.version !== version
+      || !/^[a-f0-9]{64}$/u.test(record.sha256) || !Number.isSafeInteger(record.size)
+      || record.size < 1 || record.size > extensionArchiveLimit) throw new Error('extension-publication-manifest');
+    const bytes = await read(resolve(extensionRoot, '.output/packages', artifact));
+    if (bytes.length !== record.size || createHash('sha256').update(bytes).digest('hex') !== record.sha256) {
+      throw new Error('extension-publication-local-bytes');
+    }
+    artifacts.push({ artifact, sha256: record.sha256, size: record.size, target: `r2:tobirink-public-releases/downloads/${artifact}` });
+  }
+  return { version, artifacts };
+}
+
+export function assertExtensionPublicationPlan(plan, candidate, accountId) {
+  const targets = candidate.artifacts.map(artifact => artifact.target);
+  if (plan.driverId !== DRIVER_ID || plan.actions?.length !== 2
+    || plan.actions.some(action => action.kind !== 'r2-publish' || !targets.includes(action.target))
+    || new Set(plan.actions.map(action => action.target)).size !== 2) throw new Error('extension-publication-plan-targets');
+  return assertApplicablePlan({ plan, approvedDigest: plan.digest, accountId, resourceAllowlist: targets });
+}
+
+async function readPublicExtensionArchive(record, fetcher, signal) {
+  let response;
+  try {
+    response = await fetcher(`https://tobirink.com/downloads/${record.artifact}`, { method: 'GET', redirect: 'error', signal });
+  } catch { throw new Error('extension-publication-fetch-failed'); }
+  if (response.status !== 200 || !/^application\/zip(?:\s*;|$)/iu.test(response.headers.get('Content-Type') ?? '')
+    || !/(?:^|,)\s*immutable\s*(?:,|$)/iu.test(response.headers.get('Cache-Control') ?? '') || response.body === null) {
+    await response.body?.cancel();
+    throw new Error('extension-publication-http-contract');
+  }
+  const reader = response.body.getReader();
+  const hash = createHash('sha256');
+  let size = 0;
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > extensionArchiveLimit || size > record.size) throw new Error('extension-publication-size-limit');
+      hash.update(chunk.value);
+    }
+  } catch {
+    await reader.cancel().catch(() => undefined);
+    throw new Error('extension-publication-body-failed');
+  } finally { reader.releaseLock(); }
+  const sha256 = hash.digest('hex');
+  if (size !== record.size || sha256 !== record.sha256) throw new Error('extension-publication-public-bytes');
+  return { artifact: record.artifact, sha256, size, status: 200 };
+}
+
+export async function verifyExtensionPublication(candidate, { fetcher = globalThis.fetch, timeoutMs = 30_000 } = {}) {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30_000) throw new Error('extension-publication-invalid-deadline');
+  const controller = new AbortController();
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => { controller.abort(); reject(new Error('extension-publication-timeout')); }, timeoutMs);
+  });
+  const verify = async () => {
+    const artifacts = [];
+    for (const record of candidate.artifacts) artifacts.push(await readPublicExtensionArchive(record, fetcher, controller.signal));
+    return { version: candidate.version, artifacts };
+  };
+  try { return await Promise.race([verify(), deadline]); }
+  finally { clearTimeout(timer); controller.abort(); }
+}
 
 function releasePublishOperations(config) {
   const releaseBucket = config.r2.find(resource => resource.binding === 'RELEASE_SNAPSHOTS');

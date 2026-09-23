@@ -5,7 +5,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createCloudflareDriver, fingerprintWorkerInputs, loadCloudflareConfig, validateCloudflareConfig } from './cloudflare-driver.mjs';
+import { assertExtensionPublicationContext, assertExtensionPublicationPlan, createCloudflareDriver, fingerprintWorkerInputs, loadCloudflareConfig, readExtensionPublicationCandidate, validateCloudflareConfig, verifyExtensionPublication } from './cloudflare-driver.mjs';
+import { createOperationPlan } from './provider-gate-core.mjs';
 
 const { Response } = globalThis;
 
@@ -17,6 +18,92 @@ const config = {
 };
 const extensionRoot = fileURLToPath(new URL('../../apps/extension', import.meta.url));
 const releaseVersion = JSON.parse(readFileSync(resolve(extensionRoot, 'package.json'), 'utf8')).version;
+
+test('extension publication is disabled for pushes and requires manual main plus canaries', () => {
+  assert.equal(assertExtensionPublicationContext({ GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' }), false);
+  assert.equal(assertExtensionPublicationContext({ TOBIRINK_PUBLISH_EXTENSION: 'false' }), false);
+  const enabled = { TOBIRINK_PUBLISH_EXTENSION: 'true', TOBIRINK_RUN_MANGA_CANARY: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main' };
+  assert.equal(assertExtensionPublicationContext(enabled), true);
+  for (const patch of [{ GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/other' }, { TOBIRINK_RUN_MANGA_CANARY: 'false' }, { TOBIRINK_RUN_MANGA_CANARY: undefined }]) {
+    assert.throws(() => assertExtensionPublicationContext({ ...enabled, ...patch }), /extension-publication-preconditions/u);
+  }
+});
+
+function extensionCandidateFixture(edit = () => undefined, bytes = Buffer.from('zip')) {
+  const manifest = { schemaVersion: 1, version: releaseVersion, siteOrigin: 'https://tobirink.com', artifacts: ['chrome', 'firefox'].map(browser => ({
+    artifact: `tobirink-${browser}-mv3-${releaseVersion}.zip`, target: `${browser}-mv3`, version: releaseVersion,
+    manifest: { version: releaseVersion }, size: 3, sha256: '4a70fe9aa6436e02c2dea340fbd1e352e4ef2d8ce6ca52ad25d4b95471fc8bf2',
+  })) };
+  edit(manifest);
+  return { read: async path => path.endsWith('/package.json') ? JSON.stringify({ version: releaseVersion })
+    : path.endsWith('/release-manifest.json') ? JSON.stringify(manifest) : bytes };
+}
+
+test('extension candidate checks both exact filenames, versions, sizes and local hashes', async () => {
+  const candidate = await readExtensionPublicationCandidate(extensionCandidateFixture());
+  assert.equal(candidate.artifacts.length, 2);
+  assert.equal(candidate.artifacts[0].target, `r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-${releaseVersion}.zip`);
+  for (const edit of [
+    manifest => { manifest.version = '0.0.0'; },
+    manifest => { manifest.artifacts[1] = manifest.artifacts[0]; },
+    manifest => { manifest.artifacts[0].manifest.version = '0.0.0'; },
+    manifest => { manifest.artifacts[0].size = 5 * 1024 * 1024 + 1; },
+    manifest => { manifest.artifacts[0].sha256 = '0'.repeat(64); },
+    manifest => { manifest.artifacts[0].artifact = '../other.zip'; },
+  ]) await assert.rejects(() => readExtensionPublicationCandidate(extensionCandidateFixture(edit)), /extension-publication-/u);
+  await assert.rejects(() => readExtensionPublicationCandidate(extensionCandidateFixture(undefined, Buffer.from('zap'))), /local-bytes/u);
+});
+
+test('extension plans require exactly the candidate pair and retain freshness and account checks', async () => {
+  const candidate = await readExtensionPublicationCandidate(extensionCandidateFixture());
+  const actions = candidate.artifacts.map(({ target }) => ({ kind: 'r2-publish', target }));
+  const plan = createOperationPlan({ driverId: 'cloudflare-wrangler', accountId: 'account-1', inspection: {}, preview: {}, actions });
+  assert.deepEqual(assertExtensionPublicationPlan(plan, candidate, 'account-1'), plan);
+  for (const invalid of [actions.slice(0, 1), [...actions, { kind: 'worker-deploy', target: 'worker:tobirink-public-api' }], [actions[0], actions[0]], actions.map(action => ({ ...action, kind: 'worker-deploy' }))]) {
+    assert.throws(() => assertExtensionPublicationPlan({ ...plan, actions: invalid }, candidate, 'account-1'), /plan-targets/u);
+  }
+  assert.throws(() => assertExtensionPublicationPlan(plan, candidate, 'account-2'), /account-not-allowed/u);
+  const expired = createOperationPlan({ driverId: 'cloudflare-wrangler', accountId: 'account-1', inspection: {}, preview: {}, actions, now: new Date(Date.now() - 60 * 60 * 1000) });
+  assert.throws(() => assertExtensionPublicationPlan(expired, candidate, 'account-1'), /stale-plan/u);
+});
+
+const publicArchiveResponse = (body = 'zip', options = {}) => new Response(body, {
+  headers: { 'Content-Type': 'application/zip', 'Cache-Control': 'public, max-age=31536000, immutable' }, ...options,
+});
+
+test('both public archives must match hashes, sizes and HTTP metadata without credentials or redirects', async () => {
+  const candidate = await readExtensionPublicationCandidate(extensionCandidateFixture());
+  const calls = [];
+  const proof = await verifyExtensionPublication(candidate, { fetcher: async (url, options) => { calls.push({ url, options }); return publicArchiveResponse(); } });
+  assert.equal(proof.artifacts.length, 2);
+  assert.ok(proof.artifacts.every(artifact => artifact.size === 3 && artifact.status === 200));
+  assert.deepEqual(calls.map(({ url }) => url), candidate.artifacts.map(({ artifact }) => `https://tobirink.com/downloads/${artifact}`));
+  assert.ok(calls.every(({ options }) => options.redirect === 'error' && options.headers === undefined));
+  for (const response of [
+    () => publicArchiveResponse('zip', { status: 404 }),
+    () => publicArchiveResponse('zip', { status: 302 }),
+    () => publicArchiveResponse('zip', { headers: { 'Content-Type': 'text/html', 'Cache-Control': 'immutable' } }),
+    () => publicArchiveResponse('zip', { headers: { 'Content-Type': 'application/zip', 'Cache-Control': 'no-store' } }),
+    () => publicArchiveResponse('zap'),
+    () => publicArchiveResponse('zi'),
+    () => publicArchiveResponse(Buffer.alloc(5 * 1024 * 1024 + 1)),
+  ]) await assert.rejects(() => verifyExtensionPublication(candidate, { fetcher: async () => response() }), /extension-publication-/u);
+  await assert.rejects(() => verifyExtensionPublication(candidate, { fetcher: async () => { throw new Error('secret-fixture'); } }), /^Error: extension-publication-fetch-failed$/u);
+});
+
+test('public verification has one total deadline including stalled bodies and rejects partial success', async () => {
+  const candidate = await readExtensionPublicationCandidate(extensionCandidateFixture());
+  let signal;
+  await assert.rejects(() => verifyExtensionPublication(candidate, { timeoutMs: 20, fetcher: async (_url, options) => {
+    signal = options.signal;
+    return publicArchiveResponse(new globalThis.ReadableStream({ start(controller) { controller.enqueue(new Uint8Array([1])); } }));
+  } }), /extension-publication-timeout/u);
+  assert.equal(signal.aborted, true);
+  let count = 0;
+  await assert.rejects(() => verifyExtensionPublication(candidate, { fetcher: async () => publicArchiveResponse(++count === 1 ? 'zip' : 'zap') }), /public-bytes/u);
+  assert.equal(count, 2);
+  await assert.rejects(() => verifyExtensionPublication(candidate, { timeoutMs: 30_001 }), /invalid-deadline/u);
+});
 
 function test_derive_operation_targets() {
   const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async () => '' });
@@ -264,6 +351,38 @@ test('immutable archives are authenticated and hashed, and identical retries nev
   assert.equal((await fixture.driver.apply(fixture.actions))[0].output, 'already-published-identical');
   assert.equal(fixture.reads.length, 2);
   assert.deepEqual(fixture.writes, []);
+});
+
+test('a partial two-archive publication fails and resumes without rewriting the successful object', async () => {
+  const published = new Set();
+  const writes = [];
+  let failFirefox = true;
+  const driver = createCloudflareDriver({
+    config: { ...config, r2: [{ binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] },
+    workerDirectory: '/worker', apiToken: 'fixture-token', read: async () => Buffer.from('zip'),
+    r2Fetch: async url => published.has(url.split('/').at(-1)) ? new Response('zip') : new Response(null, { status: 404 }),
+    run: async args => {
+      if (args.includes('put')) {
+        const artifact = args[3].split('/').at(-1);
+        writes.push(artifact);
+        if (failFirefox && artifact.includes('firefox')) throw new Error('fixture-upload-failed');
+        published.add(artifact);
+      }
+      return '{}';
+    },
+  });
+  const artifacts = ['chrome', 'firefox'].map(browser => `tobirink-${browser}-mv3-${releaseVersion}.zip`);
+  const actions = driver.resolveOperations(artifacts.map(artifact => `r2-publish:${artifact}`));
+  await driver.inspect('account-1', actions);
+  await assert.rejects(() => driver.apply(actions), /fixture-upload-failed/u);
+  assert.deepEqual([...published], [artifacts[0]]);
+  failFirefox = false;
+  const inspection = await driver.inspect('account-1', actions);
+  assert.deepEqual(inspection.releaseObjects.map(object => object.state), ['present', 'missing']);
+  const resumed = await driver.apply(actions);
+  assert.equal(resumed[0].output, 'already-published-identical');
+  assert.deepEqual(writes, [artifacts[0], artifacts[1], artifacts[1]]);
+  assert.deepEqual([...published], artifacts);
 });
 
 test('a conflicting archive prevents planning and a last-minute conflict prevents upload', async () => {

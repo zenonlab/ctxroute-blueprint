@@ -10,13 +10,13 @@
         "id": "publication",
         "label": "Publication bornée",
         "focus": ["staticExport", "releasePackages", "githubDelivery", "approvalGate", "releaseBucket", "publicWorker"],
-        "note": "GitHub vérifie et déclenche les livraisons; le gate reconstruit les assets avant preview et apply, puis borne chaque cible externe."
+        "note": "Worker seul par défaut; les archives optionnelles suivent les canaris et un plan distinct limité aux deux ZIP, avec reprise immuable."
       },
       {
         "id": "verification",
         "label": "Preuve en production",
         "focus": ["publicWorker", "memberPages", "publicDownloads", "productionEvidence"],
-        "note": "Les pages publiques et les téléchargements sont relus depuis tobirink.com après déploiement."
+        "note": "Deux téléchargements publics bornés doivent égaler les SHA-256 locaux; le pointeur Web avance seulement après cette preuve."
       }
     ]
   },
@@ -30,11 +30,11 @@
   "nodes": [
     { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "version publiée explicite", "stage": 0, "row": 0, "tag": "Next statique" },
     { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox", "stage": 0, "row": 2, "tag": "SHA-256 vérifiés" },
-    { "id": "githubDelivery", "type": "security", "label": "Livraison GitHub", "sublabel": "main + secrets production", "stage": 1, "row": 0, "tag": "plan expirant" },
+    { "id": "githubDelivery", "type": "security", "label": "Livraison GitHub", "sublabel": "main · canaris avant ZIP", "stage": 1, "row": 0, "tag": "plans distincts" },
     { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 1, "tag": "fail closed" },
     { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP vérifiés avant envoi", "stage": 2, "row": 2, "tag": "GET authentifié + SHA-256" },
     { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "100 %" },
-    { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "liens après uploads", "stage": 3, "row": 0, "tag": "pointeur publié" },
+    { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "après hashes publics", "stage": 3, "row": 0, "tag": "pointeur publié" },
     { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 2, "tag": "HTTP 200" },
     { "id": "productionEvidence", "type": "security", "label": "Preuve production", "sublabel": "statuts + hashes", "stage": 4, "row": 1, "tag": "concordants" }
   ],

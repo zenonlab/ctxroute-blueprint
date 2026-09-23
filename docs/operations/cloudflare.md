@@ -49,9 +49,28 @@ labellisé `self-hosted`, `macOS`, `ARM64`, `cloudflare-ci`; il prépare Node 22
 et Python 3.12 via `uv`, installe le lockfile, prépare les types générés de
 l'extension, restaure le pin Archify, construit les manifests Chrome et Firefox,
 exécute `npm run verify`, génère un plan expirant puis applique exactement la
-cible `worker:tobirink-public-api`. Il ne modifie ni D1, ni Queue, ni R2, ni les
-secrets fournisseur. Aucun autre runner ne peut recevoir cette lane de
-production.
+cible `worker:tobirink-public-api`. Il ne migre pas D1 et ne modifie pas les
+secrets; le déploiement conserve les réglages Queue du fichier Wrangler.
+Aucun autre runner ne peut recevoir cette lane de production.
+
+L'input `publish_extension` reste faux par défaut : les pushes ne publient
+aucun objet R2. Un lancement manuel sur `main` doit aussi activer
+`run_manga_canary`; le prévol refuse toute autre combinaison avant l'apply
+Worker. Après les canaris réussis, la CI crée un plan frais distinct contenant
+exactement les deux archives Chrome/Firefox de la version candidate. Elle
+recalcule leurs SHA-256 et tailles face au manifeste local, valide les cibles
+uniques puis applique seulement ces deux allowlists R2. Les secrets GitHub
+existants sont réutilisés; une permission R2 absente bloque sans modification
+automatique du token.
+
+Les deux téléchargements publics doivent répondre 200 avec type ZIP et cache
+immutable, correspondre aux tailles et SHA-256 locaux, sans redirection, sous
+une deadline commune de trente secondes et 5 MiB par archive. Le workflow
+ne modifie pas `apps/web/published-extension.json` : sa promotion demeure un
+commit séparé après ces preuves. Une publication partielle échoue, conserve
+l'objet immuable déjà créé et l'ancien pointeur. Recréer un plan permet la
+reprise idempotente; aucun objet n'est supprimé. Désactiver l'option ou revenir
+au workflow précédent constitue le rollback du mécanisme, pas des archives.
 
 Créer dans l’environnement GitHub `production` les secrets
 `CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID`. Le token doit être limité au
@@ -496,7 +515,10 @@ digest; the Worker source, checked-in config and generated static assets are
 fingerprinted instead, with only the generated Next build identifier
 normalized. Any other mismatch fails closed. When both operations are
 approved, D1 migrations run before release uploads, and the Worker deployment
-runs last. No CI workflow calls `infra:apply`.
+runs last. The protected production workflow calls `infra:apply` only for its
+Worker plan or the separately selected two-object extension publication plan.
+Direct provider mutations outside that declared workflow retain the immediate
+confirmation boundary in `AGENTS.md`.
 
 The approved orphan cleanup was bounded by the gate:
 

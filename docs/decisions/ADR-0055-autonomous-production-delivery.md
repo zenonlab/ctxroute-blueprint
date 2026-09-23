@@ -56,8 +56,12 @@ donc détectée, tandis qu’un rebuild équivalent ne déclenche pas à tort
 Les secrets `CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID` sont des secrets
 d’environnement GitHub. `PROVIDER_GATEWAY_HMAC_KEY` reste un secret runtime
 séparé du dépôt, présent côté Worker et gateway; aucune valeur secrète n’est
-versionnée. D1, R2 et les secrets fournisseur ne sont pas mutés par ce
-workflow. Wrangler redéploie cependant les réglages des consommateurs Queue
+versionnée. D1 et les secrets fournisseur ne sont pas mutés par ce workflow.
+R2 n'est publié que par l'option manuelle `publish_extension` de l'ADR-0039,
+désactivée par défaut, sur `main` avec canaris obligatoires. Son plan distinct
+autorise uniquement les deux nouvelles archives, après canaris réussis; les
+hashes publics sont vérifiés sans avancer le pointeur Web. Le plan Worker et
+son allowlist restent inchangés. Wrangler redéploie les réglages des consommateurs Queue
 déclarés dans sa configuration, y compris leur concurrence. L'inspection
 Worker inclut donc l'inventaire Queue distant, sans lire D1 ni R2. Le digest
 du bundle contient les réglages souhaités; l'inventaire Wrangler ne certifie
@@ -92,15 +96,19 @@ sans supprimer les données D1, objets R2 ou messages Queue.
 Le workflow de production est la barrière obligatoire pour Cloudflare : il ne
 s’exécute que sur `main` ou manuellement, attend `npm run verify`, exige un plan
 signé et temporaire, refuse toute action autre que
-`worker:tobirink-public-api`, conserve les routes, puis supprime le fichier de
-plan. Les actions GitHub sont épinglées sur `checkout@v5` et `setup-node@v5`.
+`worker:tobirink-public-api` dans le plan Worker, conserve les routes, puis
+supprime le fichier de plan. L'option archives utilise son plan séparé après
+canaris. Les actions GitHub v5 sont épinglées aux commits
+`fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09` pour checkout et
+`a0853c24544627f65ddf259abe73b1d18a591444` pour setup-node.
 
 La livraison Deno reste exclusivement assurée par l’application GitHub App
 Deno existante. Le dépôt fournit comme preuves le commit `main`, le run de
 l’application et la probe publique `/healthz`; il ne prétend pas fabriquer un
 journal Deno absent et n’ajoute aucun mécanisme concurrent.
 
-Le contrôle post-déploiement ne conserve que les statuts HTTP et les identifiants
-de corrélation. D1, R2, les créations/suppressions Queue et la rotation des
-secrets restent des opérations séparées, protégées par leurs propres plans
-et validations; le redéploiement des consommateurs est inclus au Worker.
+Le contrôle post-déploiement conserve les statuts HTTP et les identifiants
+de corrélation; l'option archives ajoute les tailles et SHA-256 publics.
+D1, les créations/suppressions Queue et la rotation des secrets restent des
+opérations séparées. La publication optionnelle R2 possède son propre plan
+borné; le redéploiement des consommateurs est inclus au Worker.
