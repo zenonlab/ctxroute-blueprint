@@ -50,6 +50,12 @@ function d1Cost(services: DiscoveryServices, before: D1MetricTotals): Pick<Publi
 function d1Snapshot(services: DiscoveryServices): D1MetricTotals {
   return services.d1Metrics?.snapshot() ?? { rowsRead: 0, rowsWritten: 0 };
 }
+async function allowRead(services: DiscoveryServices, context: { req: { header(name: string): string | undefined } }): Promise<boolean> {
+  if (!services.rateLimiter) return true;
+  const ip = context.req.header('CF-Connecting-IP') ?? 'unknown';
+  // Keep read traffic in a separate bucket from admissions and refreshes.
+  return (await services.rateLimiter.limit({ key: `read:${ip}` })).success;
+}
 function emitPublicCost(bindings: WorkerRuntime['Bindings'] | undefined, services: DiscoveryServices, before: D1MetricTotals, task: WorkerCostTask, result: WorkerCostResult, startedAt: number, counters: Partial<PublicCostCounters> = {}): void {
   emitWorkerCostDiagnostic(bindings, {
     acceptedResults: 0, durationMs: boundedDuration(startedAt, Date.now()), pagesRequested: 0,
@@ -88,6 +94,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
   app.get('/v3/catalogue/discoveries', async (context) => {
     const startedAt = Date.now();
     const services = routeServices(context, injected);
+    if (!(await allowRead(services, context))) return noStore({ error: 'rate-limited' }, 429);
     const before = d1Snapshot(services);
     const key = publicDiscoveryKeyV3Schema.safeParse({
       fingerprint: context.req.query('fingerprint'), mediaKind: context.req.query('mediaKind'),
@@ -102,9 +109,10 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
 
   app.post('/v3/catalogue/discoveries/lookup', limitedBody, async (context) => {
     const startedAt = Date.now();
+    const services = routeServices(context, injected);
+    if (!(await allowRead(services, context))) return noStore({ error: 'rate-limited' }, 429);
     const parsed = publicDiscoveryLookupSubmissionSchema.safeParse(await context.req.json().catch(() => undefined));
     if (!parsed.success) return noStore({ error: 'invalid-request' }, 400);
-    const services = routeServices(context, injected);
     const before = d1Snapshot(services);
     const port = v3Port(services);
     const now = new Date().toISOString();
