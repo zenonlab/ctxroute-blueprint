@@ -5474,11 +5474,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Premier push main 0fb15bd livré : CI 35863844924 et 35864161437 réussies. Worker actuel 7c5c56a4-38da-4781-a6a8-5f548f417624. Canaris neufs anime VERIFIED en 47 s et manga en 91 s ; 24 appels fournisseurs sans 429 ni erreur HTTP/réseau. Fenêtre concurrente : 106 769 lectures / 90 écritures D1.",
-            "Copie privée 1 522 hors ligne : upgrade 1.0.43 → 1.0.44, arrêts du service worker et du navigateur, puis reprise du même profil isolé. Zéro perte, 1 483 NETWORK + 39 IDENTITY_MISSING, zéro traitement restant ; Library provisoire, aucune résolution réseau revendiquée.",
-            "Cloudflare lu sans mutation : Workers Free, Queue active, consumer 5 / 10 s / 8 retries / concurrence 2. D1 du 23 septembre 00:00–13:35 UTC : environ 1,77 M lectures et 16,27 k écritures sur cette base, pas un budget global exact.",
-            "Corrections supplémentaires locales validées : 9ecc5db pour jointures D1, e33b5b0 pour budget et isolation Queue. Voie CI R2 optionnelle testée, désactivée par défaut ; hashes locaux 1.0.44 inchangés. Nouvelle livraison Worker puis canaris et petits lots en ligne à effectuer.",
-            "Deno demande toujours la connexion utilisateur pour attester la révision routée / KV. ZIP 1.0.44 non publiés, pointeur 1.0.43, historiques FAILED non réarmés. Aucun changement de permission ni d’abonnement."
+            "Nouveau Worker bb203bc déployé en version 457fe842-1245-4b03-b5a8-a8504c5da2a8 par run CI 35869562460; canaris frais anime VERIFIED 122383 ms et manga VERIFIED 47729 ms, 19 appels fournisseur, 0 HTTP/réseau/429, 6024 lectures/76 écritures D1 et 3 Queue sends.",
+            "Audit a détecté un N+1 sur lookup de 50 clés (100–150 RPC D1); readMany est maintenant groupé par json_each avec régression Worker 24/24 et métrique à 50 lectures nominales, typecheck adapters-cloudflare vert; ADR-0062 et dataflow mis à jour.",
+            "Deno local: 13 tests et deno check passent avec Deno 2.7.1; révision distante toujours non attestée par absence de session Deno. Lot 1522 non lancé, budget D1/Queue réservé par prudence."
           ]
         }
       ]
