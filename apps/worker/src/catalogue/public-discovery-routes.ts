@@ -16,7 +16,7 @@ import type { D1MetricTotals, InstrumentedD1 } from '../operational-metrics';
 interface DiscoveryQueuePort {
   send(body: NativeCollectorSignal, options?: { contentType?: 'json' }): Promise<QueueSendResponse | void>;
 }
-type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; rateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
+type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
 
 function routeServices(context: { get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
   if (injected) return injected;
@@ -24,6 +24,7 @@ function routeServices(context: { get(key: 'services'): WorkerServices }, inject
   const selected: DiscoveryServices = { d1Metrics: services.d1Metrics, publicDiscoveryV3: services.publicDiscoveryV3 };
   if (services.publicDiscoveryQueue) selected.queue = services.publicDiscoveryQueue;
   if (services.publicDiscoveryRateLimiter) selected.rateLimiter = services.publicDiscoveryRateLimiter;
+  if (services.publicDiscoveryReadRateLimiter) selected.readRateLimiter = services.publicDiscoveryReadRateLimiter;
   return selected;
 }
 
@@ -51,10 +52,11 @@ function d1Snapshot(services: DiscoveryServices): D1MetricTotals {
   return services.d1Metrics?.snapshot() ?? { rowsRead: 0, rowsWritten: 0 };
 }
 async function allowRead(services: DiscoveryServices, context: { req: { header(name: string): string | undefined } }): Promise<boolean> {
-  if (!services.rateLimiter) return true;
+  const limiter = services.readRateLimiter ?? services.rateLimiter;
+  if (!limiter) return true;
   const ip = context.req.header('CF-Connecting-IP') ?? 'unknown';
   // Keep read traffic in a separate bucket from admissions and refreshes.
-  return (await services.rateLimiter.limit({ key: `read:${ip}` })).success;
+  return (await limiter.limit({ key: `read:${ip}` })).success;
 }
 function emitPublicCost(bindings: WorkerRuntime['Bindings'] | undefined, services: DiscoveryServices, before: D1MetricTotals, task: WorkerCostTask, result: WorkerCostResult, startedAt: number, counters: Partial<PublicCostCounters> = {}): void {
   emitWorkerCostDiagnostic(bindings, {
