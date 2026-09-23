@@ -179,3 +179,11 @@ locaux et publics doivent correspondre. Une publication partielle conserve
 l'objet réussi et le pointeur précédent; la reprise saute l'objet identique.
 Les deux actions GitHub sont figées aux commits de leurs versions v5 actuelles,
 sans changement de permission. Cette voie n'a pas encore été déclenchée.
+
+Un audit complémentaire a trouvé puis corrigé le dernier N+1 de lecture : le
+lookup public de 50 clés appelait auparavant `read()` par clé, soit 100 à 150
+RPC D1 avec les gardes et les métadonnées. `readMany` joint maintenant les
+quatre colonnes d’identité dans une requête JSON1 groupée; la régression Worker
+de 50 clés reste dans le budget de lecture nominal. Les transitions expirées
+sont réévaluées uniquement pour les lignes qui atteignent effectivement la
+borne d’essais.

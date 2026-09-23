@@ -160,8 +160,37 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     if (keys.length < 1 || keys.length > 50) throw new RangeError('public-discovery-lookup-limit-out-of-range');
     const parsed = keys.map((key) => publicDiscoveryKeyV3Schema.parse(key));
     if (new Set(parsed.map((key) => JSON.stringify(key))).size !== parsed.length) throw new Error('duplicate-public-discovery-key');
-    const states = await Promise.all(parsed.map(async (key) => ({ key, state: await this.read(key, now) })));
-    return states;
+    // A lookup batch is one bounded D1 read, not one request per key.  The
+    // JSON1 table-valued function keeps the parameter count constant while
+    // preserving the complete four-column identity join.
+    const rows = await this.database.prepare(`WITH requested AS (
+        SELECT json_extract(value, '$.fingerprint') AS fingerprint,
+          json_extract(value, '$.mediaKind') AS mediaKind,
+          json_extract(value, '$.parserVersion') AS parserVersion,
+          json_extract(value, '$.siteRulesVersion') AS rulesVersion
+        FROM json_each(?1)
+      )
+      SELECT requested.fingerprint, requested.mediaKind, requested.parserVersion,
+        requested.rulesVersion AS siteRulesVersion, r.attempt_count AS attemptCount, r.claim_token_hash AS claimTokenHash,
+        r.failure_reason AS failureReason, r.lease_until AS leaseUntil, r.request_digest AS requestDigest,
+        r.request_json AS requestJson, r.refresh_attempt_count AS refreshAttemptCount,
+        r.refresh_state AS refreshState, r.next_refresh_at AS nextRefreshAt,
+        r.result_expires_at AS resultExpiresAt, r.result_json AS resultJson,
+        r.retry_at AS retryAt, r.state, r.verified_at AS verifiedAt
+      FROM requested
+      LEFT JOIN public_discovery_requests_v3 AS r
+        ON r.fingerprint = requested.fingerprint AND r.media_kind = requested.mediaKind
+        AND r.parser_version = requested.parserVersion AND r.rules_version = requested.rulesVersion`).bind(JSON.stringify(parsed)).all<DiscoveryRow & PublicDiscoveryKeyV3>();
+    const exhausted = rows.results.filter((row) => row.state === 'PROCESSING' && row.attemptCount >= 8 && row.leaseUntil !== null && row.leaseUntil <= now);
+    const exhaustedStates = new Map<string, PublicDiscoveryReadState>();
+    if (exhausted.length > 0) await Promise.all(exhausted.map(async (row) => {
+      const key = { fingerprint: row.fingerprint, mediaKind: row.mediaKind, parserVersion: row.parserVersion, siteRulesVersion: row.siteRulesVersion };
+      await this.failExhaustedKey(key, now);
+      exhaustedStates.set(JSON.stringify(key), stateFromRow(await this.row(key), now));
+    }));
+    const byKey = new Map(rows.results.map((row) => [JSON.stringify({ fingerprint: row.fingerprint, mediaKind: row.mediaKind,
+      parserVersion: row.parserVersion, siteRulesVersion: row.siteRulesVersion }), row.state === null ? null : row]));
+    return parsed.map((key) => ({ key, state: exhaustedStates.get(JSON.stringify(key)) ?? stateFromRow(byKey.get(JSON.stringify(key)) ?? null, now) }));
   }
 
   private async failExhaustedKey(key: PublicDiscoveryKeyV3, now: string): Promise<void> {

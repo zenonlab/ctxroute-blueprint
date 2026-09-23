@@ -65,11 +65,11 @@
       "id": "publicD1",
       "type": "database",
       "label": "D1 catalogue public",
-      "sublabel": "admission · refresh orthogonal",
+      "sublabel": "lookup ≤50 groupé · admission",
       "stage": 2,
       "row": 0,
       "width": 140,
-      "tag": "VERIFIED toujours lisible"
+      "tag": "D1 groupé · VERIFIED"
     },
     {
       "id": "queue",
