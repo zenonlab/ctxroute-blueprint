@@ -15,15 +15,17 @@ doit être publié.
 
 ## Livraison
 
-La CI ne déploie jamais automatiquement en production. La signature et la
-soumission aux stores sont des étapes manuelles approuvées. Cloudflare peut être
-inspecté et planifié en CI, mais `apply` exige une approbation explicite sur le
-plan exact, l'environnement, le compte et les ressources.
+La CI protégée déploie automatiquement le Worker depuis `main` après les gates
+du dépôt et la vérification du plan Cloudflare exact, décrit plus bas. La
+signature et la soumission aux stores restent des étapes distinctes. Une
+mutation directe de production hors de ce workflow exige la confirmation
+immédiate de son plan, de son compte et de ses ressources.
 
 Chaque livraison possède un artefact immuable, un numéro de version, les
 résultats des gates, une procédure de rollback vers la version précédente et
-une vérification des migrations. Un commit, un tag, une publication ou un
-déploiement reste une étape distincte à autoriser.
+une vérification des migrations. Les commits et push vérifiés sont couverts par
+le plan de développement autonome approuvé; ils ne donnent pas une autorisation
+générale pour les mutations de production hors workflow.
 
 ## Matrice cible
 
@@ -33,9 +35,11 @@ déploiement reste une étape distincte à autoriser.
   runner automatisé est stabilisé.
 - Windows : compilation, types, tests unitaires et validation des artefacts.
 
-Le pipeline existant du blueprint reste actif pendant l'initialisation. Les
-jobs produit seront ajoutés seulement avec les commandes réellement
-implémentées et approuvées.
+La matrice ci-dessus est une cible, pas une attestation de couverture : le
+workflow actuel utilise le runner macOS ARM64 enregistré. Les gates locales
+inspectent le dépôt courant; les copies de travail sous `/.worktrees/` sont
+exclues via Git sans être supprimées. Les sources hors des racines déclarées
+restent rejetées, avec un test de non-régression dédié.
 
 ## Migration du plan de contrôle
 
@@ -76,6 +80,27 @@ corrélation présent dans les en-têtes sont affichés.
 La gateway Deno reste déployée par l’application GitHub App Deno existante,
 depuis `apps/provider-gateway` sur les commits `main`. Le workflow Cloudflare
 ne crée pas de second déploiement Deno et ne possède aucun secret Deno.
+
+Le packaging produit lui-même les deux builds extension; aucune précompilation
+identique n'est nécessaire juste avant. Les builds isolés testent une autre
+propriété (reproductibilité) et restent obligatoires. L'input historique
+`run_manga_canary` exécute désormais deux admissions neuves, anime et manga,
+avec preuve `MISS → PENDING → VERIFIED`, au plus quarante lectures par média.
+Il refuse le cache chaud et n'effectue aucun réarmement historique.
 ## Diagnostic Discovery agrégé
 
-Avant le plan Cloudflare, la CI protégée exécute `scripts/infra/public-discovery-diagnostics.mjs` en lecture seule. Le rapport ne contient que des comptes D1 par état, motif, âge `PENDING` et état de signal Queue, ainsi que les métadonnées `rows_read` et `rows_written` lorsque l’API les retourne. Il exclut titres, URLs, clés, profils et identifiants d’installation. Les compteurs Chromium isolés, les `429` Worker et les délais fournisseur ne sont pas conservés dans D1 : ils restent des mesures de canari distinctes, et une valeur absente est explicitement signalée plutôt que déduite.
+Avant le plan Cloudflare, la CI protégée exécute
+`scripts/infra/public-discovery-diagnostics.mjs` en lecture seule. Le rapport v2
+sépare média, état, motif et signal Queue. L'âge `PENDING` est calculé depuis
+`created_at`; l'échéance `retry_at` constitue un groupe distinct. Les deux
+utilisent une comparaison temporelle SQLite, et non une comparaison lexicale
+entre les formats ISO et SQL. Une requête échouée ou invalide fait échouer la
+gate sans exposer son erreur brute.
+
+Les métadonnées `rows_read` et `rows_written` ne mesurent que ces quatre requêtes
+de diagnostic, jamais le coût total du consumer. Titres, URLs, clés, profils et
+identifiants d'installation sont exclus. Les compteurs Chromium isolés, les
+`429` Worker et les délais fournisseur ne sont pas conservés dans D1 : ils
+restent des mesures de canari distinctes, et une valeur absente est signalée
+plutôt que déduite. Les tests exécutent les agrégats sur SQLite avec deux médias,
+un arriéré ancien déjà dû, une demande récente différée et la borne inclusive.

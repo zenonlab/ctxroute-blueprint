@@ -17,6 +17,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-19
+- Revised: 2026-09-23
 
 ## Contexte
 
@@ -58,11 +59,21 @@ séparé du dépôt, présent côté Worker et gateway; aucune valeur secrète n
 versionnée. D1, Queue, R2 et les secrets fournisseur ne sont pas mutés par ce
 workflow. Les canaries et la promotion métier restent des contrôles distincts.
 Le workflow propose aussi un input manuel `run_manga_canary`, désactivé par
-défaut, qui réarme uniquement le digest exact du canari manga public `One
-Piece`, observe sa clé jusqu'à dix minutes et échoue si l'état terminal n'est
-pas `VERIFIED` avec une identité manga et une référence fournisseur cohérentes.
-Cette action ne réarme aucune autre ligne D1 et n'est jamais déclenchée par un
-push automatique.
+défaut, conservé comme nom compatible. Il admet maintenant exactement deux
+nouvelles clés aléatoires : un anime et un manga publics. Chaque clé doit
+d'abord répondre `MISS`, puis l'admission `PENDING`, puis une lecture
+`VERIFIED` cohérente avec son média, son titre public et son fournisseur. Un
+cache déjà vérifié échoue à la certification. Chaque demande est observée au
+plus quarante fois, avec quinze secondes entre lectures; un état terminal
+différent ou un `429` interrompt immédiatement sans nouvelle admission.
+Cette action ne réarme aucune ligne historique et n'est jamais déclenchée par
+un push automatique. La preuve de passage fournisseur complète ces états par
+les métriques du consumer; l'absence de métriques reste explicitement absente.
+
+Le packaging construit déjà Chrome et Firefox : la précompilation identique
+immédiatement précédente est supprimée du workflow. Les deux builds isolés
+de reproductibilité et les builds de la gate performance restent distincts.
+Le build Web initial reste nécessaire au serveur statique Playwright.
 
 ## Conséquences
 

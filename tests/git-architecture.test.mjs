@@ -62,6 +62,21 @@ test('the documentation audit ignores files excluded by Git', () => {
   assert.equal(result.status, 0, result.stderr);
 });
 
+test('local nested worktrees are excluded without hiding product violations', () => {
+  const cwd = repository();
+  const ignoredWorktreeRule = readFileSync(join(root, '.gitignore'), 'utf8').split('\n').find(line => line === '/.worktrees/');
+  assert.equal(ignoredWorktreeRule, '/.worktrees/');
+  writeFileSync(join(cwd, '.gitignore'), `.DS_Store\n${ignoredWorktreeRule}\n`);
+  mkdirSync(join(cwd, '.worktrees', 'private-copy'), { recursive: true });
+  writeFileSync(join(cwd, '.worktrees', 'private-copy', 'unrelated.rb'), 'puts :nested\n');
+  const valid = spawnSync('node', [validator, '--all'], { cwd, encoding: 'utf8' });
+  assert.equal(valid.status, 0, valid.stderr);
+  writeFileSync(join(cwd, 'unrelated.rb'), 'puts :outside\n');
+  const invalid = spawnSync('node', [validator, '--all'], { cwd, encoding: 'utf8' });
+  assert.equal(invalid.status, 1);
+  assert.match(invalid.stderr, /unrelated.rb: code outside declared source/u);
+});
+
 function repository() {
   const cwd = mkdtempSync(join(tmpdir(), 'git-architecture-'));
   for (const directory of ['.codex', '.project', 'docs/architecture/src', 'docs/decisions', 'src', 'tests']) mkdirSync(join(cwd, directory), { recursive: true });

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       run_manga_canary:
-        description: 'Réarmer et exécuter uniquement le canari manga One Piece après le déploiement'
+        description: 'Exécuter deux nouvelles demandes canari anime et manga après le déploiement (sans réarmement historique)'
         required: false
         default: false
         type: boolean
@@ -56,9 +56,6 @@ jobs:
 
       - name: Restore pinned Archify tooling
         run: node .githooks/archify restore
-
-      - name: Build extension manifests for verification
-        run: npm run build:extension && npm run build:extension:firefox
 
       - name: Build public web application
         run: npm run build --workspace @tobirink/web
@@ -130,7 +127,7 @@ jobs:
           probe https://tobirink.com/download
           probe https://tobirink-provider-gateway.tobirink.deno.net/healthz
 
-      - name: Run bounded Manga canary
+      - name: Run fresh bounded anime and manga canaries
         if: ${{ inputs.run_manga_canary == true }}
         run: node scripts/infra/manga-canary.mjs
 

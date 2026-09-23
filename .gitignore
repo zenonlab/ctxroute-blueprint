@@ -4,6 +4,7 @@ node_modules/
 .claude/skills/
 .ctxroute/state/
 .code-review-graph/
+/.worktrees/
 packages/code-review-graph/.venv/
 .project/*-plan.json
 ci-summary.md

@@ -17,7 +17,7 @@
     { "id": "mainCommit", "type": "security", "label": "Commit main", "sublabel": "push ou manuel", "stage": 0, "row": 1, "tag": "GitHub" },
     { "id": "verify", "type": "security", "label": "npm run verify", "sublabel": "tests + builds + audit", "stage": 1, "row": 1, "tag": "obligatoire" },
     { "id": "cloudflarePlan", "type": "cloud", "label": "Plan Cloudflare", "sublabel": "dry-run + digest stable", "stage": 2, "row": 1, "tag": "fail closed" },
-    { "id": "workerApply", "type": "backend", "label": "Worker public", "sublabel": "API · canari manuel", "stage": 3, "row": 1, "tag": "API · VERIFIED" },
+    { "id": "workerApply", "type": "backend", "label": "Worker public", "sublabel": "Canaris neufs manuels", "stage": 3, "row": 1, "tag": "MISS → PENDING → VERIFIED" },
     { "id": "publicProbes", "type": "external", "label": "Probes publiques", "sublabel": "/ + /library + /healthz", "stage": 4, "row": 0, "tag": "HTTP 200" },
     { "id": "denoApp", "type": "backend", "label": "Deno GitHub App", "sublabel": "gateway depuis main", "stage": 3, "row": 2, "tag": "mécanisme unique" }
   ],
