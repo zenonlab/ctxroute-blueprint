@@ -30,14 +30,17 @@ contrairement aux admissions et aux refreshes.
 terminales expirées restent traitées individuellement seulement lorsqu’une
 ligne effectivement retournée atteint la borne d’essais. Les clés absentes
 restent des `MISS` et l’ordre de la réponse suit l’entrée validée. Les routes
-`GET` et `lookup` réutilisent le limiteur Cloudflare avec une clé préfixée
-`read:<ip>`, séparée du budget admission/refresh, avant toute lecture D1.
+`GET` et `lookup` utilisent un second limiteur Cloudflare avec une clé préfixée
+`read:<ip>`, séparée du budget admission/refresh, avant toute lecture D1. Le
+budget admission/refresh reste à 60 requêtes par minute et par IP, tandis que
+le budget de lecture groupée est fixé à 600 requêtes par minute et par IP.
 
 ## Conséquences
 
 Un lookup de 50 clés reste borné à une lecture D1 normale, sans affaiblir les
 gardes d’identité ni les transitions `FAILED`. Une base sans JSON1 doit échouer
 fermée pendant la validation, jamais revenir silencieusement au N+1. Un client
-partageant une IP dispose d’au plus 60 lectures par minute (jusqu’à 3 000 clés
-par minute via les lots de 50), tandis que les admissions conservent leur propre
-budget. Un `429` est retourné avant le parsing et avant toute opération D1.
+partageant une IP dispose d’au plus 600 lectures par minute (jusqu’à 30 000 clés
+par minute via les lots de 50), tandis que les admissions conservent leur budget
+de 60 par minute. Un `429` est retourné avant le parsing et avant toute opération
+D1.

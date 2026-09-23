@@ -24,6 +24,7 @@ export interface WorkerServices {
   catalogue: PublicCatalogueReadPort;
   publicDiscoveryV3: PublicDiscoveryV3Port;
   publicDiscoveryRateLimiter?: RateLimit;
+  publicDiscoveryReadRateLimiter?: RateLimit;
   publicDiscoveryQueue?: Queue<NativeCollectorSignal>;
   coverImages: CoverImageRenderPort;
   coverMasters: CoverMasterReadPort;
@@ -44,6 +45,7 @@ export function createWorkerServices(bindings: NativeCollectorBindings): WorkerS
     catalogue: new D1PublicCatalogueAdapter(d1.database),
     publicDiscoveryV3: new D1PublicDiscoveryV3Adapter(d1.database),
     publicDiscoveryRateLimiter: bindings.PUBLIC_DISCOVERY_RATE_LIMITER,
+    publicDiscoveryReadRateLimiter: bindings.PUBLIC_DISCOVERY_READ_RATE_LIMITER,
     publicDiscoveryQueue: bindings.PUBLIC_DISCOVERY_QUEUE,
     coverImages: new CloudflareCoverImageAdapter(bindings.COVER_IMAGES),
     coverMasters: new R2CoverMasterReadAdapter(bindings.COVER_BUCKET),
