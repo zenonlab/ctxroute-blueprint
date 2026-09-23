@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export const workerDiagnosticsLockValue = 'worker-v1' as const;
 
 export type WorkerRouteFamily = 'catalogue' | 'cover' | 'release' | 'site' | 'unknown';
@@ -17,36 +19,29 @@ export interface WorkerDiagnosticBindings {
   readonly TOBIRINK_PIPELINE_DEBUG?: boolean;
 }
 
-export type WorkerCostResult = 'backoff' | 'changed' | 'deduplicated' | 'failed' | 'unchanged';
-export type WorkerCostTask = 'agenda' | 'agenda-admission' | 'agenda-recovery' | 'discovery' | 'discovery-admission' | 'discovery-lookup' | 'discovery-refresh';
-export type WorkerCostProvider = 'anilist' | 'kitsu' | 'mangadex' | 'mangaupdates' | 'mixed' | 'none';
-
-export interface WorkerCostDiagnosticEvent {
-  readonly schemaVersion: 1;
-  readonly type: 'worker.cost';
-  readonly task: WorkerCostTask;
-  readonly provider: WorkerCostProvider;
-  readonly pagesRequested: number;
-  readonly providerRequests: number;
-  readonly acceptedResults: number;
-  readonly result: WorkerCostResult;
-  readonly durationMs: number;
-  readonly retries: number;
-  readonly d1RowsRead?: number;
-  readonly d1RowsWritten?: number;
-  readonly d1Hits?: number;
-  readonly d1Misses?: number;
-  readonly deduplicated?: number;
-  readonly generationsCreated?: number;
-  readonly generationsAvoided?: number;
-  readonly rehydrations?: number;
-  readonly r2Reads?: number;
-  readonly r2Writes?: number;
-  readonly r2Lists?: number;
-  readonly r2Conflicts?: number;
-  readonly queueSends?: number;
-  readonly queueFailures?: number;
-}
+const workerCostResultSchema = z.enum(['backoff', 'changed', 'deduplicated', 'failed', 'unchanged']);
+const workerCostTaskSchema = z.enum(['agenda', 'agenda-admission', 'agenda-recovery', 'discovery', 'discovery-admission', 'discovery-lookup', 'discovery-refresh']);
+const workerCostProviderSchema = z.enum(['anilist', 'kitsu', 'mangadex', 'mangaupdates', 'mixed', 'none']);
+export type WorkerCostResult = z.output<typeof workerCostResultSchema>;
+export type WorkerCostTask = z.output<typeof workerCostTaskSchema>;
+export type WorkerCostProvider = z.output<typeof workerCostProviderSchema>;
+const countSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const durationSchema = countSchema.max(3_600_000);
+// Strip undeclared fields rather than serializing arbitrary properties from a caller.
+const workerCostDiagnosticEventSchema = z.object({
+  schemaVersion: z.literal(1), type: z.literal('worker.cost'),
+  task: workerCostTaskSchema, provider: workerCostProviderSchema,
+  pagesRequested: countSchema, providerRequests: countSchema, acceptedResults: countSchema,
+  result: workerCostResultSchema, durationMs: durationSchema, retries: countSchema,
+  providerTransportDurationMs: durationSchema.optional(),
+  provider429s: countSchema.optional(), providerHttpErrors: countSchema.optional(), providerNetworkErrors: countSchema.optional(),
+  d1RowsRead: countSchema.optional(), d1RowsWritten: countSchema.optional(),
+  d1Hits: countSchema.optional(), d1Misses: countSchema.optional(), deduplicated: countSchema.optional(),
+  generationsCreated: countSchema.optional(), generationsAvoided: countSchema.optional(), rehydrations: countSchema.optional(),
+  r2Reads: countSchema.optional(), r2Writes: countSchema.optional(), r2Lists: countSchema.optional(), r2Conflicts: countSchema.optional(),
+  queueSends: countSchema.optional(), queueFailures: countSchema.optional(),
+});
+export type WorkerCostDiagnosticEvent = Readonly<z.output<typeof workerCostDiagnosticEventSchema>>;
 
 export function classifyWorkerRoute(pathname: string): WorkerRouteFamily {
   if (pathname === '/v1/catalogue' || pathname.startsWith('/v1/catalogue/') || pathname.startsWith('/v2/catalogue/') || pathname.startsWith('/v3/catalogue/')) return 'catalogue';
@@ -63,7 +58,8 @@ export function emitWorkerDiagnostic(bindings: WorkerDiagnosticBindings, event: 
 
 export function emitWorkerCostDiagnostic(bindings: WorkerDiagnosticBindings | undefined, event: WorkerCostDiagnosticEvent): void {
   if (bindings === undefined || (bindings.TOBIRINK_PIPELINE_DEBUG !== undefined ? !bindings.TOBIRINK_PIPELINE_DEBUG : bindings.TOBIRINK_WORKER_DIAGNOSTICS !== workerDiagnosticsLockValue)) return;
-  console.info(JSON.stringify(event));
+  const parsed = workerCostDiagnosticEventSchema.safeParse(event);
+  if (parsed.success) console.info(JSON.stringify(parsed.data));
 }
 
 export function workerMethod(value: string): WorkerDiagnosticEvent['method'] {

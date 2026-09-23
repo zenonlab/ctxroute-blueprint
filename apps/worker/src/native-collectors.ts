@@ -14,7 +14,7 @@ import {
 import { D1AgendaCollectionAdapter, type AgendaLaneClaim } from './releases/public-release-collectors';
 import { createProviderTransportAdapter, type ProviderTransportBindings } from './provider-transport-adapter';
 import { boundedDuration, emitWorkerCostDiagnostic, workerDiagnosticsLockValue, type WorkerCostDiagnosticEvent, type WorkerCostProvider, type WorkerCostResult } from './diagnostics';
-import { instrumentAgendaR2, instrumentD1, instrumentProviderFetch, instrumentQueueSend, type D1MetricTotals, type ProviderMetricTotals, type R2MetricTotals, type QueueMetricTotals } from './operational-metrics';
+import { instrumentAgendaR2, instrumentD1, instrumentProviderFetch, instrumentQueueSend, type D1MetricTotals, type ProviderMetricTotals, type ProviderTransportMetricTotals, type R2MetricTotals, type QueueMetricTotals } from './operational-metrics';
 import { z } from 'zod';
 
 export const nativeCollectorSignalSchema = z.discriminatedUnion('type', [
@@ -48,7 +48,7 @@ interface AgendaProcessingReceipt {
 }
 
 type DiscoveryProcessingReport = PublicDiscoveryBatchReport & { readonly metrics?: CollectorCostMetrics; readonly continuationScheduled?: boolean };
-interface CollectorCostMetrics extends D1MetricTotals, Partial<R2MetricTotals>, Partial<QueueMetricTotals> {
+interface CollectorCostMetrics extends D1MetricTotals, ProviderTransportMetricTotals, Partial<R2MetricTotals>, Partial<QueueMetricTotals> {
   readonly acceptedResults: number;
   readonly pagesRequested: number;
   readonly provider: WorkerCostProvider;
@@ -71,11 +71,14 @@ function providerCost(totals: ProviderMetricTotals): ProviderCost {
 
 export function collectorCost(d1: D1MetricTotals, providers: ProviderMetricTotals, acceptedResults: number, result: WorkerCostResult, pagesRequested = 0): CollectorCostMetrics {
   const provider = providerCost(providers);
-  return { ...d1, acceptedResults, pagesRequested, ...provider, result };
+  return { ...d1, acceptedResults, pagesRequested, ...provider, result,
+    providerTransportDurationMs: providers.providerTransportDurationMs,
+    provider429s: providers.provider429s, providerHttpErrors: providers.providerHttpErrors, providerNetworkErrors: providers.providerNetworkErrors };
 }
 
 function emptyCollectorCost(result: WorkerCostResult): CollectorCostMetrics {
-  return { acceptedResults: 0, pagesRequested: 0, provider: 'none', providerRequests: 0, result, rowsRead: 0, rowsWritten: 0 };
+  return { acceptedResults: 0, pagesRequested: 0, provider: 'none', providerRequests: 0, result, rowsRead: 0, rowsWritten: 0,
+    providerTransportDurationMs: 0, provider429s: 0, providerHttpErrors: 0, providerNetworkErrors: 0 };
 }
 
 export class AgendaCollectionRetryError extends Error {
@@ -396,6 +399,10 @@ function emitCollectorCost(task: 'agenda' | 'agenda-admission' | 'agenda-recover
     pagesRequested: metrics.pagesRequested,
     provider: metrics.provider,
     providerRequests: metrics.providerRequests,
+    providerTransportDurationMs: metrics.providerTransportDurationMs,
+    provider429s: metrics.provider429s,
+    providerHttpErrors: metrics.providerHttpErrors,
+    providerNetworkErrors: metrics.providerNetworkErrors,
     result: metrics.result,
     retries: Math.max(0, attempt - 1),
     r2Reads: metrics.r2Reads ?? 0,

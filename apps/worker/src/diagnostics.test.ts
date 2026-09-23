@@ -42,11 +42,32 @@ describe('worker diagnostics', () => {
       schemaVersion: 1, task: 'discovery', type: 'worker.cost',
     });
     const serialized = String(info.mock.calls[0]?.[0]);
-    expect(Object.keys(JSON.parse(serialized))).toEqual([
+    expect(Object.keys(JSON.parse(serialized)).sort()).toEqual([
       'acceptedResults', 'd1RowsRead', 'd1RowsWritten', 'durationMs', 'pagesRequested',
       'provider', 'providerRequests', 'result', 'retries', 'schemaVersion', 'task', 'type',
-    ]);
+    ].sort());
     expect(serialized).not.toMatch(/title|url|ip|payload|secret|installation/iu);
+    info.mockRestore();
+  });
+
+  it('strips undeclared content and drops invalid bounded cost values', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const event = {
+      acceptedResults: 0, durationMs: 40, pagesRequested: 1, provider: 'anilist' as const,
+      providerRequests: 2, providerTransportDurationMs: 30, provider429s: 1,
+      providerHttpErrors: 1, providerNetworkErrors: 1, result: 'backoff' as const, retries: 0,
+      schemaVersion: 1 as const, task: 'discovery' as const, type: 'worker.cost' as const,
+      url: 'https://private.invalid', title: 'private title', error: new Error('private failure'),
+    };
+    emitWorkerCostDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: workerDiagnosticsLockValue }, event);
+    const emitted = JSON.parse(String(info.mock.calls[0]?.[0]));
+    expect(emitted).toMatchObject({ providerTransportDurationMs: 30, provider429s: 1, providerHttpErrors: 1, providerNetworkErrors: 1 });
+    expect(JSON.stringify(emitted)).not.toMatch(/private|title|url|failure/iu);
+    for (const value of [-1, 0.5, Infinity, NaN]) {
+      emitWorkerCostDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: workerDiagnosticsLockValue }, { ...event, provider429s: value });
+    }
+    emitWorkerCostDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: workerDiagnosticsLockValue }, { ...event, providerTransportDurationMs: 3_600_001 });
+    expect(info).toHaveBeenCalledOnce();
     info.mockRestore();
   });
 });

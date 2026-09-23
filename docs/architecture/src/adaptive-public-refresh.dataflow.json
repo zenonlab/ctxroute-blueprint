@@ -51,7 +51,7 @@
     { "id": "unknown-admission", "from": "unknownWork", "to": "admissionQueue", "label": "demande bornée", "classification": "4 + 4 titres maximum", "variant": "default", "labelAt": [120, 450] },
     { "id": "stale-admission", "from": "staleFavorite", "to": "admissionQueue", "label": "refresh échu", "classification": "fraîcheur séparée", "variant": "default" },
     { "id": "queue-agenda", "from": "admissionQueue", "to": "agendaLanes", "label": "deux lanes", "classification": "indépendantes", "variant": "emphasis" },
-    { "id": "queue-discovery", "from": "admissionQueue", "to": "discoveryJob", "label": "claim(20)", "classification": "priorité exacte", "variant": "default", "labelAt": [525, 450] },
+    { "id": "queue-discovery", "from": "admissionQueue", "to": "discoveryJob", "label": "claim(5)", "classification": "priorité exacte", "variant": "default", "labelAt": [525, 450] },
     { "id": "queue-refresh", "from": "admissionQueue", "to": "refreshJob", "label": "claim refresh", "classification": "VERIFIED reste servi", "variant": "default" },
     { "id": "agenda-observe", "from": "agendaLanes", "to": "operationsR2", "label": "observations bornées", "classification": "écriture conditionnelle", "variant": "default", "route": "straight", "labelAt": [760, 220] },
     { "id": "agenda-publish", "from": "agendaLanes", "to": "catalogueD1", "label": "modèle changé", "classification": "aucune occurrence matérialisée", "variant": "emphasis" },
@@ -79,6 +79,7 @@
         "Une vérification inchangée ne republie aucune fiche",
         "Le temps projette l'Agenda sans écriture distante",
         "Collecte, admission et reprise comptent leurs tentatives séparément",
+        "Logs bornés : durée transport, 429, erreurs HTTP et réseau",
         "Les coûts historiques restent des fixtures, pas des coefficients"
       ]
     },

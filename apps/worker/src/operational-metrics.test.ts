@@ -124,8 +124,40 @@ describe('operational metrics', () => {
     expect((await metrics.fetch('https://graphql.anilist.co', {})).status).toBe(429);
     expect((await metrics.fetch('https://api.mangaupdates.com/v1/releases/search', {})).status).toBe(503);
     expect((await metrics.fetch('https://tobirink.com/v3/releases', {})).status).toBe(200);
-    expect(metrics.snapshot()).toEqual({ anilist: 1, kitsu: 0, mangadex: 0, mangaupdates: 1 });
-    expect(Object.keys(metrics.snapshot())).toEqual(['anilist', 'kitsu', 'mangadex', 'mangaupdates']);
+    expect(metrics.snapshot()).toMatchObject({ anilist: 1, kitsu: 0, mangadex: 0, mangaupdates: 1,
+      provider429s: 1, providerHttpErrors: 2, providerNetworkErrors: 0 });
+    expect(Object.keys(metrics.snapshot())).toEqual(['anilist', 'kitsu', 'mangadex', 'mangaupdates',
+      'providerTransportDurationMs', 'provider429s', 'providerHttpErrors', 'providerNetworkErrors']);
+  });
+
+  it('preserves responses and transport errors while measuring only known providers', async () => {
+    let clock = 100;
+    const response = new Response('private provider payload', { status: 200 });
+    const error = new Error('private transport URL https://private.invalid');
+    const upstream = vi.fn(async (input: string) => {
+      clock += 12;
+      if (input.includes('kitsu')) throw error;
+      return response;
+    });
+    const metrics = instrumentProviderFetch(upstream, () => clock);
+    await expect(metrics.fetch('https://graphql.anilist.co', {})).resolves.toBe(response);
+    await expect(metrics.fetch('https://kitsu.io/api/edge/anime', {})).rejects.toBe(error);
+    await expect(metrics.fetch('https://unrelated.invalid', {})).resolves.toBe(response);
+    expect(response.bodyUsed).toBe(false);
+    expect(metrics.snapshot()).toEqual({ anilist: 1, kitsu: 1, mangadex: 0, mangaupdates: 0,
+      providerTransportDurationMs: 24, provider429s: 0, providerHttpErrors: 0, providerNetworkErrors: 1 });
+    expect(JSON.stringify(metrics.snapshot())).not.toMatch(/private|https|payload|URL/iu);
+  });
+
+  it('bounds cumulative transport duration even when the clock moves backwards', async () => {
+    let clock = 0;
+    const metrics = instrumentProviderFetch(async () => { clock += 4_000_000; return new Response(null); }, () => clock);
+    await metrics.fetch('https://graphql.anilist.co', {});
+    await metrics.fetch('https://graphql.anilist.co', {});
+    expect(metrics.snapshot().providerTransportDurationMs).toBe(3_600_000);
+    const reversed = instrumentProviderFetch(async () => { clock -= 10; return new Response(null); }, () => clock);
+    await reversed.fetch('https://graphql.anilist.co', {});
+    expect(reversed.snapshot().providerTransportDurationMs).toBe(0);
   });
 
   it('uses native row metadata instead of multiplying writes by payload size', async () => {

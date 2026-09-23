@@ -22,6 +22,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-16
+- Revised: 2026-09-23
 
 ## Contexte
 
@@ -41,6 +42,23 @@ pages HTTP, les résultats acceptés, l’issue `changed`, `unchanged`,
 `deduplicated`, `backoff` ou `failed`, la durée bornée, les retries et les
 lignes D1 lues ou écrites. Les admissions et lectures publiques ajoutent
 seulement leurs compteurs agrégés de HIT, MISS, déduplication ou réhydratation.
+
+Les traitements Queue ajoutent `providerTransportDurationMs`, durée cumulée
+entre invocation et résolution ou rejet du transport, bornée à une heure par
+événement. Elle inclut le passage gateway éventuel, mais ni la lecture ultérieure
+du corps ni le matching; des appels parallèles peuvent dépasser la durée murale
+du traitement. `provider429s` compte les réponses HTTP 429,
+`providerHttpErrors` les réponses HTTP de statut au moins 400 (429 inclus),
+et `providerNetworkErrors` les rejets du transport, y compris timeout ou échec
+réseau. Les réponses et exceptions sont propagées sans modification. Seuls les
+endpoints fournisseurs connus alimentent ces compteurs; les métriques déjà
+acquises restent disponibles en cas d’échec ultérieur du collecteur.
+
+Avant émission, le schéma de `worker.cost` valide les enums et les nombres
+finis, entiers et non négatifs, puis retire tout champ non déclaré. Les champs
+transport sont optionnels pour les événements HTTP sans appel fournisseur;
+aucune URL, aucun corps et aucun message d’erreur n’est sérialisé pour les
+calculer. Un événement invalide est omis sans modifier l’issue métier.
 
 Compter les appels au point où le transport reçoit l’URL fournisseur, avant la
 sélection du chemin direct ou gateway. Pour Agenda, incrémenter séparément

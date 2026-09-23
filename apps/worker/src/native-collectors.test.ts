@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, handleNativeCollectorQueue, resolveWithDeadline, type NativeCollectorSignal } from './native-collectors';
+import { instrumentProviderFetch } from './operational-metrics';
 
 function message(body: NativeCollectorSignal | null, attempts = 1) {
   return { ack: vi.fn(), attempts, body, retry: vi.fn() };
@@ -38,6 +39,7 @@ describe('native collector queue', () => {
     expect(JSON.parse(String(info.mock.calls[0]?.[0]))).toEqual({
       acceptedResults: 0, d1RowsRead: 0, d1RowsWritten: 0, durationMs: expect.any(Number),
       pagesRequested: 0, provider: 'none', providerRequests: 0, result: 'unchanged', retries: 0,
+      providerTransportDurationMs: 0, provider429s: 0, providerHttpErrors: 0, providerNetworkErrors: 0,
       r2Reads: 0, r2Writes: 0, r2Lists: 0, r2Conflicts: 0,
       queueSends: 0, queueFailures: 0,
       schemaVersion: 1, task: 'discovery', type: 'worker.cost',
@@ -98,8 +100,42 @@ describe('native collector queue', () => {
   });
 
   it('keeps paginated pages distinct from provider HTTP requests', () => {
-    expect(collectorCost({ rowsRead: 0, rowsWritten: 0 }, { anilist: 3, kitsu: 0, mangadex: 0, mangaupdates: 0 }, 2, 'changed', 2))
+    expect(collectorCost({ rowsRead: 0, rowsWritten: 0 }, { anilist: 3, kitsu: 0, mangadex: 0, mangaupdates: 0,
+      providerTransportDurationMs: 50, provider429s: 0, providerHttpErrors: 0, providerNetworkErrors: 0 }, 2, 'changed', 2))
       .toMatchObject({ pagesRequested: 2, providerRequests: 3, provider: 'anilist' });
+  });
+
+  it.each(['success', '429', 'network'] as const)('retains measured %s provider outcomes in the final collector event', async (outcome) => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    let clock = 0;
+    const provider = instrumentProviderFetch(async () => {
+      clock += 25;
+      if (outcome === 'network') throw new Error('private upstream detail');
+      return new Response('private payload', { status: outcome === '429' ? 429 : 200 });
+    }, () => clock);
+    await provider.fetch('https://graphql.anilist.co', {}).catch(() => undefined);
+    const metrics = collectorCost({ rowsRead: 2, rowsWritten: 0 }, provider.snapshot(), outcome === 'success' ? 1 : 0, outcome === 'success' ? 'changed' : 'backoff');
+    if (outcome === 'network') {
+      const item = message({ scheduledFor: '2026-09-23T00:00:00.000Z', type: 'agenda-refresh', version: 1 });
+      await handleNativeCollectorQueue([item], {
+        agenda: async () => { throw new AgendaCollectionRetryError('agenda-anilist-unavailable', 60, metrics); }, discovery: vi.fn(),
+      });
+      expect(item.retry).toHaveBeenCalledOnce();
+    } else {
+      const item = message({ type: 'public-discovery-ready', version: 1 });
+      await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery: async () => ({
+        claimed: 1, failed: 0, published: outcome === 'success' ? 1 : 0, replayed: 0, continuationScheduled: true, metrics,
+      }) });
+      expect(item.ack).toHaveBeenCalledOnce();
+    }
+    expect(info).toHaveBeenCalledOnce();
+    const event = JSON.parse(String(info.mock.calls[0]?.[0]));
+    expect(event).toMatchObject({ provider: 'anilist', providerRequests: 1, providerTransportDurationMs: 25,
+      provider429s: outcome === '429' ? 1 : 0, providerHttpErrors: outcome === '429' ? 1 : 0,
+      providerNetworkErrors: outcome === 'network' ? 1 : 0, d1RowsRead: 2 });
+    expect(JSON.stringify(event)).not.toMatch(/private|https|payload|upstream/iu);
   });
 
   it('turns a hung discovery resolution into a retryable provider delay', async () => {

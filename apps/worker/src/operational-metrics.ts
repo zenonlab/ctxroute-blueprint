@@ -1,4 +1,5 @@
 import type { R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
+import { boundedDuration } from './diagnostics';
 
 export interface QueueMetricTotals { readonly queueSends: number; readonly queueFailures: number }
 
@@ -100,7 +101,14 @@ export function instrumentD1(database: D1Database): InstrumentedD1 {
   return { database: instrumented, snapshot: () => Object.freeze({ rowsRead, rowsWritten }) };
 }
 
-export interface ProviderMetricTotals {
+export interface ProviderTransportMetricTotals {
+  readonly providerTransportDurationMs: number;
+  readonly provider429s: number;
+  readonly providerHttpErrors: number;
+  readonly providerNetworkErrors: number;
+}
+
+export interface ProviderMetricTotals extends ProviderTransportMetricTotals {
   readonly anilist: number;
   readonly kitsu: number;
   readonly mangadex: number;
@@ -114,7 +122,7 @@ export interface InstrumentedProviderFetch {
 
 export type ProviderFetch = (input: string, init: RequestInit) => Promise<Response>;
 
-function providerFromUrl(input: string): keyof ProviderMetricTotals | undefined {
+function providerFromUrl(input: string): 'anilist' | 'kitsu' | 'mangadex' | 'mangaupdates' | undefined {
   const url = new URL(input);
   if (url.hostname === 'graphql.anilist.co') return 'anilist';
   if (url.hostname === 'api.mangaupdates.com') return 'mangaupdates';
@@ -123,13 +131,26 @@ function providerFromUrl(input: string): keyof ProviderMetricTotals | undefined 
   return undefined;
 }
 
-export function instrumentProviderFetch(fetcher: ProviderFetch): InstrumentedProviderFetch {
-  const totals = { anilist: 0, kitsu: 0, mangadex: 0, mangaupdates: 0 };
+export function instrumentProviderFetch(fetcher: ProviderFetch, now = () => performance.now()): InstrumentedProviderFetch {
+  const totals = { anilist: 0, kitsu: 0, mangadex: 0, mangaupdates: 0,
+    providerTransportDurationMs: 0, provider429s: 0, providerHttpErrors: 0, providerNetworkErrors: 0 };
   return {
     fetch: async (input, init) => {
       const provider = providerFromUrl(input);
-      if (provider !== undefined) totals[provider] += 1;
-      return fetcher(input, init);
+      if (provider === undefined) return fetcher(input, init);
+      totals[provider] += 1;
+      const startedAt = now();
+      try {
+        const response = await fetcher(input, init);
+        if (response.status === 429) totals.provider429s += 1;
+        if (response.status >= 400) totals.providerHttpErrors += 1;
+        return response;
+      } catch (error) {
+        totals.providerNetworkErrors += 1;
+        throw error;
+      } finally {
+        totals.providerTransportDurationMs = Math.min(3_600_000, totals.providerTransportDurationMs + boundedDuration(startedAt, now()));
+      }
     },
     snapshot: () => Object.freeze({ ...totals }),
   };
