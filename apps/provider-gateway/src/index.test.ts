@@ -163,6 +163,37 @@ Deno.test('rejects a replay before a second provider call', async () => {
   assert(calls === 1);
 });
 
+Deno.test('retains a nonce through the inclusive validity window despite future clock skew', async () => {
+  for (const skew of [0, 30_000, 60_000]) {
+    let currentTime = now;
+    let calls = 0;
+    const expirations = new Map<string, number>();
+    const handler = createProviderGatewayHandler({
+      fetcher: () => { calls += 1; return Promise.resolve(Response.json({ ok: true })); },
+      nonceStore: {
+        claim: (value, expiresAt) => {
+          if ((expirations.get(value) ?? 0) > currentTime) return Promise.resolve(false);
+          expirations.set(value, expiresAt);
+          return Promise.resolve(true);
+        },
+      },
+      now: () => currentTime,
+      secrets: [secret],
+    });
+    const envelope = { issuedAt: new Date(now + skew).toISOString() };
+    assert((await handler(await gatewayRequest(envelope))).status === 200);
+    if (skew > 0) {
+      currentTime = now + 60_001;
+      assert((await handler(await gatewayRequest(envelope))).status === 409, 'future envelope must remain replay-protected after receipt TTL');
+    }
+    currentTime = now + skew + 60_000;
+    assert((await handler(await gatewayRequest(envelope))).status === 409, 'inclusive envelope boundary must remain replay-protected');
+    currentTime += 1;
+    assert((await handler(await gatewayRequest(envelope))).status === 400, 'expired envelope must be rejected');
+    assert(calls === 1, 'one signed nonce must cause at most one provider call');
+  }
+});
+
 Deno.test('rejects tampering, stale envelopes and arbitrary targets', async () => {
   const handler = createProviderGatewayHandler({
     fetcher: () => Promise.resolve(Response.json({ ok: true })),

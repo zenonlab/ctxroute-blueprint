@@ -22,7 +22,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-15
-- Revised: 2026-09-18
+- Revised: 2026-09-23
 
 ## Contexte
 
@@ -119,7 +119,11 @@ Deno Deploy est retenu comme premier candidat gratuit pour une passerelle
 séparée : ses règles autorisent explicitement une API qui interroge une API
 externe et un reverse proxy, contrairement à un forward proxy générique. La
 passerelle utilise une base Deno KV attachée pour réclamer chaque nonce par
-transaction atomique avec expiration. Le serveur HTTP démarre avant d’attendre
+transaction atomique avec expiration. L'expiration du nonce couvre toute la fenêtre de validité de
+l'enveloppe, y compris une horloge émettrice en avance et la borne inclusive :
+`max(réception, issuedAt) + 60 000 ms + 1 ms`. Une requête encore valide ne peut
+donc pas retrouver un nonce expiré. Cette correction ne change ni le contrat
+de transport ni la topologie des diagrammes existants. Le serveur HTTP démarre avant d’attendre
 la connexion KV : `/healthz` reste disponible pendant le warm-up, tandis que
 seul le trafic signé attend la promesse KV et échoue fermé en 503 si elle est
 indisponible. Vercel Hobby reste un candidat de repli,

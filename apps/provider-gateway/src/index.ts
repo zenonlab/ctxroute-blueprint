@@ -270,7 +270,9 @@ export function createProviderGatewayHandler(options: GatewayOptions): (request:
     if (envelope === undefined) return finish(json(400, 'invalid-envelope'));
     const provider = providerName(envelope.target);
     try {
-      if (!await options.nonceStore.claim(envelope.nonce, currentTime + replayWindowMs)) return finish(json(409, 'replayed-request'), provider);
+      // Timestamp validation includes the boundary and permits future clock skew.
+      const nonceExpiresAt = Math.max(currentTime, Date.parse(envelope.issuedAt)) + replayWindowMs + 1;
+      if (!await options.nonceStore.claim(envelope.nonce, nonceExpiresAt)) return finish(json(409, 'replayed-request'), provider);
     } catch {
       return finish(json(503, 'gateway-not-configured'), provider);
     }
