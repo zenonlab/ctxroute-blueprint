@@ -64,6 +64,28 @@ describe('public discovery indexed query cost', () => {
     expect(cost.rowsRead).toBeLessThan(32);
   });
 
+  it('uses the named four-key identity index for grouped lookups', async () => {
+    const key = { fingerprint: fingerprint(100001), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
+    const measured = instrumentD1(env.PUBLIC_DB);
+    const adapter = new D1PublicDiscoveryV3Adapter(measured.database);
+    await expect(adapter.readMany?.([key], now)).resolves.toMatchObject([{ key, state: { state: 'NOT_FOUND' } }]);
+    const plan = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN WITH requested AS (
+        SELECT json_extract(value, '$.fingerprint') AS fingerprint,
+          json_extract(value, '$.mediaKind') AS mediaKind,
+          json_extract(value, '$.parserVersion') AS parserVersion,
+          json_extract(value, '$.siteRulesVersion') AS rulesVersion
+        FROM json_each(?1)
+      )
+      SELECT requested.fingerprint, r.request_digest
+      FROM requested
+      LEFT JOIN public_discovery_requests_v3 AS r INDEXED BY sqlite_autoindex_public_discovery_requests_v3_1
+        ON r.fingerprint = requested.fingerprint AND r.media_kind = requested.mediaKind
+        AND r.parser_version = requested.parserVersion AND r.rules_version = requested.rulesVersion`).bind(JSON.stringify([key])).all<{ detail: string }>();
+    console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'grouped-lookup-identity-index', details: plan.results.map(({ detail }) => detail), ...measured.snapshot() }));
+    expect(plan.results.some(({ detail }) => detail.includes('sqlite_autoindex_public_discovery_requests_v3_1'))).toBe(true);
+    expect(measured.snapshot().rowsRead).toBeLessThan(16);
+  });
+
   it('preserves priority, concurrent leases and refreshes without reading terminal history', async () => {
     const seeds = [
       { id: 1, priority: 2, state: 'PENDING', updated: '2026-09-23T10:01:00.000Z' },

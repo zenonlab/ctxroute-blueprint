@@ -1,6 +1,7 @@
 ---
 scope:
   - packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts
+  - apps/worker/src/catalogue/public-discovery-query-cost.test.ts
   - apps/worker/src/catalogue/public-discovery-routes.ts
   - apps/worker/src/catalogue/public-discovery-routes.test.ts
   - docs/architecture/src/favorite-convergence.architecture.json
@@ -26,7 +27,10 @@ contrairement aux admissions et aux refreshes.
 ## Décision
 
 `D1PublicDiscoveryV3Adapter.readMany` utilise une seule requête préparée avec
-`json_each` et une jointure sur les quatre colonnes d’identité. Les transitions
+`json_each` et une jointure sur les quatre colonnes d’identité. Cette jointure
+force l’index primaire composite de la table afin que chaque clé reste une
+recherche d’index même lorsque la table contient un historique important; le
+plan est vérifié par `EXPLAIN QUERY PLAN`. Les transitions
 terminales expirées restent traitées individuellement seulement lorsqu’une
 ligne effectivement retournée atteint la borne d’essais. Les clés absentes
 restent des `MISS` et l’ordre de la réponse suit l’entrée validée. Les routes

@@ -178,7 +178,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         r.result_expires_at AS resultExpiresAt, r.result_json AS resultJson,
         r.retry_at AS retryAt, r.state, r.verified_at AS verifiedAt
       FROM requested
-      LEFT JOIN public_discovery_requests_v3 AS r
+      LEFT JOIN public_discovery_requests_v3 AS r INDEXED BY sqlite_autoindex_public_discovery_requests_v3_1
         ON r.fingerprint = requested.fingerprint AND r.media_kind = requested.mediaKind
         AND r.parser_version = requested.parserVersion AND r.rules_version = requested.rulesVersion`).bind(JSON.stringify(parsed)).all<DiscoveryRow & PublicDiscoveryKeyV3>();
     const exhausted = rows.results.filter((row) => row.state === 'PROCESSING' && row.attemptCount >= 8 && row.leaseUntil !== null && row.leaseUntil <= now);
