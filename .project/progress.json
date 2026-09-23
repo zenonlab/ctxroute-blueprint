@@ -5474,9 +5474,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Protected run 35875863436 (workflow_dispatch, run_manga_canary=true, publish_extension=false) succeeded; Worker 4f11cb66-0737-427c-8bc0-b8bbb2fd7b4b deployed with only worker target.",
-            "Fresh anime MISS→PENDING→VERIFIED in 16.05s and manga MISS→PENDING→VERIFIED in 30.94s; 4 provider requests, 2 accepted results, 0 retries, 0 provider 429/http/network errors, 4,501 D1 rows read, 24 written, 2 Queue sends, 0 Queue failures.",
-            "Extension publication remains intentionally disabled; 1,522-favorite online convergence and historical FAILED recovery remain unexecuted."
+            "Worker canary run 35875863436 completed successfully: fresh anime and manga VERIFIED with 4 provider requests, 0 retries/429s and 4,501 D1 rows read.",
+            "The existing temporary online session tobirink-installed-review-oKOCZz is preserved, but its private bookmark export input is not present in the workspace; installed-review refuses online resume without that explicit export.",
+            "No synthetic export was substituted, no 1,522-favorite online convergence was claimed, no historical FAILED rows were rearmed, and extension archives remain unpublished."
           ]
         }
       ]
