@@ -59,7 +59,7 @@ export async function loadCloudflareConfig(path) {
   return { worker, d1, r2, queues: [...queueNames].sort().map(name => ({ name })) };
 }
 
-export function createCloudflareDriver({ config, retiredQueues = [], workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, fingerprintWorker = fingerprintWorkerInputs, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET], preserveRoutes = false }) {
+export function createCloudflareDriver({ config, retiredQueues = [], workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, fingerprintWorker = fingerprintWorkerInputs, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET], preserveRoutes = false, r2Fetch = globalThis.fetch, apiToken = process.env.CLOUDFLARE_API_TOKEN }) {
   validateCloudflareConfig(config);
   validateRetiredQueues(config, retiredQueues);
   const operations = new Map([
@@ -70,6 +70,15 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
     ['worker-deploy', { kind: 'worker-deploy', target: `worker:${config.worker}` }],
     ...config.d1.map(database => [`d1-migrate:${database.binding}`, { kind: 'd1-migrate', target: `d1:${database.name}`, binding: database.binding }]),
   ]);
+  let inspectedAccountId;
+  const inspectArchive = async (action, accountId) => {
+    const remote = await readAuthenticatedArchive(action, accountId, r2Fetch, apiToken);
+    const local = await read(action.source);
+    if (remote.state === 'present' && (remote.size !== local.length || remote.sha256 !== createHash('sha256').update(local).digest('hex'))) {
+      throw new Error(`immutable-release-conflict:${action.target}`);
+    }
+    return { target: action.target, ...remote };
+  };
 
   return {
     id: DRIVER_ID,
@@ -80,6 +89,7 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
       return resolveOperations(operations, operationNames, config, releaseDirectory).map(({ kind, target }) => ({ kind, target }));
     },
     async inspect(accountId, requestedActions) {
+      inspectedAccountId = undefined;
       requiredString(accountId, 'account-id');
       const actions = requestedActions === undefined
         ? [...operations.values()]
@@ -93,15 +103,16 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
       const inspectedBuckets = requestedActions === undefined
         ? config.r2
         : config.r2.filter(bucket => requiredBuckets.includes(bucket.name));
-      const requiresQueues = config.queues.length > 0 && (requestedActions === undefined || actions.some(action => action.kind === 'queue-create' || action.kind === 'queue-delete'));
-      const [identity, deployment, migrations, buckets, queues] = await Promise.all([
+      const requiresQueues = config.queues.length > 0 && (requestedActions === undefined || actions.some(action => action.kind === 'worker-deploy' || action.kind === 'queue-create' || action.kind === 'queue-delete'));
+      const [identity, deployment, migrations, buckets, queues, releaseObjects] = await Promise.all([
         run(['whoami', '--account', accountId, '--json'], { cwd: workerDirectory }),
         requiresWorker ? run(['deployments', 'status', '--name', config.worker, '--json'], { cwd: workerDirectory }) : Promise.resolve('{}'),
         requiresD1 ? Promise.all(config.d1.map(database => run(['d1', 'migrations', 'list', database.binding, '--remote'], { cwd: workerDirectory }))) : Promise.resolve([]),
         Promise.all(inspectedBuckets.map(bucket => run(['r2', 'bucket', 'info', bucket.name, '--json'], { cwd: workerDirectory }))),
         requiresQueues ? run(['queues', 'list'], { accountId, cwd: workerDirectory }) : Promise.resolve(''),
+        Promise.all(actions.filter(action => action.kind === 'r2-publish').map(action => inspectArchive(action, accountId))),
       ]);
-      return {
+      const inspection = {
         driverId: DRIVER_ID,
         accountId,
         identity: parseJson(identity, 'invalid-whoami-response'),
@@ -109,7 +120,10 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
         migrations: requiresD1 ? config.d1.map((database, index) => ({ binding: database.binding, name: database.name, output: migrations[index].trim() })) : [],
         buckets: inspectedBuckets.map((bucket, index) => ({ binding: bucket.binding, name: bucket.name, info: parseJson(buckets[index], 'invalid-r2-response') })),
         queues: { configured: requiresQueues ? config.queues.map(queue => queue.name) : [], output: queues.trim() },
+        releaseObjects,
       };
+      inspectedAccountId = accountId;
+      return inspection;
     },
     async preview(requestedActions) {
       const actions = materializeActions(operations, requestedActions, config, releaseDirectory);
@@ -136,6 +150,14 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
       }
       const results = [];
       for (const action of selected) {
+        if (action.kind === 'r2-publish') {
+          if (inspectedAccountId === undefined) throw new Error('release-publication-requires-inspection');
+          const remote = await inspectArchive(action, inspectedAccountId);
+          if (remote.state === 'present') {
+            results.push({ kind: action.kind, target: action.target, output: 'already-published-identical' });
+            continue;
+          }
+        }
         const args = await mutationArguments(action, workerDirectory, preserveRoutes);
         const input = action.kind === 'worker-secret-set' ? `${assertGatewaySecret(gatewaySecret)}\n` : undefined;
         const output = await run(args, { cwd: workerDirectory, input });
@@ -144,6 +166,39 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
       return results;
     },
   };
+}
+
+async function readAuthenticatedArchive(action, accountId, fetcher, apiToken) {
+  if (apiToken !== String(apiToken) || apiToken.length === 0) throw new Error('r2-object-inspection-token-required');
+  const url = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/r2/buckets/${encodeURIComponent(action.bucket)}/objects/downloads/${encodeURIComponent(action.artifact)}`;
+  let response;
+  try {
+    response = await fetcher(url, { headers: { Authorization: `Bearer ${apiToken}` }, method: 'GET', redirect: 'error', signal: globalThis.AbortSignal.timeout(15_000) });
+  } catch { throw new Error('r2-object-inspection-network-failed'); }
+  if (response.status === 404) {
+    await response.body?.cancel();
+    return { state: 'missing' };
+  }
+  if (response.status !== 200 || response.body === null) {
+    await response.body?.cancel();
+    throw new Error(`r2-object-inspection-http:${response.status}`);
+  }
+  const reader = response.body.getReader();
+  const hash = createHash('sha256');
+  let size = 0;
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > 5 * 1024 * 1024) throw new Error('archive-size-limit');
+      hash.update(chunk.value);
+    }
+  } catch {
+    await reader.cancel().catch(() => undefined);
+    throw new Error('r2-object-inspection-body-failed');
+  } finally { reader.releaseLock(); }
+  return { state: 'present', sha256: hash.digest('hex'), size };
 }
 
 async function mutationArguments(action, workerDirectory, preserveRoutes) {

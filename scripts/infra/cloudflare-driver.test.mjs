@@ -7,6 +7,8 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCloudflareDriver, fingerprintWorkerInputs, loadCloudflareConfig, validateCloudflareConfig } from './cloudflare-driver.mjs';
 
+const { Response } = globalThis;
+
 const config = {
   worker: 'public-api',
   d1: [{ binding: 'CATALOGUE_DB', name: 'public-catalogue' }],
@@ -218,7 +220,7 @@ async function test_worker_build_failure_prevents_wrangler() {
 async function test_release_publish_is_hashed_and_translated() {
   const calls = [];
   const releaseConfig = { ...config, r2: [...config.r2, { binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] };
-  const driver = createCloudflareDriver({ config: releaseConfig, workerDirectory: '/worker', read: async () => Buffer.from('zip'), run: async args => { calls.push(args); return 'uploaded'; } });
+  const driver = createCloudflareDriver({ config: releaseConfig, workerDirectory: '/worker', apiToken: 'fixture-token', r2Fetch: async () => new Response(null, { status: 404 }), read: async () => Buffer.from('zip'), run: async args => { calls.push(args); return '{}'; } });
   const actions = driver.resolveOperations([`r2-publish:tobirink-chrome-mv3-${releaseVersion}.zip`]);
   const preview = await driver.preview(actions);
   assert.deepEqual(preview.artifacts, [{
@@ -226,6 +228,8 @@ async function test_release_publish_is_hashed_and_translated() {
     sha256: '4a70fe9aa6436e02c2dea340fbd1e352e4ef2d8ce6ca52ad25d4b95471fc8bf2',
     size: 3,
   }]);
+  await driver.inspect('account-1', actions);
+  calls.length = 0;
   await driver.apply(actions);
   assert.deepEqual(calls, [[
     'r2', 'object', 'put', `public-releases/downloads/tobirink-chrome-mv3-${releaseVersion}.zip`,
@@ -235,6 +239,64 @@ async function test_release_publish_is_hashed_and_translated() {
     '--cache-control', 'public, max-age=31536000, immutable', '--remote', '--force',
   ]]);
 }
+
+function archiveInspectionFixture(response) {
+  const writes = [];
+  const reads = [];
+  const driver = createCloudflareDriver({
+    config: { ...config, r2: [{ binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] },
+    workerDirectory: '/worker', apiToken: 'fixture-token', read: async () => Buffer.from('zip'),
+    run: async args => { if (args.includes('put')) writes.push(args); return '{}'; },
+    r2Fetch: async (url, init) => { reads.push({ url, init }); return response(); },
+  });
+  const actions = driver.resolveOperations([`r2-publish:tobirink-chrome-mv3-${releaseVersion}.zip`]);
+  return { actions, driver, reads, writes };
+}
+
+test('immutable archives are authenticated and hashed, and identical retries never upload', async () => {
+  const fixture = archiveInspectionFixture(() => new Response('zip'));
+  const inspection = await fixture.driver.inspect('account-1', fixture.actions);
+  assert.deepEqual(inspection.releaseObjects, [{ target: fixture.actions[0].target, state: 'present', size: 3, sha256: '4a70fe9aa6436e02c2dea340fbd1e352e4ef2d8ce6ca52ad25d4b95471fc8bf2' }]);
+  assert.equal(fixture.reads[0].url, `https://api.cloudflare.com/client/v4/accounts/account-1/r2/buckets/public-releases/objects/downloads/tobirink-chrome-mv3-${releaseVersion}.zip`);
+  assert.equal(fixture.reads[0].init.headers.Authorization, 'Bearer fixture-token');
+  assert.equal(fixture.reads[0].init.redirect, 'error');
+  assert.equal(JSON.stringify(inspection).includes('fixture-token'), false);
+  assert.equal((await fixture.driver.apply(fixture.actions))[0].output, 'already-published-identical');
+  assert.equal(fixture.reads.length, 2);
+  assert.deepEqual(fixture.writes, []);
+});
+
+test('a conflicting archive prevents planning and a last-minute conflict prevents upload', async () => {
+  let present = true;
+  const fixture = archiveInspectionFixture(() => present ? new Response('different') : new Response(null, { status: 404 }));
+  await assert.rejects(() => fixture.driver.inspect('account-1', fixture.actions), /immutable-release-conflict/u);
+  present = false;
+  const inspection = await fixture.driver.inspect('account-1', fixture.actions);
+  assert.equal(inspection.releaseObjects[0].state, 'missing');
+  present = true;
+  await assert.rejects(() => fixture.driver.apply(fixture.actions), /immutable-release-conflict/u);
+  assert.deepEqual(fixture.writes, []);
+});
+
+test('R2 authentication, unavailable responses and oversized bodies never count as absence', async () => {
+  for (const status of [401, 403, 429, 503]) {
+    const fixture = archiveInspectionFixture(() => new Response('sensitive-body', { status }));
+    await assert.rejects(() => fixture.driver.inspect('account-1', fixture.actions), new RegExp(`r2-object-inspection-http:${status}`, 'u'));
+    await assert.rejects(() => fixture.driver.apply(fixture.actions), /requires-inspection/u);
+    assert.deepEqual(fixture.writes, []);
+  }
+  const oversized = archiveInspectionFixture(() => new Response(Buffer.alloc(5 * 1024 * 1024 + 1)));
+  await assert.rejects(() => oversized.driver.inspect('account-1', oversized.actions), /r2-object-inspection-body-failed/u);
+  const network = archiveInspectionFixture(() => { throw new Error('fixture-token-sensitive'); });
+  await assert.rejects(() => network.driver.inspect('account-1', network.actions), /^Error: r2-object-inspection-network-failed$/u);
+});
+
+test('immutable publication requires an API token and never guesses absence from local-only authentication', async () => {
+  const driver = createCloudflareDriver({ config: { ...config, r2: [{ binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] }, workerDirectory: '/worker', apiToken: '', run: async () => '{}', r2Fetch: async () => { throw new Error('must-not-fetch'); } });
+  const actions = driver.resolveOperations([`r2-publish:tobirink-chrome-mv3-${releaseVersion}.zip`]);
+  await assert.rejects(() => driver.inspect('account-1', actions), /r2-object-inspection-token-required/u);
+  await assert.rejects(() => driver.apply(actions), /release-publication-requires-inspection/u);
+});
 
 async function test_release_snapshot_publication_is_validated_and_ordered() {
   const calls = [];

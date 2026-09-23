@@ -56,8 +56,15 @@ donc détectée, tandis qu’un rebuild équivalent ne déclenche pas à tort
 Les secrets `CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID` sont des secrets
 d’environnement GitHub. `PROVIDER_GATEWAY_HMAC_KEY` reste un secret runtime
 séparé du dépôt, présent côté Worker et gateway; aucune valeur secrète n’est
-versionnée. D1, Queue, R2 et les secrets fournisseur ne sont pas mutés par ce
-workflow. Les canaries et la promotion métier restent des contrôles distincts.
+versionnée. D1, R2 et les secrets fournisseur ne sont pas mutés par ce
+workflow. Wrangler redéploie cependant les réglages des consommateurs Queue
+déclarés dans sa configuration, y compris leur concurrence. L'inspection
+Worker inclut donc l'inventaire Queue distant, sans lire D1 ni R2. Le digest
+du bundle contient les réglages souhaités; l'inventaire Wrangler ne certifie
+ni tous les réglages distants ni le plan tarifaire du compte. Leur validation
+opérationnelle reste explicite, sans ajouter une permission Billing.
+Les créations/suppressions Queue restent des opérations séparées.
+Les canaries et la promotion métier restent des contrôles distincts.
 Le workflow propose aussi un input manuel `run_manga_canary`, désactivé par
 défaut, conservé comme nom compatible. Il admet maintenant exactement deux
 nouvelles clés aléatoires : un anime et un manga publics. Chaque clé doit
@@ -94,6 +101,6 @@ l’application et la probe publique `/healthz`; il ne prétend pas fabriquer un
 journal Deno absent et n’ajoute aucun mécanisme concurrent.
 
 Le contrôle post-déploiement ne conserve que les statuts HTTP et les identifiants
-de corrélation. D1, R2, Queues et la rotation des secrets sont explicitement
-hors périmètre et restent des opérations séparées, protégées par leurs propres
-plans et validations.
+de corrélation. D1, R2, les créations/suppressions Queue et la rotation des
+secrets restent des opérations séparées, protégées par leurs propres plans
+et validations; le redéploiement des consommateurs est inclus au Worker.

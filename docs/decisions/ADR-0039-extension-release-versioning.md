@@ -113,6 +113,15 @@ Existing archives are retained unchanged. A `worker-deploy` preview and apply
 must each rebuild the web workspace before invoking Wrangler, so the reviewed
 bundle and the deployed Worker cannot reuse a stale `apps/web/out` from an
 older extension version. A failed web build prevents Wrangler from running.
+The R2 publication adapter reads each exact object through the authenticated
+Cloudflare API during plan inspection and immediately before upload. Only an
+authenticated 404 means absent. A matching SHA-256 and size produce an
+idempotent skip; different bytes, failed authentication, oversized content or
+an unavailable API stop before upload. Public HTTP status is never used as
+proof of object absence. These checks reuse the deployment token and request
+no permission or billing mutation. Wrangler offers no conditional-put flag:
+the final read narrows, but does not atomically eliminate, races with an
+independent writer; the release workflow must remain single-writer.
 Publishing a new archive remains behind the Cloudflare infrastructure gate. The
 1.0.34 plan digest was `d272ac3e68ac5b2a2a05f792fbdf95b18ffc5e99fd9fdc22e38ec04c0cdd78df`
 for the two R2 objects and `worker:tobirink-public-api`; the deployed Worker

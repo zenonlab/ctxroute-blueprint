@@ -67,3 +67,13 @@ test('invalid Queue names fail closed', () => {
   assert.throws(() => validateCloudflareConfig({ ...config, queues: [{ name: 'Public_Discovery' }] }), /invalid-queue-name/u);
   assert.throws(() => validateCloudflareConfig({ ...config, queues: [{ name: 'a'.repeat(64) }] }), /invalid-queue-name/u);
 });
+
+test('Worker deployment inspection includes configured Queues without unrelated storage reads', async () => {
+  const calls = [];
+  const driver = createCloudflareDriver({ config, workerDirectory: '/worker', run: async args => { calls.push(args); return args[0] === 'queues' ? 'queue-consumer-revision' : '{}'; } });
+  const inspection = await driver.inspect('account-1', driver.resolveOperations(['worker-deploy']));
+  assert.deepEqual(inspection.queues, { configured: ['public-discovery', 'public-discovery-dlq'], output: 'queue-consumer-revision' });
+  assert.deepEqual(calls, [['whoami', '--account', 'account-1', '--json'], ['deployments', 'status', '--name', 'public-api', '--json'], ['queues', 'list']]);
+  assert.deepEqual(inspection.migrations, []);
+  assert.deepEqual(inspection.buckets, []);
+});

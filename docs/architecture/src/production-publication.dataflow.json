@@ -32,7 +32,7 @@
     { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox", "stage": 0, "row": 2, "tag": "SHA-256 vérifiés" },
     { "id": "githubDelivery", "type": "security", "label": "Livraison GitHub", "sublabel": "main + secrets production", "stage": 1, "row": 0, "tag": "plan expirant" },
     { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 1, "tag": "fail closed" },
-    { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP versionnés", "stage": 2, "row": 2, "tag": "R2" },
+    { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP vérifiés avant envoi", "stage": 2, "row": 2, "tag": "GET authentifié + SHA-256" },
     { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "100 %" },
     { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "liens après uploads", "stage": 3, "row": 0, "tag": "pointeur publié" },
     { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 2, "tag": "HTTP 200" },
