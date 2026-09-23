@@ -5474,9 +5474,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR #84 merged as 65709ee0; protected run 35875116944 succeeded and deployed Worker version cb7d12f3-ec95-4f98-a52a-741dde75a996 with only worker:tobirink-public-api.",
-            "Public read routes now use a separate 60/min/IP bucket before D1; regression 25/25, full npm run verify green, Archify architecture validation 0 errors/0 warnings.",
-            "Fresh canaries and extension publication were skipped because no canary/publication inputs were provided; online profile convergence remains unverified."
+            "Protected run 35875863436 (workflow_dispatch, run_manga_canary=true, publish_extension=false) succeeded; Worker 4f11cb66-0737-427c-8bc0-b8bbb2fd7b4b deployed with only worker target.",
+            "Fresh anime MISS→PENDING→VERIFIED in 16.05s and manga MISS→PENDING→VERIFIED in 30.94s; 4 provider requests, 2 accepted results, 0 retries, 0 provider 429/http/network errors, 4,501 D1 rows read, 24 written, 2 Queue sends, 0 Queue failures.",
+            "Extension publication remains intentionally disabled; 1,522-favorite online convergence and historical FAILED recovery remain unexecuted."
           ]
         }
       ]
