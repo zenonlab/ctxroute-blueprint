@@ -223,7 +223,7 @@ describe('verified public discovery cache', () => {
     const app = createPublicDiscoveryApp({
       publicDiscoveryV3: new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB),
       rateLimiter: limiter,
-      readRateLimiter,
+      readRateLimiter: readLimiter,
     });
     const getResponse = await app.request(`https://tobirink.test/v3/catalogue/discoveries?fingerprint=${'a'.repeat(64)}&mediaKind=ANIME&parserVersion=5&siteRulesVersion=3`);
     const postResponse = await app.request('https://tobirink.test/v3/catalogue/discoveries/lookup', {
