@@ -20,8 +20,9 @@ describe('native collector queue', () => {
     expect(providerFailureCode(new Error('fetch failed'))).toBe('provider-network');
     expect(providerFailureCode(new Error('private title from unexpected error'))).toBe('provider-unavailable');
     const invalid = new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['data', 0, 'attributes', 'titles', 'private-language'], message: 'private title' }]);
-    expect(providerFailureCode(invalid)).toBe('provider-response-invalid-titles');
-    expect(providerFailureCode(new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['private-title'], message: 'private title' }]))).toBe('provider-response-invalid');
+    expect(providerFailureCode(invalid)).toBe('provider-response-invalid-titles-invalid_type');
+    expect(providerFailureCode(new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['private-title'], message: 'private title' }]))).toBe('provider-response-invalid-unknown-invalid_type');
+    expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 16, inclusive: true, path: ['data', 0, 'attributes', 'abbreviatedTitles'], message: 'private title' }]))).toBe('provider-response-invalid-abbreviatedTitles-too_big');
   });
 
   it('logs only a bounded provider operation code for an invalid response', async () => {
@@ -43,7 +44,7 @@ describe('native collector queue', () => {
       requestDigest: 'b'.repeat(64), schemaVersion: 3,
     })).rejects.toThrow('private title');
     expect(search).toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith('public-discovery-provider-operation-failed', 'kitsu-manga', 'search', 'provider-response-invalid-titles');
+    expect(warn).toHaveBeenCalledWith('public-discovery-provider-operation-failed', 'kitsu-manga', 'search', 'provider-response-invalid-titles-invalid_type');
     expect(JSON.stringify(warn.mock.calls)).not.toContain('private title');
   });
 
