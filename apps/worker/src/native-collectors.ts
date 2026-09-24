@@ -230,9 +230,13 @@ export function providerFailureCode(error: Error | undefined): string {
   if (error === undefined) return 'provider-unknown';
   if (error instanceof PublicDiscoveryInvocationBudgetError || error instanceof PublicDiscoveryInvocationBudgetRetryError) return 'public-discovery-invocation-budget';
   if (error instanceof z.ZodError) {
-    const fields = new Set(['titles', 'abbreviatedTitles', 'posterImage', 'canonicalTitle', 'slug', 'subtype', 'ageRating', 'status', 'startDate', 'endDate', 'userCount', 'chapterCount', 'volumeCount', 'episodeCount', 'nsfw']);
-    const field = error.issues[0]?.path.find(segment => fields.has(String(segment)));
-    return field === undefined ? 'provider-response-invalid' : `provider-response-invalid-${String(field)}`;
+    const fields = new Set(['titles', 'abbreviatedTitles', 'posterImage', 'canonicalTitle', 'slug', 'subtype', 'ageRating', 'status', 'startDate', 'endDate', 'userCount', 'chapterCount', 'volumeCount', 'episodeCount', 'nsfw', 'title', 'altTitles', 'contentRating', 'originalLanguage', 'tags', 'relationships', 'fileName', 'links', 'limit', 'offset', 'total', 'series_id', 'total_hits', 'associated', 'categories', 'genres', 'image', 'type', 'url']);
+    const categories = new Set(['invalid_type', 'too_big', 'too_small', 'invalid_format', 'invalid_value', 'invalid_union', 'unrecognized_keys', 'custom']);
+    const issue = error.issues[0];
+    const field = issue?.path.find(segment => fields.has(String(segment)));
+    const issueCode = issue?.code ?? 'schema';
+    const category = categories.has(issueCode) ? issueCode : 'schema';
+    return `provider-response-invalid-${field === undefined ? 'unknown' : String(field)}-${category}`;
   }
   const incomplete = /^incomplete-provider-search:(deadline|candidate-page-limit|candidate-limit|cursor|page-limit)$/u.exec(error.message)?.[1];
   if (incomplete !== undefined) return `provider-search-${incomplete}`;

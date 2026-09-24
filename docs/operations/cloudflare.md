@@ -1138,3 +1138,11 @@ canonique comme repli d'affichage et accepte au plus 64 abréviations brutes
 en conservant au plus seize titres et variantes. Un alias numérique ou plus
 de 64 abréviations restent rejetés. Les autres rejets fournisseurs devront
 être diagnostiqués séparément avant toute reprise historique ou publication.
+
+La PR #91 (run `36062360487`) a livré le correctif d'alias. Les compteurs
+d'échecs Kitsu anime et manga sont ensuite revenus à zéro, mais Discovery
+observait encore des backoffs sans résultat accepté. Le diagnostic Worker
+conserve désormais seulement un champ et une catégorie Zod sur listes
+fermées, sans chemin complet, titre ou valeur fautive. Les schémas des
+fournisseurs ne changent pas dans cette étape ; les codes servent à choisir
+un correctif démontré plutôt qu'à assouplir les trois parseurs à l'aveugle.
