@@ -1128,3 +1128,13 @@ chemin inconnu reste `provider-response-invalid`. Aucune valeur, titre, URL
 ou réponse brute n'est journalisée. Ce changement n'effectue ni reprise D1,
 ni canari, ni publication R2 ; les futurs codes doivent être observés avant
 de décider d'un nouveau correctif fournisseur.
+
+Après le déploiement de la PR #90 (Worker `b6d79552`), la tentative automatique
+du 24 septembre à 21:26:19 UTC a révélé un rejet Kitsu manga sur `titles` ;
+Kitsu anime rejette aussi `abbreviatedTitles`. Des GET publics bornés, sans
+titre privé, montrent une traduction manga vide et vingt abréviations anime
+valides. Le correctif ciblé ignore la traduction vide, utilise le titre
+canonique comme repli d'affichage et accepte au plus 64 abréviations brutes
+en conservant au plus seize titres et variantes. Un alias numérique ou plus
+de 64 abréviations restent rejetés. Les autres rejets fournisseurs devront
+être diagnostiqués séparément avant toute reprise historique ou publication.

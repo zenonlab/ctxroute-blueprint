@@ -11,7 +11,7 @@ const posterImageSchema = z.object({
   tiny: z.url().nullable().optional(), small: z.url().nullable().optional(), medium: z.url().nullable().optional(), large: z.url().nullable().optional(), original: z.url().nullable().optional(),
 }).passthrough();
 const attributesSchema = z.object({
-  abbreviatedTitles: z.array(nonEmptyString).max(16),
+  abbreviatedTitles: z.array(nonEmptyString).max(64),
   ageRating: nonEmptyString.nullable().optional(),
   canonicalTitle: nonEmptyString,
   nsfw: z.boolean().optional(),
@@ -21,7 +21,7 @@ const attributesSchema = z.object({
   episodeCount: z.number().int().nonnegative().nullable().optional(), chapterCount: z.number().int().nonnegative().nullable().optional(), volumeCount: z.number().int().nonnegative().nullable().optional(),
   userCount: z.number().int().nonnegative().nullable().optional(),
   posterImage: posterImageSchema.nullable().optional(),
-  titles: z.record(z.string(), nonEmptyString.nullable()).refine((value) => Object.keys(value).length <= 16),
+  titles: z.record(z.string(), z.string().trim().nullable()).refine((value) => Object.keys(value).length <= 16),
 }).strict();
 const resourceSchema = z.object({ attributes: attributesSchema, id: nonEmptyString, type: z.enum(['anime', 'manga']) }).passthrough();
 const searchSchema = z.object({
@@ -53,7 +53,7 @@ function sparseFields(provider: KitsuProvider): string {
 function candidate(resource: KitsuResource, provider: KitsuProvider): ProviderCandidate {
   const expectedType = kind(provider);
   if (resource.type !== expectedType) throw new Error('Kitsu returned a different media type.');
-  const translatedTitles = Object.entries(resource.attributes.titles).filter((entry): entry is [string, string] => entry[1] !== null);
+  const translatedTitles = Object.entries(resource.attributes.titles).filter((entry): entry is [string, string] => entry[1] !== null && entry[1].length > 0);
   const titles = [...new Set([resource.attributes.canonicalTitle, ...translatedTitles.map(([, title]) => title), ...resource.attributes.abbreviatedTitles])].slice(0, 16);
   const result: MutableCandidate = {
     contentClassification: contentClassification(resource.attributes),
@@ -64,7 +64,7 @@ function candidate(resource: KitsuResource, provider: KitsuProvider): ProviderCa
     provider,
     titles,
     metadataVersion: 2,
-    displayTitle: resource.attributes.titles.fr_fr ?? resource.attributes.titles.en ?? resource.attributes.canonicalTitle,
+    displayTitle: resource.attributes.titles.fr_fr || resource.attributes.titles.en || resource.attributes.canonicalTitle,
     titleVariants: [{ title: resource.attributes.canonicalTitle }, ...translatedTitles.map(([language, title]) => ({ language: language.replace('_', '-'), title })), ...resource.attributes.abbreviatedTitles.map((title) => ({ title }))].slice(0, 16),
   };
   const coverUrl = resource.attributes.posterImage?.large ?? resource.attributes.posterImage?.medium ?? resource.attributes.posterImage?.original ?? resource.attributes.posterImage?.small ?? resource.attributes.posterImage?.tiny;

@@ -66,6 +66,22 @@ describe('KitsuFavoriteProviderAdapter', () => {
     await expect(adapter.search({ limit: 20, provider: 'kitsu-manga', titles: ['Naruto'] })).rejects.toThrow();
   });
 
+  it('ignores empty translated titles and bounds a long abbreviation list', async () => {
+    const mangaAttributes = { ...manga.attributes, titles: { en: '', en_jp: 'Naruto' } };
+    const mangaAdapter = new KitsuFavoriteProviderAdapter('kitsu-manga', async () => Response.json({ data: [{ ...manga, attributes: mangaAttributes }], links: { next: null }, meta: { count: 1 } }));
+    const mangaResult = await mangaAdapter.search({ limit: 20, provider: 'kitsu-manga', titles: ['Naruto'] });
+    expect(mangaResult.candidates[0]).toMatchObject({ displayTitle: manga.attributes.canonicalTitle, titles: expect.arrayContaining([manga.attributes.canonicalTitle, 'Naruto']) });
+    expect(mangaResult.candidates[0]?.titleVariants).not.toContainEqual({ language: 'en', title: '' });
+
+    const animeAttributes = { ...anime.attributes, abbreviatedTitles: Array.from({ length: 20 }, (_value, index) => `Alias ${index}`) };
+    const animeAdapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes: animeAttributes }], links: { next: null }, meta: { count: 1 } }));
+    const animeResult = await animeAdapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
+    expect(animeResult.candidates[0]?.titles.length).toBeLessThanOrEqual(16);
+    expect(animeResult.candidates[0]?.titleVariants?.length).toBeLessThanOrEqual(16);
+    const excessive = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes: { ...animeAttributes, abbreviatedTitles: Array.from({ length: 65 }, (_value, index) => `Alias ${index}`) } }], links: { next: null }, meta: { count: 1 } }));
+    await expect(excessive.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] })).rejects.toThrow();
+  });
+
   it('marks paginated responses incomplete and rejects cross-lane media', async () => {
     const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => new Response(JSON.stringify({ data: [anime], links: { next: 'https://kitsu.io/next' }, meta: { count: 2 } }), { headers: { 'content-type': 'application/vnd.api+json' } }));
     await expect(adapter.search({ limit: 1, provider: 'kitsu-anime', titles: ['Frieren'] })).resolves.toMatchObject({ complete: false, truncated: true });
