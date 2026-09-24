@@ -13,6 +13,7 @@ Passing a narrower unit test is not evidence for a broader invariant.
 | Experiment | Retained worktree and experiment receipt at `READY_FOR_PROMOTION`; no integration before explicit promotion | Negative integration test followed by promotion test |
 | Outcome | Read-only snapshot unchanged; mutation commit reachable from primary HEAD; recovery backup/final inventory; experiment promotion consumed | Real Git completion tests for every effect |
 | Git authority | Every shared Git effect runs inside `repositoryMutationLock`; workers use read-only allowlist | Multiprocess allocation, commit, integration, rollback, purge, and per-runtime worker denial tests |
+| Portable workers | Only CTXRoute starts assigned, non-overlapping missions within `parallelWorktrees`; adapter output never bypasses report validation | Fake Codex, Claude, and OpenCode executables; parallel temporary Git worktrees; root-binding and invalid-output tests |
 | Recovery | Inventory includes worktrees, divergent branches, interrupted operations, and unreachable commits; no age-based deletion | Dirty recovery with bounded patch and explicit destructive receipt |
 | Hook snapshot | Atomic policy under 16 KiB, independent envelope/policy digest validation, last-valid and fail-closed mutation fallback | Corrupt/missing/oversized snapshot tests |
 | Execution binding | Worker policy, stage, access, digest, and revision come from durable mission state; contradictory environment is rejected | Writable/read-only stage, stale revision, wrong digest, and missing mission tests |

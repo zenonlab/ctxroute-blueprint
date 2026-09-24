@@ -37,6 +37,7 @@ same service and is the emergency path when MCP is unavailable:
 
 ```sh
 npm run orchestrator:read
+npm run orchestrator:run -- --goal-id goal-one --adapter codex
 npm run orchestrator:doctor
 npm run orchestrator:cli -- modes
 npm run orchestrator:cli -- explain-execution request.json
@@ -53,6 +54,25 @@ npm run orchestrator:cli -- rollback-mission transaction.json
 npm run orchestrator:cli -- purge-worktree transaction.json
 npm run ctxroute:query -- query.json
 ```
+
+`prepare-mission` only creates an `ASSIGNED` mission and its worktree; it does
+not launch an agent. `orchestrator:run` selects ready missions within
+`parallelWorktrees`, then invokes `codex exec`, `claude -p`, or `opencode run`
+inside each worktree. `--adapter` defaults to `codex`; MCP exposes the same
+operation as `orchestrator_run_goal`. `orchestrator:read` includes each mission's
+bounded latest attempt. Interrupted attempts become `BLOCKED` on the next run
+and retain their worktrees. An explicit `BLOCKED` → `ASSIGNED` transition is
+required before retry. Reports still pass diff inspection and declared
+validations. The orchestrator alone commits and serially integrates into a
+clean primary checkout. A mission completed before the `integration` stage
+retains its commit until integration becomes eligible.
+
+Workers receive `CTXROUTE_PRIMARY_ROOT`, `CTXROUTE_WORKTREE`, and
+`CTXROUTE_MISSION_ID`. Hooks read durable state and policy from the primary
+checkout while checking files in the assigned worktree. CTXRoute state is not
+copied into worktrees. Ordinary CLI authentication, hooks, and permissions
+remain active; native delegation is disabled inside mission workers but stays
+available outside orchestrated missions.
 
 Transactions require `operation_id`, `expected_revision`, `action`, and a
 bounded payload. Repeating the same operation identifier, action, and complete
