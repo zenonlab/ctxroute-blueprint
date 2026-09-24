@@ -40,6 +40,28 @@ describe('MangaDex exact hydration', () => {
     await expect(new MangaDexFavoriteProviderAdapter(async () => searchResponse(Array.from({ length: 129 }, (_value, index) => relationships[index % relationships.length]!))).search({ provider: 'mangadex', titles: ['Synthetic Series'], limit: 20 })).rejects.toThrow();
   });
 
+  it('keeps a matching identity when another result has an oversized title', async () => {
+    const overlong = { ...payload.data, id: '12345678-1234-4234-8234-123456789abd', attributes: { ...payload.data.attributes, title: { en: 'A'.repeat(201) }, altTitles: [] } };
+    const adapter = new MangaDexFavoriteProviderAdapter(async () => Response.json({ result: 'ok', data: [overlong, payload.data], limit: 20, offset: 0, total: 2 }));
+    const result = await adapter.search({ provider: 'mangadex', titles: ['Synthetic Series'], limit: 20 });
+    expect(result).toMatchObject({ complete: false, truncated: true, candidates: [{ externalId: id }] });
+    expect(result).not.toHaveProperty('nextCursor');
+    const unmatched = new MangaDexFavoriteProviderAdapter(async () => Response.json({ result: 'ok', data: [overlong], limit: 20, offset: 0, total: 1 }));
+    await expect(unmatched.search({ provider: 'mangadex', titles: ['Synthetic Series'], limit: 20 })).resolves.toMatchObject({ candidates: [], complete: false, truncated: true });
+  });
+
+  it('does not claim completeness after omitting a late alias', async () => {
+    const attributes = { ...payload.data.attributes, altTitles: Array.from({ length: 17 }, (_value, index) => ({ en: `Alias ${index}` })) };
+    const adapter = new MangaDexFavoriteProviderAdapter(async () => Response.json({ result: 'ok', data: [{ ...payload.data, attributes }], limit: 20, offset: 0, total: 1 }));
+    await expect(adapter.search({ provider: 'mangadex', titles: ['Missing'], limit: 20 })).resolves.toMatchObject({ complete: false, truncated: true });
+  });
+
+  it('hydrates an exact identity using a bounded alternate title', async () => {
+    const attributes = { ...payload.data.attributes, title: { en: 'A'.repeat(201) }, altTitles: [{ ja: 'Synthetic Alias' }] };
+    const adapter = new MangaDexFavoriteProviderAdapter(async () => Response.json({ result: 'ok', data: { ...payload.data, attributes } }));
+    await expect(adapter.hydrate({ provider: 'mangadex', externalId: id })).resolves.toMatchObject({ displayTitle: 'Synthetic Alias', titles: ['Synthetic Alias'] });
+  });
+
   it('hydrates only the requested public identity and retains aliases', async () => {
     const fetcher = vi.fn(async () => Response.json(payload));
     const adapter = new MangaDexFavoriteProviderAdapter(fetcher);
