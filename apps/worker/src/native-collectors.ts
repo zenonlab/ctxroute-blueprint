@@ -150,6 +150,7 @@ export function createBudgetedDiscoveryResolver(
     async resolve(request: PublicDiscoveryClaimedRequest) {
       const first = completed === 0;
       const scope = { closed: false, exceeded: false };
+      const diagnosed = new Set<keyof PublicDiscoveryProviderPorts>();
       const operation = async <T>(run: () => Promise<T>): Promise<T> => {
         if (scope.closed) throw new Error('public-discovery-resolution-closed');
         // Publication (7) also covers this claim's alternative defer (2).
@@ -164,15 +165,26 @@ export function createBudgetedDiscoveryResolver(
         try { return await run(); }
         finally { outstanding -= 4; }
       };
-      const wrap = (provider: FavoriteProviderPort): FavoriteProviderPort => ({
-        search: query => operation(() => provider.search(query)),
-        hydrate: reference => operation(() => provider.hydrate(reference)),
+      const observe = async <T>(providerName: keyof PublicDiscoveryProviderPorts, action: 'search' | 'hydrate', run: () => Promise<T>): Promise<T> => {
+        try { return await run(); }
+        catch (error) {
+          const code = providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined);
+          if (!diagnosed.has(providerName) && (code.startsWith('provider-response-invalid') || code === 'provider-timeout' || code === 'provider-unavailable')) {
+            diagnosed.add(providerName);
+            console.warn('public-discovery-provider-operation-failed', providerName, action, code);
+          }
+          throw error;
+        }
+      };
+      const wrap = (providerName: keyof PublicDiscoveryProviderPorts, provider: FavoriteProviderPort): FavoriteProviderPort => ({
+        search: query => operation(() => observe(providerName, 'search', () => provider.search(query))),
+        hydrate: reference => operation(() => observe(providerName, 'hydrate', () => provider.hydrate(reference))),
       });
       try {
         if (exhausted) throw deferred();
         const resolver = createPublicDiscoveryResolver({
-          anilist: wrap(providers.anilist), mangaupdates: wrap(providers.mangaupdates), mangadex: wrap(providers.mangadex),
-          'kitsu-anime': wrap(providers['kitsu-anime']), 'kitsu-manga': wrap(providers['kitsu-manga']),
+          anilist: wrap('anilist', providers.anilist), mangaupdates: wrap('mangaupdates', providers.mangaupdates), mangadex: wrap('mangadex', providers.mangadex),
+          'kitsu-anime': wrap('kitsu-anime', providers['kitsu-anime']), 'kitsu-manga': wrap('kitsu-manga', providers['kitsu-manga']),
         });
         const result = await resolveWithDeadline(resolver.resolve(request), timeoutMilliseconds);
         // The portable resolver may have caught a port error or returned a
@@ -217,9 +229,15 @@ function providerFetch(bindings: NativeCollectorBindings) {
 export function providerFailureCode(error: Error | undefined): string {
   if (error === undefined) return 'provider-unknown';
   if (error instanceof PublicDiscoveryInvocationBudgetError || error instanceof PublicDiscoveryInvocationBudgetRetryError) return 'public-discovery-invocation-budget';
+  if (error instanceof z.ZodError) {
+    const fields = new Set(['titles', 'abbreviatedTitles', 'posterImage', 'canonicalTitle', 'slug', 'subtype', 'ageRating', 'status', 'startDate', 'endDate', 'userCount', 'chapterCount', 'volumeCount', 'episodeCount', 'nsfw']);
+    const field = error.issues[0]?.path.find(segment => fields.has(String(segment)));
+    return field === undefined ? 'provider-response-invalid' : `provider-response-invalid-${String(field)}`;
+  }
   const incomplete = /^incomplete-provider-search:(deadline|candidate-page-limit|candidate-limit|cursor|page-limit)$/u.exec(error.message)?.[1];
   if (incomplete !== undefined) return `provider-search-${incomplete}`;
   if (error.message === 'Provider cadence requires a later wake.') return 'provider-cadence-deferred';
+  if (error.message === 'Public discovery resolution exceeded its bounded execution window.') return 'provider-resolution-deadline';
   if (/^provider-(gateway|transport)-/u.test(error.message)) {
     return error.message.slice(0, 80);
   }
@@ -289,7 +307,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       resolve: async (request) => {
         try { return await resolver.resolve(request); }
         catch (error) {
-          console.warn('public-discovery-provider-failed', providerFailureCode(error instanceof Error ? error : undefined));
+          console.warn('public-discovery-provider-failed', providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined));
           throw error;
         }
       },

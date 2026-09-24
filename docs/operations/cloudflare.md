@@ -1116,3 +1116,15 @@ comme traduction absente, garde le titre canonique et les alias valides et
 refuse toujours les valeurs non nulles malformées. Il ne réarme aucune demande
 historique et ne publie aucune archive ; les autres causes de backoff restent
 à vérifier après déploiement.
+
+La PR #89 (run protégé `36056110741`) a livré le schéma Kitsu corrigé, mais
+la tentative automatique suivante a porté `kitsu-manga` à 18 échecs sans
+résultat accepté ; 438 demandes `VERIFIED` et 367 œuvres sont conservées.
+Le diagnostic Worker ajouté émet au plus un avertissement par fournisseur et
+demande pour une erreur de réponse, un délai ou une erreur non classée. Il
+contient uniquement le fournisseur et l'opération prédéfinis, plus un code
+borné. Pour Zod, seul un nom de champ sur liste fermée est conservé ; un
+chemin inconnu reste `provider-response-invalid`. Aucune valeur, titre, URL
+ou réponse brute n'est journalisée. Ce changement n'effectue ni reprise D1,
+ni canari, ni publication R2 ; les futurs codes doivent être observés avant
+de décider d'un nouveau correctif fournisseur.
