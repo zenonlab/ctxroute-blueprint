@@ -83,13 +83,13 @@ identifiant et n’appelle aucun fournisseur. Une seconde soumission de la même
 clé doit porter le même digest de requête; un contenu différent est refusé au
 lieu d’écraser le travail existant.
 
-Le consumer reçoit jusqu’à cinq signaux à la fois mais exécute un seul
-`claim(5)` par lot; chaque résultat vérifié est publié dès sa disponibilité.
+Le consumer reçoit un signal par invocation et exécute un seul
+`claim(1)` ; le résultat vérifié est publié dès sa disponibilité.
 Chaque résolution possède aussi une deadline applicative de trente secondes :
 si un transport amont ou une opération d’infrastructure reste suspendu, le
 claim est différé comme une erreur fournisseur retryable au lieu de rester
 `PROCESSING` jusqu’à l’expiration du bail de quinze minutes.
-Le budget d'une invocation Discovery conserve `claim(5)` et compte les appels
+Le budget d'une invocation Discovery conserve `claim(1)` et compte les appels
 D1 avant exécution, indépendamment des métriques de lignes `worker.cost`.
 Un batch D1 constitue un appel RPC, sans confondre ce nombre avec ses statements
 SQL ni avec ses lignes lues/écrites. Avant chaque opération publique fournisseur
@@ -125,8 +125,10 @@ la même instruction atomique de claim. L’expiration des huitièmes tentatives
 utilise également ces index; elle ne parcourt pas l’historique terminal.
 `nextPendingAt()` conserve le minimum des échéances sur les seuls index actifs.
 Le nombre de lectures dépend donc encore du travail actif à examiner, pas
-seulement du nombre de demandes retournées : `claim(5)` n’est pas une garantie
-de cinq lignes lues.
+seulement du nombre de demandes retournées : `claim(1)` n’est pas une garantie
+d’une seule ligne lue. Les `UPDATE` de claim et d’expiration reprennent aussi
+le prédicat d’état actif à l’extérieur de leur sous-requête, pour éviter un
+scan de l’historique terminal avant la recherche sur les index partiels.
 Si la réservation de cadence ou un `429` impose une attente avant tout résultat
 fournisseur, le collecteur libère le bail, remet la demande (ou son refresh)
 à `PENDING` jusqu’à cette échéance et restitue la tentative prise au claim.

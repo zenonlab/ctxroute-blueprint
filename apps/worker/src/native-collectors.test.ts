@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, handleNativeCollectorQueue, resolveWithDeadline, type NativeCollectorSignal } from './native-collectors';
+import { FavoriteProviderRetryError } from '@tobirink/public-discovery';
+import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, handleNativeCollectorQueue, providerFailureCode, resolveWithDeadline, type NativeCollectorSignal } from './native-collectors';
 import { instrumentProviderFetch } from './operational-metrics';
 
 function message(body: NativeCollectorSignal | null, attempts = 1) {
@@ -8,6 +9,15 @@ function message(body: NativeCollectorSignal | null, attempts = 1) {
 
 describe('native collector queue', () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it('emits bounded provider failure codes without error payloads', () => {
+    expect(providerFailureCode(new FavoriteProviderRetryError('Provider cadence requires a later wake.', Date.now() + 1_000))).toBe('provider-cadence-deferred');
+    expect(providerFailureCode(new Error('incomplete-provider-search:deadline'))).toBe('provider-search-deadline');
+    expect(providerFailureCode(new Error('incomplete-provider-search:page-limit'))).toBe('provider-search-page-limit');
+    expect(providerFailureCode(new Error('Favorite provider request failed with HTTP 429.'))).toBe('provider-http-429');
+    expect(providerFailureCode(new Error('fetch failed'))).toBe('provider-network');
+    expect(providerFailureCode(new Error('private title from unexpected error'))).toBe('provider-unavailable');
+  });
 
   it('routes an operational recovery signal without invoking collectors or resetting requests', async () => {
     const item = message({ type: 'agenda-recovery', version: 1 });

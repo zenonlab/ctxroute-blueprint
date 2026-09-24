@@ -1081,4 +1081,25 @@ rollback du seul code Worker repasse par un plan de déploiement revu; une
 restauration D1 est une opération séparée et non automatique.
 ## Reprise Discovery bornée
 
-La limite d’admission publique est de 60 requêtes par minute et par IP ; l’extension attend au moins 1,1 seconde entre deux soumissions et respecte `Retry-After`. Le consommateur Queue réclame au plus cinq demandes par lot. Un second cron Worker, quotidien, réveille ce traitement borné pour les demandes D1 arrivées à échéance lorsqu’un signal Queue a disparu ; le cron Agenda hebdomadaire reste séparé et inchangé. Toute publication ou reprise D1 historique exige les canaris et la confirmation immédiate prévue par la procédure de production.
+La limite d’admission publique est de 60 requêtes par minute et par IP ; l’extension attend au moins 1,1 seconde entre deux soumissions et respecte `Retry-After`. Le consumer Queue traite un message et réclame une demande par invocation, avec une seule invocation concurrente. Un second cron Worker, quotidien, réveille ce traitement borné pour les demandes D1 arrivées à échéance lorsqu’un signal Queue a disparu ; le cron Agenda hebdomadaire reste séparé et inchangé. Toute publication ou reprise D1 historique exige les canaris et la confirmation immédiate prévue par la procédure de production.
+
+### Diagnostic et correction candidate du 24 septembre 2026
+
+Avant correction, `wrangler d1 insights PUBLIC_DB --time-period 1h` mesurait
+408 expirations de refresh pour 370 056 lectures, 334 claims pour 311 594
+lectures et 292 expirations de demandes pour 272 750 lectures. Le plan distant
+de `UPDATE ... WHERE rowid IN (SELECT ...)` scannait la table externe entière,
+malgré l’index de la sous-requête. Un prédicat externe redondant sur les états
+actifs permet au moteur d’utiliser les index partiels sans changer la sélection
+ni ajouter de migration. Sur D1 local avec 500 échecs terminaux synthétiques,
+un claim lit 25 lignes et un claim à vide 22, avec respectivement 3 et 0
+écritures. Ce résultat local doit être corroboré après déploiement.
+
+Les diagnostics Worker agrégés de 18:45 à 19:05 UTC comptaient 153 invocations
+`success`, zéro erreur de plateforme, 40 `backoff`, un `failed`, 193 appels
+fournisseur et aucun résultat accepté. `kitsu-manga` avait dix échecs
+consécutifs et un circuit ouvert ; la DLQ contenait treize messages. Les
+avertissements `provider-unavailable` masquaient la cause précise. La candidate
+émet des codes bornés pour cadence, recherche incomplète, HTTP, réseau et
+réponse invalide, sans titre ou payload privé. Aucun réarmement historique,
+rejeu DLQ ni publication d’archive ne fait partie de cette correction Worker.

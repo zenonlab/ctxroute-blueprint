@@ -208,7 +208,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       state = 'FAILED', failure_reason = 'ATTEMPT_LIMIT', failed_at = ?1,
       claim_token_hash = NULL, lease_until = NULL, retry_at = ?1, updated_at = ?1,
       purge_after = ?3
-      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_pending
+      WHERE state IN ('PENDING', 'PROCESSING')
+        AND rowid IN (SELECT rowid FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_pending
         WHERE state IN ('PENDING', 'PROCESSING')
           AND state = 'PROCESSING' AND attempt_count >= 8 AND lease_until <= ?1
         ORDER BY updated_at, fingerprint LIMIT ?2)
@@ -216,7 +217,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       refresh_state = 'IDLE', refresh_attempt_count = 0,
       claim_token_hash = NULL, lease_until = NULL, updated_at = ?1
-      WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_refresh_claim
+      WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING')
+        AND rowid IN (SELECT rowid FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_refresh_claim
         WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING') AND refresh_state = 'PROCESSING'
           AND refresh_attempt_count >= 8 AND lease_until <= ?1
         ORDER BY updated_at, fingerprint LIMIT ?2)
@@ -354,7 +356,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       attempt_count = CASE WHEN state = 'VERIFIED' THEN attempt_count ELSE attempt_count + 1 END,
       refresh_attempt_count = CASE WHEN state = 'VERIFIED' THEN refresh_attempt_count + 1 ELSE refresh_attempt_count END,
       retry_at = ?2, updated_at = ?3
-      WHERE rowid IN (SELECT rowid FROM (
+      WHERE (state IN ('PENDING', 'PROCESSING') OR (state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING')))
+        AND rowid IN (SELECT rowid FROM (
         SELECT rowid, admission_priority, updated_at, fingerprint
         FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_claim_priority
         WHERE state IN ('PENDING', 'PROCESSING') AND attempt_count < 8

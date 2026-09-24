@@ -214,15 +214,20 @@ function providerFetch(bindings: NativeCollectorBindings) {
   }
 }
 
-function providerFailureCode(error: Error | undefined): string {
+export function providerFailureCode(error: Error | undefined): string {
   if (error === undefined) return 'provider-unknown';
   if (error instanceof PublicDiscoveryInvocationBudgetError || error instanceof PublicDiscoveryInvocationBudgetRetryError) return 'public-discovery-invocation-budget';
+  const incomplete = /^incomplete-provider-search:(deadline|candidate-page-limit|candidate-limit|cursor|page-limit)$/u.exec(error.message)?.[1];
+  if (incomplete !== undefined) return `provider-search-${incomplete}`;
+  if (error.message === 'Provider cadence requires a later wake.') return 'provider-cadence-deferred';
   if (/^provider-(gateway|transport)-/u.test(error.message)) {
     return error.message.slice(0, 80);
   }
   const status = /HTTP ([1-5]\d{2})\b/u.exec(error.message)?.[1];
   if (status !== undefined) return `provider-http-${status}`;
   if (error.name === 'AbortError' || error.name === 'TimeoutError') return 'provider-timeout';
+  if (/fetch failed|network/iu.test(error.message)) return 'provider-network';
+  if (error.name === 'ZodError' || /Favorite provider response/u.test(error.message)) return 'provider-response-invalid';
   return 'provider-unavailable';
 }
 
@@ -277,7 +282,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
         return { published: receipt.published, replayed: receipt.replayed };
       },
     },
-    limit: 5,
+    limit: 1,
     nonce: () => crypto.randomUUID(),
     now: () => new Date().toISOString(),
     resolver: {

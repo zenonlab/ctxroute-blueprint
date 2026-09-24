@@ -17,7 +17,7 @@
         "id": "cache-miss",
         "label": "Œuvre absente de D1",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1", "extensionResult"],
-        "note": "Le claim(5) respecte 50 appels D1 avec réserves fournisseur, publication et reports; le secours quotidien reprend les signaux perdus."
+        "note": "Le claim(1) respecte 50 appels D1 avec réserves fournisseur, publication et reports; le secours quotidien reprend les signaux perdus."
       },
       {
         "id": "verified-refresh",
@@ -85,7 +85,7 @@
       "id": "collector",
       "type": "backend",
       "label": "Collecteur Worker",
-      "sublabel": "claim(5) · budget D1 · 30 s",
+      "sublabel": "claim(1) · budget D1 · 30 s",
       "stage": 3,
       "row": 1,
       "width": 140,
@@ -173,7 +173,7 @@
       "from": "queue",
       "to": "collector",
       "label": "lot de signaux disponible",
-      "classification": "claim(5) · bail D1 conditionnel",
+      "classification": "claim(1) · bail D1 conditionnel",
       "variant": "emphasis",
       "route": "straight",
       "labelAt": [638, 480]
