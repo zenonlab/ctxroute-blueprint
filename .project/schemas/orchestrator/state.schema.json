@@ -75,7 +75,7 @@
       "properties": {
         "operation_id": { "$ref": "common.schema.json#/$defs/identifier" },
         "digest": { "$ref": "common.schema.json#/$defs/digest" },
-        "action": { "enum": ["operating-mode.set", "mode.set", "goal.create", "goal.stage.advance", "goal.transition", "goal.policy.rebase", "decision.request", "decision.resolve", "experiment.promote", "mission.prepare", "mission.commit", "mission.integrate", "mission.transition", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
+        "action": { "enum": ["operating-mode.set", "mode.set", "goal.create", "goal.stage.advance", "goal.transition", "goal.policy.rebase", "decision.request", "decision.resolve", "experiment.promote", "mission.prepare", "mission.commit", "mission.integrate", "mission.transition", "mission.attempt.start", "mission.attempt.finish", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
         "intent": { "type": ["object", "null"] },
         "status": { "enum": ["PENDING", "COMPLETED", "BLOCKED"] },
         "start_revision": { "type": "integer", "minimum": 0 },

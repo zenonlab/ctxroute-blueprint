@@ -20,12 +20,18 @@ import { MODE_DESCRIPTORS, WORKFLOW_DESCRIPTORS, canonicalMode, explainExecution
 import { writePolicySnapshot } from './orchestrator-policy-snapshot.mjs';
 import { executionBindingForMission } from './orchestrator-execution-binding.mjs';
 import { decide } from './agent-governance.mjs';
+import { verifyWorkerRoots } from './orchestrator-worker-roots.mjs';
 
 export async function readCoordination(root = process.cwd(), environment = process.env) {
   const state = await readOrchestratorState(root);
   if (environment.CTXROUTE_AGENT_ROLE !== 'worker') return state;
   const found = findMission(state, environment.CTXROUTE_MISSION_ID);
   if (!found?.mission.worktree_allocation?.path) throw new Error('worker role requires an assigned CTXROUTE_MISSION_ID');
+  if (environment.CTXROUTE_WORKTREE) {
+    const expected = resolve(root, found.mission.worktree_allocation.path);
+    if (resolve(environment.CTXROUTE_WORKTREE) !== expected) throw new Error('worker worktree contradicts the assigned mission');
+    await verifyWorkerRoots(root, expected);
+  }
   const config = await loadOrchestratorConfig(root);
   const { binding, mission, requestedMode, resolvedMode } = executionBindingForMission(state, environment.CTXROUTE_MISSION_ID, config, environment.CTXROUTE_SESSION_ID);
   const portableBinding = { ...binding };
@@ -218,13 +224,13 @@ export async function submitWorkerReport(command, root = process.cwd(), environm
     if (mission.access === 'read-only' && inspection.files.length) throw categorized('READ_ONLY_POLICY_VIOLATION', 'read-only mission changed repository files');
     const reported = [...report.files_touched].sort();
     if (JSON.stringify(reported) !== JSON.stringify(inspection.files)) throw categorized('REPORT_DIFF_MISMATCH', 'worker report files_touched does not match the worktree diff');
-    if (report.status === 'BLOCKED') return blockOrchestratorTransaction(command, 'WORKER_BLOCKED', root, dependencies, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'BLOCKED', report })));
+    if (report.status === 'BLOCKED') return blockOrchestratorTransaction(command, 'WORKER_BLOCKED', root, dependencies, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...blockedAttempt(item, 'WORKER_BLOCKED'), report })));
     const worktree = resolve(root, mission.worktree_allocation.path);
     const receipt = await runMissionValidations(mission, worktree, root, dependencies);
-    if (receipt.status !== 'PASSED') return blockOrchestratorTransaction(command, receipt.status === 'TIMED_OUT' ? 'VALIDATION_TIMEOUT' : 'VALIDATION_FAILED', root, dependencies, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'BLOCKED', report, validation_receipt: receipt })));
+    if (receipt.status !== 'PASSED') return blockOrchestratorTransaction(command, receipt.status === 'TIMED_OUT' ? 'VALIDATION_TIMEOUT' : 'VALIDATION_FAILED', root, dependencies, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...blockedAttempt(item, receipt.status === 'TIMED_OUT' ? 'VALIDATION_TIMEOUT' : 'VALIDATION_FAILED'), report, validation_receipt: receipt })));
     return completeOrchestratorTransaction(command, current => updateMission(current, command.payload.goal_id, report.mission_id, item => ({ ...item, status: 'COMPLETED', report, validation_receipt: receipt })), 'UPDATED', root, dependencies);
   } catch (error) {
-    await blockOrchestratorTransaction(command, error.causeCode ?? 'REPORT_REJECTED', root, dependencies).catch(() => {});
+    await blockOrchestratorTransaction(command, error.causeCode ?? 'REPORT_REJECTED', root, dependencies, current => updateMission(current, command.payload.goal_id, report.mission_id, item => blockedAttempt(item, error.causeCode ?? 'REPORT_REJECTED'))).catch(() => {});
     throw error;
   }
 }
@@ -345,6 +351,10 @@ function missionRecord(request, reason, goal) {
   const record = { ...request, response_format: 'worker-report', execution_reason: reason, stage: stage.stage, strategy: stage.strategy, access: stage.access, policy_digest: goal.policy_digest, reinforcements: goal.reinforcements ?? [], status: 'PREPARING', worktree_allocation: null, orchestrator_commit: null, integrated_commit: null, report: null, validation_receipt: null };
   assertOrchestratorContract('mission-record', record);
   return record;
+}
+function blockedAttempt(mission, cause) {
+  if (!mission.attempt) return { ...mission, status: 'BLOCKED' };
+  return { ...mission, status: 'BLOCKED', attempt: { ...mission.attempt, status: 'BLOCKED', finished_at: mission.attempt.finished_at ?? new Date().toISOString(), cause } };
 }
 function assertGoalPolicyCanRunMission(goal, request) {
   if (!goal || goal.status !== 'ACTIVE') throw new Error('mission requires an active goal');

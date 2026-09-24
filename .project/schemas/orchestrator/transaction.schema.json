@@ -6,7 +6,7 @@
   "properties": {
     "operation_id": { "$ref": "common.schema.json#/$defs/identifier" },
     "expected_revision": { "type": "integer", "minimum": 0 },
-    "action": { "enum": ["operating-mode.set", "mode.set", "goal.create", "goal.stage.advance", "goal.transition", "goal.policy.rebase", "decision.request", "decision.resolve", "experiment.promote", "mission.prepare", "mission.commit", "mission.integrate", "mission.transition", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
+    "action": { "enum": ["operating-mode.set", "mode.set", "goal.create", "goal.stage.advance", "goal.transition", "goal.policy.rebase", "decision.request", "decision.resolve", "experiment.promote", "mission.prepare", "mission.commit", "mission.integrate", "mission.transition", "mission.attempt.start", "mission.attempt.finish", "report.submit", "audit.apply", "skill.register", "worktree.reconcile", "mission.rollback", "worktree.purge"] },
     "payload": { "type": "object" }
   },
   "oneOf": [
@@ -23,6 +23,8 @@
     { "properties": { "action": { "const": "mission.commit" }, "payload": { "$ref": "#/$defs/missionCommit" } } },
     { "properties": { "action": { "const": "mission.integrate" }, "payload": { "$ref": "#/$defs/missionIntegrate" } } },
     { "properties": { "action": { "const": "mission.transition" }, "payload": { "$ref": "#/$defs/missionTransition" } } },
+    { "properties": { "action": { "const": "mission.attempt.start" }, "payload": { "$ref": "#/$defs/attemptStart" } } },
+    { "properties": { "action": { "const": "mission.attempt.finish" }, "payload": { "$ref": "#/$defs/attemptFinish" } } },
     { "properties": { "action": { "const": "report.submit" }, "payload": { "$ref": "#/$defs/reportSubmit" } } },
     { "properties": { "action": { "const": "audit.apply" }, "payload": { "$ref": "#/$defs/auditApply" } } },
     { "properties": { "action": { "const": "skill.register" }, "payload": { "$ref": "#/$defs/skillRegister" } } },
@@ -44,6 +46,8 @@
     "missionCommit": { "type": "object", "required": ["goal_id", "mission_id", "message"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "mission_id": { "$ref": "common.schema.json#/$defs/identifier" }, "message": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[^\\r\\n\\u0000]+$" } }, "unevaluatedProperties": false },
     "missionIntegrate": { "type": "object", "required": ["goal_id", "mission_id", "commit_oid"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "mission_id": { "$ref": "common.schema.json#/$defs/identifier" }, "commit_oid": { "$ref": "common.schema.json#/$defs/gitOid" } }, "unevaluatedProperties": false },
     "missionTransition": { "type": "object", "required": ["goal_id", "mission_id", "status"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "mission_id": { "$ref": "common.schema.json#/$defs/identifier" }, "status": { "enum": ["ASSIGNED", "RUNNING", "BLOCKED", "COMPLETED", "CANCELLED"] } }, "unevaluatedProperties": false },
+    "attemptStart": { "type": "object", "required": ["goal_id", "mission_id", "attempt_id", "adapter", "supervisor_pid", "started_at"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "mission_id": { "$ref": "common.schema.json#/$defs/identifier" }, "attempt_id": { "$ref": "common.schema.json#/$defs/identifier" }, "adapter": { "enum": ["codex", "claude", "opencode"] }, "supervisor_pid": { "type": "integer", "minimum": 1 }, "started_at": { "$ref": "common.schema.json#/$defs/timestamp" } }, "unevaluatedProperties": false },
+    "attemptFinish": { "type": "object", "required": ["goal_id", "mission_id", "attempt_id", "status", "finished_at", "cause"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "mission_id": { "$ref": "common.schema.json#/$defs/identifier" }, "attempt_id": { "$ref": "common.schema.json#/$defs/identifier" }, "status": { "enum": ["SUCCEEDED", "BLOCKED"] }, "finished_at": { "$ref": "common.schema.json#/$defs/timestamp" }, "cause": { "oneOf": [{ "type": "string", "pattern": "^[A-Z_]{1,64}$" }, { "type": "null" }] } }, "unevaluatedProperties": false },
     "reportSubmit": { "type": "object", "required": ["goal_id", "report"], "properties": { "goal_id": { "$ref": "common.schema.json#/$defs/identifier" }, "report": { "$ref": "worker-report.schema.json" } }, "unevaluatedProperties": false },
     "auditApply": { "type": "object", "required": ["report"], "properties": { "report": { "$ref": "audit-report.schema.json" } }, "unevaluatedProperties": false },
     "skillRegister": { "type": "object", "required": ["skill_id", "version", "path", "artifact_digest", "validation_receipt", "audit_id"], "properties": { "skill_id": { "$ref": "common.schema.json#/$defs/identifier" }, "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32 }, "path": { "$ref": "common.schema.json#/$defs/relativePath" }, "artifact_digest": { "$ref": "common.schema.json#/$defs/digest" }, "validation_receipt": { "$ref": "validation-receipt.schema.json" }, "audit_id": { "$ref": "common.schema.json#/$defs/identifier" } }, "unevaluatedProperties": false },

@@ -26,7 +26,7 @@ export function handlerPlan(harness, event, root = projectRoot, lane = 'synchron
 
   const plans = {
     synchronous: {
-      SessionStart: [local('worktree-reconcile.mjs', 'advisory', async (_input, project) => (await import('./worktree-reconcile.mjs')).reconcileHook(project)), local('mission-context.mjs', 'advisory', async (_input, project, environment) => (await import('./mission-context.mjs')).missionContext(environment.CTXROUTE_MISSION_ID, project))],
+      SessionStart: [local('worktree-reconcile.mjs', 'advisory', async (_input, project, environment) => (await import('./worktree-reconcile.mjs')).reconcileHook(environment.CTXROUTE_PRIMARY_ROOT ?? project)), local('mission-context.mjs', 'advisory', async (_input, project, environment) => (await import('./mission-context.mjs')).missionContext(environment.CTXROUTE_MISSION_ID, environment.CTXROUTE_PRIMARY_ROOT ?? project))],
       PreToolUse: [local('pre-tool-architecture.mjs', 'critical-mutation-gate', async (input, project) => (await import('./pre-tool-architecture.mjs')).preToolArchitecture(input, project))],
       PostToolUse: [local('post-tool-sensor.mjs', 'advisory', async (input, project, environment) => (await import('./post-tool-sensor.mjs')).postToolSensor(input, { stateDirectory: environment.CTXROUTE_STATE_DIR, root: project })), local('post-tool-audit.mjs', 'advisory', async (input, project) => (await import('./post-tool-audit.mjs')).postToolAudit(input, project))],
       UserPromptSubmit: [],

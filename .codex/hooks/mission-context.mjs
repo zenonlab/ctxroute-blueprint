@@ -7,7 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export async function missionContext(missionId = process.env.CTXROUTE_MISSION_ID, projectRoot = root) {
   if (!missionId) return null;
   try {
-    const view = await readCoordination(projectRoot, { CTXROUTE_AGENT_ROLE: 'worker', CTXROUTE_MISSION_ID: missionId, CTXROUTE_SESSION_ID: process.env.CTXROUTE_SESSION_ID });
+    const view = await readCoordination(process.env.CTXROUTE_PRIMARY_ROOT ?? projectRoot, { CTXROUTE_AGENT_ROLE: 'worker', CTXROUTE_MISSION_ID: missionId, CTXROUTE_SESSION_ID: process.env.CTXROUTE_SESSION_ID, CTXROUTE_WORKTREE: process.env.CTXROUTE_WORKTREE });
     return { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: `Worker MissionView (no global history):\n${JSON.stringify(view, null, 2)}` } };
   } catch (error) {
     return { systemMessage: `Mission ${String(missionId).slice(0, 128)} is unavailable (${error.causeCode ?? 'MISSION_VIEW_INVALID'}); continuing without injected context.` };

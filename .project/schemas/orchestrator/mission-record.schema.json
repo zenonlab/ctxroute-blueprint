@@ -25,6 +25,7 @@
     "integrated_commit": { "oneOf": [{ "$ref": "common.schema.json#/$defs/gitOid" }, { "type": "null" }] },
     "report": { "oneOf": [{ "$ref": "worker-report.schema.json" }, { "type": "null" }] },
     "validation_receipt": { "oneOf": [{ "$ref": "validation-receipt.schema.json" }, { "type": "null" }] }
+    ,"attempt": { "oneOf": [{ "type": "null" }, { "type": "object", "required": ["attempt_id", "adapter", "supervisor_pid", "started_at", "finished_at", "status", "cause"], "properties": { "attempt_id": { "$ref": "common.schema.json#/$defs/identifier" }, "adapter": { "enum": ["codex", "claude", "opencode"] }, "supervisor_pid": { "type": "integer", "minimum": 1 }, "started_at": { "$ref": "common.schema.json#/$defs/timestamp" }, "finished_at": { "oneOf": [{ "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" }] }, "status": { "enum": ["RUNNING", "SUCCEEDED", "BLOCKED"] }, "cause": { "oneOf": [{ "type": "string", "pattern": "^[A-Z_]{1,64}$" }, { "type": "null" }] } }, "unevaluatedProperties": false }] }
   },
   "unevaluatedProperties": false
 }

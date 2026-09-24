@@ -11,7 +11,7 @@ export const LEGACY_MODES = Object.freeze(['SWARM_ON', 'SWARM_OFF']);
 export const GOAL_STATUSES = Object.freeze(['ACTIVE', 'WAITING_FOR_USER_DECISION', 'READY_FOR_PROMOTION', 'COMPLETED', 'CANCELLED']);
 export const MISSION_STATUSES = Object.freeze(['PREPARING', 'ASSIGNED', 'RUNNING', 'BLOCKED', 'COMPLETED', 'CANCELLED']);
 const GOAL_TRANSITIONS = Object.freeze({ ACTIVE: ['WAITING_FOR_USER_DECISION', 'READY_FOR_PROMOTION', 'COMPLETED', 'CANCELLED'], WAITING_FOR_USER_DECISION: ['ACTIVE', 'CANCELLED'], READY_FOR_PROMOTION: ['COMPLETED', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
-const MISSION_TRANSITIONS = Object.freeze({ PREPARING: ['ASSIGNED', 'BLOCKED', 'CANCELLED'], ASSIGNED: ['RUNNING', 'CANCELLED'], RUNNING: ['BLOCKED', 'COMPLETED', 'CANCELLED'], BLOCKED: ['RUNNING', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
+const MISSION_TRANSITIONS = Object.freeze({ PREPARING: ['ASSIGNED', 'BLOCKED', 'CANCELLED'], ASSIGNED: ['RUNNING', 'CANCELLED'], RUNNING: ['BLOCKED', 'COMPLETED', 'CANCELLED'], BLOCKED: ['ASSIGNED', 'RUNNING', 'CANCELLED'], COMPLETED: [], CANCELLED: [] });
 const SECRET_KEY = /(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)/iu;
 const SECRET_VALUE = /(?:bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|secret|token)\s*[:=]\s*\S+)/iu;
 const DEFAULTS = Object.freeze({
@@ -320,6 +320,14 @@ function applyOperation(state, command) {
     assertTransition(MISSION_TRANSITIONS, mission.status, payload.status, 'mission');
     if (payload.status === 'COMPLETED' && mission.validation_receipt?.status !== 'PASSED') throw new Error('mission completion requires an orchestrator PASSED receipt');
     return { ...mission, status: payload.status };
+  });
+  if (command.action === 'mission.attempt.start') return updateMission(state, payload.goal_id, payload.mission_id, mission => {
+    if (mission.status !== 'ASSIGNED') throw new Error('attempt requires an assigned mission');
+    return { ...mission, status: 'RUNNING', attempt: { attempt_id: payload.attempt_id, adapter: payload.adapter, supervisor_pid: payload.supervisor_pid, started_at: payload.started_at, finished_at: null, status: 'RUNNING', cause: null } };
+  });
+  if (command.action === 'mission.attempt.finish') return updateMission(state, payload.goal_id, payload.mission_id, mission => {
+    if (mission.status !== 'RUNNING' || mission.attempt?.attempt_id !== payload.attempt_id || (mission.attempt.status !== 'RUNNING' && !(mission.attempt.status === 'SUCCEEDED' && payload.status === 'BLOCKED'))) throw new Error('attempt is not running');
+    return { ...mission, status: payload.status === 'BLOCKED' ? 'BLOCKED' : 'RUNNING', attempt: { ...mission.attempt, status: payload.status, finished_at: payload.finished_at, cause: payload.cause } };
   });
   if (command.action === 'report.submit') return updateMission(state, payload.goal_id, payload.report.mission_id, mission => ({ ...mission, report: payload.report, status: 'BLOCKED' }));
   if (command.action === 'audit.apply') {

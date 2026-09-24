@@ -42,7 +42,7 @@
     { "id": "sensor-grammars", "from": "sensor", "to": "grammars", "label": "parse supported sources", "labelAt": [500, 304] },
     { "id": "agents-orchestrator", "from": "agents", "to": "orchestrator", "label": "MCP or CLI transaction", "fromSide": "bottom", "toSide": "top", "via": [[115, 170]], "labelAt": [110, 170] },
     { "id": "orchestrator-lifecycle", "from": "orchestrator", "to": "lifecycle", "label": "bound MissionView", "fromSide": "right", "toSide": "bottom", "via": [[250, 260], [250, 140], [370, 140]], "labelAt": [305, 122] },
-    { "id": "orchestrator-workers", "from": "orchestrator", "to": "workers", "label": "scope + worktree", "fromSide": "bottom", "toSide": "top", "labelAt": [90, 350] },
+    { "id": "orchestrator-workers", "from": "orchestrator", "to": "workers", "label": "CLI launch + MissionView", "fromSide": "bottom", "toSide": "top", "labelAt": [90, 350] },
     { "id": "workers-orchestrator", "from": "workers", "to": "orchestrator", "label": "bounded report", "variant": "emphasis", "fromSide": "right", "toSide": "right", "via": [[250, 440], [250, 260]], "labelAt": [285, 395] },
     { "id": "agents-crg", "from": "agents", "to": "crg", "label": "client-owned official stdio", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[115, 20], [885, 20]], "labelAt": [500, 35] },
     { "id": "lifecycle-crg", "from": "lifecycle", "to": "crg", "label": "status / single-flight update", "fromSide": "bottom", "toSide": "bottom", "via": [[370, 150], [885, 150]], "labelAt": [630, 135] },
