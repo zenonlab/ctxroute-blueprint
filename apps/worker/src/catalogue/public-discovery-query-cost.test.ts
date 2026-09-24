@@ -64,6 +64,28 @@ describe('public discovery indexed query cost', () => {
     expect(cost.rowsRead).toBeLessThan(32);
   });
 
+  it('uses the named four-key identity index for grouped lookups', async () => {
+    const key = { fingerprint: fingerprint(100001), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
+    const measured = instrumentD1(env.PUBLIC_DB);
+    const adapter = new D1PublicDiscoveryV3Adapter(measured.database);
+    await expect(adapter.readMany?.([key], now)).resolves.toMatchObject([{ key, state: { state: 'NOT_FOUND' } }]);
+    const plan = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN WITH requested AS (
+        SELECT json_extract(value, '$.fingerprint') AS fingerprint,
+          json_extract(value, '$.mediaKind') AS mediaKind,
+          json_extract(value, '$.parserVersion') AS parserVersion,
+          json_extract(value, '$.siteRulesVersion') AS rulesVersion
+        FROM json_each(?1)
+      )
+      SELECT requested.fingerprint, r.request_digest
+      FROM requested
+      LEFT JOIN public_discovery_requests_v3 AS r INDEXED BY sqlite_autoindex_public_discovery_requests_v3_1
+        ON r.fingerprint = requested.fingerprint AND r.media_kind = requested.mediaKind
+        AND r.parser_version = requested.parserVersion AND r.rules_version = requested.rulesVersion`).bind(JSON.stringify([key])).all<{ detail: string }>();
+    console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'grouped-lookup-identity-index', details: plan.results.map(({ detail }) => detail), ...measured.snapshot() }));
+    expect(plan.results.some(({ detail }) => detail.includes('sqlite_autoindex_public_discovery_requests_v3_1'))).toBe(true);
+    expect(measured.snapshot().rowsRead).toBeLessThan(16);
+  });
+
   it('preserves priority, concurrent leases and refreshes without reading terminal history', async () => {
     const seeds = [
       { id: 1, priority: 2, state: 'PENDING', updated: '2026-09-23T10:01:00.000Z' },
@@ -142,13 +164,19 @@ describe('public discovery indexed query cost', () => {
     if (publicationSql === undefined) throw new Error('Publication title guard must be exercised.');
     const canonicalGuard = publicationSql.slice(publicationSql.lastIndexOf('AND NOT EXISTS') + 4);
     const explainGuard = `EXPLAIN QUERY PLAN SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
-      CROSS JOIN catalogue_canonical_titles_v1 AS existing ON existing.normalized_title = proposed.value
+      CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value
       WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`;
     expect(canonicalGuard.replace(/\s+/gu, ' ')).toBe(explainGuard.slice('EXPLAIN QUERY PLAN SELECT 1 WHERE '.length).replace(/\s+/gu, ' '));
     const plan = await env.PUBLIC_DB.prepare(explainGuard)
       .bind(JSON.stringify(['fresh alpha', 'fresh beta', 'fresh gamma', 'fresh delta']), favoriteTitlePreparationVersion, 'anime', 'work_publication_cost_200001')
       .all<{ detail: string }>();
     expect(plan.results.some(({ detail }) => detail.includes('normalization_version=? AND normalized_title=? AND media_kind=?'))).toBe(true);
+    const titleGuardPlan = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN SELECT 1
+      FROM catalogue_canonical_titles_v1
+      WHERE normalization_version = ?1 AND normalized_title = ?2 AND media_kind = ?3 AND work_id <> ?4`)
+      .bind(favoriteTitlePreparationVersion, 'fresh alpha', 'anime', 'work_publication_cost_200001').all<{ detail: string }>();
+    console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'canonical-title-index', details: titleGuardPlan.results.map(({ detail }) => detail) }));
+    expect(titleGuardPlan.results.some(({ detail }) => detail.includes('sqlite_autoindex_catalogue_canonical_titles_v1_1'))).toBe(true);
     console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'canonical-publication-guard', details: plan.results.map(({ detail }) => detail) }));
     expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_titles WHERE work_id = ?1').bind('work_publication_cost_200001').first())
       .toEqual({ count: 4 });

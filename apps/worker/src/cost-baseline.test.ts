@@ -230,6 +230,33 @@ describe('local D1 cost baseline — no external requests', () => {
     m.report();
   });
 
+  it('keeps idle discovery claims bounded with terminal history', async () => {
+    const m = meter();
+    const adapter = new D1PublicDiscoveryV3Adapter(m.database);
+    await adapter.request(request('9'), at(0));
+    await env.PUBLIC_DB.prepare(`WITH RECURSIVE sequence(value) AS (
+      SELECT 1 UNION ALL SELECT value + 1 FROM sequence WHERE value < 500
+    ) INSERT INTO public_discovery_requests_v3(
+      fingerprint, media_kind, parser_version, rules_version, request_digest,
+      request_json, state, attempt_count, failure_reason, failed_at,
+      retry_at, created_at, updated_at
+    ) SELECT printf('%064x', sequence.value), seed.media_kind, seed.parser_version,
+      seed.rules_version, seed.request_digest, seed.request_json,
+      'FAILED', 8, 'ATTEMPT_LIMIT', ?1, ?1, ?1, ?1
+    FROM sequence CROSS JOIN public_discovery_requests_v3 AS seed
+    WHERE seed.fingerprint = ?2`).bind(at(0), key('9').fingerprint).run();
+    const claim = (minute: number) => adapter.claimBatch({
+      claimToken: 'b'.repeat(48), tokenDigest: 'b'.repeat(64),
+      now: at(minute), leaseUntil: at(minute + 15), limit: 1,
+    });
+    expect((await m.measure('claim-with-terminal-history', () => claim(0))).requests).toHaveLength(1);
+    expect((await m.measure('idle-with-terminal-history', () => claim(1))).requests).toHaveLength(0);
+    expect(m.records[0]?.rowsWritten).toBeGreaterThan(0);
+    expect(m.records[1]?.rowsWritten).toBe(0);
+    expect(m.records.every(({ rowsRead }) => rowsRead < 50)).toBe(true);
+    m.report();
+  });
+
   it('measures agenda checkpoint recovery and rejects an incomplete snapshot', async () => {
     const m = meter();
     const adapter = new D1AgendaCollectionAdapter(m.database);
