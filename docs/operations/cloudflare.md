@@ -1103,3 +1103,16 @@ avertissements `provider-unavailable` masquaient la cause précise. La candidate
 émet des codes bornés pour cadence, recherche incomplète, HTTP, réseau et
 réponse invalide, sans titre ou payload privé. Aucun réarmement historique,
 rejeu DLQ ni publication d’archive ne fait partie de cette correction Worker.
+
+Le déploiement protégé de la PR #88 (run `36052050878`) a confirmé la baisse
+des lectures D1 : le nouveau claim lit en moyenne 20 lignes contre 914 pour
+l'ancienne forme, les expirations 19 contre 913 et 4 contre 907. Il n'a pas
+rétabli les fournisseurs : `kitsu-manga` est passé à 16 échecs consécutifs et
+son circuit s'est rouvert. Un GET public avec un titre de test non privé et
+les champs clairsemés de l'adaptateur a retourné HTTP 200 avec
+`titles.en: null`. Le schéma Worker exigeait une chaîne non vide pour chaque
+traduction et rejetait donc toute cette réponse. Le correctif accepte `null`
+comme traduction absente, garde le titre canonique et les alias valides et
+refuse toujours les valeurs non nulles malformées. Il ne réarme aucune demande
+historique et ne publie aucune archive ; les autres causes de backoff restent
+à vérifier après déploiement.
