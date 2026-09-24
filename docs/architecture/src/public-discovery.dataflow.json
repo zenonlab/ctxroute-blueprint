@@ -30,6 +30,12 @@
         "label": "Frontières",
         "focus": ["extension", "worker", "publicD1", "queue", "collector", "transportPort", "providers"],
         "note": "AniList et MU via Deno ; MD et Kitsu directs. Un titre >200 rend la page incomplète, sauf preuve exacte."
+      },
+      {
+        "id": "canary",
+        "label": "Preuve fournisseur",
+        "focus": ["worker", "publicD1", "queue", "collector", "transportPort", "providers", "verifiedD1"],
+        "note": "Deux œuvres publiques absentes du cache exigent MISS → PENDING → VERIFIED, référence exacte et coût fournisseur par fenêtre."
       }
     ]
   },
