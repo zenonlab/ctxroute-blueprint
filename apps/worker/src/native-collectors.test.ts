@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FavoriteProviderRetryError } from '@tobirink/public-discovery';
-import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, handleNativeCollectorQueue, providerFailureCode, resolveWithDeadline, type NativeCollectorSignal } from './native-collectors';
+import { FavoriteProviderRetryError, type FavoriteProviderPort, type PublicDiscoveryProviderPorts } from '@tobirink/public-discovery';
+import { z } from 'zod';
+import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, createBudgetedDiscoveryResolver, handleNativeCollectorQueue, providerFailureCode, resolveWithDeadline, type NativeCollectorSignal } from './native-collectors';
 import { instrumentProviderFetch } from './operational-metrics';
 
 function message(body: NativeCollectorSignal | null, attempts = 1) {
@@ -15,8 +16,35 @@ describe('native collector queue', () => {
     expect(providerFailureCode(new Error('incomplete-provider-search:deadline'))).toBe('provider-search-deadline');
     expect(providerFailureCode(new Error('incomplete-provider-search:page-limit'))).toBe('provider-search-page-limit');
     expect(providerFailureCode(new Error('Favorite provider request failed with HTTP 429.'))).toBe('provider-http-429');
+    expect(providerFailureCode(new Error('Public discovery resolution exceeded its bounded execution window.'))).toBe('provider-resolution-deadline');
     expect(providerFailureCode(new Error('fetch failed'))).toBe('provider-network');
     expect(providerFailureCode(new Error('private title from unexpected error'))).toBe('provider-unavailable');
+    const invalid = new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['data', 0, 'attributes', 'titles', 'private-language'], message: 'private title' }]);
+    expect(providerFailureCode(invalid)).toBe('provider-response-invalid-titles');
+    expect(providerFailureCode(new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['private-title'], message: 'private title' }]))).toBe('provider-response-invalid');
+  });
+
+  it('logs only a bounded provider operation code for an invalid response', async () => {
+    const invalid = new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['data', 0, 'attributes', 'titles', 'private-language'], message: 'private title' }]);
+    const port = (provider: keyof PublicDiscoveryProviderPorts): FavoriteProviderPort => ({
+      hydrate: async () => undefined,
+      search: async () => ({ candidates: [], complete: true, digest: 'fixture', provider, truncated: false }),
+    });
+    const search = vi.fn(async () => { throw invalid; });
+    const providers: PublicDiscoveryProviderPorts = {
+      anilist: port('anilist'), mangaupdates: port('mangaupdates'), mangadex: port('mangadex'), 'kitsu-anime': port('kitsu-anime'),
+      'kitsu-manga': { ...port('kitsu-manga'), search },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const resolver = createBudgetedDiscoveryResolver(providers, () => 0, () => 1);
+    await expect(resolver.resolve({
+      attempt: 1, key: { fingerprint: 'a'.repeat(64), mediaKind: 'MANGA', parserVersion: 'parser-v1', siteRulesVersion: 'rules-v1' },
+      query: { discoveryTitles: ['private title'], mediaKind: 'MANGA', sourceTitles: ['private title'] },
+      requestDigest: 'b'.repeat(64), schemaVersion: 3,
+    })).rejects.toThrow('private title');
+    expect(search).toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('public-discovery-provider-operation-failed', 'kitsu-manga', 'search', 'provider-response-invalid-titles');
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('private title');
   });
 
   it('routes an operational recovery signal without invoking collectors or resetting requests', async () => {
