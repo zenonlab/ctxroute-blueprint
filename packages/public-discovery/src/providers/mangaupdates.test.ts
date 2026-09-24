@@ -17,6 +17,28 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     expect(result.candidates[0]).not.toHaveProperty('cover');
   });
 
+  it('keeps exact evidence but marks pages with unprojectable long titles incomplete', async () => {
+    const overlong = { ...series, series_id: 67890, title: 'A'.repeat(201), associated: [] };
+    const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({ results: [{ record: overlong }, { record: series }], total_hits: 2 }));
+    const result = await adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] });
+    expect(result).toMatchObject({ complete: false, truncated: true, candidates: [{ externalId: '12345' }] });
+    expect(result).not.toHaveProperty('nextCursor');
+    const unmatched = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({ results: [{ record: overlong }], total_hits: 1 }));
+    await expect(unmatched.search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] })).resolves.toMatchObject({ candidates: [], complete: false, truncated: true });
+  });
+
+  it('does not claim completeness after omitting a late alias', async () => {
+    const manyAliases = { ...series, associated: Array.from({ length: 33 }, (_value, index) => ({ title: `Alias ${index}` })) };
+    const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({ results: [{ record: manyAliases }], total_hits: 1 }));
+    await expect(adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['Missing'] })).resolves.toMatchObject({ complete: false, truncated: true });
+  });
+
+  it('uses a bounded alternate title for an exact long-title identity', async () => {
+    const longSeries = { ...series, title: 'A'.repeat(201), associated: [{ title: 'Synthetic Series' }] };
+    const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json(longSeries));
+    await expect(adapter.hydrate({ externalId: '12345', provider: 'mangaupdates' })).resolves.toMatchObject({ displayTitle: 'Synthetic Series', titles: ['Synthetic Series'] });
+  });
+
   it('accepts the nullable optional fields returned by the live MangaUpdates API', async () => {
     const liveRecord = {
       ...series,

@@ -1156,3 +1156,14 @@ Un rejet de schéma sur champ inconnu ne journalise que la borne numérique
 publique (au plus 1024), sans chemin, titre ni valeur. Le champ exact du rejet
 MangaUpdates reste à établir après déploiement protégé ; aucun réarmement
 historique ni publication d'extension ne découle de ce correctif.
+
+Après la PR #93 et son run protégé `36069337874`, les recherches MangaDex et
+MangaUpdates signalent toutes deux `unknown/too_big/max200`. La limite de
+200 caractères appartient au candidat public, pas au corps HTTP fournisseur.
+Une réponse contenant une autre identité au titre plus long ne doit plus
+rejeter la preuve exacte de la page entière. Le correctif suivant projette
+uniquement les titres de longueur contractuelle ; si un titre trop long est
+écarté, ou si un alias dépasse la projection bornée, la page reste
+explicitement incomplète et ne peut produire un
+`NOT_FOUND` certain. Une hydratation exacte sans aucun titre projetable reste
+un échec, jamais une identité inventée. Le plafond HTTP de 512 Kio demeure.

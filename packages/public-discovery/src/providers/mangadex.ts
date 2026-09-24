@@ -5,6 +5,7 @@ import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavorit
 import type { FavoriteProviderFetch } from '../provider-http.js';
 
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
+interface SearchProjection { readonly candidate?: ProviderCandidate; readonly incomplete: boolean }
 
 const uuid = z.uuid();
 const titleMap = z.record(z.string().max(16), z.string().min(1).max(1024)).refine((value) => Object.keys(value).length <= 64);
@@ -47,27 +48,33 @@ export class MangaDexFavoriteProviderAdapter implements FavoriteProviderCandidat
     const response = await this.gate.run(favoriteProviderPolicy.mangadex.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, url.toString(), { headers: { Accept: 'application/json' }, method: 'GET' }, searchSchema));
     const value = response.value;
     if (value.offset !== offset || value.limit !== 20 || value.data.length > value.limit || value.total < offset + value.data.length || (value.data.length < value.limit && value.total > offset + value.data.length)) throw new Error('MangaDex pagination is inconsistent.');
-    const inspected = value.data.map((data) => this.candidateFromData(hydrationSchema.parse({ result: 'ok', data }).data));
+    const projected = value.data.map((data) => this.candidateFromData(hydrationSchema.parse({ result: 'ok', data }).data));
+    const inspected = projected.flatMap((item) => item.candidate === undefined ? [] : [item.candidate]);
     const matchQuery = query.explicitProviderReference === undefined ? { sourceTitles: query.titles } : { sourceTitles: query.titles, explicitProviderReference: query.explicitProviderReference };
     const evidence = inspectFavoriteTitleCandidates(matchQuery, inspected);
     const references = new Set(evidence.candidateReferences.map(reference => reference.externalId));
     const candidates = inspected.filter(candidate => references.has(candidate.externalId));
     if (candidates.length > query.limit) throw new Error('MangaDex comparable candidate limit exceeded.');
-    const truncated = value.total > offset + value.data.length;
+    const upstreamTruncated = value.total > offset + value.data.length;
+    const truncated = upstreamTruncated || projected.some((item) => item.incomplete);
     const envelope = { candidates, complete: !truncated, digest: response.digest, provider: 'mangadex' as const, truncated };
-    return truncated ? { ...envelope, nextCursor: String(page + 1) } : envelope;
+    return upstreamTruncated ? { ...envelope, nextCursor: String(page + 1) } : envelope;
   }
 
-  private candidateFromData(data: MangaDexData): ProviderCandidate {
+  private candidateFromData(data: MangaDexData): SearchProjection {
     const id = data.id.toLowerCase(); const attributes = data.attributes;
-    const variants = [...Object.entries(attributes.title), ...attributes.altTitles.flatMap((value) => Object.entries(value))].map(([language, title]) => ({ language, title }));
+    const rawVariants = [...Object.entries(attributes.title), ...attributes.altTitles.flatMap((value) => Object.entries(value))].map(([language, title]) => ({ language, title }));
+    const variants = rawVariants.filter((variant) => variant.title.length <= 200);
+    const incomplete = variants.length !== rawVariants.length || variants.length > 16;
     const titles = [...new Set(variants.map((variant) => variant.title))];
-    const result: MutableCandidate = { canonicalUrl: `https://mangadex.org/title/${id}`, categories: attributes.contentRating === 'erotica' || attributes.contentRating === 'pornographic' ? ['Adult'] : [], contentClassification: contentClassification(attributes.contentRating), externalId: id, mediaKind: attributes.originalLanguage === 'ko' ? 'MANHWA' : attributes.originalLanguage.startsWith('zh') ? 'MANHUA' : 'MANGA', preSerialization: false, provider: 'mangadex', titles: titles.slice(0, 16), metadataVersion: 2, displayTitle: attributes.title.fr ?? attributes.title.en ?? attributes.title['ja-ro'] ?? titles[0], titleVariants: variants.slice(0, 16) };
+    if (titles.length === 0) return { incomplete: true };
+    const preferredTitle = attributes.title.fr ?? attributes.title.en ?? attributes.title['ja-ro'];
+    const result: MutableCandidate = { canonicalUrl: `https://mangadex.org/title/${id}`, categories: attributes.contentRating === 'erotica' || attributes.contentRating === 'pornographic' ? ['Adult'] : [], contentClassification: contentClassification(attributes.contentRating), externalId: id, mediaKind: attributes.originalLanguage === 'ko' ? 'MANHWA' : attributes.originalLanguage.startsWith('zh') ? 'MANHUA' : 'MANGA', preSerialization: false, provider: 'mangadex', titles: titles.slice(0, 16), metadataVersion: 2, displayTitle: preferredTitle !== undefined && preferredTitle.length <= 200 ? preferredTitle : titles[0], titleVariants: variants.slice(0, 16) };
     const fileName = data.relationships.find((relationship) => relationship.type === 'cover_art')?.attributes?.fileName;
     if (fileName !== undefined) result.cover = { attribution: 'MangaDex', url: `https://uploads.mangadex.org/covers/${id}/${encodeURIComponent(fileName)}.512.jpg` };
     const linked = this.mangaUpdatesReference(attributes.links?.mu);
     if (linked !== undefined) result.linkedReferences = [linked];
-    return createProviderCandidate(result, 'mangadex');
+    return { candidate: createProviderCandidate(result, 'mangadex'), incomplete };
   }
 
   private mangaUpdatesReference(value: string | null | undefined): FavoriteProviderReference | undefined {
@@ -89,7 +96,7 @@ export class MangaDexFavoriteProviderAdapter implements FavoriteProviderCandidat
     if (response.value.data.id.toLowerCase() !== id) throw new Error('MangaDex hydration returned a different identity.');
     const attributes = response.value.data.attributes;
     const variants = [...Object.entries(attributes.title), ...attributes.altTitles.flatMap((value) => Object.entries(value))]
-      .map(([language, title]) => ({ language, title }));
+      .map(([language, title]) => ({ language, title })).filter((variant) => variant.title.length <= 200);
     const titles = [...new Set(variants.map((variant) => variant.title))];
     if (titles.length === 0) throw new Error('MangaDex identity requires a title.');
     const blocked = attributes.contentRating === 'erotica' || attributes.contentRating === 'pornographic';
@@ -97,7 +104,7 @@ export class MangaDexFavoriteProviderAdapter implements FavoriteProviderCandidat
       canonicalUrl: `https://mangadex.org/title/${id}`, categories: blocked ? ['Adult'] : [],
       externalId: id, mediaKind: attributes.originalLanguage === 'ko' ? 'MANHWA' : attributes.originalLanguage.startsWith('zh') ? 'MANHUA' : 'MANGA',
       preSerialization: false, provider: 'mangadex', titles: titles.slice(0, 16), metadataVersion: 2,
-      displayTitle: attributes.title.fr ?? attributes.title.en ?? attributes.title['ja-ro'] ?? titles[0],
+      displayTitle: [attributes.title.fr, attributes.title.en, attributes.title['ja-ro']].find((title) => title !== undefined && title.length <= 200) ?? titles[0],
       titleVariants: variants.slice(0, 16),
     };
     const fileName = response.value.data.relationships.find((relationship) => relationship.type === 'cover_art')?.attributes?.fileName;
