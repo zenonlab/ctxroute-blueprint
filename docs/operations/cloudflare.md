@@ -1146,3 +1146,13 @@ conserve désormais seulement un champ et une catégorie Zod sur listes
 fermées, sans chemin complet, titre ou valeur fautive. Les schémas des
 fournisseurs ne changent pas dans cette étape ; les codes servent à choisir
 un correctif démontré plutôt qu'à assouplir les trois parseurs à l'aveugle.
+
+Le contrôle du 25 septembre reproduit sur une recherche publique MangaDex
+`One Piece` une réponse de 84 relations, rejetée par la borne locale de 64.
+Le correctif candidat accepte au plus 128 relations sans élargir les vingt
+résultats de recherche ni la réponse HTTP de 512 Kio. Il accepte au plus 256
+abréviations Kitsu brutes mais projette toujours seize titres et variantes.
+Un rejet de schéma sur champ inconnu ne journalise que la borne numérique
+publique (au plus 1024), sans chemin, titre ni valeur. Le champ exact du rejet
+MangaUpdates reste à établir après déploiement protégé ; aucun réarmement
+historique ni publication d'extension ne découle de ce correctif.

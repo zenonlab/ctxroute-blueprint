@@ -236,7 +236,9 @@ export function providerFailureCode(error: Error | undefined): string {
     const field = issue?.path.find(segment => fields.has(String(segment)));
     const issueCode = issue?.code ?? 'schema';
     const category = categories.has(issueCode) ? issueCode : 'schema';
-    return `provider-response-invalid-${field === undefined ? 'unknown' : String(field)}-${category}`;
+    const maximum = issue?.code === 'too_big' ? Number(issue.maximum) : NaN;
+    const bound = Number.isSafeInteger(maximum) && maximum >= 0 && maximum <= 1024 ? `-max${maximum}` : '';
+    return `provider-response-invalid-${field === undefined ? 'unknown' : String(field)}-${category}${field === undefined ? bound : ''}`;
   }
   const incomplete = /^incomplete-provider-search:(deadline|candidate-page-limit|candidate-limit|cursor|page-limit)$/u.exec(error.message)?.[1];
   if (incomplete !== undefined) return `provider-search-${incomplete}`;

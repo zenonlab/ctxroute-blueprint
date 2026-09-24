@@ -11,7 +11,7 @@ const posterImageSchema = z.object({
   tiny: z.url().nullable().optional(), small: z.url().nullable().optional(), medium: z.url().nullable().optional(), large: z.url().nullable().optional(), original: z.url().nullable().optional(),
 }).passthrough();
 const attributesSchema = z.object({
-  abbreviatedTitles: z.array(nonEmptyString).max(64),
+  abbreviatedTitles: z.array(nonEmptyString).max(256),
   ageRating: nonEmptyString.nullable().optional(),
   canonicalTitle: nonEmptyString,
   nsfw: z.boolean().optional(),

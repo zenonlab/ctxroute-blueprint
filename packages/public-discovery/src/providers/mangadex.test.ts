@@ -32,6 +32,14 @@ describe('MangaDex exact hydration', () => {
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('/manga?title=Synthetic+Series'), expect.objectContaining({ method: 'GET' }));
   });
 
+  it('accepts a public search result with 84 relationships but rejects 129', async () => {
+    const relationships = Array.from({ length: 84 }, (_value, index) => ({ id: `12345678-1234-4234-8234-${String(index).padStart(12, '0')}`, type: 'author' }));
+    const searchResponse = (items: typeof relationships) => Response.json({ result: 'ok', data: [{ ...payload.data, relationships: items }], limit: 20, offset: 0, total: 1 });
+    const accepted = await new MangaDexFavoriteProviderAdapter(async () => searchResponse(relationships)).search({ provider: 'mangadex', titles: ['Synthetic Series'], limit: 20 });
+    expect(accepted.candidates).toMatchObject([{ externalId: id }]);
+    await expect(new MangaDexFavoriteProviderAdapter(async () => searchResponse(Array.from({ length: 129 }, (_value, index) => relationships[index % relationships.length]!))).search({ provider: 'mangadex', titles: ['Synthetic Series'], limit: 20 })).rejects.toThrow();
+  });
+
   it('hydrates only the requested public identity and retains aliases', async () => {
     const fetcher = vi.fn(async () => Response.json(payload));
     const adapter = new MangaDexFavoriteProviderAdapter(fetcher);
