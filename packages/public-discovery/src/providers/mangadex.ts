@@ -22,7 +22,7 @@ const hydrationSchema = z.object({
       attributes: z.object({ fileName: z.string().min(1).max(512) }).passthrough().optional(),
       id: uuid,
       type: z.string().min(1).max(64),
-    }).passthrough()).max(64).optional().default([]),
+    }).passthrough()).max(128).optional().default([]),
   }),
 });
 type MangaDexData = z.infer<typeof hydrationSchema>['data'];

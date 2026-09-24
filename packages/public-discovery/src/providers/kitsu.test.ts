@@ -78,7 +78,12 @@ describe('KitsuFavoriteProviderAdapter', () => {
     const animeResult = await animeAdapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
     expect(animeResult.candidates[0]?.titles.length).toBeLessThanOrEqual(16);
     expect(animeResult.candidates[0]?.titleVariants?.length).toBeLessThanOrEqual(16);
-    const excessive = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes: { ...animeAttributes, abbreviatedTitles: Array.from({ length: 65 }, (_value, index) => `Alias ${index}`) } }], links: { next: null }, meta: { count: 1 } }));
+    const longAttributes = { ...animeAttributes, abbreviatedTitles: Array.from({ length: 65 }, (_value, index) => `Alias ${index}`) };
+    const longAdapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes: longAttributes }], links: { next: null }, meta: { count: 1 } }));
+    const longResult = await longAdapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
+    expect(longResult.candidates[0]?.titles.length).toBeLessThanOrEqual(16);
+    expect(longResult.candidates[0]?.titleVariants?.length).toBeLessThanOrEqual(16);
+    const excessive = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes: { ...animeAttributes, abbreviatedTitles: Array.from({ length: 257 }, (_value, index) => `Alias ${index}`) } }], links: { next: null }, meta: { count: 1 } }));
     await expect(excessive.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] })).rejects.toThrow();
   });
 

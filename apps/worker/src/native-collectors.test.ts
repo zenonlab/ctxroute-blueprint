@@ -23,6 +23,8 @@ describe('native collector queue', () => {
     expect(providerFailureCode(invalid)).toBe('provider-response-invalid-titles-invalid_type');
     expect(providerFailureCode(new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['private-title'], message: 'private title' }]))).toBe('provider-response-invalid-unknown-invalid_type');
     expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 16, inclusive: true, path: ['data', 0, 'attributes', 'abbreviatedTitles'], message: 'private title' }]))).toBe('provider-response-invalid-abbreviatedTitles-too_big');
+    expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 25, inclusive: true, path: ['private-field'], message: 'private title' }]))).toBe('provider-response-invalid-unknown-too_big-max25');
+    expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 2048, inclusive: true, path: ['private-field'], message: 'private title' }]))).toBe('provider-response-invalid-unknown-too_big');
   });
 
   it('logs only a bounded provider operation code for an invalid response', async () => {
