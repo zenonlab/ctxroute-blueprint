@@ -1167,3 +1167,16 @@ uniquement les titres de longueur contractuelle ; si un titre trop long est
 explicitement incomplète et ne peut produire un
 `NOT_FOUND` certain. Une hydratation exacte sans aucun titre projetable reste
 un échec, jamais une identité inventée. Le plafond HTTP de 512 Kio demeure.
+
+Le préflight du 25 septembre pour le prochain lot canari, en lecture seule,
+trouve zéro titre et zéro référence D1 pour `Odd Taxi`/AniList `128547` et
+`Spirit Circle`/MangaUpdates `13893304082`. Les quatre opérations publiques
+`search`/`hydrate` réussissent localement sur ces identités. La gate canari
+exige pour chaque clé un `MISS`, un seul POST, `PENDING`, puis `VERIFIED` avec
+la référence exacte ; chaque fenêtre doit mesurer au moins un appel
+fournisseur, zéro 429 et zéro échec Queue. Les seules sorties sont des états
+et des compteurs agrégés, sans titre, empreinte ni corps fournisseur.
+L'observation du trafic seule ne relie pas cryptographiquement un appel à
+une clé ; l'absence préalable des titres/références et l'identité exacte
+servent de preuves indépendantes. Ne pas publier l'extension ni réarmer les
+`FAILED` par ce lot.

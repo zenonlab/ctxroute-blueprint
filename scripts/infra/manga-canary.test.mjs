@@ -5,7 +5,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { canaryFailureCode, createCostObservation, runDiscoveryCanaries, runObservedDiscoveryCanaries, startCostObserver } from './manga-canary.mjs';
 
-function fixtureFetcher({ initial = 'MISS', admission = 'PENDING', terminal = 'VERIFIED', admissionStatus = 202 } = {}) {
+function fixtureFetcher({ initial = 'MISS', admission = 'PENDING', terminal = 'VERIFIED', admissionStatus = 202, wrongReference = false } = {}) {
   const admitted = new Map();
   const calls = [];
   return {
@@ -22,7 +22,7 @@ function fixtureFetcher({ initial = 'MISS', admission = 'PENDING', terminal = 'V
       const state = query === undefined ? { state: initial } : terminal === 'VERIFIED'
         ? { state: terminal, profile: {
           candidate: { mediaKind: key.mediaKind, titles: query.sourceTitles },
-          references: [{ provider: key.mediaKind === 'ANIME' ? 'anilist' : 'mangaupdates', externalId: '1' }],
+          references: [{ ...query.explicitProviderReference, externalId: wrongReference ? '1' : query.explicitProviderReference.externalId }],
         } } : { state: terminal };
       return Response.json([{ key, state }]);
     },
@@ -36,9 +36,12 @@ test('new anime and manga keys prove MISS to PENDING to VERIFIED with two admiss
   const results = await runDiscoveryCanaries({ fetcher: fixture.fetcher, nonce: 'test-run-one', now: () => time, wait: ms => { time += ms; }, report: row => reports.push(row) });
   assert.deepEqual(results.map(row => [row.media, row.state]), [['ANIME', 'VERIFIED'], ['MANGA', 'VERIFIED']]);
   assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, 2);
+  assert.deepEqual(fixture.calls.filter(call => call.url.endsWith('/requests')).map(call => call.body.query.explicitProviderReference), [
+    { provider: 'anilist', externalId: '128547' }, { provider: 'mangaupdates', externalId: '13893304082' },
+  ]);
   assert.equal(fixture.calls.length, 6);
   assert.deepEqual(results.map(row => row.elapsedMs), [15_000, 15_000]);
-  assert.doesNotMatch(JSON.stringify(reports), /fingerprint|Cowboy|One Piece|https:/u);
+  assert.doesNotMatch(JSON.stringify(reports), /fingerprint|Odd Taxi|Spirit Circle|https:/u);
   const second = fixtureFetcher();
   await runDiscoveryCanaries({ fetcher: second.fetcher, nonce: 'test-run-two', wait: () => {}, report: () => {} });
   assert.notEqual(fixture.calls[0].body.keys[0].fingerprint, second.calls[0].body.keys[0].fingerprint);
@@ -50,6 +53,12 @@ test('cached initial or admitted VERIFIED cannot falsely certify a fresh provide
     await assert.rejects(runDiscoveryCanaries({ fetcher: fixture.fetcher, wait: () => {}, report: () => {} }), /not-fresh|admission-not-pending/u);
     assert.ok(fixture.calls.filter(call => call.url.endsWith('/requests')).length <= 1);
   }
+});
+
+test('a different public provider identity cannot certify either canary', async () => {
+  const fixture = fixtureFetcher({ wrongReference: true });
+  await assert.rejects(runDiscoveryCanaries({ fetcher: fixture.fetcher, wait: () => {}, report: () => {} }), /provider-reference-missing/u);
+  assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, 1);
 });
 
 test('terminal failure or 429 stops immediately without rearming or retrying admission', async () => {
@@ -152,16 +161,44 @@ test('observed canaries start the observer first and certify only measured provi
     fetcher: async (...args) => { assert.equal(fake.launches.length, 1); return fixture.fetcher(...args); },
     wait: () => {}, report: row => reports.push(row), signals,
     observerFactory: () => startCostObserver(fake),
-    observationWait: () => { if (++waits === 2) fake.child.stdout.write(tailFrame(cost())); },
+    observationWait: () => {
+      waits += 1;
+      if (waits === 2) fake.child.stdout.write(tailFrame(cost({ provider429s: 0 })));
+      if (waits === 3) fake.child.stdout.write(tailFrame(cost({ provider: 'mangaupdates', provider429s: 0 })));
+    },
   });
   assert.equal(results.length, 2);
-  assert.equal(waits, 2);
+  assert.equal(waits, 4);
   assert.equal(reports.at(-1).state, 'COMPLETE');
   assert.equal(reports.at(-1).scope, 'discovery-traffic-window');
-  assert.equal(reports.at(-1).providerRequests, 2);
+  assert.equal(reports.at(-1).providerRequests, 4);
+  assert.deepEqual(reports.filter(row => row.type === 'discovery-canary.fixture-cost').map(row => [row.media, row.providerRequests]), [['ANIME', 2], ['MANGA', 2]]);
   assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
   assert.equal(signals.listenerCount('SIGTERM'), 0);
   assert.doesNotMatch(JSON.stringify(reports), /private|title|https|secret|payload/iu);
+});
+
+test('a missing first-fixture provider call stops before the manga admission', async () => {
+  const fake = fakeTail();
+  const fixture = fixtureFetcher();
+  await assert.rejects(runObservedDiscoveryCanaries({ fetcher: fixture.fetcher, wait: () => {}, report: () => {},
+    observerFactory: () => startCostObserver(fake), observationWait: () => {},
+  }), /observer-no-provider-calls/u);
+  assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, 1);
+});
+
+test('a provider 429 or Queue failure stops before the second admission', async () => {
+  for (const [field, code] of [['provider429s', 'provider-429'], ['queueFailures', 'queue-failure']]) {
+    const fake = fakeTail();
+    const fixture = fixtureFetcher();
+    let waits = 0;
+    await assert.rejects(runObservedDiscoveryCanaries({ fetcher: fixture.fetcher, wait: () => {}, report: () => {},
+      observerFactory: () => startCostObserver(fake), observationWait: () => {
+        if (++waits === 2) fake.child.stdout.write(tailFrame(cost({ provider429s: 0, [field]: 1 })));
+      },
+    }), new RegExp(`observer-${code}`, 'u'));
+    assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, 1);
+  }
 });
 
 test('empty observer or no provider calls fails certification and always closes the child', async () => {
@@ -227,8 +264,9 @@ test('late invalid or truncated logs during termination prevent a complete certi
       fake.child.stdout.write(late);
       fake.killProcess(pid, signal);
     } });
+    let waits = 0;
     await assert.rejects(runObservedDiscoveryCanaries({ ...fixture, wait: () => {}, report: row => reports.push(row), observerFactory,
-      observationWait: () => { fake.child.stdout.write(tailFrame(cost())); },
+      observationWait: () => { if (++waits === 2 || waits === 3) fake.child.stdout.write(tailFrame(cost({ provider429s: 0 }))); },
     }), /observer-truncated|observer-invalid-cost/u);
     assert.equal(reports.at(-1).state, 'INCOMPLETE');
     assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);

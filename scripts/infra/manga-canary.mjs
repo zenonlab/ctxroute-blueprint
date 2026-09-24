@@ -13,8 +13,8 @@ const observationDelay = 15_000;
 const observerBudget = 24 * 60_000;
 const observerByteLimit = 1024 * 1024;
 const fixtures = [
-  { mediaKind: 'ANIME', title: 'Cowboy Bebop', providers: ['anilist', 'kitsu-anime'] },
-  { mediaKind: 'MANGA', title: 'One Piece', providers: ['mangaupdates', 'mangadex', 'kitsu-manga'] },
+  { mediaKind: 'ANIME', title: 'Odd Taxi', reference: { provider: 'anilist', externalId: '128547' } },
+  { mediaKind: 'MANGA', title: 'Spirit Circle', reference: { provider: 'mangaupdates', externalId: '13893304082' } },
 ];
 
 async function request(fetcher, path, body, signal) {
@@ -38,15 +38,16 @@ function assertVerified(state, fixture) {
   const candidate = state.profile?.candidate;
   if (!candidate || candidate.mediaKind !== fixture.mediaKind) throw new Error('discovery-canary-media-mismatch');
   if (!candidate.titles.some(title => title.toLowerCase() === fixture.title.toLowerCase())) throw new Error('discovery-canary-title-mismatch');
-  if (!state.profile.references?.some(({ provider }) => fixture.providers.includes(provider))) {
+  if (!state.profile.references?.some(({ provider, externalId }) => provider === fixture.reference.provider && externalId === fixture.reference.externalId)) {
     throw new Error('discovery-canary-provider-reference-missing');
   }
 }
 
 // Two new public fixture keys, exactly one admission each; never rearm history.
-export async function runDiscoveryCanaries({ fetcher = fetch, wait = sleep, now = Date.now, nonce = randomUUID(), report = writeReport, signal } = {}) {
+export async function runDiscoveryCanaries({ fetcher = fetch, wait = sleep, now = Date.now, nonce = randomUUID(), report = writeReport, signal, onFixtureStart, onFixtureVerified } = {}) {
   const results = [];
   for (const fixture of fixtures) {
+    onFixtureStart?.(fixture);
     const startedAt = now();
     const key = {
       fingerprint: createHash('sha256').update(`release-canary:${nonce}:${fixture.mediaKind}`).digest('hex'),
@@ -55,7 +56,7 @@ export async function runDiscoveryCanaries({ fetcher = fetch, wait = sleep, now 
     const lookupBody = { keys: [key], schemaVersion: 3 };
     const initial = await request(fetcher, 'lookup', lookupBody, signal);
     if (initial.status !== 200 || stateOf(initial.payload, key)?.state !== 'MISS') throw new Error('discovery-canary-not-fresh');
-    const query = { discoveryTitles: [fixture.title], mediaKind: fixture.mediaKind, sourceTitles: [fixture.title] };
+    const query = { discoveryTitles: [fixture.title], explicitProviderReference: fixture.reference, mediaKind: fixture.mediaKind, sourceTitles: [fixture.title] };
     const submission = await request(fetcher, 'requests', { key, query, schemaVersion: 3 }, signal);
     if (submission.status !== 202) throw new Error(`discovery-canary-submit-http-${submission.status}`);
     if (submission.payload?.state !== 'PENDING') throw new Error('discovery-canary-admission-not-pending');
@@ -68,6 +69,7 @@ export async function runDiscoveryCanaries({ fetcher = fetch, wait = sleep, now 
       const state = stateOf(response.payload, key);
       if (state?.state === 'VERIFIED') {
         assertVerified(state, fixture);
+        await onFixtureVerified?.(fixture);
         const result = { media: fixture.mediaKind, state: 'VERIFIED', observations: observation, elapsedMs: now() - startedAt };
         results.push(result);
         report(result);
@@ -229,10 +231,26 @@ export async function runObservedDiscoveryCanaries({ observerFactory = startCost
   signals.once('SIGINT', onSignal);
   try {
     observer = observerFactory();
+    let before;
     const work = async () => {
       await observationWait(3000, undefined, { signal: controller.signal });
       controller.signal.throwIfAborted();
-      const value = await runDiscoveryCanaries({ ...canaryOptions, report, now, signal: controller.signal });
+      const value = await runDiscoveryCanaries({ ...canaryOptions, report, now, signal: controller.signal,
+        onFixtureStart: () => { before = observer.snapshot(); },
+        onFixtureVerified: async (fixture) => {
+          await observationWait(5000, undefined, { signal: controller.signal });
+          const after = observer.snapshot();
+          const providerRequests = after.providerRequests - before.providerRequests;
+          const provider429s = after.provider429s - before.provider429s;
+          const queueFailures = after.queueFailures - before.queueFailures;
+          if (providerRequests < 1) throw observerError('no-provider-calls');
+          if (provider429s > 0) throw observerError('provider-429');
+          if (queueFailures > 0) throw observerError('queue-failure');
+          report({ schemaVersion: 1, type: 'discovery-canary.fixture-cost', media: fixture.mediaKind,
+            providerRequests, provider429s, queueFailures, acceptedResults: after.acceptedResults - before.acceptedResults,
+            d1RowsRead: after.d1RowsRead - before.d1RowsRead, d1RowsWritten: after.d1RowsWritten - before.d1RowsWritten });
+        },
+      });
       await observationWait(5000, undefined, { signal: controller.signal });
       return value;
     };
@@ -248,6 +266,8 @@ export async function runObservedDiscoveryCanaries({ observerFactory = startCost
   const totals = observer?.snapshot() ?? createCostObservation().snapshot();
   if (!failure && totals.observedEvents === 0) failure = observerError('no-events');
   if (!failure && totals.providerRequests === 0) failure = observerError('no-provider-calls');
+  if (!failure && totals.provider429s > 0) failure = observerError('provider-429');
+  if (!failure && totals.queueFailures > 0) failure = observerError('queue-failure');
   report({ schemaVersion: 1, type: 'discovery-canary.observation', scope: 'discovery-traffic-window',
     state: failure ? 'INCOMPLETE' : 'COMPLETE', windowDurationMs: Math.max(0, now() - startedAt), ...totals });
   if (failure) throw failure;
@@ -257,7 +277,7 @@ export async function runObservedDiscoveryCanaries({ observerFactory = startCost
 export function canaryFailureCode(error) {
   const code = z.string().safeParse(error?.message);
   if (!code.success) return 'discovery-canary-failed';
-  return /^discovery-canary-(?:invalid-arguments|invalid-lookup|not-fresh|admission-not-pending|media-mismatch|title-mismatch|provider-reference-missing|(?:submit|lookup)-http-[1-5][0-9]{2}|terminal-(?:ANIME|MANGA)-(?:UNAVAILABLE|NOT_FOUND|AMBIGUOUS|MISS|INVALID)|observation-timeout-(?:ANIME|MANGA)|observer-(?:invalid-cost|invalid-frame|truncated|byte-limit|depth-limit|count-limit|failed|exited|cleanup-failed|unsupported-platform|invalid-budget|interrupted|budget|no-events|no-provider-calls))$/u.test(code.data)
+  return /^discovery-canary-(?:invalid-arguments|invalid-lookup|not-fresh|admission-not-pending|media-mismatch|title-mismatch|provider-reference-missing|(?:submit|lookup)-http-[1-5][0-9]{2}|terminal-(?:ANIME|MANGA)-(?:UNAVAILABLE|NOT_FOUND|AMBIGUOUS|MISS|INVALID)|observation-timeout-(?:ANIME|MANGA)|observer-(?:invalid-cost|invalid-frame|truncated|byte-limit|depth-limit|count-limit|failed|exited|cleanup-failed|unsupported-platform|invalid-budget|interrupted|budget|no-events|no-provider-calls|provider-429|queue-failure))$/u.test(code.data)
     ? code.data : 'discovery-canary-failed';
 }
 
