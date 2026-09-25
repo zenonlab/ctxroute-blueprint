@@ -1,4 +1,4 @@
-import { applyD1Migrations, createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
+import { applyD1Migrations, createExecutionContext, env } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import { FavoriteProviderRetryError, type FavoriteProviderPort, type ProviderCandidateEnvelope } from '@tobirink/public-discovery';
 import { HttpPublicDiscoveryAdapter } from '../../../../packages/adapters-browser/src/catalogue/http-public-discovery-adapter';
@@ -434,7 +434,6 @@ describe('public discovery queue trigger', () => {
       body: JSON.stringify({ ...submission('e', 'Queue fallback'), key: fallbackKey }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
     }, undefined, executionCtx);
     expect(response.status).toBe(202);
-    await waitOnExecutionContext(executionCtx);
     expect(queueFallback).toHaveBeenCalledOnce();
     expect(queueFallback).toHaveBeenCalledWith(fallbackKey);
     await expect(adapter.read(fallbackKey, new Date().toISOString())).resolves.toMatchObject({ state: 'PENDING' });
