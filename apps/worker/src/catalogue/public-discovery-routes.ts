@@ -10,19 +10,20 @@ import {
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { WorkerRuntime, WorkerServices } from '../composition';
-import type { NativeCollectorSignal } from '../native-collectors';
+import { processPublicDiscoveryQueue, type NativeCollectorSignal } from '../native-collectors';
 import { boundedDuration, emitWorkerCostDiagnostic, type WorkerCostDiagnosticEvent, type WorkerCostResult, type WorkerCostTask } from '../diagnostics';
 import type { D1MetricTotals, InstrumentedD1 } from '../operational-metrics';
 interface DiscoveryQueuePort {
   send(body: NativeCollectorSignal, options?: { contentType?: 'json' }): Promise<QueueSendResponse | void>;
 }
-type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
+type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: () => Promise<void>; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
 
-function routeServices(context: { get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
+function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
   if (injected) return injected;
   const services = context.get('services');
   const selected: DiscoveryServices = { d1Metrics: services.d1Metrics, publicDiscoveryV3: services.publicDiscoveryV3 };
   if (services.publicDiscoveryQueue) selected.queue = services.publicDiscoveryQueue;
+  selected.queueFallback = async () => { await processPublicDiscoveryQueue(context.env); };
   if (services.publicDiscoveryRateLimiter) selected.rateLimiter = services.publicDiscoveryRateLimiter;
   if (services.publicDiscoveryReadRateLimiter) selected.readRateLimiter = services.publicDiscoveryReadRateLimiter;
   return selected;
@@ -99,7 +100,7 @@ function emitQueueHealth(code: string, error?: Error): void {
   console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code, errorType, ...errorDetail }));
 }
 
-async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string): Promise<boolean> {
+async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string, startFallback?: () => void): Promise<boolean> {
   if (!services.queue) {
     emitQueueHealth('public-discovery-queue-binding-missing');
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
@@ -111,11 +112,22 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
     const error = caught instanceof Error ? caught : undefined;
     emitQueueHealth(queueFailureCode(error), error);
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
+    if (startFallback) {
+      startFallback();
+      return true;
+    }
     return false;
   }
   try { await port.confirmQueueSignal(key, requestDigest, new Date().toISOString()); }
   catch { emitQueueHealth('public-discovery-queue-confirm-failed'); }
   return true;
+}
+
+function startQueueFallback(context: { executionCtx: { waitUntil(promise: Promise<unknown>): void } }, services: DiscoveryServices): (() => void) | undefined {
+  if (services.queueFallback === undefined) return undefined;
+  return () => context.executionCtx.waitUntil(services.queueFallback!().catch(() => {
+    emitQueueHealth('public-discovery-queue-fallback-failed');
+  }));
 }
 
 export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCollectorTestHarness?: () => Promise<void>): Hono<WorkerRuntime> {
@@ -172,7 +184,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
         emitPublicCost(context.env, services, before, 'discovery-admission', 'failed', startedAt);
         return noStore({ error: 'discovery-capacity-unavailable' }, 503);
       }
-      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, requestDigest))) {
+      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, requestDigest, startQueueFallback(context, services)))) {
         emitPublicCost(context.env, services, before, 'discovery-admission', 'backoff', startedAt);
         return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }
@@ -197,7 +209,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     const port = v3Port(services);
     try {
       const admission = await port.requestRefresh(parsed.data.key, new Date().toISOString());
-      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, admission.requestDigest))) {
+      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, admission.requestDigest, startQueueFallback(context, services)))) {
         emitPublicCost(context.env, services, before, 'discovery-refresh', 'backoff', startedAt);
         return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }

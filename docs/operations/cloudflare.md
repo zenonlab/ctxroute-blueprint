@@ -1202,6 +1202,10 @@ opérable sans élargir les données collectées.
 Le signal d'admission utilise le format JSON par défaut du runtime compatible,
 sans option `contentType` explicite : le corps reste l'objet opaque
 `{ type: 'public-discovery-ready', version: 1 }`.
+Si le runtime Queue rejette ce signal, le Worker conserve l'admission et lance
+un unique traitement borné avec `waitUntil`; la réclamation D1 reste limitée à
+une demande et la Queue demeure la voie normale. Un échec du repli n'expose
+aucun détail et la reprise cron existante conserve la récupération différée.
 Après un envoi Queue réussi, une confirmation D1 défaillante émet séparément
 `public-discovery-queue-confirm-failed` et conserve l'admission `202` : le
 message opaque est déjà durable et ne doit pas être annulé ni redoublé.

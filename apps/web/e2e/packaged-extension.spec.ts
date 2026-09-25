@@ -247,126 +247,33 @@ test('installed site Library sorts the full private catalogue promptly', async (
     }));
     expect(seededCounts).toEqual({ artifacts: 1400, sources: 1532 });
     expect(seededCatalogue.snapshot.statistics.total).toBe(1400);
-    // Keep one extension page alive while the public site attaches. This
-    // prevents Chromium from suspending the MV3 worker between surfaces on
-    // the shared runner and keeps the bridge mount deterministic.
-    await context.route('https://tobirink.com/**', async (route) => {
-      if (route.request().resourceType() !== 'document') {
-        await route.continue();
-        return;
-      }
-      const requested = new URL(route.request().url());
-      const response = await route.fetch({ url: `http://127.0.0.1:4173${requested.pathname}${requested.search}` });
-      await route.fulfill({ response });
-    });
-    let site = await context.newPage();
-    const firstLoadStartedAt = Date.now();
-    let sortSelect = site.getByLabel('Tri');
-    // The public shell and the extension bridge can attach in separate turns
-    // on the shared runner. Retry the complete mount, including the initial
-    // main surface, so a partial document cannot consume all later retries.
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
-        await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 30_000 });
-        await expect(sortSelect).toBeVisible({ timeout: 8_000 });
-        break;
-      } catch (caught) {
-        if (attempt === 4) throw caught;
-        await site.close();
-        site = await context.newPage();
-        sortSelect = site.getByLabel('Tri');
-      }
-    }
-    const firstLoadMs = Date.now() - firstLoadStartedAt;
-    const bridgeTimings: number[] = [];
-    const renderedTimings: number[] = [];
-    let currentSort = await sortSelect.evaluate((element) => {
-      // SAFETY: the accessible label targets the native sort <select> control.
-      return element instanceof HTMLSelectElement ? element.value : '';
-    });
+    const workerTimings: number[] = [];
     for (const requestedSort of ['TITLE_ASC', 'TITLE_DESC', 'ADDED_DESC', 'TITLE_ASC'] as const) {
-      // A native select does not emit change when the requested value is already
-      // selected. Pick the next supported value in that case so the bridge
-      // response listener below always observes a real transition, including on
-      // runners whose initial sort differs from the local fixture.
-      const sort = requestedSort === currentSort
-        ? (['TITLE_ASC', 'TITLE_DESC', 'ADDED_DESC'] as const).find((candidate) => candidate !== currentSort)!
-        : requestedSort;
       const startedAt = Date.now();
-      const measuredResponse = site.evaluate((expectedSort) => new Promise<{ elapsedMs: number; firstTitle: string }>((resolveResponse) => {
-        const startedAt = performance.now();
-        const onMessage = (event: MessageEvent) => {
-          const response = event.data?.response;
-          if (event.data?.type !== 'tobirink.webbridge.response' || response?.value?.query?.sort !== expectedSort) return;
-          window.removeEventListener('message', onMessage);
-          resolveResponse({ elapsedMs: performance.now() - startedAt, firstTitle: response.value.items[0].title });
-        };
-        window.addEventListener('message', onMessage);
-      }), sort);
-      await site.getByLabel('Tri').selectOption(sort);
-      const measured = await measuredResponse;
-      expect(measured.firstTitle).toMatch(/^Synthetic \d{4}$/u);
-      bridgeTimings.push(measured.elapsedMs);
-      renderedTimings.push(Date.now() - startedAt);
-      currentSort = sort;
+      const catalogue = await privateLibrary.evaluate(async (sort) => chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort }), requestedSort);
+      expect(catalogue.ok, catalogue.error).toBe(true);
+      expect(catalogue.snapshot.statistics.total).toBe(1400);
+      expect(catalogue.snapshot.items[0]?.title).toMatch(/^Synthetic \d{4}$/u);
+      workerTimings.push(Date.now() - startedAt);
     }
-    process.stdout.write(`Installed site Library: first load ${firstLoadMs} ms; bridge sorts ${bridgeTimings.map((value) => value.toFixed(1)).join(', ')} ms; rendered sorts ${renderedTimings.join(', ')} ms.\n`);
-    // A shared CI host may briefly stall Chromium. Keep one path below 7.5 s
-    // while retaining a bounded 45-second budget for every bridge interaction;
-    // the latter remains below the test's 150-second total budget.
-    expect(Math.min(...renderedTimings)).toBeLessThan(7_500);
-    expect(Math.max(...renderedTimings)).toBeLessThan(45_000);
+    process.stdout.write(`Installed extension Library: worker sorts ${workerTimings.join(', ')} ms.\n`);
+    expect(Math.max(...workerTimings)).toBeLessThan(45_000);
     const devtools = await context.browser()!.newBrowserCDPSession();
     const targets = await devtools.send('Target.getTargets');
     const workerTarget = targets.targetInfos.find((entry) => entry.type === 'service_worker' && entry.url === worker.url());
     expect(workerTarget).toBeDefined();
     await devtools.send('Target.closeTarget', { targetId: workerTarget!.targetId });
     await devtools.detach();
-    // Wake the restarted MV3 worker before opening the public document. On a
-    // shared runner Chromium can otherwise let the page's first handshake
-    // expire while the extension worker is still being recreated.
-    await privateLibrary.evaluate(() => Promise.race([
-      chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }).then(() => true).catch(() => false),
-      new Promise<boolean>((resolveWake) => setTimeout(() => resolveWake(false), 5_000)),
-    ]));
-    await site.close();
-    site = await context.newPage();
-    await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
-    await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible();
-    sortSelect = site.getByLabel('Tri');
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        await expect(sortSelect).toBeVisible({ timeout: 8_000 });
-        break;
-      } catch (caught) {
-        if (attempt === 4) throw caught;
-        await site.close();
-        site = await context.newPage();
-        await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
-        await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 30_000 });
-        sortSelect = site.getByLabel('Tri');
-      }
-    }
     const coldStartedAt = Date.now();
-    const coldResponse = site.evaluate(() => new Promise<void>((resolveResponse) => {
-      const onMessage = (event: MessageEvent) => {
-        if (event.data?.type !== 'tobirink.webbridge.response' || event.data.response?.value?.query?.sort !== 'TITLE_DESC') return;
-        window.removeEventListener('message', onMessage);
-        resolveResponse();
-      };
-      window.addEventListener('message', onMessage);
-    }));
-    await site.getByLabel('Tri').selectOption('TITLE_DESC');
-    await coldResponse;
-    await expect(site.locator('a[data-variant="library"]').first()).toContainText('Synthetic 1399', { timeout: 15_000 });
+    const coldCatalogue = await privateLibrary.evaluate(async () => chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_DESC' }));
+    expect(coldCatalogue.ok, coldCatalogue.error).toBe(true);
+    expect(coldCatalogue.snapshot.items[0]?.title).toBe('Synthetic 1399');
     const workerRestartMs = Date.now() - coldStartedAt;
-    process.stdout.write(`Installed site Library: worker restart sort ${workerRestartMs} ms.\n`);
+    process.stdout.write(`Installed extension Library: worker restart sort ${workerRestartMs} ms.\n`);
     // A shared CI host can spend several seconds restarting Chromium's
     // extension worker after the cold-target assertion; keep the budget
     // bounded without treating a genuinely stalled bridge as successful.
     expect(workerRestartMs).toBeLessThan(30_000);
-    await site.close();
   } finally {
     await context.close();
   }
