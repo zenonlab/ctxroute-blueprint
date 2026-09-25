@@ -17,7 +17,8 @@ interface DiscoveryQueuePort {
   send(body: NativeCollectorSignal, options?: { contentType?: 'json' }): Promise<QueueSendResponse | void>;
 }
 type DiscoveryDeliveryMode = 'queue' | 'worker-direct';
-type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: (key: PublicDiscoveryKeyV3) => Promise<void>; deliveryMode?: DiscoveryDeliveryMode; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
+type DiscoveryFallbackReport = { claimed: number; deferred?: number; failed: number; published: number; replayed: number };
+type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: (key: PublicDiscoveryKeyV3) => Promise<DiscoveryFallbackReport | void>; deliveryMode?: DiscoveryDeliveryMode; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
 
 function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
   if (injected) return injected;
@@ -29,15 +30,17 @@ function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'serv
     const startedAt = Date.now();
     const report = await processPublicDiscoveryQueue(context.env, key, false);
     const metrics = report.metrics;
-    if (metrics === undefined) return;
-    emitWorkerCostDiagnostic(context.env, {
-      acceptedResults: metrics.acceptedResults, d1RowsRead: metrics.rowsRead, d1RowsWritten: metrics.rowsWritten,
-      durationMs: boundedDuration(startedAt, Date.now()), pagesRequested: metrics.pagesRequested, provider: metrics.provider,
-      provider429s: metrics.provider429s, providerHttpErrors: metrics.providerHttpErrors,
-      providerNetworkErrors: metrics.providerNetworkErrors, providerRequests: metrics.providerRequests,
-      providerTransportDurationMs: metrics.providerTransportDurationMs, queueFailures: metrics.queueFailures,
-      queueSends: metrics.queueSends, result: metrics.result, retries: 0, schemaVersion: 1, task: 'discovery', type: 'worker.cost',
-    });
+    if (metrics !== undefined) {
+      emitWorkerCostDiagnostic(context.env, {
+        acceptedResults: metrics.acceptedResults, d1RowsRead: metrics.rowsRead, d1RowsWritten: metrics.rowsWritten,
+        durationMs: boundedDuration(startedAt, Date.now()), pagesRequested: metrics.pagesRequested, provider: metrics.provider,
+        provider429s: metrics.provider429s, providerHttpErrors: metrics.providerHttpErrors,
+        providerNetworkErrors: metrics.providerNetworkErrors, providerRequests: metrics.providerRequests,
+        providerTransportDurationMs: metrics.providerTransportDurationMs, queueFailures: metrics.queueFailures,
+        queueSends: metrics.queueSends, result: metrics.result, retries: 0, schemaVersion: 1, task: 'discovery', type: 'worker.cost',
+      });
+    }
+    return report;
   };
   if (services.publicDiscoveryRateLimiter) selected.rateLimiter = services.publicDiscoveryRateLimiter;
   if (services.publicDiscoveryReadRateLimiter) selected.readRateLimiter = services.publicDiscoveryReadRateLimiter;
@@ -149,9 +152,18 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
 
 function startQueueFallback(services: DiscoveryServices): ((key: PublicDiscoveryKeyV3) => Promise<void>) | undefined {
   if (services.queueFallback === undefined) return undefined;
-  return async (key) => services.queueFallback!(key).catch(() => {
-    emitQueueHealth('public-discovery-queue-fallback-failed');
-  });
+  return async (key) => {
+    try {
+      const report = await services.queueFallback!(key);
+      if (report !== undefined && (report.claimed !== 1 || report.failed !== 0 || (report.deferred ?? 0) !== 0 || report.published + report.replayed !== 1)) {
+        throw new Error('public-discovery-fallback-incomplete');
+      }
+    }
+    catch (error) {
+      emitQueueHealth('public-discovery-queue-fallback-failed', error instanceof Error ? error : undefined);
+      throw error;
+    }
+  };
 }
 
 export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCollectorTestHarness?: () => Promise<void>): Hono<WorkerRuntime> {

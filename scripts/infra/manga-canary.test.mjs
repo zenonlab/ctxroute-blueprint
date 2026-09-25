@@ -84,6 +84,12 @@ function cost(overrides = {}) {
     d1RowsRead: 10, d1RowsWritten: 3, queueSends: 1, queueFailures: 0, ...overrides };
 }
 
+function lookupCost(overrides = {}) {
+  return { schemaVersion: 1, type: 'worker.cost', task: 'discovery-lookup', provider: 'none', result: 'unchanged',
+    pagesRequested: 0, providerRequests: 0, acceptedResults: 0, durationMs: 3, retries: 0,
+    d1RowsRead: 2, d1RowsWritten: 0, ...overrides };
+}
+
 function tailFrame(...events) {
   return JSON.stringify({ event: { request: { url: 'https://private.invalid', headers: { authorization: 'private-secret' } } },
     logs: [{ message: ['private title and payload', ...events.map(row => JSON.stringify(row))] }],
@@ -151,7 +157,7 @@ test('tail uses only the pinned npm command, discards stderr, disables disk logs
   assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
 });
 
-test('observed canaries start the observer first and certify only measured provider traffic', async () => {
+test('observed canaries await readiness and late per-fixture provider traffic without mixing windows', async () => {
   const fake = fakeTail();
   const fixture = fixtureFetcher();
   const reports = [];
@@ -163,16 +169,18 @@ test('observed canaries start the observer first and certify only measured provi
     observerFactory: () => startCostObserver(fake),
     observationWait: () => {
       waits += 1;
-      if (waits === 2) fake.child.stdout.write(tailFrame(cost({ provider429s: 0 })));
-      if (waits === 3) fake.child.stdout.write(tailFrame(cost({ provider: 'mangaupdates', provider429s: 0 })));
+      if (waits === 1) fake.child.stdout.write(tailFrame(lookupCost()));
+      if (waits === 3) assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, 1);
+      if (waits === 4) fake.child.stdout.write(tailFrame(cost({ providerRequests: 1, provider429s: 0, queueSends: 0 })));
+      if (waits === 7) fake.child.stdout.write(tailFrame(cost({ provider: 'mangaupdates', providerRequests: 1, provider429s: 0, queueSends: 0 })));
     },
   });
   assert.equal(results.length, 2);
-  assert.equal(waits, 4);
+  assert.equal(waits, 8);
   assert.equal(reports.at(-1).state, 'COMPLETE');
   assert.equal(reports.at(-1).scope, 'discovery-traffic-window');
-  assert.equal(reports.at(-1).providerRequests, 4);
-  assert.deepEqual(reports.filter(row => row.type === 'discovery-canary.fixture-cost').map(row => [row.media, row.providerRequests]), [['ANIME', 2], ['MANGA', 2]]);
+  assert.equal(reports.at(-1).providerRequests, 2);
+  assert.deepEqual(reports.filter(row => row.type === 'discovery-canary.fixture-cost').map(row => [row.media, row.providerRequests]), [['ANIME', 1], ['MANGA', 1]]);
   assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
   assert.equal(signals.listenerCount('SIGTERM'), 0);
   assert.doesNotMatch(JSON.stringify(reports), /private|title|https|secret|payload/iu);
@@ -181,9 +189,14 @@ test('observed canaries start the observer first and certify only measured provi
 test('a missing first-fixture provider call stops before the manga admission', async () => {
   const fake = fakeTail();
   const fixture = fixtureFetcher();
+  let waits = 0;
   await assert.rejects(runObservedDiscoveryCanaries({ fetcher: fixture.fetcher, wait: () => {}, report: () => {},
-    observerFactory: () => startCostObserver(fake), observationWait: () => {},
+    observerFactory: () => startCostObserver(fake), observationWait: () => {
+      waits += 1;
+      if (waits === 1) fake.child.stdout.write(tailFrame(lookupCost()));
+    },
   }), /observer-no-provider-calls/u);
+  assert.equal(waits, 13);
   assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, 1);
 });
 
@@ -194,23 +207,27 @@ test('a provider 429 or Queue failure stops before the second admission', async 
     let waits = 0;
     await assert.rejects(runObservedDiscoveryCanaries({ fetcher: fixture.fetcher, wait: () => {}, report: () => {},
       observerFactory: () => startCostObserver(fake), observationWait: () => {
-        if (++waits === 2) fake.child.stdout.write(tailFrame(cost({ provider429s: 0, [field]: 1 })));
+        waits += 1;
+        if (waits === 1) fake.child.stdout.write(tailFrame(lookupCost()));
+        if (waits === 4) fake.child.stdout.write(tailFrame(cost({ providerRequests: 1, provider429s: 0, queueSends: 0, [field]: 1 })));
       },
     }), new RegExp(`observer-${code}`, 'u'));
+    assert.equal(waits, 4);
     assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, 1);
   }
 });
 
 test('empty observer or no provider calls fails certification and always closes the child', async () => {
-  for (const rows of [[], [cost({ provider: 'none', providerRequests: 0 })]]) {
+  for (const rows of [[], [lookupCost()]]) {
     const fake = fakeTail();
     const fixture = fixtureFetcher();
     const reports = [];
     await assert.rejects(runObservedDiscoveryCanaries({ ...fixture, wait: () => {}, report: row => reports.push(row),
       observerFactory: () => startCostObserver(fake), observationWait: () => { if (rows.length) fake.child.stdout.write(tailFrame(...rows)); },
-    }), /observer-no-events|observer-no-provider-calls/u);
+    }), /observer-not-ready|observer-no-provider-calls/u);
     assert.equal(reports.at(-1).state, 'INCOMPLETE');
     assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
+    assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, rows.length === 0 ? 0 : 1);
   }
 });
 
@@ -219,8 +236,11 @@ test('canary failure and observer exit abort certification, redact errors and cl
     const fake = fakeTail();
     const fixture = fixtureFetcher({ admissionStatus: 429 });
     const reports = [];
+    let waits = 0;
     await assert.rejects(runObservedDiscoveryCanaries({ ...fixture, wait: () => {}, report: row => reports.push(row),
       observerFactory: () => startCostObserver(fake), observationWait: () => {
+        waits += 1;
+        if (waits === 1) fake.child.stdout.write(tailFrame(lookupCost()));
         if (failure === 'observer') fake.child.emit('error', new Error('private secret url https://private.invalid'));
       },
     }), failure === 'observer' ? /observer-failed/u : /submit-http-429/u);
@@ -266,7 +286,11 @@ test('late invalid or truncated logs during termination prevent a complete certi
     } });
     let waits = 0;
     await assert.rejects(runObservedDiscoveryCanaries({ ...fixture, wait: () => {}, report: row => reports.push(row), observerFactory,
-      observationWait: () => { if (++waits === 2 || waits === 3) fake.child.stdout.write(tailFrame(cost({ provider429s: 0 }))); },
+      observationWait: () => {
+        waits += 1;
+        if (waits === 1) fake.child.stdout.write(tailFrame(lookupCost()));
+        if (waits === 2 || waits === 3) fake.child.stdout.write(tailFrame(cost({ providerRequests: 1, provider429s: 0, queueSends: 0 })));
+      },
     }), /observer-truncated|observer-invalid-cost/u);
     assert.equal(reports.at(-1).state, 'INCOMPLETE');
     assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
@@ -275,6 +299,7 @@ test('late invalid or truncated logs during termination prevent a complete certi
 
 test('CLI errors are closed codes, including a hostile error imitating their prefix', () => {
   assert.equal(canaryFailureCode(new Error('discovery-canary-submit-http-429')), 'discovery-canary-submit-http-429');
+  assert.equal(canaryFailureCode(new Error('discovery-canary-observer-not-ready')), 'discovery-canary-observer-not-ready');
   for (const message of ['private-secret', 'discovery-canary-private-secret', 'https://private.invalid', 'discovery-canary-observer-failed\nprivate']) {
     assert.equal(canaryFailureCode(new Error(message)), 'discovery-canary-failed');
   }
@@ -300,7 +325,7 @@ test('an unexpected tail exit fails immediately without certifying or launching 
       return new Promise(() => {});
     },
   }), /observer-exited/u);
-  assert.equal(fixture.calls.length, 0);
+  assert.equal(fixture.calls.filter(call => call.url.endsWith('/requests')).length, 0);
   assert.equal(reports.at(-1).state, 'INCOMPLETE');
   assert.equal(fake.kills.length, 0);
 });

@@ -12,6 +12,10 @@ const maxObservations = 40;
 const observationDelay = 15_000;
 const observerBudget = 24 * 60_000;
 const observerByteLimit = 1024 * 1024;
+const observerReadinessAttempts = 12;
+const observerReadinessDelay = 2_500;
+const fixtureCostObservationAttempts = 12;
+const fixtureCostObservationDelay = 5_000;
 const fixtures = [
   { mediaKind: 'ANIME', title: 'Odd Taxi', reference: { provider: 'anilist', externalId: '128547' } },
   { mediaKind: 'MANGA', title: 'Spirit Circle', reference: { provider: 'mangaupdates', externalId: '13893304082' } },
@@ -214,8 +218,39 @@ export function startCostObserver({ spawnProcess = spawn, killProcess = process.
   return { failed, snapshot: observation.snapshot, close: () => { closePromise ??= close(); return closePromise; } };
 }
 
+async function awaitCostObserverReady(observer, fetcher, wait, signal) {
+  const initialEvents = observer.snapshot().observedEvents;
+  const key = {
+    fingerprint: createHash('sha256').update(`release-canary-observer:${randomUUID()}`).digest('hex'),
+    mediaKind: 'UNKNOWN', parserVersion: 'release-canary-observer-v1', siteRulesVersion: 'canary-v1',
+  };
+  const body = { keys: [key], schemaVersion: 3 };
+  for (let attempt = 1; attempt <= observerReadinessAttempts; attempt += 1) {
+    const response = await request(fetcher, 'lookup', body, signal);
+    if (response.status !== 200) throw new Error(`discovery-canary-lookup-http-${response.status}`);
+    if (stateOf(response.payload, key)?.state !== 'MISS') throw observerError('readiness-probe');
+    await wait(observerReadinessDelay, undefined, { signal });
+    if (observer.snapshot().observedEvents > initialEvents) return;
+  }
+  throw observerError('not-ready');
+}
+
+async function awaitFixtureCost(observer, before, wait, signal) {
+  let after = before;
+  for (let attempt = 1; attempt <= fixtureCostObservationAttempts; attempt += 1) {
+    await wait(fixtureCostObservationDelay, undefined, { signal });
+    after = observer.snapshot();
+    const provider429s = after.provider429s - before.provider429s;
+    const queueFailures = after.queueFailures - before.queueFailures;
+    if (provider429s > 0) throw observerError('provider-429');
+    if (queueFailures > 0) throw observerError('queue-failure');
+    if (after.providerRequests - before.providerRequests > 0) return after;
+  }
+  throw observerError('no-provider-calls');
+}
+
 export async function runObservedDiscoveryCanaries({ observerFactory = startCostObserver, observationWait = sleep, signals = process,
-  budgetMs = observerBudget, report = writeReport, now = Date.now, ...canaryOptions } = {}) {
+  budgetMs = observerBudget, fetcher = fetch, report = writeReport, now = Date.now, ...canaryOptions } = {}) {
   if (!Number.isInteger(budgetMs) || budgetMs < 1 || budgetMs > observerBudget) throw observerError('invalid-budget');
   const controller = new AbortController();
   const startedAt = now();
@@ -233,19 +268,14 @@ export async function runObservedDiscoveryCanaries({ observerFactory = startCost
     observer = observerFactory();
     let before;
     const work = async () => {
-      await observationWait(3000, undefined, { signal: controller.signal });
-      controller.signal.throwIfAborted();
-      const value = await runDiscoveryCanaries({ ...canaryOptions, report, now, signal: controller.signal,
+      await awaitCostObserverReady(observer, fetcher, observationWait, controller.signal);
+      const value = await runDiscoveryCanaries({ ...canaryOptions, fetcher, report, now, signal: controller.signal,
         onFixtureStart: () => { before = observer.snapshot(); },
         onFixtureVerified: async (fixture) => {
-          await observationWait(5000, undefined, { signal: controller.signal });
-          const after = observer.snapshot();
+          const after = await awaitFixtureCost(observer, before, observationWait, controller.signal);
           const providerRequests = after.providerRequests - before.providerRequests;
           const provider429s = after.provider429s - before.provider429s;
           const queueFailures = after.queueFailures - before.queueFailures;
-          if (providerRequests < 1) throw observerError('no-provider-calls');
-          if (provider429s > 0) throw observerError('provider-429');
-          if (queueFailures > 0) throw observerError('queue-failure');
           report({ schemaVersion: 1, type: 'discovery-canary.fixture-cost', media: fixture.mediaKind,
             providerRequests, provider429s, queueFailures, acceptedResults: after.acceptedResults - before.acceptedResults,
             d1RowsRead: after.d1RowsRead - before.d1RowsRead, d1RowsWritten: after.d1RowsWritten - before.d1RowsWritten });
@@ -277,7 +307,7 @@ export async function runObservedDiscoveryCanaries({ observerFactory = startCost
 export function canaryFailureCode(error) {
   const code = z.string().safeParse(error?.message);
   if (!code.success) return 'discovery-canary-failed';
-  return /^discovery-canary-(?:invalid-arguments|invalid-lookup|not-fresh|admission-not-pending|media-mismatch|title-mismatch|provider-reference-missing|(?:submit|lookup)-http-[1-5][0-9]{2}|terminal-(?:ANIME|MANGA)-(?:UNAVAILABLE|NOT_FOUND|AMBIGUOUS|MISS|INVALID)|observation-timeout-(?:ANIME|MANGA)|observer-(?:invalid-cost|invalid-frame|truncated|byte-limit|depth-limit|count-limit|failed|exited|cleanup-failed|unsupported-platform|invalid-budget|interrupted|budget|no-events|no-provider-calls|provider-429|queue-failure))$/u.test(code.data)
+  return /^discovery-canary-(?:invalid-arguments|invalid-lookup|not-fresh|admission-not-pending|media-mismatch|title-mismatch|provider-reference-missing|(?:submit|lookup)-http-[1-5][0-9]{2}|terminal-(?:ANIME|MANGA)-(?:UNAVAILABLE|NOT_FOUND|AMBIGUOUS|MISS|INVALID)|observation-timeout-(?:ANIME|MANGA)|observer-(?:invalid-cost|invalid-frame|truncated|byte-limit|depth-limit|count-limit|failed|exited|cleanup-failed|unsupported-platform|invalid-budget|interrupted|budget|readiness-probe|not-ready|no-events|no-provider-calls|provider-429|queue-failure))$/u.test(code.data)
     ? code.data : 'discovery-canary-failed';
 }
 
