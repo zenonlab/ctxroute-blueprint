@@ -517,8 +517,9 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         ON CONFLICT(work_id) DO UPDATE SET media_kind = excluded.media_kind,
         preferred_title = excluded.preferred_title, revision = excluded.revision`)
         .bind(profile.workId, candidate.mediaKind === 'ANIME' ? 'anime' : 'manga', candidate.displayTitle ?? candidate.titles[0] ?? candidate.externalId, revision, ...guardValues),
-      ...candidate.titles.map((title) => this.database.prepare(`INSERT OR IGNORE INTO catalogue_titles(work_id, locale, title)
-        SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+      this.database.prepare(`INSERT OR IGNORE INTO catalogue_titles(work_id, locale, title)
+        SELECT ?, 'und', proposed.value FROM json_each(?) AS proposed
+        WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
@@ -530,10 +531,11 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
             CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value
             WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`)
-        .bind(profile.workId, 'und', title, ...guardValues)),
-      ...canonical.normalizedTitles.map((normalizedTitle) => this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
+        .bind(profile.workId, JSON.stringify(candidate.titles), ...guardValues),
+      this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
           normalization_version, normalized_title, media_kind, work_id, created_at)
-        SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+        SELECT ?, proposed.value, ?, ?, ? FROM json_each(?) AS proposed
+        WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
@@ -546,9 +548,10 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
             CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value
             WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
         ON CONFLICT(normalization_version, normalized_title, media_kind) DO NOTHING`)
-        .bind(favoriteTitlePreparationVersion, normalizedTitle, candidate.mediaKind === 'ANIME' ? 'anime' : 'manga', profile.workId, verifiedAt, ...guardValues)),
-      ...profile.references.map((reference) => this.database.prepare(`INSERT INTO catalogue_external_references(provider, external_id, work_id)
-        SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+        .bind(favoriteTitlePreparationVersion, candidate.mediaKind === 'ANIME' ? 'anime' : 'manga', profile.workId, verifiedAt, JSON.stringify(canonical.normalizedTitles), ...guardValues),
+      this.database.prepare(`INSERT INTO catalogue_external_references(provider, external_id, work_id)
+        SELECT json_extract(proposed.value, '$.provider'), json_extract(proposed.value, '$.externalId'), ?
+        FROM json_each(?) AS proposed WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
@@ -560,7 +563,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
             CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value
             WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
-        ON CONFLICT(provider, external_id) DO NOTHING`).bind(reference.provider, reference.externalId, profile.workId, ...guardValues)),
+        ON CONFLICT(provider, external_id) DO NOTHING`).bind(profile.workId, JSON.stringify(profile.references), ...guardValues),
       this.database.prepare(`INSERT INTO catalogue_current_metadata(
           work_id, profile_json, editorial_status, format, start_year, end_year,
           episode_total, chapter_total, volume_total, cover_url, cover_attribution,
