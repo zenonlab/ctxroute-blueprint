@@ -1,4 +1,4 @@
-import { applyD1Migrations, env } from 'cloudflare:test';
+import { applyD1Migrations, createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import { FavoriteProviderRetryError, type FavoriteProviderPort, type ProviderCandidateEnvelope } from '@tobirink/public-discovery';
 import { HttpPublicDiscoveryAdapter } from '../../../../packages/adapters-browser/src/catalogue/http-public-discovery-adapter';
@@ -422,6 +422,21 @@ describe('public discovery queue trigger', () => {
     });
     expect(retry.status).toBe(503);
     warn.mockRestore();
+  });
+
+  it('accepts a Queue failure when the Worker runtime starts the bounded fallback', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const queueFallback = vi.fn(async () => undefined);
+    const executionCtx = createExecutionContext();
+    const fallbackKey = { ...key('e'), fingerprint: `${'e'.repeat(63)}1` };
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue: { send: async () => { throw new Error('queue runtime'); } }, queueFallback });
+    const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+      body: JSON.stringify({ ...submission('e', 'Queue fallback'), key: fallbackKey }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    }, undefined, executionCtx);
+    expect(response.status).toBe(202);
+    await waitOnExecutionContext(executionCtx);
+    expect(queueFallback).toHaveBeenCalledOnce();
+    await expect(adapter.read(fallbackKey, new Date().toISOString())).resolves.toMatchObject({ state: 'PENDING' });
   });
 
   it('classifies a platform internal Queue error without emitting its message', async () => {
