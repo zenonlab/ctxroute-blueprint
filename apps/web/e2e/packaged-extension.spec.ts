@@ -251,10 +251,6 @@ test('installed site Library sorts the full private catalogue promptly', async (
     // prevents Chromium from suspending the MV3 worker between surfaces on
     // the shared runner and keeps the bridge mount deterministic.
     await context.route('https://tobirink.com/**', async (route) => {
-      if (route.request().resourceType() !== 'document') {
-        await route.continue();
-        return;
-      }
       const requested = new URL(route.request().url());
       const response = await route.fetch({ url: `http://127.0.0.1:4173${requested.pathname}${requested.search}` });
       await route.fulfill({ response });
