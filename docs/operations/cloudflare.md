@@ -1195,7 +1195,9 @@ Un échec d'émission du signal initial d'admission journalise un unique événe
 `public-discovery-queue-unavailable` ou `public-discovery-queue-runtime-failed`.
 Le diagnostic ne contient ni titre, empreinte, URL, corps de demande ni message
 d'exception. En cas de rejet runtime, il peut seulement qualifier le type fermé
-`type-error`, `dom-exception`, `error` ou `other-error`. Il rend le `503`
+`type-error`, `dom-exception`, `error` ou `other-error`, et le détail fermé
+`internal-error`, `message-rejected` ou `unknown`. Ce dernier est dérivé d'une
+allowlist de phrases plateforme : toute autre phrase est masquée. Il rend le `503`
 opérable sans élargir les données collectées.
 Après un envoi Queue réussi, une confirmation D1 défaillante émet séparément
 `public-discovery-queue-confirm-failed` et conserve l'admission `202` : le
