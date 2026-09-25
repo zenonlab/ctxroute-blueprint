@@ -16,14 +16,14 @@ import type { D1MetricTotals, InstrumentedD1 } from '../operational-metrics';
 interface DiscoveryQueuePort {
   send(body: NativeCollectorSignal, options?: { contentType?: 'json' }): Promise<QueueSendResponse | void>;
 }
-type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: () => Promise<void>; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
+type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: (key: PublicDiscoveryKeyV3) => Promise<void>; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
 
 function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
   if (injected) return injected;
   const services = context.get('services');
   const selected: DiscoveryServices = { d1Metrics: services.d1Metrics, publicDiscoveryV3: services.publicDiscoveryV3 };
   if (services.publicDiscoveryQueue) selected.queue = services.publicDiscoveryQueue;
-  selected.queueFallback = async () => { await processPublicDiscoveryQueue(context.env); };
+  selected.queueFallback = async (key) => { await processPublicDiscoveryQueue(context.env, key); };
   if (services.publicDiscoveryRateLimiter) selected.rateLimiter = services.publicDiscoveryRateLimiter;
   if (services.publicDiscoveryReadRateLimiter) selected.readRateLimiter = services.publicDiscoveryReadRateLimiter;
   return selected;
@@ -100,7 +100,7 @@ function emitQueueHealth(code: string, error?: Error): void {
   console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code, errorType, ...errorDetail }));
 }
 
-async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string, startFallback?: () => void): Promise<boolean> {
+async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string, startFallback?: (key: PublicDiscoveryKeyV3) => void): Promise<boolean> {
   if (!services.queue) {
     emitQueueHealth('public-discovery-queue-binding-missing');
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
@@ -113,7 +113,7 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
     emitQueueHealth(queueFailureCode(error), error);
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
     if (startFallback) {
-      startFallback();
+      startFallback(key);
       return true;
     }
     return false;
@@ -123,9 +123,9 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
   return true;
 }
 
-function startQueueFallback(context: { executionCtx: { waitUntil(promise: Promise<unknown>): void } }, services: DiscoveryServices): (() => void) | undefined {
+function startQueueFallback(context: { executionCtx: { waitUntil(promise: Promise<unknown>): void } }, services: DiscoveryServices): ((key: PublicDiscoveryKeyV3) => void) | undefined {
   if (services.queueFallback === undefined) return undefined;
-  return () => context.executionCtx.waitUntil(services.queueFallback!().catch(() => {
+  return (key) => context.executionCtx.waitUntil(services.queueFallback!(key).catch(() => {
     emitQueueHealth('public-discovery-queue-fallback-failed');
   }));
 }

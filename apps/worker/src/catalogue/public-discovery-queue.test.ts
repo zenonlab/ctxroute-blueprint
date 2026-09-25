@@ -436,7 +436,20 @@ describe('public discovery queue trigger', () => {
     expect(response.status).toBe(202);
     await waitOnExecutionContext(executionCtx);
     expect(queueFallback).toHaveBeenCalledOnce();
+    expect(queueFallback).toHaveBeenCalledWith(fallbackKey);
     await expect(adapter.read(fallbackKey, new Date().toISOString())).resolves.toMatchObject({ state: 'PENDING' });
+  });
+
+  it('claims only the fallback admission instead of older pending requests', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const now = new Date().toISOString();
+    const olderKey = { ...key('a'), fingerprint: `${'a'.repeat(63)}1` };
+    const fallbackKey = { ...key('b'), fingerprint: `${'b'.repeat(63)}1` };
+    await adapter.request({ ...submission('a', 'Older pending request'), key: olderKey, requestDigest: 'a'.repeat(64) }, now);
+    await adapter.request({ ...submission('b', 'Fallback request'), key: fallbackKey, requestDigest: 'b'.repeat(64) }, now);
+    const claim = await adapter.claimBatch({ claimToken: 'c'.repeat(48), key: fallbackKey, leaseUntil: new Date(Date.now() + 15 * 60_000).toISOString(), limit: 1, now, tokenDigest: 'd'.repeat(64) });
+    expect(claim.requests.map((request) => request.key)).toEqual([fallbackKey]);
+    await expect(adapter.read(olderKey, now)).resolves.toMatchObject({ state: 'PENDING' });
   });
 
   it('classifies a platform internal Queue error without emitting its message', async () => {

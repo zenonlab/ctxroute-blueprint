@@ -68,7 +68,7 @@ interface CanonicalFacts {
   workId: string;
 }
 export interface PublicDiscoveryV3Port {
-  claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
+  claimBatch(input: { claimToken: string; key?: PublicDiscoveryKeyV3; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
   deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string): Promise<void>;
   confirmQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
   publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ published: number; replayed: number }>;
@@ -347,7 +347,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       RETURNING state`).bind(...keyValues(key), requestDigest, now).first();
   }
 
-  async claimBatch(input: { claimToken: string; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch> {
+  async claimBatch(input: { claimToken: string; key?: PublicDiscoveryKeyV3; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch> {
     await this.failExhaustedBatch(input.now, input.limit);
     const rows = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = CASE WHEN state = 'VERIFIED' THEN state ELSE 'PROCESSING' END,
@@ -362,17 +362,19 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_claim_priority
         WHERE state IN ('PENDING', 'PROCESSING') AND attempt_count < 8
           AND ((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
+          AND (?5 IS NULL OR (fingerprint = ?5 AND media_kind = ?6 AND parser_version = ?7 AND rules_version = ?8))
         UNION ALL
         SELECT rowid, admission_priority, updated_at, fingerprint
         FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_refresh_claim
         WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING') AND refresh_attempt_count < 8
-          AND ((refresh_state = 'PENDING' AND retry_at <= ?3) OR (refresh_state = 'PROCESSING' AND lease_until <= ?3)))
+          AND ((refresh_state = 'PENDING' AND retry_at <= ?3) OR (refresh_state = 'PROCESSING' AND lease_until <= ?3))
+          AND (?5 IS NULL OR (fingerprint = ?5 AND media_kind = ?6 AND parser_version = ?7 AND rules_version = ?8)))
         ORDER BY admission_priority, updated_at, fingerprint LIMIT ?4)
       RETURNING request_json AS requestJson, result_json AS resultJson, request_digest AS requestDigest,
         state, attempt_count AS attemptCount, refresh_attempt_count AS refreshAttemptCount,
         admission_priority AS admissionPriority, updated_at AS updatedAt,
         fingerprint, media_kind AS mediaKind, parser_version AS parserVersion, rules_version AS siteRulesVersion`)
-      .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit)
+      .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit, input.key?.fingerprint ?? null, input.key?.mediaKind ?? null, input.key?.parserVersion ?? null, input.key?.siteRulesVersion ?? null)
       .all<{ admissionPriority: number; attemptCount: number; fingerprint: string; mediaKind: PublicDiscoveryKeyV3['mediaKind']; parserVersion: string; refreshAttemptCount: number; requestDigest: string; requestJson: string; resultJson: string | null; siteRulesVersion: string; state: DiscoveryRow['state']; updatedAt: string }>();
     const ordered = rows.results.sort((left, right) => left.admissionPriority - right.admissionPriority
       || left.updatedAt.localeCompare(right.updatedAt) || left.fingerprint.localeCompare(right.fingerprint));
