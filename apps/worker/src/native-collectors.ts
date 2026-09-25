@@ -10,6 +10,7 @@ import {
   runPublicDiscoveryBatch,
   type PublicDiscoveryBatchReport,
   type PublicDiscoveryClaimedRequest,
+  type PublicDiscoveryKeyV3,
   type PublicDiscoveryProviderPorts,
   type PublicDiscoveryResultBatch,
   type FavoriteProviderPort,
@@ -275,7 +276,7 @@ export function agendaCollectionFailureCode(failures: readonly string[]): string
   return 'agenda-provider-unavailable';
 }
 
-export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings): Promise<DiscoveryProcessingReport> {
+export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings, key?: PublicDiscoveryKeyV3): Promise<DiscoveryProcessingReport> {
   const d1 = instrumentD1(bindings.PUBLIC_DB);
   const queue = instrumentQueueSend(bindings.PUBLIC_DISCOVERY_QUEUE);
   const providers = instrumentProviderFetch(providerFetch(bindings));
@@ -295,7 +296,9 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
         activeToken = randomToken();
         activeTokenDigest = await digest(activeToken);
         const now = new Date();
-        const claimed = await port.claimBatch({ claimToken: activeToken, leaseUntil: new Date(now.valueOf() + 15 * 60_000).toISOString(), limit, now: now.toISOString(), tokenDigest: activeTokenDigest });
+        const claimInput: Parameters<typeof port.claimBatch>[0] = { claimToken: activeToken, leaseUntil: new Date(now.valueOf() + 15 * 60_000).toISOString(), limit, now: now.toISOString(), tokenDigest: activeTokenDigest };
+        if (key) claimInput.key = key;
+        const claimed = await port.claimBatch(claimInput);
         claimedCount = claimed.requests.length;
         return claimed;
       },
