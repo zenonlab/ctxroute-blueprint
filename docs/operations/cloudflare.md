@@ -1079,8 +1079,10 @@ La séquence de reprise est distincte de la livraison habituelle :
    clauses conditionnelles sur l'état et le digest courants, lots bornés,
    signal Queue opaque et contrôle après chaque lot. Les 38 baux en cours,
    les 88 profils vérifiés et les résultats terminaux ne sont pas remis à zéro.
-   Le POST v3 actuel ne réarme pas `FAILED` ; aucun SQL manuel sans plan de
-   reprise testé et accord explicite immédiatement avant son application.
+   Le POST v3 réarme atomiquement une ligne `FAILED` seulement lorsque le
+   payload validé reproduit la même clé et le même digest calculé côté
+   serveur. La reprise passe exclusivement par cette admission publique ;
+   aucun SQL manuel n'est autorisé.
 
 Arrêter la reprise si un canari échoue, si une demande nouvelle ou réarmée
 passe à `FAILED` sans appel fournisseur, si une publication perd un ancien `VERIFIED`, si la gateway
@@ -1193,6 +1195,15 @@ L'observation du trafic seule ne relie pas cryptographiquement un appel à
 une clé ; l'absence préalable des titres/références et l'identité exacte
 servent de preuves indépendantes. Ne pas publier l'extension ni réarmer les
 `FAILED` par ce lot.
+
+Le run du 25 septembre a ensuite mesuré 1 194 et 1 206 lectures D1 dans les
+deux tâches `discovery`, malgré leur résultat `VERIFIED`. L'audit a isolé une
+garde de conflit orientée depuis les 540 références existantes : 1 079 lignes
+lues, contre deux lorsque la collection proposée bornée pilote le lookup par
+clé primaire. Les sept écritures atomiques utilisent cette seconde forme sans
+migration. Avant toute reprise historique, deux nouvelles clés doivent chacune
+rester à au plus 300 lectures dans leur événement `task=discovery`, avec un
+appel fournisseur, un résultat accepté, zéro 429 et zéro échec Queue.
 
 Un consumer `public-discovery-ready` ne doit jamais se réessayer uniquement
 parce que son signal de continuation n'a pas pu être ajouté à la même Queue.

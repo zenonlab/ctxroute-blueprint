@@ -19,6 +19,15 @@ garde de lease et de conflit dans chaque écriture atomique. Le banc local fixe
 ce scénario à **au plus 300 lignes lues** (246 mesurées) ; aucune valeur locale
 ne doit être interprétée comme un coût de facturation distant.
 
+Mise à jour du 26 septembre : deux canaris réels ont isolé **1 194** et
+**1 206** lectures dans la seule tâche de collecte. Une comparaison distante
+en lecture seule a attribué **1 079** lectures à la garde de conflit qui
+parcourait les 540 références existantes avant les références proposées. Les
+sept gardes partent désormais de la collection `json_each` bornée puis
+consultent la clé primaire `(provider, external_id)` ; la même comparaison lit
+deux lignes. La régression locale exige cet ordre textuel, son plan indexé et
+au plus 300 lectures pour une publication avec 582 références existantes.
+
 Le [plan maître A à Z](./tobirink-a-z-master-plan.md) est la source de vérité
 pour l'ordre d'exécution, les seuils proposés et les frontières d'approbation.
 
@@ -76,7 +85,7 @@ ni l'idempotence, ni la décision de ne pas écrire.
 | Lookup par lot | une requête `json_each` pour jusqu'à 50 clés | Évite un appel par clé et restitue aussi les MISS | Déjà le chemin optimal exposé |
 | Admission Discovery | écriture atomique, puis lecture de l'état; reprise du signal si nécessaire | La lecture confirme saturation, conflit et état final après concurrence | Fusion possible seulement avec une nouvelle forme de retour SQL |
 | Claim Discovery | `UPDATE ... RETURNING`, plus clôture bornée des claims épuisés | Sélection, bail et retour des demandes sont atomiques | Aucune lecture séparée à retirer |
-| Publication Discovery | lecture de garde, comparaison catalogue, batch protégé par lease, relecture seulement après `changes=0` | Protège rejeu, collision, bail et publication partielle | Les gardes répétées sont le prix de l'atomicité; pas de suppression sûre |
+| Publication Discovery | lecture de garde, comparaison catalogue, batch protégé par lease, relecture seulement après `changes=0` | Protège rejeu, collision, bail et publication partielle | Les collections proposées pilotent les gardes indexées ; aucune suppression sûre restante |
 | Relations Discovery historiques | lecture puis admission secondaire | Retirées du runtime cible; aucune relation ne crée de travail |
 | Claim Agenda | lecture complète de lane puis `UPDATE ... RETURNING` | La lecture distingue complete/deferred/resume; l'UPDATE arbitre le lease | **Candidate** : décision + retour d'état dans une requête atomique |
 | Page Agenda | batch de deux écritures : page et checkpoint lane | Les deux écritures doivent réussir ensemble pour reprendre sans trou | Aucune écriture inutile démontrée |

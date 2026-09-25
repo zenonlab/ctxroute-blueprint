@@ -102,6 +102,7 @@
       "docs/architecture/src/provider-operations.lifecycle.json",
       "docs/architecture/src/public-pipeline.architecture.json"
       ,"docs/architecture/src/favorite-convergence.architecture.json"
+      ,"docs/architecture/src/discovery-recovery.dataflow.json"
     ],
     "internalDocuments": [
       "docs/architecture/src/blueprint.architecture.json",

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Reprise bornée de Public Discovery",
+    "output": "discovery-recovery.dataflow.html",
+    "viewBox": [1080, 760],
+    "quality_profile": "showcase"
+  },
+  "stages": [
+    { "label": "Preuves" },
+    { "label": "Garde" },
+    { "label": "Admission v3" },
+    { "label": "Collecte" },
+    { "label": "Résultat" }
+  ],
+  "nodes": [
+    { "id": "snapshot", "type": "database", "label": "Export D1 frais", "sublabel": "intégrité · SHA-256", "stage": 0, "row": 0, "tag": "lecture seule" },
+    { "id": "inventory", "type": "backend", "label": "Inventaire agrégé", "sublabel": "FAILED/ATTEMPT_LIMIT", "stage": 0, "row": 2, "tag": "sans titres ni clés" },
+    { "id": "canaries", "type": "backend", "label": "Canaris neufs", "sublabel": "anime · manga · fournisseur", "stage": 1, "row": 0, "width": 150, "tag": "VERIFIED requis" },
+    { "id": "approval", "type": "security", "label": "Confirmation ciblée", "sublabel": "lot · seuils · arrêt", "stage": 1, "row": 2, "tag": "avant écriture" },
+    { "id": "rearm", "type": "backend", "label": "Resoumission API v3", "sublabel": "même clé · même payload", "stage": 2, "row": 2, "tag": "un POST · aucun SQL" },
+    { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "PENDING · PROCESSING", "stage": 2, "row": 0, "tag": "cache public" },
+    { "id": "queue", "type": "messagebus", "label": "Queue Discovery", "sublabel": "signal opaque · claim(1)", "stage": 3, "row": 0, "tag": "batch 1 · concurrency 1" },
+    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "fournisseur · coût D1", "stage": 3, "row": 2, "tag": "aucun faux VERIFIED" },
+    { "id": "library", "type": "frontend", "label": "Library privée", "sublabel": "œuvre ou raison visible", "stage": 4, "row": 1, "tag": "contrôle après lot" }
+  ],
+  "flows": [
+    { "from": "snapshot", "to": "canaries", "label": "base de comparaison", "classification": "lecture seule", "variant": "default", "labelDy": 53 },
+    { "from": "inventory", "to": "approval", "label": "cibles éligibles", "classification": "comptes agrégés", "variant": "security" },
+    { "from": "canaries", "to": "approval", "label": "preuve fournisseur", "classification": "VERIFIED · D1 ≤ 300", "variant": "security", "labelDy": 24 },
+    { "from": "approval", "to": "rearm", "label": "autorise le lot exact", "classification": "confirmation immédiate", "variant": "security", "labelDy": 53 },
+    { "from": "rearm", "to": "d1", "label": "admission FAILED vers PENDING", "classification": "digest recalculé identique", "variant": "emphasis", "labelDy": -23 },
+    { "from": "d1", "to": "queue", "label": "signal de reprise", "classification": "une clé opaque", "variant": "emphasis" },
+    { "from": "queue", "to": "collector", "label": "claim borné", "classification": "un traitement par réveil", "variant": "emphasis", "labelDy": 24 },
+    { "from": "collector", "to": "library", "label": "résultat terminal", "classification": "VERIFIED ou raison", "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Canari non terminal : aucune reprise historique autorisée", "providerRequests > 0 ne suffit pas sans résultat terminal", "429, échec Queue ou dépassement CPU arrêtent le lot"] },
+    { "dot": "emerald", "title": "Preuve par lot", "items": ["Comparer les états D1 avant et après", "Exiger task=discovery à 300 rows_read maximum", "Vérifier les œuvres canoniques puis Library"] }
+  ]
+}

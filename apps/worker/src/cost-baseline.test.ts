@@ -262,6 +262,7 @@ describe('local D1 cost baseline — no external requests', () => {
     const m = meter();
     const adapter = new D1PublicDiscoveryV3Adapter(m.database);
     const revision = 991_001;
+    const externalReferenceCount = 540;
     await env.PUBLIC_DB.prepare('INSERT INTO catalogue_revisions(revision, published_at) VALUES (?1, ?2)')
       .bind(revision, at(0)).run();
     const statements = Array.from({ length: 2_349 }, (_, index) => {
@@ -272,9 +273,15 @@ describe('local D1 cost baseline — no external requests', () => {
         env.PUBLIC_DB.prepare(`INSERT INTO catalogue_canonical_titles_v1(
           normalization_version, normalized_title, media_kind, work_id, created_at
         ) VALUES (?1, ?2, ?3, ?4, ?5)`).bind(favoriteTitlePreparationVersion, `existing ${index}`, 'anime', workId, at(0)),
+        ...(index < externalReferenceCount ? [
+          env.PUBLIC_DB.prepare('INSERT INTO catalogue_external_references(provider, external_id, work_id) VALUES (?1, ?2, ?3)')
+            .bind('anilist', `existing-${index}`, workId),
+        ] : []),
       ];
     }).flat();
     for (let offset = 0; offset < statements.length; offset += 100) await env.PUBLIC_DB.batch(statements.slice(offset, offset + 100));
+    expect(await env.PUBLIC_DB.prepare("SELECT COUNT(*) AS count FROM catalogue_external_references WHERE provider = 'anilist' AND external_id GLOB 'existing-*'").first())
+      .toEqual({ count: externalReferenceCount });
     expect((await adapter.request(request('c'), at(0))).outcome).toBe('created');
     await adapter.confirmQueueSignal(key('c'), 'c'.repeat(64), at(0));
     const claimed = await adapter.claimBatch({ claimToken: 'g'.repeat(48), tokenDigest: 'g'.repeat(64), now: at(0), leaseUntil: at(15), limit: 20 });

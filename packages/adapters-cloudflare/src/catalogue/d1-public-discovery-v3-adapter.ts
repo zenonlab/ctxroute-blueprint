@@ -495,8 +495,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
-          AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
-            JOIN json_each(?) AS proposed
+          AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
+            CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
             WHERE existing.work_id <> ?)
@@ -508,8 +508,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
-          AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
-            JOIN json_each(?) AS proposed
+          AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
+            CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
             WHERE existing.work_id <> ?)
@@ -525,8 +525,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
-          AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
-            JOIN json_each(?) AS proposed
+          AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
+            CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
             WHERE existing.work_id <> ?)
@@ -541,8 +541,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
-          AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
-            JOIN json_each(?) AS proposed
+          AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
+            CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
             WHERE existing.work_id <> ?)
@@ -557,8 +557,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
-          AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
-            JOIN json_each(?) AS proposed
+          AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
+            CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
             WHERE existing.work_id <> ?)
@@ -576,8 +576,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
           AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)
-          AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
-            JOIN json_each(?) AS proposed
+          AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
+            CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
               ON existing.provider = json_extract(proposed.value, '$.provider')
               AND existing.external_id = json_extract(proposed.value, '$.externalId')
             WHERE existing.work_id <> ?)
@@ -696,8 +696,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       WHERE fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
         AND (state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING'))
         AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?
-          AND NOT EXISTS (SELECT 1 FROM catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
-          JOIN json_each(?) AS proposed
+          AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
+          CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
             ON existing.provider = json_extract(proposed.value, '$.provider')
             AND existing.external_id = json_extract(proposed.value, '$.externalId')
           WHERE existing.work_id <> ?)
