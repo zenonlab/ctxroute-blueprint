@@ -100,7 +100,7 @@ function emitQueueHealth(code: string, error?: Error): void {
   console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code, errorType, ...errorDetail }));
 }
 
-async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string, startFallback?: (key: PublicDiscoveryKeyV3) => void): Promise<boolean> {
+async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string, startFallback?: (key: PublicDiscoveryKeyV3) => Promise<void>): Promise<boolean> {
   if (!services.queue) {
     emitQueueHealth('public-discovery-queue-binding-missing');
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
@@ -113,7 +113,7 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
     emitQueueHealth(queueFailureCode(error), error);
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
     if (startFallback) {
-      startFallback(key);
+      await startFallback(key);
       return true;
     }
     return false;
@@ -123,11 +123,11 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
   return true;
 }
 
-function startQueueFallback(context: { executionCtx: { waitUntil(promise: Promise<unknown>): void } }, services: DiscoveryServices): ((key: PublicDiscoveryKeyV3) => void) | undefined {
+function startQueueFallback(services: DiscoveryServices): ((key: PublicDiscoveryKeyV3) => Promise<void>) | undefined {
   if (services.queueFallback === undefined) return undefined;
-  return (key) => context.executionCtx.waitUntil(services.queueFallback!(key).catch(() => {
+  return async (key) => services.queueFallback!(key).catch(() => {
     emitQueueHealth('public-discovery-queue-fallback-failed');
-  }));
+  });
 }
 
 export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCollectorTestHarness?: () => Promise<void>): Hono<WorkerRuntime> {
@@ -184,7 +184,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
         emitPublicCost(context.env, services, before, 'discovery-admission', 'failed', startedAt);
         return noStore({ error: 'discovery-capacity-unavailable' }, 503);
       }
-      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, requestDigest, startQueueFallback(context, services)))) {
+      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, requestDigest, startQueueFallback(services)))) {
         emitPublicCost(context.env, services, before, 'discovery-admission', 'backoff', startedAt);
         return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }
@@ -209,7 +209,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     const port = v3Port(services);
     try {
       const admission = await port.requestRefresh(parsed.data.key, new Date().toISOString());
-      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, admission.requestDigest, startQueueFallback(context, services)))) {
+      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, admission.requestDigest, startQueueFallback(services)))) {
         emitPublicCost(context.env, services, before, 'discovery-refresh', 'backoff', startedAt);
         return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }

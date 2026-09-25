@@ -1202,8 +1202,8 @@ opérable sans élargir les données collectées.
 Le signal d'admission utilise le format JSON par défaut du runtime compatible,
 sans option `contentType` explicite : le corps reste l'objet opaque
 `{ type: 'public-discovery-ready', version: 1 }`.
-Si le runtime Queue rejette ce signal, le Worker conserve l'admission et lance
-un unique traitement borné avec `waitUntil` pour cette clé exacte; il ne réclame
+Si le runtime Queue rejette ce signal, le Worker conserve l'admission et attend
+un unique traitement borné pour cette clé exacte avant de répondre `202`; il ne réclame
 ni ne réarme une ancienne demande `PENDING` ou `FAILED`. La réclamation D1
 reste limitée à une demande et la Queue demeure la voie normale. Un échec du
 repli n'expose aucun détail et la reprise cron existante conserve la récupération
