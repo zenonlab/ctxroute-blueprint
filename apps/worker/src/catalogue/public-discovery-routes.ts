@@ -86,9 +86,17 @@ function queueFailureCode(error: Error | undefined): string {
   return 'public-discovery-queue-runtime-failed';
 }
 
+function queueFailureDetail(error: Error): 'internal-error' | 'message-rejected' | 'unknown' {
+  const message = error.message.trim().toLowerCase().replaceAll(/\s+/gu, ' ');
+  if (message === 'internal error' || message === 'internal server error') return 'internal-error';
+  if (message === 'failed to send message' || message === 'queue send failed') return 'message-rejected';
+  return 'unknown';
+}
+
 function emitQueueHealth(code: string, error?: Error): void {
   const errorType = error === undefined ? 'none' : error.name === 'TypeError' ? 'type-error' : error.name === 'DOMException' ? 'dom-exception' : error.name === 'Error' ? 'error' : 'other-error';
-  console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code, errorType }));
+  const errorDetail = error === undefined ? {} : { errorDetail: queueFailureDetail(error) };
+  console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code, errorType, ...errorDetail }));
 }
 
 async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string): Promise<boolean> {

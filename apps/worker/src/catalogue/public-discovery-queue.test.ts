@@ -414,13 +414,26 @@ describe('public discovery queue trigger', () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: 'discovery-queue-unavailable' });
     await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'PENDING' });
-    expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-runtime-failed', errorType: 'error' }));
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-runtime-failed', errorType: 'error', errorDetail: 'unknown' }));
     expect(JSON.stringify(warn.mock.calls)).not.toContain('private title');
     const retry = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
       body: JSON.stringify(submission('5', 'Queue retry')),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect(retry.status).toBe(503);
+    warn.mockRestore();
+  });
+
+  it('classifies a platform internal Queue error without emitting its message', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue: { send: async () => { throw new Error('Internal Server Error'); } } });
+    const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+      body: JSON.stringify(submission('d', 'Queue runtime')), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(response.status).toBe(503);
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-runtime-failed', errorType: 'error', errorDetail: 'internal-error' }));
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('Internal Server Error');
     warn.mockRestore();
   });
 
