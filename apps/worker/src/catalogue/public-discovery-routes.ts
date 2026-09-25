@@ -106,7 +106,7 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
     return false;
   }
   try {
-    await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
+    await services.queue.send({ type: 'public-discovery-ready', version: 1 });
   } catch (caught) {
     const error = caught instanceof Error ? caught : undefined;
     emitQueueHealth(queueFailureCode(error), error);

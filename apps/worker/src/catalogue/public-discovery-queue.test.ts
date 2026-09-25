@@ -398,7 +398,7 @@ describe('public discovery queue trigger', () => {
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect(response.status).toBe(202);
-    expect(queue.send).toHaveBeenCalledExactlyOnceWith({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
+    expect(queue.send).toHaveBeenCalledExactlyOnceWith({ type: 'public-discovery-ready', version: 1 });
     expect(JSON.stringify(queue.send.mock.calls)).not.toContain('Private');
   });
 
