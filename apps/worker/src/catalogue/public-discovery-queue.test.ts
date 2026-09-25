@@ -414,7 +414,7 @@ describe('public discovery queue trigger', () => {
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: 'discovery-queue-unavailable' });
     await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'PENDING' });
-    expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-runtime-failed' }));
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-runtime-failed', errorType: 'error' }));
     expect(JSON.stringify(warn.mock.calls)).not.toContain('private title');
     const retry = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
       body: JSON.stringify(submission('5', 'Queue retry')),
@@ -463,7 +463,7 @@ describe('public discovery queue trigger', () => {
     expect(queue.send).toHaveBeenCalledOnce();
     expect(confirm).toHaveBeenCalledOnce();
     expect(release).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-confirm-failed' }));
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-confirm-failed', errorType: 'none' }));
     warn.mockRestore();
   });
 

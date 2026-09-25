@@ -86,8 +86,9 @@ function queueFailureCode(error: Error | undefined): string {
   return 'public-discovery-queue-runtime-failed';
 }
 
-function emitQueueHealth(code: string): void {
-  console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code }));
+function emitQueueHealth(code: string, error?: Error): void {
+  const errorType = error === undefined ? 'none' : error.name === 'TypeError' ? 'type-error' : error.name === 'DOMException' ? 'dom-exception' : error.name === 'Error' ? 'error' : 'other-error';
+  console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code, errorType }));
 }
 
 async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string): Promise<boolean> {
@@ -99,7 +100,8 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
   try {
     await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
   } catch (caught) {
-    emitQueueHealth(queueFailureCode(caught instanceof Error ? caught : undefined));
+    const error = caught instanceof Error ? caught : undefined;
+    emitQueueHealth(queueFailureCode(error), error);
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
     return false;
   }
