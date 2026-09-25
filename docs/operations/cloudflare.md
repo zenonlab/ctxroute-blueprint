@@ -4,6 +4,15 @@ Tobirink does not expose Wrangler as a release command. Every provider change
 starts from the repository-owned gate, while the extension and Worker runtime
 remain independent of this operational path.
 
+## Incident Queue Discovery — contournement borné
+
+Tant que le runtime Cloudflare Queue renvoie une erreur d'envoi non qualifiée,
+`DISCOVERY_DELIVERY_MODE=worker-direct` traite une admission fraîche dans le
+Worker. Le traitement réclame exactement sa clé et ne programme aucune
+continuation Queue ; les crons et le consumer Queue restent inchangés. Ce mode
+est réversible par retour à `queue` dans le même fichier Wrangler et ne
+réarme jamais les lignes `FAILED` historiques.
+
 ## Candidate 1.0.44 — certification en cours
 
 La candidate locale est `1.0.44`; le pointeur publié reste `1.0.43`.
