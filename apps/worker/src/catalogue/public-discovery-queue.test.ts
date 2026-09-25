@@ -445,6 +445,28 @@ describe('public discovery queue trigger', () => {
       .bind(key('a').fingerprint).first()).toEqual({ signal: 'SENT' });
   });
 
+  it('accepts a delivered signal when only its D1 confirmation fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const port = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const confirm = vi.spyOn(port, 'confirmQueueSignal').mockRejectedValueOnce(new Error('D1 confirmation failed'));
+    const release = vi.spyOn(port, 'releaseQueueSignal');
+    const queue = { send: vi.fn(async () => undefined) };
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: port, queue });
+    const request = submission('f', 'Confirmation fixture');
+    request.key.fingerprint = crypto.randomUUID().replaceAll('-', '').repeat(2);
+    const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+      body: JSON.stringify(request),
+      headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    await expect(response.clone().json()).resolves.toMatchObject({ state: 'PENDING' });
+    expect(response.status).toBe(202);
+    expect(queue.send).toHaveBeenCalledOnce();
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(release).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-confirm-failed' }));
+    warn.mockRestore();
+  });
+
   it('emits one Queue signal for ten thousand identical admissions', async () => {
     const queue = { send: vi.fn(async () => undefined) };
     let requests = 0;
