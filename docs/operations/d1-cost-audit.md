@@ -11,6 +11,14 @@ les tâches `agenda-admission` et `agenda-recovery` les rapportent séparément.
 Les tableaux 0021/0024 ci-dessous restent des références historiques, pas le
 coût du schéma courant ni celui d'un réveil complet en production.
 
+Mise à jour du 25 septembre : une publication Discovery avec **2 349** clés
+canoniques et **16** titres a révélé une amplification de lectures par les
+gardes SQL répétées. Les insertions de titres, clés canoniques et références
+sont maintenant regroupées par collection `json_each`, tout en conservant la
+garde de lease et de conflit dans chaque écriture atomique. Le banc local fixe
+ce scénario à **au plus 300 lignes lues** (246 mesurées) ; aucune valeur locale
+ne doit être interprétée comme un coût de facturation distant.
+
 Le [plan maître A à Z](./tobirink-a-z-master-plan.md) est la source de vérité
 pour l'ordre d'exécution, les seuils proposés et les frontières d'approbation.
 

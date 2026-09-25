@@ -1,5 +1,6 @@
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter, R2AgendaOperationStore } from '@tobirink/adapters-cloudflare';
+import { favoriteTitlePreparationVersion } from '@tobirink/application';
 import type { PublicDiscoveryVerifiedProfile } from '@tobirink/public-discovery';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { instrumentD1 } from './operational-metrics';
@@ -254,6 +255,48 @@ describe('local D1 cost baseline — no external requests', () => {
     expect(m.records[0]?.rowsWritten).toBeGreaterThan(0);
     expect(m.records[1]?.rowsWritten).toBe(0);
     expect(m.records.every(({ rowsRead }) => rowsRead < 50)).toBe(true);
+    m.report();
+  });
+
+  it('measures one verified publication against a production-sized canonical catalogue', async () => {
+    const m = meter();
+    const adapter = new D1PublicDiscoveryV3Adapter(m.database);
+    const revision = 991_001;
+    await env.PUBLIC_DB.prepare('INSERT INTO catalogue_revisions(revision, published_at) VALUES (?1, ?2)')
+      .bind(revision, at(0)).run();
+    const statements = Array.from({ length: 2_349 }, (_, index) => {
+      const workId = `work_existing_${index}`;
+      return [
+        env.PUBLIC_DB.prepare('INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES (?1, ?2, ?3, ?4)')
+          .bind(workId, 'anime', `Existing ${index}`, revision),
+        env.PUBLIC_DB.prepare(`INSERT INTO catalogue_canonical_titles_v1(
+          normalization_version, normalized_title, media_kind, work_id, created_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5)`).bind(favoriteTitlePreparationVersion, `existing ${index}`, 'anime', workId, at(0)),
+      ];
+    }).flat();
+    for (let offset = 0; offset < statements.length; offset += 100) await env.PUBLIC_DB.batch(statements.slice(offset, offset + 100));
+    expect((await adapter.request(request('c'), at(0))).outcome).toBe('created');
+    await adapter.confirmQueueSignal(key('c'), 'c'.repeat(64), at(0));
+    const claimed = await adapter.claimBatch({ claimToken: 'g'.repeat(48), tokenDigest: 'g'.repeat(64), now: at(0), leaseUntil: at(15), limit: 20 });
+    expect(claimed.requests.some(({ key: claimedKey }) => claimedKey.fingerprint === key('c').fingerprint)).toBe(true);
+    const productionProfile: PublicDiscoveryVerifiedProfile = {
+      ...profile,
+      workId: 'work_cost_production_sized',
+      candidate: {
+        ...profile.candidate,
+        displayTitle: 'Production Sized Publication',
+        externalId: '910099',
+        titles: Array.from({ length: 16 }, (_, index) => `Production Sized Publication ${index}`),
+      },
+      references: [{ externalId: '910099', provider: 'anilist' }],
+    };
+    await m.measure('publish-with-production-sized-canonical-catalogue', () => adapter.publishBatch({
+      claimToken: 'g'.repeat(48), nonce: crypto.randomUUID(), schemaVersion: 3, verifiedAt: at(0),
+      results: [{ key: key('c'), requestDigest: 'c'.repeat(64), resolution: { state: 'VERIFIED', profile: productionProfile } }],
+    }, 'g'.repeat(64), 'h'.repeat(64), at(0)));
+    const measurement = m.records.find(({ scenario }) => scenario === 'publish-with-production-sized-canonical-catalogue');
+    expect(measurement?.rowsRead).toBeLessThanOrEqual(300);
+    expect(measurement?.rowsWritten).toBeGreaterThan(0);
     m.report();
   });
 
