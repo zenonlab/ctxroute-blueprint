@@ -1188,3 +1188,10 @@ Dans ce cas, il acquitte le message déjà traité, journalise seulement le code
 reprendre les lignes D1 encore dues. Cette dégradation conserve la Queue
 `batch_size=1` / `max_concurrency=1`, évite une boucle de retries et ne réarme
 aucune demande historique.
+
+Un échec d'émission du signal initial d'admission journalise un unique événement
+`native-collector.health` avec l'un des codes fermés `public-discovery-queue-binding-missing`,
+`public-discovery-queue-rate-limited`, `public-discovery-queue-forbidden`,
+`public-discovery-queue-unavailable` ou `public-discovery-queue-runtime-failed`.
+Le diagnostic ne contient ni titre, empreinte, URL, corps de demande ni message
+d'exception. Il rend le `503` opérable sans élargir les données collectées.

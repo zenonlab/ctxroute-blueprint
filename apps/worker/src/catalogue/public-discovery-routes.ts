@@ -83,7 +83,18 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
     await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
     await port.confirmQueueSignal(key, requestDigest, new Date().toISOString());
     return true;
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    const code = message === 'public-discovery-queue-unavailable'
+      ? 'public-discovery-queue-binding-missing'
+      : /429|rate.?limit|too many/u.test(message)
+        ? 'public-discovery-queue-rate-limited'
+        : /forbidden|unauthori[sz]ed|permission|access denied/u.test(message)
+          ? 'public-discovery-queue-forbidden'
+          : /not found|unavailable|disabled|not enabled/u.test(message)
+            ? 'public-discovery-queue-unavailable'
+            : 'public-discovery-queue-runtime-failed';
+    console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code }));
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
     return false;
   }
