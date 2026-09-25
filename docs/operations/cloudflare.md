@@ -1180,3 +1180,11 @@ L'observation du trafic seule ne relie pas cryptographiquement un appel à
 une clé ; l'absence préalable des titres/références et l'identité exacte
 servent de preuves indépendantes. Ne pas publier l'extension ni réarmer les
 `FAILED` par ce lot.
+
+Un consumer `public-discovery-ready` ne doit jamais se réessayer uniquement
+parce que son signal de continuation n'a pas pu être ajouté à la même Queue.
+Dans ce cas, il acquitte le message déjà traité, journalise seulement le code
+`public-discovery-continuation-unsent`, et laisse le réveil quotidien borné
+reprendre les lignes D1 encore dues. Cette dégradation conserve la Queue
+`batch_size=1` / `max_concurrency=1`, évite une boucle de retries et ne réarme
+aucune demande historique.

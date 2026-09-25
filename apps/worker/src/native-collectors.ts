@@ -320,12 +320,18 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     },
   });
   const nextPendingAt = await port.nextPendingAt();
+  let continuationScheduled = false;
   if (nextPendingAt !== undefined) {
     const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(nextPendingAt) - Date.now()) / 1_000)));
-    await queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json', delaySeconds });
+    try {
+      await queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json', delaySeconds });
+      continuationScheduled = true;
+    } catch {
+      console.warn('public-discovery-continuation-unsent');
+    }
   }
   const result = report.replayed > 0 && report.published === 0 ? 'deduplicated' : report.published > 0 ? 'changed' : (report.deferred ?? 0) > 0 ? 'backoff' : 'unchanged';
-  return { ...report, continuationScheduled: nextPendingAt !== undefined, metrics: { ...collectorCost(d1.snapshot(), providers.snapshot(), report.published, result), ...queue.snapshot() } };
+  return { ...report, continuationScheduled, metrics: { ...collectorCost(d1.snapshot(), providers.snapshot(), report.published, result), ...queue.snapshot() } };
   } catch (error) {
     throw new PublicDiscoveryProcessingError(error instanceof Error ? error : undefined, { ...collectorCost(d1.snapshot(), providers.snapshot(), acceptedResults, 'failed'), ...queue.snapshot() });
   }

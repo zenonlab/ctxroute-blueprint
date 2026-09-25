@@ -323,7 +323,7 @@ describe('public discovery queue trigger', () => {
       expect(queue.send).toHaveBeenCalledOnce();
     } finally { provider.mockRestore(); }
   }, 15_000);
-  it('keeps an empty claimed batch alive and retries when continuation delivery fails', async () => {
+  it('acks an empty claimed batch when continuation delivery fails', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const now = new Date().toISOString();
     await adapter.request({ ...submission('3', 'Synthetic leased work'), requestDigest: 'a'.repeat(64) }, now);
@@ -338,7 +338,7 @@ describe('public discovery queue trigger', () => {
     queue.send.mockRejectedValueOnce(new Error('local-queue-failure'));
     const item = { body: { type: 'public-discovery-ready', version: 1 }, attempts: 1, ack: vi.fn(), retry: vi.fn() };
     await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery: () => processPublicDiscoveryQueue(bindings) });
-    expect(item.ack).not.toHaveBeenCalled(); expect(item.retry).toHaveBeenCalledOnce();
+    expect(item.ack).toHaveBeenCalledOnce(); expect(item.retry).not.toHaveBeenCalled();
   });
   it('measures warm local admission and D1 read separately', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
