@@ -1185,6 +1185,10 @@ exige pour chaque clé un `MISS`, un seul POST, `PENDING`, puis `VERIFIED` avec
 la référence exacte ; chaque fenêtre doit mesurer au moins un appel
 fournisseur, zéro 429 et zéro échec Queue. Les seules sorties sont des états
 et des compteurs agrégés, sans titre, empreinte ni corps fournisseur.
+Avant la première admission, une lecture `MISS` aléatoire et sans écriture est
+répétée jusqu'à ce que son coût apparaisse dans `wrangler tail`, au plus trente
+secondes. Après chaque `VERIFIED`, la seconde admission reste bloquée jusqu'à
+soixante secondes pour attribuer le coût fournisseur tardif à la bonne œuvre.
 L'observation du trafic seule ne relie pas cryptographiquement un appel à
 une clé ; l'absence préalable des titres/références et l'identité exacte
 servent de preuves indépendantes. Ne pas publier l'extension ni réarmer les
@@ -1215,8 +1219,8 @@ Si le runtime Queue rejette ce signal, le Worker conserve l'admission et attend
 un unique traitement borné pour cette clé exacte avant de répondre `202`; il ne réclame
 ni ne réarme une ancienne demande `PENDING` ou `FAILED`. La réclamation D1
 reste limitée à une demande et la Queue demeure la voie normale. Un échec du
-repli n'expose aucun détail et la reprise cron existante conserve la récupération
-différée.
+repli, un claim absent, un report différé ou non publié répond `503` sans exposer
+de détail ; la reprise cron existante conserve la récupération différée.
 Après un envoi Queue réussi, une confirmation D1 défaillante émet séparément
 `public-discovery-queue-confirm-failed` et conserve l'admission `202` : le
 message opaque est déjà durable et ne doit pas être annulé ni redoublé.

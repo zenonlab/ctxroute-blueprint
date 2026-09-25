@@ -439,6 +439,41 @@ describe('public discovery queue trigger', () => {
     await expect(adapter.read(fallbackKey, new Date().toISOString())).resolves.toMatchObject({ state: 'PENDING' });
   });
 
+  it('returns 503 without leaking details when the bounded fallback rejects', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fallbackKey = { ...key('f'), fingerprint: `${'f'.repeat(63)}1` };
+    const queueFallback = vi.fn(async () => { throw new Error('private fallback detail'); });
+    try {
+      const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue: { send: async () => { throw new Error('queue runtime'); } }, queueFallback });
+      const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+        body: JSON.stringify({ ...submission('f', 'Fallback rejection'), key: fallbackKey }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+      });
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({ error: 'discovery-unavailable' });
+      expect(queueFallback).toHaveBeenCalledExactlyOnceWith(fallbackKey);
+      expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-fallback-failed', errorType: 'error', errorDetail: 'unknown' }));
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('private fallback detail');
+    } finally { warn.mockRestore(); }
+  });
+
+  it('returns 503 when the bounded fallback does not publish its exact claim', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fallbackKey = { ...key('7'), fingerprint: `${'7'.repeat(63)}1` };
+    const queueFallback = vi.fn(async () => ({ claimed: 1, deferred: 0, failed: 1, published: 0, replayed: 0 }));
+    try {
+      const app = createPublicDiscoveryApp({ deliveryMode: 'worker-direct', publicDiscoveryV3: adapter, queueFallback });
+      const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+        body: JSON.stringify({ ...submission('7', 'Incomplete fallback'), key: fallbackKey }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+      });
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({ error: 'discovery-unavailable' });
+      expect(queueFallback).toHaveBeenCalledExactlyOnceWith(fallbackKey);
+      expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-fallback-failed', errorType: 'error', errorDetail: 'unknown' }));
+    } finally { warn.mockRestore(); }
+  });
+
   it('claims only the fallback admission instead of older pending requests', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const now = new Date().toISOString();
