@@ -276,7 +276,7 @@ export function agendaCollectionFailureCode(failures: readonly string[]): string
   return 'agenda-provider-unavailable';
 }
 
-export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings, key?: PublicDiscoveryKeyV3): Promise<DiscoveryProcessingReport> {
+export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings, key?: PublicDiscoveryKeyV3, scheduleContinuation = true): Promise<DiscoveryProcessingReport> {
   const d1 = instrumentD1(bindings.PUBLIC_DB);
   const queue = instrumentQueueSend(bindings.PUBLIC_DISCOVERY_QUEUE);
   const providers = instrumentProviderFetch(providerFetch(bindings));
@@ -324,7 +324,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   });
   const nextPendingAt = await port.nextPendingAt();
   let continuationScheduled = false;
-  if (nextPendingAt !== undefined) {
+  if (scheduleContinuation && nextPendingAt !== undefined) {
     const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(nextPendingAt) - Date.now()) / 1_000)));
     try {
       await queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json', delaySeconds });

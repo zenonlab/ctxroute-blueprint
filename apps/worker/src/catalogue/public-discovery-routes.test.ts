@@ -193,6 +193,22 @@ describe('verified public discovery cache', () => {
     expect(metrics.snapshot().rowsWritten).toBeLessThanOrEqual(8);
   });
 
+  it('uses the bounded Worker fallback without calling Queue in worker-direct mode', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const queue = { send: vi.fn(async () => undefined) };
+    const queueFallback = vi.fn(async () => undefined);
+    const key = { ...discoveryKey('c'), fingerprint: `${'c'.repeat(63)}1` };
+    const app = createPublicDiscoveryApp({ deliveryMode: 'worker-direct', publicDiscoveryV3: adapter, queue, queueFallback });
+    const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+      body: JSON.stringify({ key, query: { discoveryTitles: ['Worker direct'], mediaKind: 'ANIME', sourceTitles: ['Worker direct'] }, schemaVersion: 3 }),
+      headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(response.status).toBe(202);
+    expect(queue.send).not.toHaveBeenCalled();
+    expect(queueFallback).toHaveBeenCalledOnce();
+    expect(queueFallback).toHaveBeenCalledWith(key);
+  });
+
   it('reads up to fifty discovery states in one public request', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const keys = Array.from({ length: 50 }, (_, index) => ({ ...discoveryKey('8'), fingerprint: `${'8'.repeat(62)}${index.toString(16).padStart(2, '0')}` }));
