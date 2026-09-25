@@ -23,7 +23,20 @@ function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'serv
   const services = context.get('services');
   const selected: DiscoveryServices = { d1Metrics: services.d1Metrics, publicDiscoveryV3: services.publicDiscoveryV3 };
   if (services.publicDiscoveryQueue) selected.queue = services.publicDiscoveryQueue;
-  selected.queueFallback = async (key) => { await processPublicDiscoveryQueue(context.env, key); };
+  selected.queueFallback = async (key) => {
+    const startedAt = Date.now();
+    const report = await processPublicDiscoveryQueue(context.env, key);
+    const metrics = report.metrics;
+    if (metrics === undefined) return;
+    emitWorkerCostDiagnostic(context.env, {
+      acceptedResults: metrics.acceptedResults, d1RowsRead: metrics.rowsRead, d1RowsWritten: metrics.rowsWritten,
+      durationMs: boundedDuration(startedAt, Date.now()), pagesRequested: metrics.pagesRequested, provider: metrics.provider,
+      provider429s: metrics.provider429s, providerHttpErrors: metrics.providerHttpErrors,
+      providerNetworkErrors: metrics.providerNetworkErrors, providerRequests: metrics.providerRequests,
+      providerTransportDurationMs: metrics.providerTransportDurationMs, queueFailures: metrics.queueFailures,
+      queueSends: metrics.queueSends, result: metrics.result, retries: 0, schemaVersion: 1, task: 'discovery', type: 'worker.cost',
+    });
+  };
   if (services.publicDiscoveryRateLimiter) selected.rateLimiter = services.publicDiscoveryRateLimiter;
   if (services.publicDiscoveryReadRateLimiter) selected.readRateLimiter = services.publicDiscoveryReadRateLimiter;
   return selected;
