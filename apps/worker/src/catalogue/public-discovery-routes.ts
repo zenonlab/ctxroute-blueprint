@@ -77,27 +77,35 @@ function randomToken(): string {
   return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
 }
 
+function queueFailureCode(error: Error | undefined): string {
+  const message = error?.message.toLowerCase() ?? '';
+  if (message === 'public-discovery-queue-unavailable') return 'public-discovery-queue-binding-missing';
+  if (/429|rate.?limit|too many/u.test(message)) return 'public-discovery-queue-rate-limited';
+  if (/forbidden|unauthori[sz]ed|permission|access denied/u.test(message)) return 'public-discovery-queue-forbidden';
+  if (/not found|unavailable|disabled|not enabled/u.test(message)) return 'public-discovery-queue-unavailable';
+  return 'public-discovery-queue-runtime-failed';
+}
+
+function emitQueueHealth(code: string): void {
+  console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code }));
+}
+
 async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string): Promise<boolean> {
-  try {
-    if (!services.queue) throw new Error('public-discovery-queue-unavailable');
-    await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
-    await port.confirmQueueSignal(key, requestDigest, new Date().toISOString());
-    return true;
-  } catch (error) {
-    const message = error instanceof Error ? error.message.toLowerCase() : '';
-    const code = message === 'public-discovery-queue-unavailable'
-      ? 'public-discovery-queue-binding-missing'
-      : /429|rate.?limit|too many/u.test(message)
-        ? 'public-discovery-queue-rate-limited'
-        : /forbidden|unauthori[sz]ed|permission|access denied/u.test(message)
-          ? 'public-discovery-queue-forbidden'
-          : /not found|unavailable|disabled|not enabled/u.test(message)
-            ? 'public-discovery-queue-unavailable'
-            : 'public-discovery-queue-runtime-failed';
-    console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code }));
+  if (!services.queue) {
+    emitQueueHealth('public-discovery-queue-binding-missing');
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
     return false;
   }
+  try {
+    await services.queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json' });
+  } catch (caught) {
+    emitQueueHealth(queueFailureCode(caught instanceof Error ? caught : undefined));
+    await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
+    return false;
+  }
+  try { await port.confirmQueueSignal(key, requestDigest, new Date().toISOString()); }
+  catch { emitQueueHealth('public-discovery-queue-confirm-failed'); }
+  return true;
 }
 
 export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCollectorTestHarness?: () => Promise<void>): Hono<WorkerRuntime> {
