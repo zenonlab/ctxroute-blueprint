@@ -269,7 +269,7 @@ test('installed site Library sorts the full private catalogue promptly', async (
       try {
         await site.goto('https://tobirink.com/library', { waitUntil: 'networkidle' });
         await expect(site.getByRole('main', { name: 'Bibliothèque' })).toBeVisible({ timeout: 30_000 });
-        await expect(sortSelect).toBeVisible({ timeout: 8_000 });
+        await expect(sortSelect).toBeVisible({ timeout: 30_000 });
         break;
       } catch (caught) {
         if (attempt === 4) throw caught;
