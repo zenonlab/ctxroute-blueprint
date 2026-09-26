@@ -13,9 +13,22 @@ continuation Queue ; les crons et le consumer Queue restent inchangés. Ce mode
 est réversible par retour à `queue` dans le même fichier Wrangler et ne
 réarme jamais les lignes `FAILED` historiques.
 
-## Candidate 1.0.44 — certification en cours
+## Publication 1.0.44 — certifiée
 
-La candidate locale est `1.0.44`; le pointeur publié reste `1.0.43`.
+La source et le pointeur publié sont `1.0.44`. Le run protégé
+`36253775721` a reproduit les archives, validé Playwright et la suite complète,
+appliqué le Worker avec routes conservées, puis certifié deux canaris frais.
+Anime et manga terminent VERIFIED avec chacun un appel fournisseur et un
+résultat accepté; la campagne cumule 216 lectures et 34 écritures D1, sans
+retry, 429, erreur HTTP/réseau ni échec Queue.
+
+Le plan R2 séparé ne contenait que les ZIP Chrome et Firefox 1.0.44. Les deux
+objets ont été relus en HTTP 200 avec cache immuable : Chrome 303214 octets,
+SHA-256 `bc31da284a42a9d68dea420b00e68caed4310a8a8e8e6af46a7ceec601d3b7f2`;
+Firefox 303256 octets, SHA-256
+`6c1e218e564e9e9cecbab73b8627197203b93879bdd87633d21116dad28be4e3`.
+Les objets 1.0.42 et 1.0.43 ne sont pas remplacés.
+
 La [certification du 23 septembre](../audits/favorite-convergence-20260923.md)
 sépare corrections, preuves locales, mesures de coût et validations distantes
 restantes. Aucun canari de cache chaud ne suffit à prouver une nouvelle collecte.
