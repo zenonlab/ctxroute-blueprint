@@ -170,7 +170,7 @@ export function createBudgetedDiscoveryResolver(
         try { return await run(); }
         catch (error) {
           const code = providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined);
-          if (!diagnosed.has(providerName) && (code.startsWith('provider-response-invalid') || code === 'provider-timeout' || code === 'provider-unavailable')) {
+          if (!diagnosed.has(providerName) && (code.startsWith('provider-response-invalid') || code.startsWith('provider-runtime-') || code === 'provider-timeout' || code === 'provider-unavailable')) {
             diagnosed.add(providerName);
             console.warn('public-discovery-provider-operation-failed', providerName, action, code);
           }
@@ -241,6 +241,14 @@ export function providerFailureCode(error: Error | undefined): string {
     const bound = Number.isSafeInteger(maximum) && maximum >= 0 && maximum <= 1024 ? `-max${maximum}` : '';
     return `provider-response-invalid-${field === undefined ? 'unknown' : String(field)}-${category}${field === undefined ? bound : ''}`;
   }
+  if (error instanceof SyntaxError || error.name === 'SyntaxError') return 'provider-response-invalid-json';
+  if (error.message === 'Kitsu hydration returned a different media identity.') return 'provider-response-invalid-kitsu-identity';
+  if (/^cover origin is not allowed for (?:anilist|mangaupdates|mangadex|kitsu-anime|kitsu-manga)$/u.test(error.message)) return 'provider-response-invalid-cover-origin';
+  if (error instanceof URIError || error.name === 'URIError' || /^URI malformed\b/u.test(error.message) || /^Invalid URL\b/u.test(error.message)) return 'provider-response-invalid-uri';
+  if (/^The encoded data was not valid for encoding\b/u.test(error.message)) return 'provider-response-invalid-encoding';
+  if (error.message === 'provider-runtime-state-missing') return 'provider-runtime-state-missing';
+  if (error.message === 'invalid-provider-runtime-reservation') return 'provider-runtime-reservation-invalid';
+  if (/^D1_[A-Z_]+:/u.test(error.message)) return 'provider-runtime-d1';
   const incomplete = /^incomplete-provider-search:(deadline|candidate-page-limit|candidate-limit|cursor|page-limit)$/u.exec(error.message)?.[1];
   if (incomplete !== undefined) return `provider-search-${incomplete}`;
   if (error.message === 'Provider cadence requires a later wake.') return 'provider-cadence-deferred';
@@ -259,12 +267,9 @@ export function providerFailureCode(error: Error | undefined): string {
 function collectorFailureCode(error: Error | undefined): string {
   if (error !== undefined && /^(?:public-discovery|agenda)-[a-z-]{1,64}$/u.test(error.message)) return error.message;
   if (error?.name === 'ZodError') return 'collector-schema-invalid';
-  if (error !== undefined && /^D1_[A-Z_]+:/u.test(error.message)) return error.message.split('\n')[0]!.slice(0, 120);
+  if (error !== undefined && /^D1_[A-Z_]+:/u.test(error.message)) return 'collector-d1';
   if (error !== undefined && /constraint failed/iu.test(error.message)) return 'collector-d1-constraint';
-  if (error instanceof TypeError) {
-    const detail = error.message.slice(0, 80).replaceAll(/[^A-Za-z0-9 .:_-]/gu, '?');
-    return `collector-type-error:${detail}`;
-  }
+  if (error instanceof TypeError) return 'collector-type-error';
   return 'collector-internal';
 }
 

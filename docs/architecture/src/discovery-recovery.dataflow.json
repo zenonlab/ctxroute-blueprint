@@ -22,7 +22,7 @@
     { "id": "rearm", "type": "backend", "label": "Resoumission API v3", "sublabel": "même clé · même payload", "stage": 2, "row": 2, "tag": "un POST · aucun SQL" },
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "PENDING · PROCESSING", "stage": 2, "row": 0, "tag": "cache public" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "HTTP direct · Queue", "stage": 3, "row": 0, "tag": "Queue 1/1 · claim(1)" },
-    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "fournisseur · coût D1", "stage": 3, "row": 2, "tag": "échec : essai consommé" },
+    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "projection sûre", "stage": 3, "row": 2, "tag": "incomplet ≠ NOT_FOUND" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · candidat lié", "stage": 4, "row": 1, "width": 150, "tag": "pas de preuve Library" }
   ],
   "flows": [
@@ -33,10 +33,10 @@
     { "from": "rearm", "to": "d1", "label": "admission FAILED vers PENDING", "classification": "digest recalculé identique", "variant": "emphasis", "labelDy": -23 },
     { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "HTTP ou signal Queue", "variant": "emphasis", "labelDy": -53 },
     { "from": "queue", "to": "collector", "label": "claim borné", "classification": "un travail par collecteur", "variant": "emphasis", "labelDy": 24 },
-    { "from": "collector", "to": "result", "label": "FAILED → VERIFIED", "classification": "MANGA → MANHWA compatible", "variant": "emphasis" }
+    { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "VERIFIED · jamais de faux NOT_FOUND", "variant": "emphasis" }
   ],
   "cards": [
-    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Huit échecs consommés : FAILED après expiration du bail", "Cadence ou 429 seuls : report à échéance conservée", "Timeout Worker 30 s : report inchangé, preuve distincte"] },
-    { "dot": "emerald", "title": "Résultat lot 1", "items": ["Un POST : VERIFIED, 256 lectures D1, CPU 31 ms", "MangaUpdates : deux appels, un accepté, zéro 429/Queue", "MANGA → MANHWA accepté; garde locale stricte refusée"] }
+    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Huit échecs consommés : FAILED après expiration du bail", "Cadence ou 429 seuls : report sans essai", "Projection incomplète : essai consommé, jamais NOT_FOUND", "Timeout Worker 30 s : report inchangé, preuve distincte"] },
+    { "dot": "emerald", "title": "Preuves acquises", "items": ["Un POST : VERIFIED, 256 lectures D1, CPU 31 ms", "MangaUpdates : deux appels, un accepté, zéro 429/Queue", "Profil read-only : 301 Work, zéro POST; convergence ouverte"] }
   ]
 }

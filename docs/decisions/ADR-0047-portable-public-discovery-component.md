@@ -69,6 +69,22 @@ HTTP reste indépendant et l'appel déjà en
 vol n'est pas annulé par le budget du résolveur; aucune nouvelle page n'est
 démarrée après son expiration.
 
+Une projection de recherche ne transforme pas un champ fournisseur optionnel
+non fiable en perte de l'identité entière. Pour Kitsu, une couverture dont
+l'origine ne respecte pas l'allowlist est omise sans élargir cette allowlist.
+Le helper partagé accepte les couvertures des cinq providers uniquement sur
+leur origine HTTPS exacte, sans identifiants ni port non standard ; les schémas
+`blob:`, `javascript:` et HTTP restent refusés même si leur hostname paraît
+autorisé.
+Une ressource du mauvais type ou dont l'identité ne peut pas être encodée est
+écartée. Toute omission marque l'enveloppe incomplète : les candidats valides
+restent utilisables, mais l'absence de correspondance ne peut jamais produire
+un faux `NOT_FOUND`. Sans correspondance exacte, cette incomplétude devient le
+code fermé `provider-search-cursor` et consomme l'essai courant ; elle ne se
+confond pas avec un report de cadence ou `429`. La validation et cette
+projection s'exécutent sous la même gate de cadence afin qu'un rejet résiduel
+alimente correctement l'état runtime du fournisseur.
+
 Les erreurs ordinaires de transport, HTTP hors `429` et validation remontent
 sans conversion en `FavoriteProviderRetryError`. Le résolveur garde la cause
 prioritaire : recherche incomplète, erreur ordinaire, puis report typé avec
