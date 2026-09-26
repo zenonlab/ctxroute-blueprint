@@ -21,7 +21,7 @@
     { "id": "approval", "type": "security", "label": "Confirmation ciblée", "sublabel": "lot · seuils · arrêt", "stage": 1, "row": 2, "tag": "avant écriture" },
     { "id": "rearm", "type": "backend", "label": "Runner serveur v3", "sublabel": "dry-run · payload v3", "stage": 2, "row": 2, "tag": "un POST · arrêt 429/503" },
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "PENDING · PROCESSING", "stage": 2, "row": 0, "tag": "cache public" },
-    { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "HTTP direct · Queue", "stage": 3, "row": 0, "tag": "Queue 1/1 · claim(1)" },
+    { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "202 · waitUntil", "stage": 3, "row": 0, "tag": "Queue 1/1 · claim(1)" },
     { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "recherche manga rapide", "stage": 3, "row": 2, "tag": "preuve exacte · échec fermé" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · candidat lié", "stage": 4, "row": 1, "width": 150, "tag": "pas de preuve Library" }
   ],
@@ -31,7 +31,7 @@
     { "from": "canaries", "to": "approval", "label": "preuve bout en bout corrélée", "classification": "appels réels · D1 cumulé ≤ 300", "variant": "security", "labelDx": 100, "labelDy": 24 },
     { "from": "approval", "to": "rearm", "label": "autorise le lot exact", "classification": "confirmation immédiate", "variant": "security", "labelDy": 53 },
     { "from": "rearm", "to": "d1", "label": "admission FAILED vers PENDING", "classification": "digest recalculé identique", "variant": "emphasis", "labelDy": -23 },
-    { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "jeton opaque · arrêt 429/503", "variant": "emphasis", "labelDy": -53 },
+    { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "PENDING durable · réponse non bloquante", "variant": "emphasis", "labelDy": -53 },
     { "from": "queue", "to": "collector", "label": "claim exact borné", "classification": "digest D1 · ordre rapide", "variant": "emphasis", "labelDy": 24 },
     { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "terminal ou continuation durable confirmée", "variant": "emphasis", "labelDx": 100 }
   ],
