@@ -156,10 +156,28 @@ describe('public discovery indexed query cost', () => {
     expect(await new D1PublicDiscoveryV3Adapter(replayMeasured.database).publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now))
       .toEqual({ published: 0, replayed: 1 });
     const replay = replayMeasured.snapshot();
-    console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'publication-and-replay', catalogueWorks: 582, canonicalTitles: 2328, publication, replay }));
-    expect(publication.rowsRead).toBeLessThan(400);
+    console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'publication-and-replay', catalogueWorks: 582, canonicalTitles: 2328, externalReferences: 582, publication, replay }));
+    expect(publication.rowsRead).toBeLessThanOrEqual(300);
     expect(replay.rowsRead).toBeLessThan(100);
     expect(replay.rowsWritten).toBe(0);
+    const externalReferenceGuards = statements.mock.calls.map(([sql]) => sql)
+      .filter(sql => sql.includes('CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1'));
+    expect(externalReferenceGuards).toHaveLength(7);
+    expect(statements.mock.calls.map(([sql]) => sql).join('\n')).not.toContain('FROM catalogue_external_references AS existing');
+    const externalGuardPlan = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN SELECT 1 WHERE NOT EXISTS (
+      SELECT 1 FROM json_each(?1) AS proposed
+      CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
+        ON existing.provider = json_extract(proposed.value, '$.provider')
+        AND existing.external_id = json_extract(proposed.value, '$.externalId')
+      WHERE existing.work_id <> ?2)`).bind(
+      JSON.stringify([{ provider: 'anilist', externalId: 'publication-200001' }]),
+      'work_publication_cost_200001',
+    ).all<{ detail: string }>();
+    const externalPlanDetails = externalGuardPlan.results.map(({ detail }) => detail);
+    const proposedLoop = externalPlanDetails.findIndex(detail => detail.includes('SCAN proposed VIRTUAL TABLE'));
+    const referenceLookup = externalPlanDetails.findIndex(detail => detail.includes('sqlite_autoindex_catalogue_external_references_1 (provider=? AND external_id=?)'));
+    expect(proposedLoop).toBeGreaterThanOrEqual(0);
+    expect(referenceLookup).toBeGreaterThan(proposedLoop);
     const publicationSql = statements.mock.calls.find(([sql]) => sql.startsWith('INSERT OR IGNORE INTO catalogue_titles('))?.[0];
     if (publicationSql === undefined) throw new Error('Publication title guard must be exercised.');
     const canonicalGuard = publicationSql.slice(publicationSql.lastIndexOf('AND NOT EXISTS') + 4);
