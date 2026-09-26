@@ -24,7 +24,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-14
-- Revised: 2026-09-23
+- Revised: 2026-09-26
 - Supersedes: le protocole Collectif, les owners et les confirmations humaines de l’ADR-0043; l’identité collective de l’ADR-0044
 
 ## Contexte
@@ -129,19 +129,32 @@ seulement du nombre de demandes retournées : `claim(1)` n’est pas une garanti
 d’une seule ligne lue. Les `UPDATE` de claim et d’expiration reprennent aussi
 le prédicat d’état actif à l’extérieur de leur sous-requête, pour éviter un
 scan de l’historique terminal avant la recherche sur les index partiels.
-Si la réservation de cadence ou un `429` impose une attente avant tout résultat
-fournisseur, le collecteur libère le bail, remet la demande (ou son refresh)
-à `PENDING` jusqu’à cette échéance et restitue la tentative prise au claim.
-Le pointeur de continuation Queue suit cette échéance. Une panne effective du
-fournisseur reste transitoire et ne devient jamais un `NOT_FOUND` implicite.
+Si seules des réservations de cadence ou des réponses `429` empêchent un
+résultat fournisseur, le collecteur libère le bail, remet la demande (ou son
+refresh) à `PENDING` et restitue la tentative prise au claim. Entre plusieurs
+reports, l'échéance la plus tardive est conservée. Le pointeur de continuation
+Queue suit cette échéance.
+
+Une erreur ordinaire de transport, HTTP hors `429` ou validation ne devient
+pas une attente de cadence. Si aucun fallback n'aboutit, elle consomme la
+tentative et laisse le bail existant expirer avant la prochaine prise. Une
+cadence ou un `429` rencontré plus tard ne peut effacer cette dépense ; cela
+vaut aussi entre les deux lanes `UNKNOWN` et pendant le fallback d'hydratation.
+La priorité conservée est recherche structurellement incomplète, erreur
+ordinaire, puis report typé. Les erreurs ordinaires de même priorité gardent
+la dernière cause ; un fallback réussi reste autorisé. Après huit échecs
+consommants et expiration du dernier bail, D1 expose `UNAVAILABLE/ATTEMPT_LIMIT`.
+Une panne ne produit jamais un `NOT_FOUND` implicite ; un refresh échoué
+conserve le profil `VERIFIED` déjà publié.
 
 Le composant portable de l’ADR-0047 lit les demandes v3 en attente via une source
 injectée. Il route la recherche vers AniList, MangaUpdates, MangaDex, Kitsu
 Anime ou Kitsu Manga selon le type média, applique le matcher versionné, puis
 hydrate l’identifiant exact retenu. Dans une lane, une panne transitoire (403,
 404, 429, 5xx, timeout ou réponse incomplète) ouvre le fournisseur suivant;
-si toutes les lanes applicables échouent, la demande reste `PENDING` avec une
-reprise bornée. Une lane `UNKNOWN` ne publie jamais l’autre média lorsqu’une
+si toutes les lanes applicables échouent, la demande reste active avec une
+reprise bornée par les règles de bail et de dépense ci-dessus. Une lane
+`UNKNOWN` ne publie jamais l’autre média lorsqu’une
 lane est indisponible. Il produit exactement un résultat `VERIFIED`, `NOT_FOUND`
 ou `AMBIGUOUS`; une panne effective ne devient jamais un `NOT_FOUND` implicite.
 Le Worker conditionne chaque publication au bail et au digest courants; il

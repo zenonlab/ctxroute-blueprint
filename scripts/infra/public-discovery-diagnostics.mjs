@@ -1,7 +1,11 @@
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const common = ['exec', '--', 'wrangler', 'd1', 'execute', 'tobirink-public', '--remote', '--config', 'apps/worker/wrangler.jsonc', '--json', '--command'];
+const wranglerCli = resolve(dirname(createRequire(import.meta.url).resolve('wrangler/package.json')), 'wrangler-dist/cli.js');
+const common = ['--no-warnings', wranglerCli, 'd1', 'execute', 'tobirink-public', '--remote', '--config', 'apps/worker/wrangler.jsonc', '--json', '--command'];
+const failureCodes = new Set(['account-missing', 'account-invalid', 'access-denied', 'authentication-failed', 'timeout', 'output-limit', 'command-unavailable', 'transport-failed', 'query-failed', 'response-invalid']);
 export function discoveryDiagnosticQueries(now) {
   if (new Date(now).toISOString() !== now) throw new TypeError('invalid-diagnostic-clock');
   return {
@@ -25,26 +29,52 @@ export function discoveryDiagnosticQueries(now) {
   };
 }
 
-function execute(command) {
-  const result = spawnSync('npm', [...common, command], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  if (result.status !== 0) throw new Error('diagnostic-query-failed');
-  const payload = JSON.parse(result.stdout);
+function commandFailureCode(result) {
+  if (result.error?.code === 'ETIMEDOUT') return 'timeout';
+  if (result.error?.code === 'ENOBUFS') return 'output-limit';
+  if (result.error?.code === 'ENOENT') return 'command-unavailable';
+  const output = `${result.stderr ?? ''}\n${result.stdout ?? ''}`;
+  if (/\[code: 910[69]\]|\bForbidden\b/iu.test(output)) return 'access-denied';
+  if (/\[code: 10000\]|Authentication error|\bUnauthorized\b/iu.test(output)) return 'authentication-failed';
+  if (/\b(?:ENOTFOUND|ECONNRESET|EAI_AGAIN|ETIMEDOUT)\b|fetch failed/iu.test(output)) return 'transport-failed';
+  return 'query-failed';
+}
+
+export function executeDiagnosticQuery(command, { run = spawnSync, environment = process.env } = {}) {
+  if (!environment.CLOUDFLARE_ACCOUNT_ID) throw new Error('account-missing');
+  if (!/^[a-f0-9]{32}$/u.test(environment.CLOUDFLARE_ACCOUNT_ID)) throw new Error('account-invalid');
+  const env = { ...environment, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_SANITIZE: 'true', WRANGLER_SEND_METRICS: 'false',
+    WRANGLER_SEND_ERROR_REPORTS: 'false', FORCE_COLOR: '0' };
+  delete env.WRANGLER_OUTPUT_FILE_PATH;
+  delete env.WRANGLER_OUTPUT_FILE_DIRECTORY;
+  let result;
+  try {
+    result = run(process.execPath, [...common, command], { cwd: new URL('../../', import.meta.url), env, encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'], timeout: 15_000, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 });
+  } catch { throw new Error('query-failed'); }
+  if (result.status !== 0 || result.error) throw new Error(commandFailureCode(result));
+  let payload;
+  try { payload = JSON.parse(result.stdout); } catch { throw new Error('response-invalid'); }
   const first = Array.isArray(payload) ? payload[0] : payload;
-  if (first?.success === false || !Array.isArray(first?.results)) throw new Error('diagnostic-response-invalid');
+  if (first?.success === false || !Array.isArray(first?.results)) throw new Error('response-invalid');
   return { meta: first.meta ?? null, rows: first.results };
 }
 
-export function collectDiscoveryDiagnostics({ now = new Date().toISOString(), query = execute } = {}) {
+export function collectDiscoveryDiagnostics({ now = new Date().toISOString(), query = executeDiagnosticQuery } = {}) {
   const d1 = {};
   const missing = [];
+  const failures = [];
   for (const [name, command] of Object.entries(discoveryDiagnosticQueries(now))) {
     try {
       const value = query(command);
       // Only the requested aggregate columns may leave this diagnostic boundary.
       const columns = { reasons: ['media', 'state', 'reason', 'requests'], signals: ['media', 'state', 'signal', 'requests'], pendingAges: ['media', 'age', 'requests'], pendingDeadlines: ['media', 'deadline', 'requests'] }[name];
-      if (!Array.isArray(value?.rows) || value.rows.some(row => Object.keys(row).some(key => !columns.includes(key)))) throw new Error('diagnostic-response-invalid');
+      if (!Array.isArray(value?.rows) || value.rows.some(row => Object.keys(row).some(key => !columns.includes(key)))) throw new Error('response-invalid');
       d1[name] = { rows: value.rows, rowsRead: value.meta?.rows_read ?? null, rowsWritten: value.meta?.rows_written ?? null };
-    } catch { missing.push(`d1-${name}`); }
+    } catch (error) {
+      missing.push(`d1-${name}`);
+      failures.push({ query: name, code: failureCodes.has(error?.message) ? error.message : 'query-failed' });
+    }
   }
   return {
     schemaVersion: 2,
@@ -53,6 +83,7 @@ export function collectDiscoveryDiagnostics({ now = new Date().toISOString(), qu
     scope: 'aggregate-only',
     queryCostScope: 'these-diagnostic-queries-only',
     d1,
+    failures,
     unavailable: ['extension-profile-counters', 'provider-latencies', 'worker-429-counts', ...missing],
   };
 }

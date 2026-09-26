@@ -87,7 +87,9 @@ jobs:
         run: npm run verify
 
       - name: Collect aggregate Discovery diagnostics
+        timeout-minutes: 2
         env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/infra/public-discovery-diagnostics.mjs
 
@@ -104,6 +106,7 @@ jobs:
           node -e "const fs=require('node:fs'); const plan=JSON.parse(fs.readFileSync('.ctxroute-production-plan.json','utf8')); if (!plan.digest || !Array.isArray(plan.actions) || plan.actions.length !== 1 || plan.actions[0].target !== 'worker:tobirink-public-api' || plan.options?.preserveRoutes !== true) process.exit(1);"
 
       - name: Apply only the approved Worker target
+        if: ${{ github.ref == 'refs/heads/main' }}
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -117,6 +120,7 @@ jobs:
             --allow worker:tobirink-public-api
 
       - name: Verify public production probes
+        if: ${{ github.ref == 'refs/heads/main' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -139,7 +143,7 @@ jobs:
           probe https://tobirink-provider-gateway.tobirink.deno.net/healthz
 
       - name: Run fresh bounded anime and manga canaries
-        if: ${{ inputs.run_manga_canary == true }}
+        if: ${{ github.ref == 'refs/heads/main' && inputs.run_manga_canary == true }}
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

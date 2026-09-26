@@ -28,6 +28,7 @@ interface LaneDecision {
   readonly candidates: readonly ProviderCandidate[];
   readonly references: readonly PublicDiscoveryReferenceV3[];
   readonly state: 'MATCH' | 'AMBIGUOUS' | 'NOT_FOUND';
+  readonly retainedFailure?: Error;
   readonly unavailable?: Error;
 }
 interface MutableTitleMatchQuery {
@@ -130,9 +131,14 @@ function isTransientProviderError(error: Error): boolean {
   return /(?:abort|fetch failed|incomplete provider page|network|tim(?:e|d out)|HTTP (?:401|403|404|405|408|425|429|500|502|503|504)\b)/iu.test(`${error.name}: ${error.message}`);
 }
 
-function retryableProviderError(error: Error): FavoriteProviderRetryError {
-  if (error instanceof FavoriteProviderRetryError) return error;
-  return new FavoriteProviderRetryError(error.message, Date.now() + 60_000);
+function retainProviderFailure(current: Error | undefined, incoming: Error): Error {
+  if (current instanceof IncompleteProviderSearchError) return current;
+  if (incoming instanceof IncompleteProviderSearchError) return incoming;
+  if (incoming instanceof FavoriteProviderRetryError) {
+    if (current !== undefined && !(current instanceof FavoriteProviderRetryError)) return current;
+    if (current instanceof FavoriteProviderRetryError && current.retryAt > incoming.retryAt) return current;
+  }
+  return incoming;
 }
 
 function isProviderInvariantError(error: Error): boolean {
@@ -157,11 +163,14 @@ async function searchLane(
       if (isProviderInvariantError(error)) throw error;
       // Bounded incomplete searches consume an attempt; do not turn them into
       // cadence-only deferrals that could restart page one without limit.
-      if (!(unavailable instanceof IncompleteProviderSearchError)) unavailable = error;
+      unavailable = retainProviderFailure(unavailable, error);
       continue;
     }
     inspected.push(...result.candidates);
-    if (result.state !== 'NOT_FOUND') return { ...result, candidates: inspected };
+    if (result.state !== 'NOT_FOUND') {
+      const matched = { ...result, candidates: inspected };
+      return unavailable === undefined ? matched : { ...matched, retainedFailure: unavailable };
+    }
   }
   const result: LaneDecision = { candidates: inspected, references: [], state: 'NOT_FOUND' };
   return unavailable === undefined ? result : { ...result, unavailable };
@@ -178,10 +187,12 @@ async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, re
           await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }, deadline),
           await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }, deadline),
         ];
-  const unavailable = lanes.find((lane) => lane.unavailable instanceof IncompleteProviderSearchError)?.unavailable
-    ?? lanes.find((lane) => lane.unavailable !== undefined)?.unavailable;
-  if (unavailable instanceof IncompleteProviderSearchError) throw unavailable;
-  if (unavailable !== undefined) throw retryableProviderError(unavailable);
+  const unavailable = lanes.reduce<Error | undefined>((retained, lane) => lane.unavailable === undefined
+    ? retained : retainProviderFailure(retained, lane.unavailable), undefined);
+  if (unavailable !== undefined) {
+    throw lanes.reduce((failure, lane) => lane.retainedFailure === undefined
+      ? failure : retainProviderFailure(failure, lane.retainedFailure), unavailable);
+  }
   return lanes;
 }
 
@@ -193,7 +204,7 @@ function providerOrderFor(request: PublicDiscoveryClaimedRequest): readonly Reso
 
 type SelectedMatch =
   | { readonly kind: 'terminal'; readonly resolution: PublicDiscoveryTerminalResolution }
-  | { readonly kind: 'matched'; readonly reference: PublicDiscoveryReferenceV3; readonly searched: ProviderCandidate | undefined };
+  | { readonly kind: 'matched'; readonly reference: PublicDiscoveryReferenceV3; readonly searched: ProviderCandidate | undefined; readonly retainedFailure?: Error };
 
 function selectMatch(lanes: readonly LaneDecision[]): SelectedMatch {
   const credible = lanes.filter((lane) => lane.state !== 'NOT_FOUND');
@@ -206,7 +217,8 @@ function selectMatch(lanes: readonly LaneDecision[]): SelectedMatch {
   const reference = lane?.references[0];
   if (lane === undefined || reference === undefined) throw new Error('matched-reference-missing');
   const searched = lane.candidates.find((candidate) => candidate.provider === reference.provider && candidate.externalId === reference.externalId);
-  return { kind: 'matched', reference, searched };
+  return lane.retainedFailure === undefined ? { kind: 'matched', reference, searched }
+    : { kind: 'matched', reference, searched, retainedFailure: lane.retainedFailure };
 }
 
 async function sha256(value: string): Promise<string> {
@@ -254,14 +266,17 @@ async function hydrateWithTransientFallback(
   reference: PublicDiscoveryReferenceV3,
   searched: ProviderCandidate | undefined,
   deadline: number,
+  retainedFailure: Error | undefined,
 ): Promise<PublicDiscoveryTerminalResolution> {
   try {
-    return await hydrateReference(providers, reference, 'matched-provider-identity-not-found', searched);
+    const resolution = await hydrateReference(providers, reference, 'matched-provider-identity-not-found', searched);
+    if (resolution.state === 'NOT_FOUND' && retainedFailure !== undefined) throw retainedFailure;
+    return resolution;
   } catch (error) {
     if (!(error instanceof Error) || isProviderInvariantError(error)) throw error;
     const order = providerOrderFor(request);
     const start = Math.max(0, order.indexOf(reference.provider) + 1);
-    let lastUnavailable: Error = error;
+    let lastUnavailable = retainProviderFailure(retainedFailure, error);
     const titles = request.query.discoveryTitles.slice(0, 4);
     const query = matchQueryFor(request, titles);
     for (const provider of order.slice(start)) {
@@ -270,25 +285,25 @@ async function hydrateWithTransientFallback(
         lane = await searchLane(providers, [provider], titles, query, deadline);
       } catch (fallbackError) {
         if (!(fallbackError instanceof Error) || !isTransientProviderError(fallbackError)) throw fallbackError;
-        if (!(lastUnavailable instanceof IncompleteProviderSearchError)) lastUnavailable = fallbackError;
+        lastUnavailable = retainProviderFailure(lastUnavailable, fallbackError);
         continue;
       }
       if (lane.state !== 'MATCH' || lane.references.length !== 1) {
-        if (lane.unavailable !== undefined && !(lastUnavailable instanceof IncompleteProviderSearchError)) lastUnavailable = lane.unavailable;
+        if (lane.unavailable !== undefined) lastUnavailable = retainProviderFailure(lastUnavailable, lane.unavailable);
         continue;
       }
       const fallbackReference = lane.references[0];
       if (fallbackReference === undefined) continue;
       const fallbackCandidate = lane.candidates.find((candidate) => candidate.provider === fallbackReference.provider && candidate.externalId === fallbackReference.externalId);
       try {
-        return await hydrateReference(providers, fallbackReference, 'matched-provider-identity-not-found', fallbackCandidate);
+        const resolution = await hydrateReference(providers, fallbackReference, 'matched-provider-identity-not-found', fallbackCandidate);
+        if (resolution.state !== 'NOT_FOUND') return resolution;
       } catch (fallbackError) {
         if (!(fallbackError instanceof Error) || isProviderInvariantError(fallbackError)) throw fallbackError;
-        if (!(lastUnavailable instanceof IncompleteProviderSearchError)) lastUnavailable = fallbackError;
+        lastUnavailable = retainProviderFailure(lastUnavailable, fallbackError);
       }
     }
-    if (lastUnavailable instanceof IncompleteProviderSearchError) throw lastUnavailable;
-    throw retryableProviderError(lastUnavailable);
+    throw lastUnavailable;
   }
 }
 
@@ -301,7 +316,7 @@ export function createPublicDiscoveryResolver(providers: PublicDiscoveryProvider
       const selected = selectMatch(await searchApplicableLanes(providers, request, deadline));
       return selected.kind === 'terminal'
         ? selected.resolution
-        : hydrateWithTransientFallback(providers, request, selected.reference, selected.searched, deadline);
+        : hydrateWithTransientFallback(providers, request, selected.reference, selected.searched, deadline, selected.retainedFailure);
     },
   };
 }

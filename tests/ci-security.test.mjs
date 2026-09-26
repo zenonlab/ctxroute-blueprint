@@ -51,6 +51,41 @@ test('fresh production canaries require bounded provider observation', () => {
   assert.doesNotMatch(canaryStep, /DEN[O0].*TOKEN|continue-on-error/u);
 });
 
+test('diagnostics receive the explicit Cloudflare account before the production plan', () => {
+  const workflow = read('.github/workflows/deploy-production.yml');
+  const diagnostics = workflow.split('- name: Collect aggregate Discovery diagnostics')[1]?.split('- name:')[0];
+  assert.ok(diagnostics);
+  assert.match(diagnostics, /CLOUDFLARE_ACCOUNT_ID: \$\{\{ secrets\.CLOUDFLARE_ACCOUNT_ID \}\}/u);
+  assert.match(diagnostics, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/u);
+  assert.match(diagnostics, /timeout-minutes: 2/u);
+  assert.doesNotMatch(diagnostics, /continue-on-error/u);
+  assert.ok(workflow.indexOf('- name: Collect aggregate Discovery diagnostics') < workflow.indexOf('- name: Create expiring Cloudflare plan'));
+});
+
+test('branch dispatch verifies and plans without applying the Worker or admitting canaries', () => {
+  const workflow = read('.github/workflows/deploy-production.yml');
+  const step = name => workflow.split(`- name: ${name}`)[1]?.split('- name:')[0];
+  const condition = name => step(name)?.match(/if: \$\{\{ (.+) \}\}/u)?.[1];
+  const applyCondition = condition('Apply only the approved Worker target');
+  const canaryCondition = condition('Run fresh bounded anime and manga canaries');
+  assert.equal(applyCondition, "github.ref == 'refs/heads/main'");
+  assert.equal(condition('Verify public production probes'), applyCondition);
+  assert.equal(canaryCondition, "github.ref == 'refs/heads/main' && inputs.run_manga_canary == true");
+  assert.doesNotMatch(step('Verify repository'), /if:/u);
+  assert.doesNotMatch(step('Create expiring Cloudflare plan'), /if:/u);
+  for (const [ref, enabled, expectedApply, expectedCanary] of [
+    ['refs/heads/main', false, true, false],
+    ['refs/heads/main', true, true, true],
+    ['refs/heads/fix/example', false, false, false],
+    ['refs/heads/fix/example', true, false, false],
+    ['refs/tags/main', true, false, false],
+  ]) {
+    const allowed = expression => expression.split(' && ').every(term => term === "github.ref == 'refs/heads/main'" ? ref === 'refs/heads/main' : term === 'inputs.run_manga_canary == true' && enabled);
+    assert.equal(allowed(applyCondition), expectedApply);
+    assert.equal(allowed(canaryCondition), expectedCanary);
+  }
+});
+
 test('extension publication is an optional two-object phase after successful canaries', () => {
   const workflow = read('.github/workflows/deploy-production.yml');
   assert.match(workflow, /publish_extension:[\s\S]*?default: false[\s\S]*?type: boolean/u);

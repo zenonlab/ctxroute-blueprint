@@ -62,6 +62,29 @@ cible `worker:tobirink-public-api`. Il ne migre pas D1 et ne modifie pas les
 secrets; le déploiement conserve les réglages Queue du fichier Wrangler.
 Aucun autre runner ne peut recevoir cette lane de production.
 
+Un lancement manuel sur une branche conserve les vérifications et le plan en
+lecture seule, mais n'applique aucun Worker et n'admet aucun canari. Ces étapes,
+ainsi que les probes post-déploiement, exigent `refs/heads/main`. La publication
+des archives conserve sa condition distincte sur `main` et ses deux options.
+
+Le diagnostic agrégé reçoit explicitement `CLOUDFLARE_ACCOUNT_ID` et le token
+depuis les secrets existants. Il refuse un compte absent ou invalide avant de
+lancer Wrangler ; aucun élargissement de permission ni découverte automatique
+de compte n'est requis. Les erreurs 9109 observées le 26 septembre concernaient
+la lecture `/accounts`, pas une panne D1 prouvée. Un ID explicite ne garantit
+pas les droits D1 : une lecture avec l'identité CI doit encore réussir.
+
+Chaque requête SELECT utilise directement le CLI Wrangler verrouillé dans
+un processus enfant via l'exécutable Node courant, avec une limite de quinze secondes et de 1 Mio
+de sortie. Le processus est tué à l'échéance ; aucun wrapper npm intermédiaire
+n'est conservé. Les quatre requêtes ne sont pas réessayées et l'étape CI est
+limitée à deux minutes. Les logs disque et rapports d'erreur Wrangler sont
+désactivés. Le rapport ajoute seulement des échecs `{query, code}` issus d'une
+liste fermée : compte absent/invalide, accès refusé, authentification, timeout,
+sortie excessive, commande absente, transport, requête ou réponse invalide.
+Ni stdout/stderr brut, ni token, ni corps privé ne quitte cette frontière.
+Toute requête manquante garde `ok=false` et interdit le plan/application.
+
 L'input `publish_extension` reste faux par défaut : les pushes ne publient
 aucun objet R2. Un lancement manuel sur `main` doit aussi activer
 `run_manga_canary`; le prévol refuse toute autre combinaison avant l'apply
@@ -1235,3 +1258,34 @@ de détail ; la reprise cron existante conserve la récupération différée.
 Après un envoi Queue réussi, une confirmation D1 défaillante émet séparément
 `public-discovery-queue-confirm-failed` et conserve l'admission `202` : le
 message opaque est déjà durable et ne doit pas être annulé ni redoublé.
+
+### Qualification du budget d'essais fournisseur
+
+Le résolveur portable conserve les erreurs ordinaires de transport, HTTP hors
+429 et validation, plutôt que de les convertir en reports de cadence. Si
+aucun fallback ne réussit, ces erreurs consomment la tentative D1 déjà prise.
+Le bail existant, de quinze minutes, borne la prochaine prise ; huit échecs
+consommants puis l'expiration du dernier bail donnent `FAILED/ATTEMPT_LIMIT`,
+jamais un `NOT_FOUND` fabriqué. Les lectures restent sans réarmement implicite.
+
+Une cadence ou un 429 rencontré après une erreur consommante ne peut effacer
+sa dépense, y compris entre lanes `UNKNOWN` ou pendant l'hydratation de repli.
+Un fallback réussi reste autorisé. Si seules des erreurs typées de cadence/429
+subsistent, la tentative est restituée et l'échéance la plus tardive est gardée.
+Dans un scénario mixte, le gate D1 du fournisseur conserve son `Retry-After`
+même si le bail de la demande expire auparavant. Le profil déjà `VERIFIED`
+reste servi pendant un refresh défaillant.
+
+La configuration courante est `worker-direct` : un traitement HTTP direct
+et le chemin Queue partagent ce résolveur, mais la concurrence Queue 1/1
+ne sérialise pas les requêtes HTTP. Le schéma de reprise distingue désormais
+ces deux entrées. Il décrit les conditions requises avant une reprise, pas
+un certificat déjà obtenu par le script canari agrégé.
+
+Ce correctif ne modifie ni la deadline Worker de trente secondes, encore
+remboursable, ni les baux fournisseur sans propriétaire, ni l'absence de
+checkpoint de pagination. Il ne prouve donc pas une convergence universelle.
+Le risque opérationnel attendu est la terminalisation de demandes auparavant
+réessayées sans fin ; aucun FAILED n'est réarmé automatiquement. Le rollback
+porte uniquement sur le commit de qualification des erreurs, sans migration
+ou suppression ; il ne doit pas effacer les résultats terminaux existants.
