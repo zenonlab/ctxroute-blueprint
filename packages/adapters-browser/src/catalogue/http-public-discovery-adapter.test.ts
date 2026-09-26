@@ -94,7 +94,8 @@ describe('HttpPublicDiscoveryAdapter', () => {
     vi.useFakeTimers();
     const stalled = new HttpPublicDiscoveryAdapter('https://tobirink.com', async () => new Promise<Response>(() => undefined));
     const assertion = expect(stalled.resolveOrRequest(key, query)).rejects.toMatchObject({ code: 'TIMEOUT' });
-    await vi.advanceTimersByTimeAsync(15_000); await assertion;
+    await vi.advanceTimersByTimeAsync(44_999);
+    await vi.advanceTimersByTimeAsync(1); await assertion;
     const malformed = new HttpPublicDiscoveryAdapter('https://tobirink.com', async () => new Response('not-json'));
     await expect(malformed.resolveOrRequest(key, query)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });

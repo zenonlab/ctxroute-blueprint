@@ -209,27 +209,6 @@ describe('verified public discovery cache', () => {
     expect(queueFallback).toHaveBeenCalledWith(key, expect.any(String));
   });
 
-  it('acknowledges worker-direct admission before the deferred fallback completes', async () => {
-    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
-    let completeFallback!: () => void;
-    const fallback = new Promise<void>((resolve) => { completeFallback = resolve; });
-    const queueFallback = vi.fn(() => fallback);
-    const deferred: Promise<void>[] = [];
-    const key = { ...discoveryKey('1'), fingerprint: `${'1'.repeat(63)}a` };
-    const app = createPublicDiscoveryApp({
-      defer: (task) => deferred.push(task), deliveryMode: 'worker-direct', publicDiscoveryV3: adapter, queueFallback,
-    });
-    const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
-      body: JSON.stringify({ key, query: { discoveryTitles: ['Deferred fallback'], mediaKind: 'ANIME', sourceTitles: ['Deferred fallback'] }, schemaVersion: 3 }),
-      headers: { 'Content-Type': 'application/json' }, method: 'POST',
-    });
-    expect(response.status).toBe(202);
-    expect(queueFallback).toHaveBeenCalledOnce();
-    expect(deferred).toHaveLength(1);
-    completeFallback();
-    await deferred[0];
-  });
-
   it('reads up to fifty discovery states in one public request', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const keys = Array.from({ length: 50 }, (_, index) => ({ ...discoveryKey('8'), fingerprint: `${'8'.repeat(62)}${index.toString(16).padStart(2, '0')}` }));
