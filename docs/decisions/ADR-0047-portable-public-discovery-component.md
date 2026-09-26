@@ -69,6 +69,15 @@ HTTP reste indépendant et l'appel déjà en
 vol n'est pas annulé par le budget du résolveur; aucune nouvelle page n'est
 démarrée après son expiration.
 
+Dans les lanes `MANHWA` et `MANHUA`, l'ordre est `MangaDex`, `Kitsu Manga`,
+puis `MangaUpdates`. Les deux premiers fournisseurs peuvent donc apporter une
+preuve exacte avant la recherche paginée MangaUpdates, dont la cadence de six
+secondes peut à elle seule consommer presque tout le budget partagé. La lane
+`MANGA` conserve son ordre historique. Ce routage ne change ni les règles de
+matching, ni la priorité des preuves, ni le comportement fermé d'une réponse
+incomplète : faute de preuve exacte chez les fournisseurs rapides,
+MangaUpdates reste interrogé et ses bornes restent applicables.
+
 Une projection de recherche ne transforme pas un champ fournisseur optionnel
 non fiable en perte de l'identité entière. Pour Kitsu, une couverture dont
 l'origine ne respecte pas l'allowlist est omise sans élargir cette allowlist.

@@ -166,6 +166,11 @@ lane est indisponible. Il produit exactement un résultat `VERIFIED`, `NOT_FOUND
 ou `AMBIGUOUS`; une panne effective ne devient jamais un `NOT_FOUND` implicite.
 Le Worker conditionne chaque publication au bail et au digest courants; il
 demeure l’unique auteur des tables publiques fiables.
+Les lanes `MANHWA` et `MANHUA` interrogent `MangaDex`, puis `Kitsu Manga`, puis
+`MangaUpdates` : une preuve exacte rapide peut ainsi terminer la demande avant
+que la pagination cadencée de MangaUpdates n'épuise la fenêtre partagée, sans
+convertir une recherche incomplète en résultat négatif. La lane `MANGA`
+conserve son ordre historique.
 
 La clé D1 possède un index unique. Demande, prise de travail et publication sont
 idempotentes. Un seul collecteur peut posséder un bail de traitement actif; les

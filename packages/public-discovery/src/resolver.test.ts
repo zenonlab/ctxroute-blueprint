@@ -218,6 +218,20 @@ describe('standalone provider resolver', () => {
     expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
   });
 
+  it('accepts an exact MangaDex identity before MangaUpdates can exhaust the shared page budget', async () => {
+    const target = candidate('mangadex', 'MANHWA', 'md-fast', 'Target');
+    const ports = providers({ mangadex: target });
+    ports.mangaupdates.search.mockImplementation(async ({ cursor }) => ({
+      candidates: [], complete: false, digest: `page-${cursor}`, nextCursor: String(Number(cursor) + 1), provider: 'mangaupdates', truncated: true,
+    }));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANHWA'))).resolves.toMatchObject({
+      profile: { candidate: { externalId: 'md-fast', provider: 'mangadex' } }, state: 'VERIFIED',
+    });
+    expect(ports.mangadex.search).toHaveBeenCalledOnce();
+    expect(ports['kitsu-manga'].search).not.toHaveBeenCalled();
+    expect(ports.mangaupdates.search).not.toHaveBeenCalled();
+  });
+
   it('reports ambiguity when unknown media matches both provider lanes', async () => {
     const ports = providers({
       anilist: candidate('anilist', 'ANIME', '1', 'Target'),
