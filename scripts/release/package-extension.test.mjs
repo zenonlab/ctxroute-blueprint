@@ -43,8 +43,11 @@ describe('installed extension certification', () => {
   const retained = () => ({ aggregate: snapshot(), integrity: { sources: ['source'], works: ['work'], library: ['work'], humanReviews: ['human-decision'], progress: [{ identity: 'progress', value: 5 }] } });
 
   it('bounds time, observations and resume tokens, requiring private input online', () => {
-    expect(installedReviewConfig({})).toMatchObject({ budgetSeconds: 240, mutationBudget: 0, readBudget: 0, refreshBudget: 0 });
-    expect(installedReviewConfig({ TOBIRINK_REAL_RUN: '1', TOBIRINK_FAVORITES_EXPORT: 'private-input' })).toMatchObject({ budgetSeconds: 600, mutationBudget: 0, readBudget: 200, refreshBudget: 0 });
+    expect(installedReviewConfig({})).toMatchObject({ budgetSeconds: 240, captureSubmissions: false, mutationBudget: 0, readBudget: 0, refreshBudget: 0 });
+    expect(installedReviewConfig({ TOBIRINK_REAL_RUN: '1', TOBIRINK_FAVORITES_EXPORT: 'private-input' })).toMatchObject({ budgetSeconds: 600, captureSubmissions: false, mutationBudget: 0, readBudget: 200, refreshBudget: 0 });
+    expect(installedReviewConfig({ TOBIRINK_INSTALLED_CAPTURE_SUBMISSIONS: '1', TOBIRINK_REAL_RUN: '1', TOBIRINK_FAVORITES_EXPORT: 'private-input' })).toMatchObject({ captureSubmissions: true, mutationBudget: 0 });
+    expect(() => installedReviewConfig({ TOBIRINK_INSTALLED_CAPTURE_SUBMISSIONS: 'true', TOBIRINK_REAL_RUN: '1', TOBIRINK_FAVORITES_EXPORT: 'private-input' })).toThrow(/explicitly enabled/);
+    expect(() => installedReviewConfig({ TOBIRINK_INSTALLED_CAPTURE_SUBMISSIONS: '1' })).toThrow(/online zero-mutation/);
     expect(() => installedReviewConfig({ TOBIRINK_REAL_RUN: '1' })).toThrow(/private bookmark export/);
     expect(() => installedReviewConfig({ TOBIRINK_INSTALLED_BUDGET_SECONDS: '1801' })).toThrow(/bounded/);
     expect(() => installedReviewConfig({ TOBIRINK_INSTALLED_MUTATION_BUDGET: '1' })).toThrow(/cannot forward/);

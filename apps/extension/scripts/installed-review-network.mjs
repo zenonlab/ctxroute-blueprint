@@ -45,6 +45,7 @@ const receiptSchema = z.strictObject({
   schemaVersion: z.literal(1),
   sequence: z.number().int().positive().max(2),
 });
+const capturedSubmissionSchema = requestSchema;
 const readSlotSchema = z.strictObject({ schemaVersion: z.literal(1), sequence: z.number().int().positive().max(5000) });
 const failureCodeSchema = z.enum([
   'agenda-read-rejected', 'discovery-read-rejected', 'duplicate-mutation-key',
@@ -161,18 +162,38 @@ async function readFailure(root, token) {
   }
 }
 
+export async function readInstalledReviewSubmissions(root, token) {
+  let names;
+  try { names = await readdir(root); }
+  catch (error) { if (error?.code === 'ENOENT') return []; throw error; }
+  const prefix = token + '.submission-';
+  const selected = names.filter((name) => name.startsWith(prefix) && /^.*\.submission-[a-f0-9]{64}\.json$/u.test(name)).sort();
+  const submissions = [];
+  for (const name of selected) {
+    const path = join(root, name);
+    const [details, raw] = await Promise.all([stat(path), readFile(path, 'utf8')]);
+    assert.equal(details.mode & 0o077, 0, 'Installed-review captured submission must remain private.');
+    const submission = capturedSubmissionSchema.parse(JSON.parse(raw));
+    assert.equal(name, `${token}.submission-${digestKey(submission.key)}.json`, 'Captured submission filename must match its key.');
+    submissions.push(submission);
+  }
+  return submissions;
+}
+
 class InstalledReviewNetworkGuard {
-  constructor(options, receipts, readSlots, sealedFailure) {
+  constructor(options, receipts, readSlots, capturedSubmissions, sealedFailure) {
     this.options = options;
     this.previousReceipts = receipts;
     this.previousReadSlots = readSlots;
     this.seen = new Set(receipts.map(({ keyDigest }) => keyDigest));
+    this.captured = new Set(capturedSubmissions.map(({ key }) => digestKey(key)));
     this.failure = sealedFailure?.code;
     this.inFlight = new Set();
     this.reservation = Promise.resolve();
     this.counts = {
       attemptedMutations: 0,
       blockedByBudget: 0,
+      capturedRequests: capturedSubmissions.length,
       foreignAttempts: 0,
       forwardedReads: 0,
       forwardedRefreshes: 0,
@@ -288,6 +309,17 @@ class InstalledReviewNetworkGuard {
     let submission;
     try { submission = await parsePost(request, new URL(request.url()), kind === 'request' ? requestSchema : refreshSchema); }
     catch { await this.abort(route, 'mutation-payload-rejected'); return; }
+    if (kind === 'request' && this.options.captureSubmissions) {
+      const digest = digestKey(submission.key);
+      await this.exclusively(async () => {
+        if (this.captured.has(digest)) return;
+        const path = join(this.options.receiptRoot, `${this.options.token}.submission-${digest}.json`);
+        try { await writeFile(path, JSON.stringify(submission) + '\n', { flag: 'wx', mode: 0o600 }); }
+        catch (error) { if (error?.code !== 'EEXIST') throw error; }
+        this.captured.add(digest);
+        this.counts.capturedRequests += 1;
+      });
+    }
     if (this.options.mutationBudget === 0) {
       this.counts.blockedByBudget += 1;
       await this.abort(route, 'mutation-budget-zero', false);
@@ -427,15 +459,16 @@ class InstalledReviewNetworkGuard {
 }
 
 export async function createInstalledReviewNetworkGuard(options) {
-  const [receipts, slots, sealedFailure] = await Promise.all([
+  const [receipts, slots, capturedSubmissions, sealedFailure] = await Promise.all([
     readReceipts(options.receiptRoot, options.token),
     readSlots(options.receiptRoot, options.token),
+    readInstalledReviewSubmissions(options.receiptRoot, options.token),
     readFailure(options.receiptRoot, options.token),
   ]);
   assert.ok(receipts.length <= options.mutationBudget, 'Existing mutation receipts exceed the configured budget.');
   assert.ok(receipts.filter(({ kind }) => kind === 'refresh').length <= options.refreshBudget, 'Existing refresh receipts exceed the configured budget.');
   assert.ok(slots.length <= options.readBudget, 'Existing read slots exceed the configured budget.');
-  return new InstalledReviewNetworkGuard(options, receipts, slots, sealedFailure);
+  return new InstalledReviewNetworkGuard(options, receipts, slots, capturedSubmissions, sealedFailure);
 }
 
 export async function installInstalledReviewNetworkRoutes(context, guard) {

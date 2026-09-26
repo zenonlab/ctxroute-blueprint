@@ -27,17 +27,20 @@ export function installedReviewConfig(env = process.env) {
   const budgetSeconds = integer(env.TOBIRINK_INSTALLED_BUDGET_SECONDS, online ? 600 : 240, 30, 1800);
   const bookmarkLimit = integer(env.TOBIRINK_INSTALLED_BOOKMARK_LIMIT, 100_000, 1, 100_000);
   const mutationBudget = integer(env.TOBIRINK_INSTALLED_MUTATION_BUDGET, 0, 0, 2);
+  const captureSubmissions = env.TOBIRINK_INSTALLED_CAPTURE_SUBMISSIONS === '1';
+  assert.ok(env.TOBIRINK_INSTALLED_CAPTURE_SUBMISSIONS === undefined || captureSubmissions, 'Submission capture must be explicitly enabled with 1.');
   const refreshBudget = integer(env.TOBIRINK_INSTALLED_REFRESH_BUDGET, 0, 0, 2);
   const readBudget = integer(env.TOBIRINK_INSTALLED_READ_BUDGET, online ? 200 : 0, 0, 5000);
   assert.ok(online || mutationBudget === 0 && refreshBudget === 0 && readBudget === 0, 'Offline installed review cannot forward network requests.');
   assert.ok(refreshBudget <= mutationBudget, 'Refresh budget must fit inside the combined mutation budget.');
+  assert.ok(!captureSubmissions || online && mutationBudget === 0 && refreshBudget === 0, 'Submission capture requires an online zero-mutation review.');
   const milestones = env.TOBIRINK_INSTALLED_OBSERVE_SECONDS === undefined
     ? [15, 60, 180, Math.floor(budgetSeconds / 2)]
     : env.TOBIRINK_INSTALLED_OBSERVE_SECONDS.split(',').map((value) => integer(value, 0, 1, budgetSeconds - 1));
   assert.ok(milestones.length <= 12, 'At most twelve observation milestones are allowed.');
   const session = env.TOBIRINK_INSTALLED_SESSION;
   assert.ok(session === undefined || /^tobirink-installed-review-[A-Za-z0-9]{6,32}$/u.test(session), 'Invalid installed-review session token.');
-  return { online, budgetSeconds, bookmarkLimit, mutationBudget, refreshBudget, readBudget, favoritesExport: env.TOBIRINK_FAVORITES_EXPORT, session,
+  return { online, budgetSeconds, bookmarkLimit, mutationBudget, captureSubmissions, refreshBudget, readBudget, favoritesExport: env.TOBIRINK_FAVORITES_EXPORT, session,
     milestones: [...new Set(milestones.filter((value) => value < budgetSeconds - 5))].sort((left, right) => left - right) };
 }
 
@@ -206,7 +209,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     const bookmarks = corpus.slice(0, config.bookmarkLimit);
     const corpusDigest = installedBookmarkCorpusDigest(bookmarks);
     await mkdir(descriptorRoot, { recursive: true, mode: 0o700 });
-    const network = { mutationBudget: config.mutationBudget, readBudget: config.readBudget, refreshBudget: config.refreshBudget };
+    const network = { captureSubmissions: config.captureSubmissions, mutationBudget: config.mutationBudget, readBudget: config.readBudget, refreshBudget: config.refreshBudget };
     if (config.session !== undefined) {
       session = JSON.parse(await readFile(join(descriptorRoot, config.session + '.json'), 'utf8'));
       assert.equal(session.schemaVersion, 3, 'Sessions created before the exact corpus and network guard cannot be resumed.');
