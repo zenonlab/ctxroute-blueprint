@@ -138,6 +138,18 @@ describe('native collector queue', () => {
     expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toMatchObject({ code: 'public-discovery-partial', disposition: 'retry', retryDelaySeconds: 900 });
   });
 
+  it('preserves an opaque admission correlation through the Queue cost', async () => {
+    const correlationId = '00000000-0000-4000-8000-000000000001';
+    const continuationToken = 'a'.repeat(43);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const item = message({ continuationToken, correlationId, type: 'public-discovery-ready', version: 1 });
+    const discovery = vi.fn(async () => ({ claimed: 1, failed: 0, published: 1, replayed: 0 }));
+    await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery });
+    expect(discovery).toHaveBeenCalledExactlyOnceWith(correlationId, continuationToken);
+    expect(JSON.parse(String(info.mock.calls[0]?.[0]))).toMatchObject({ correlationId, task: 'discovery' });
+    expect(item.ack).toHaveBeenCalledOnce();
+  });
+
   it('runs only the first signal group and forwards the others before acknowledging them', async () => {
     const info = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const discoveryItem = message({ type: 'public-discovery-ready', version: 1 });

@@ -97,6 +97,7 @@ const counts = ['providerRequests', 'acceptedResults', 'retries', 'durationMs', 
 const countSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const costSchema = z.object({
   schemaVersion: z.literal(1), type: z.literal('worker.cost'),
+  correlationId: z.string().uuid().optional(),
   task: z.enum(['agenda', 'agenda-admission', 'agenda-recovery', 'discovery', 'discovery-admission', 'discovery-lookup', 'discovery-refresh']),
   provider: z.enum(['anilist', 'kitsu', 'mangadex', 'mangaupdates', 'mixed', 'none']),
   result: z.enum(['backoff', 'changed', 'deduplicated', 'failed', 'unchanged']),
@@ -138,35 +139,46 @@ export function createCostObservation() {
     if (record.request.status !== expectation.status || record.httpStatus !== expectation.status
       || record.httpTask !== expectation.task) fail('request-mismatch');
     const selected = record.costs.filter(cost => cost.task === expectation.task);
-    if (selected.length !== 1) fail('ambiguous-cost');
-    const collector = selected[0];
+    if (selected.length === 0) fail('ambiguous-cost');
     for (const cost of record.costs) {
       if (cost.d1RowsRead === undefined || cost.d1RowsWritten === undefined) fail('invalid-cost');
-      if (['failed', 'backoff'].includes(cost.result)) fail('failed-result');
       if (cost.providerHttpErrors > 0 || cost.providerNetworkErrors > 0) fail('provider-error');
     }
     if (expectation.task === 'discovery-lookup') {
+      if (selected.length !== 1) fail('ambiguous-cost');
+      const collector = selected[0];
       if (record.costs.length !== 1 || collector.provider !== 'none' || collector.providerRequests !== 0
         || collector.acceptedResults !== 0 || collector.result !== 'unchanged') fail('invalid-cost');
       matched.set(requestId, { ...collector });
       return;
     }
-    if (counts.some(key => collector[key] === undefined)) fail('invalid-cost');
-    if (collector.provider === 'none'
-      || (expectation.provider !== 'any' && collector.provider !== expectation.provider)) fail('provider-mismatch');
-    if (collector.providerRequests === 0) fail('no-provider-calls');
-    if (collector.acceptedResults !== 1 || collector.result !== 'changed') fail('accepted-results');
     const admissions = record.costs.filter(cost => cost.task === 'discovery-admission');
-    if (admissions.length !== 1 || record.costs.length !== 2) fail('ambiguous-cost');
+    if (admissions.length !== 1 || record.costs.length !== selected.length + 1) fail('ambiguous-cost');
     const admission = admissions[0];
     if (admission.provider !== 'none' || admission.providerRequests !== 0 || admission.acceptedResults !== 0
       || admission.result !== 'changed') fail('invalid-cost');
-    const summary = Object.fromEntries(counts.map(key => [key, (collector[key] ?? 0) + (admission[key] ?? 0)]));
+    for (const collector of selected) {
+      if (counts.some(key => collector[key] === undefined)) fail('invalid-cost');
+      if (collector.provider === 'none') fail('provider-mismatch');
+      if (collector.providerRequests === 0) fail('no-provider-calls');
+      if (collector.queueFailures > 0) fail('queue-failure');
+      if (collector.acceptedResults === 0 && ['failed', 'backoff'].includes(collector.result) && collector.queueSends !== 1) fail('failed-result');
+      if (collector.acceptedResults === 0 && !['failed', 'backoff'].includes(collector.result)) fail('accepted-results');
+      if (collector.acceptedResults === 1 && ['failed', 'backoff'].includes(collector.result)) fail('failed-result');
+      if (collector.acceptedResults > 1 || collector.acceptedResults === 1 && collector.result !== 'changed') fail('accepted-results');
+    }
+    const terminals = selected.filter(collector => collector.acceptedResults === 1 && collector.result === 'changed');
+    if (terminals.length > 1) fail('ambiguous-cost');
+    if (terminals.length === 0) return;
+    const terminal = terminals[0];
+    if (terminal.provider === 'none'
+      || (expectation.provider !== 'any' && terminal.provider !== expectation.provider)) fail('provider-mismatch');
+    const summary = Object.fromEntries(counts.map(key => [key, [admission, ...selected].reduce((total, cost) => total + (cost[key] ?? 0), 0)]));
     if (Object.values(summary).some(value => !Number.isSafeInteger(value))) fail('count-limit');
     if (summary.d1RowsRead > 300) fail('d1-budget');
     summary.durationMs = admission.durationMs;
-    matched.set(requestId, { ...summary, provider: collector.provider, result: collector.result,
-      collectorD1RowsRead: collector.d1RowsRead, admissionD1RowsRead: admission.d1RowsRead });
+    matched.set(requestId, { ...summary, provider: terminal.provider, result: terminal.result,
+      collectorD1RowsRead: selected.reduce((total, cost) => total + cost.d1RowsRead, 0), admissionD1RowsRead: admission.d1RowsRead });
   }
   function consume() {
     let envelope;
@@ -199,6 +211,18 @@ export function createCostObservation() {
       if (!parsed.success) error = 'invalid-cost';
       else costs.push(parsed.data);
     }
+    if (requests.length === 0) {
+      const continuations = costs.filter(cost => cost.task === 'discovery' && cost.correlationId !== undefined && expected.has(cost.correlationId));
+      if (continuations.length > 1) fail('ambiguous-cost');
+      const continuation = continuations[0];
+      if (continuation !== undefined) {
+        const record = records.get(continuation.correlationId);
+        if (!record) fail('request-mismatch');
+        record.costs.push(continuation);
+        validate(continuation.correlationId);
+      }
+      return;
+    }
     const parsedRequest = requestSchema.safeParse(requests[0]);
     if (requests.length !== 1 || !parsedRequest.success) error ??= 'request-mismatch';
     let httpTask;
@@ -215,6 +239,7 @@ export function createCostObservation() {
     for (const request of requests) {
       if (!requestIdSchema.safeParse(request?.requestId).success) continue;
       const requestId = request.requestId;
+      if (costs.some(cost => cost.task === 'discovery' && cost.correlationId !== undefined && cost.correlationId !== requestId)) error ??= 'request-mismatch';
       if (records.has(requestId)) {
         records.set(requestId, { error: 'duplicate-request' });
       } else {

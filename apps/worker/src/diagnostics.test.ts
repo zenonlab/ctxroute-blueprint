@@ -38,12 +38,13 @@ describe('worker diagnostics', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     emitWorkerCostDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: workerDiagnosticsLockValue }, {
       acceptedResults: 20, d1RowsRead: 24, d1RowsWritten: 20, durationMs: 120,
+      correlationId: '00000000-0000-4000-8000-000000000001',
       pagesRequested: 3, provider: 'mixed', providerRequests: 3, result: 'changed', retries: 0,
       schemaVersion: 1, task: 'discovery', type: 'worker.cost',
     });
     const serialized = String(info.mock.calls[0]?.[0]);
     expect(Object.keys(JSON.parse(serialized)).sort()).toEqual([
-      'acceptedResults', 'd1RowsRead', 'd1RowsWritten', 'durationMs', 'pagesRequested',
+      'acceptedResults', 'correlationId', 'd1RowsRead', 'd1RowsWritten', 'durationMs', 'pagesRequested',
       'provider', 'providerRequests', 'result', 'retries', 'schemaVersion', 'task', 'type',
     ].sort());
     expect(serialized).not.toMatch(/title|url|ip|payload|secret|installation/iu);

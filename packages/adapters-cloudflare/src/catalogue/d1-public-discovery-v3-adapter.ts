@@ -68,16 +68,16 @@ interface CanonicalFacts {
   workId: string;
 }
 export interface PublicDiscoveryV3Port {
-  claimBatch(input: { claimToken: string; key?: PublicDiscoveryKeyV3; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
+  claimBatch(input: { claimToken: string; continuationTokenDigest?: string; key?: PublicDiscoveryKeyV3; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
   deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string): Promise<void>;
   confirmQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
   publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ published: number; replayed: number }>;
   read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState>;
   readMany?(keys: readonly PublicDiscoveryKeyV3[], now: string): Promise<readonly { key: PublicDiscoveryKeyV3; state: PublicDiscoveryReadState }[]>;
-  requestRefresh(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryRefreshAdmission>;
+  requestRefresh(key: PublicDiscoveryKeyV3, now: string, admissionTokenDigest?: string): Promise<PublicDiscoveryRefreshAdmission>;
   releaseQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
-  request(request: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryAdmission>;
-  nextPendingAt?(): Promise<string | undefined>;
+  request(request: PublicDiscoveryRequest, now: string, admissionTokenDigest?: string): Promise<PublicDiscoveryAdmission>;
+  nextPendingAt?(continuationTokenDigest?: string): Promise<string | undefined>;
 }
 
 function keyValues(key: PublicDiscoveryKeyV3): [string, string, string, string] {
@@ -233,7 +233,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     return profile === undefined ? state : { ...state, profile };
   }
 
-  async request(input: PublicDiscoveryRequest, now: string): Promise<PublicDiscoveryAdmission> {
+  async request(input: PublicDiscoveryRequest, now: string, admissionTokenDigest?: string): Promise<PublicDiscoveryAdmission> {
     const request = publicDiscoveryRequestSchema.parse(input);
     await this.failExhaustedKey(request.key, now);
     const priority = request.query.explicitProviderReference !== undefined ? 1 : request.query.mediaKind === 'UNKNOWN' ? 3 : 2;
@@ -241,15 +241,15 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     const created = await this.database.prepare(`INSERT INTO public_discovery_requests_v3(
       fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
       state, retry_at, created_at, updated_at, admission_priority,
-      queue_signal_state, queue_signal_lease_until
-    ) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7, ?9, 'SENDING', ?10
+      queue_signal_state, queue_signal_lease_until, claim_token_hash
+    ) SELECT ?1, ?2, ?3, ?4, ?5, ?6, 'PENDING', ?7, ?7, ?7, ?9, 'SENDING', ?10, ?11
     WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
         AND state IN ('PENDING', 'PROCESSING'))
       OR (SELECT COUNT(*) FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_pending
         WHERE state IN ('PENDING', 'PROCESSING')) < ?8
     ON CONFLICT(fingerprint, media_kind, parser_version, rules_version) DO UPDATE SET
-      state = 'PENDING', claim_token_hash = NULL, lease_until = NULL, attempt_count = 0,
+      state = 'PENDING', claim_token_hash = excluded.claim_token_hash, lease_until = NULL, attempt_count = 0,
       failure_reason = NULL, failed_at = NULL, result_json = NULL, verified_at = NULL,
       result_expires_at = NULL, request_digest = excluded.request_digest,
       request_json = excluded.request_json, admission_priority = excluded.admission_priority,
@@ -260,7 +260,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         OR (public_discovery_requests_v3.state IN ('NOT_FOUND', 'AMBIGUOUS')
           AND public_discovery_requests_v3.result_expires_at <= excluded.updated_at))
     RETURNING state`)
-      .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now, this.pendingLimit, priority, signalLeaseUntil)
+      .bind(...keyValues(request.key), request.requestDigest, JSON.stringify(request), now, this.pendingLimit, priority, signalLeaseUntil, admissionTokenDigest ?? null)
       .first<{ state: string }>();
     if (created !== null) {
       return {
@@ -276,7 +276,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       && row.resultExpiresAt !== null && row.resultExpiresAt <= now)) return { outcome: 'saturated' };
     const resumedSignal = created === null
       ? await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
-          queue_signal_state = 'SENDING', queue_signal_lease_until = ?7, updated_at = ?6
+          queue_signal_state = 'SENDING', queue_signal_lease_until = ?7, claim_token_hash = ?9, updated_at = ?6
           WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
             AND request_digest = ?5
             AND ((state = 'PENDING' AND retry_at <= ?6) OR (state = 'PROCESSING' AND lease_until <= ?6))
@@ -284,36 +284,38 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
               OR (queue_signal_state = 'SENDING' AND queue_signal_lease_until <= ?6)
               OR (queue_signal_state = 'SENT' AND updated_at <= ?8))
           RETURNING state`)
-        .bind(...keyValues(request.key), request.requestDigest, now, signalLeaseUntil, futureIso(now, -queueSignalLeaseMilliseconds)).first()
+        .bind(...keyValues(request.key), request.requestDigest, now, signalLeaseUntil, futureIso(now, -queueSignalLeaseMilliseconds), admissionTokenDigest ?? null).first()
       : null;
     return { outcome: created !== null || resumedSignal !== null ? 'created' : 'existing', state: stateFromRow(row, now) };
   }
 
-  async nextPendingAt(): Promise<string | undefined> {
+  async nextPendingAt(continuationTokenDigest?: string): Promise<string | undefined> {
     const row = await this.database.prepare(`SELECT MIN(due) AS due FROM (
       SELECT CASE WHEN state = 'PROCESSING' THEN lease_until ELSE retry_at END AS due
       FROM public_discovery_requests_v3 WHERE state IN ('PENDING', 'PROCESSING')
+        AND (?1 IS NULL OR claim_token_hash = ?1)
       UNION ALL
       SELECT CASE WHEN refresh_state = 'PROCESSING' THEN lease_until ELSE retry_at END AS due
       FROM public_discovery_requests_v3 WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING')
-    )`).first<{ due: string | null }>();
+        AND (?1 IS NULL OR claim_token_hash = ?1)
+    )`).bind(continuationTokenDigest ?? null).first<{ due: string | null }>();
     return row?.due ?? undefined;
   }
 
-  async requestRefresh(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryRefreshAdmission> {
+  async requestRefresh(key: PublicDiscoveryKeyV3, now: string, admissionTokenDigest?: string): Promise<PublicDiscoveryRefreshAdmission> {
     const signalLeaseUntil = futureIso(now, queueSignalLeaseMilliseconds);
     const nextRefreshAt = futureIso(now, refreshFreshnessMilliseconds);
     const created = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       refresh_state = 'PENDING', refresh_attempt_count = 0, refresh_requested_at = ?5,
       next_refresh_at = ?6, queue_signal_state = 'SENDING', queue_signal_lease_until = ?7,
-      claim_token_hash = NULL, lease_until = NULL, admission_priority = 1, updated_at = ?5
+      claim_token_hash = ?8, lease_until = NULL, admission_priority = 1, updated_at = ?5
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
         AND state = 'VERIFIED' AND refresh_state = 'IDLE' AND next_refresh_at <= ?5
-      RETURNING request_digest AS requestDigest`).bind(...keyValues(key), now, nextRefreshAt, signalLeaseUntil)
+      RETURNING request_digest AS requestDigest`).bind(...keyValues(key), now, nextRefreshAt, signalLeaseUntil, admissionTokenDigest ?? null)
       .first<{ requestDigest: string }>();
     const resumed = created === null
       ? await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
-          queue_signal_state = 'SENDING', queue_signal_lease_until = ?6, updated_at = ?5
+          queue_signal_state = 'SENDING', queue_signal_lease_until = ?6, claim_token_hash = ?8, updated_at = ?5
           WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
             AND state = 'VERIFIED'
             AND ((refresh_state = 'PENDING' AND retry_at <= ?5)
@@ -321,7 +323,8 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
             AND (queue_signal_state = 'UNSENT'
               OR (queue_signal_state = 'SENDING' AND queue_signal_lease_until <= ?5)
               OR (queue_signal_state = 'SENT' AND updated_at <= ?7))
-          RETURNING request_digest AS requestDigest`).bind(...keyValues(key), now, signalLeaseUntil, futureIso(now, -queueSignalLeaseMilliseconds))
+          RETURNING request_digest AS requestDigest`)
+        .bind(...keyValues(key), now, signalLeaseUntil, futureIso(now, -queueSignalLeaseMilliseconds), admissionTokenDigest ?? null)
         .first<{ requestDigest: string }>()
       : null;
     const row = await this.row(key);
@@ -347,7 +350,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       RETURNING state`).bind(...keyValues(key), requestDigest, now).first();
   }
 
-  async claimBatch(input: { claimToken: string; key?: PublicDiscoveryKeyV3; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch> {
+  async claimBatch(input: { claimToken: string; continuationTokenDigest?: string; key?: PublicDiscoveryKeyV3; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch> {
     await this.failExhaustedBatch(input.now, input.limit);
     const rows = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = CASE WHEN state = 'VERIFIED' THEN state ELSE 'PROCESSING' END,
@@ -362,19 +365,21 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_claim_priority
         WHERE state IN ('PENDING', 'PROCESSING') AND attempt_count < 8
           AND ((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
-          AND (?5 IS NULL OR (fingerprint = ?5 AND media_kind = ?6 AND parser_version = ?7 AND rules_version = ?8))
+          AND (?5 IS NULL OR claim_token_hash = ?5)
+          AND (?6 IS NULL OR (fingerprint = ?6 AND media_kind = ?7 AND parser_version = ?8 AND rules_version = ?9))
         UNION ALL
         SELECT rowid, admission_priority, updated_at, fingerprint
         FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_refresh_claim
         WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING') AND refresh_attempt_count < 8
           AND ((refresh_state = 'PENDING' AND retry_at <= ?3) OR (refresh_state = 'PROCESSING' AND lease_until <= ?3))
-          AND (?5 IS NULL OR (fingerprint = ?5 AND media_kind = ?6 AND parser_version = ?7 AND rules_version = ?8)))
+          AND (?5 IS NULL OR claim_token_hash = ?5)
+          AND (?6 IS NULL OR (fingerprint = ?6 AND media_kind = ?7 AND parser_version = ?8 AND rules_version = ?9)))
         ORDER BY admission_priority, updated_at, fingerprint LIMIT ?4)
       RETURNING request_json AS requestJson, result_json AS resultJson, request_digest AS requestDigest,
         state, attempt_count AS attemptCount, refresh_attempt_count AS refreshAttemptCount,
         admission_priority AS admissionPriority, updated_at AS updatedAt,
         fingerprint, media_kind AS mediaKind, parser_version AS parserVersion, rules_version AS siteRulesVersion`)
-      .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit, input.key?.fingerprint ?? null, input.key?.mediaKind ?? null, input.key?.parserVersion ?? null, input.key?.siteRulesVersion ?? null)
+      .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit, input.continuationTokenDigest ?? null, input.key?.fingerprint ?? null, input.key?.mediaKind ?? null, input.key?.parserVersion ?? null, input.key?.siteRulesVersion ?? null)
       .all<{ admissionPriority: number; attemptCount: number; fingerprint: string; mediaKind: PublicDiscoveryKeyV3['mediaKind']; parserVersion: string; refreshAttemptCount: number; requestDigest: string; requestJson: string; resultJson: string | null; siteRulesVersion: string; state: DiscoveryRow['state']; updatedAt: string }>();
     const ordered = rows.results.sort((left, right) => left.admissionPriority - right.admissionPriority
       || left.updatedAt.localeCompare(right.updatedAt) || left.fingerprint.localeCompare(right.fingerprint));
@@ -413,7 +418,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     if (!Number.isFinite(Date.parse(retryAt)) || retryAt <= now) throw new TypeError('invalid-public-discovery-defer-time');
     const result = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = 'PENDING', attempt_count = attempt_count - 1,
-      claim_token_hash = NULL, lease_until = NULL, retry_at = ?8, updated_at = ?9
+      lease_until = NULL, retry_at = ?8, updated_at = ?9
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
         AND request_digest = ?5 AND claim_token_hash = ?6 AND attempt_count = ?7
         AND state = 'PROCESSING' RETURNING fingerprint`)
@@ -421,7 +426,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     if (result) return;
     const refresh = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       refresh_state = 'PENDING', refresh_attempt_count = refresh_attempt_count - 1,
-      claim_token_hash = NULL, lease_until = NULL, retry_at = ?8, updated_at = ?9
+      lease_until = NULL, retry_at = ?8, updated_at = ?9
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
         AND request_digest = ?5 AND claim_token_hash = ?6 AND refresh_attempt_count = ?7
         AND state = 'VERIFIED' AND refresh_state = 'PROCESSING' RETURNING fingerprint`)

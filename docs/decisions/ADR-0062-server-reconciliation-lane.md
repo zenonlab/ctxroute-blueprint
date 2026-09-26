@@ -2,11 +2,17 @@
 scope:
   - apps/worker/src/catalogue/public-discovery-routes.ts
   - apps/worker/src/catalogue/public-discovery-queue.test.ts
+  - apps/worker/src/diagnostics.ts
+  - apps/worker/src/index.ts
+  - apps/worker/src/native-collectors.ts
+  - apps/worker/src/native-collectors.test.ts
   - apps/extension/scripts/installed-review.mjs
   - apps/extension/scripts/installed-review-network.mjs
   - apps/extension/scripts/installed-review.test.mjs
   - scripts/infra/discovery-reconcile.mjs
   - scripts/infra/discovery-reconcile.test.mjs
+  - scripts/infra/manga-canary.mjs
+  - scripts/infra/manga-canary.test.mjs
   - docs/architecture/src/discovery-recovery.dataflow.json
 review: on-change
 revised: true
@@ -48,6 +54,13 @@ En mode `worker-direct`, un premier passage qui consomme un essai sans résultat
 terminal n'est accepté en `202` que si le Worker a effectivement programmé une
 continuation Queue différée. Si cette programmation échoue, la réponse reste
 `503` et le runner s'arrête ; aucun état `PENDING` n'est présenté comme livré.
+L'UUID de la réponse HTTP suit cette continuation dans le signal opaque et le
+diagnostic de coût. Un jeton aléatoire distinct, dont seul le digest est gardé
+dans D1, oblige le consumer à reprendre la ligne exacte avant d'émettre ce coût.
+Le certificat attend le terminal corrélé et additionne le
+coût D1 de l'admission, du passage direct et de chaque passage Queue ; il
+échoue fermé si la corrélation manque, si une autre admission est observée ou
+si le total dépasse 300 lectures.
 Toute exécution distante appliquée passe par le workflow protégé et une
 confirmation immédiate du lot exact.
 

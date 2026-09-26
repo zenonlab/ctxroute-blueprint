@@ -72,6 +72,10 @@ Une lecture renvoie exactement un état :
 
 Sur `MISS`, le Worker classe atomiquement l’admission en `created`, `existing`
 ou `saturated`. Seule la transition `created` émet le signal Queue opaque;
+il contient un jeton aléatoire de sélection et un UUID de corrélation, mais ni
+clé, empreinte, titre, URL ni payload. D1 conserve uniquement le SHA-256 du
+jeton dans `claim_token_hash`. Le consumer sélectionne la ligne portant ce
+digest avant de remplacer le claim par son propre jeton de publication;
 un POST concurrent ou répété classé `existing` n’ajoute aucun message. Un petit
 outbox D1 passe par `UNSENT`, `SENDING` et `SENT` : si l’émission initiale
 échoue, la ligne `PENDING` revient à `UNSENT` et un POST identique peut reprendre
@@ -114,8 +118,11 @@ panne fournisseur et sans contenu métier. Le compteur couvre les méthodes de
 la binding utilisées par les collecteurs; `withSession()` reste un passthrough
 non compté, jamais utilisé dans cette composition. Le passage à des sessions
 exigerait d'étendre ce compteur avant de conserver la garantie de budget.
-Après le lot, une lecture des demandes restantes conserve une continuation
-Queue retardée de 1 à 900 secondes, même après un claim vide. L’échec de cet
+Après le lot, une lecture de la ligne réclamée conserve une continuation Queue
+retardée de 1 à 900 secondes et le même UUID si cette ligne reste active. Le
+report de cadence garde le digest du claim comme sélecteur; un échec consommant
+le garde jusqu'à l'expiration du bail. Un claim vide peut seulement programmer
+un réveil générique sans UUID de certification. L’échec de cet
 envoi conserve le signal entrant par retry. Le claim ordonne
 les demandes par référence fournisseur exacte, média précis, puis recherche
 ambiguë, avant l’ancienneté et l’empreinte.

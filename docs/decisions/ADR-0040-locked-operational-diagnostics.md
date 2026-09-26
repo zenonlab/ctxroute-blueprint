@@ -6,6 +6,8 @@ scope:
   - apps/extension/entrypoints/options/ResolutionStatus/**
   - apps/provider-gateway/src/**
   - packages/application/src/favorites/favorite-resolution-runner.ts
+  - scripts/infra/manga-canary.mjs
+  - scripts/infra/manga-canary.test.mjs
   - docs/systems/favorite-resolution-rebuild-pipeline.md
   - docs/architecture/src/favorite-resolution.dataflow.json
 review: on-change
@@ -51,6 +53,16 @@ les claims restent atomiques et chaque lane fournisseur conserve ses limites.
 
 Les logs de requête natifs de Cloudflare suivent la configuration de la
 plateforme; le verrou Worker gouverne les événements applicatifs Tobirink.
+Lorsqu'une admission `worker-direct` programme une continuation, son UUID
+aléatoire non privé traverse uniquement le signal Queue et les diagnostics de
+coût. Le canari peut ainsi additionner les lectures et écritures D1 de chaque
+passage jusqu'au terminal, sans exposer la clé, le titre ni la requête métier.
+Le signal porte séparément un jeton de sélection aléatoire à usage unique. D1
+n'en conserve que le SHA-256 dans `claim_token_hash`; le consumer doit posséder
+le jeton exact pour reprendre cette ligne, puis le remplace par son propre jeton
+de publication. Le jeton brut n'entre jamais dans un diagnostic.
+Une continuation étrangère, orpheline ou portant un coût cumulé supérieur à
+300 lectures D1 ne peut pas certifier l'admission.
 
 ## Consequences
 

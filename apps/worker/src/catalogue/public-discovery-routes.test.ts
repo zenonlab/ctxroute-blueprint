@@ -206,7 +206,7 @@ describe('verified public discovery cache', () => {
     expect(response.status).toBe(202);
     expect(queue.send).not.toHaveBeenCalled();
     expect(queueFallback).toHaveBeenCalledOnce();
-    expect(queueFallback).toHaveBeenCalledWith(key);
+    expect(queueFallback).toHaveBeenCalledWith(key, expect.any(String));
   });
 
   it('reads up to fifty discovery states in one public request', async () => {
