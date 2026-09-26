@@ -5,8 +5,9 @@
 Premier lot corrigé, vérifié et déployé par CI depuis `0fb15bd`; canaris neufs
 anime et manga réussis. Deux limites D1 supplémentaires identifiées pendant
 la mesure de production sont corrigées et vérifiées localement, avant nouvelle
-livraison. La convergence du profil
-réel n'est pas encore certifiée. Candidate extension `1.0.44`, pointeur public `1.0.43`.
+livraison. La convergence complète du profil réel reste non acquise. Extension
+et pointeur public `1.0.44`; les archives ont été publiées et relues par le run
+protégé `36253775721` après deux nouveaux canaris fournisseur VERIFIED.
 Les versions publiées ne sont pas remplacées et les données privées ne sont
 ni committées ni jointes aux artefacts CI.
 

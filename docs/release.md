@@ -1,12 +1,13 @@
 # Extension packaging and rollback
 
-## Candidate 1.0.44 — garde du profil installé — 26 septembre 2026
+## Publication 1.0.44 — garde du profil installé — 26 septembre 2026
 
-Les candidates locales 1.0.44 contiennent chacune 20 fichiers. Le ZIP Chrome
-possède le SHA-256
-`d04072bc846a90e66b820647469da50934eb2a74d3873fabe23c4fc5063f4a17`
-et le ZIP Firefox
-`862049a83d831dacbc2f7cf7b3c6571273e332482299e74d0a9db6f1ca2afe5a`.
+Les archives 1.0.44 produites et reproduites isolément par la CI protégée
+contiennent chacune 20 fichiers. Le ZIP Chrome possède le SHA-256
+`bc31da284a42a9d68dea420b00e68caed4310a8a8e8e6af46a7ceec601d3b7f2`
+(303214 octets) et le ZIP Firefox
+`6c1e218e564e9e9cecbab73b8627197203b93879bdd87633d21116dad28be4e3`
+(303256 octets).
 Ces nouveaux octets ajoutent une directive CSP `connect-src` limitée à
 l'origine HTTPS TobiRink; le packager refuse désormais toute divergence de CSP,
 permissions, origine, content script ou clés racine du manifeste. L'ancien hash
@@ -23,14 +24,19 @@ ou en-tête hors contrat TobiRink, partage un budget mutationnel fermé entre
 admission et refresh, écrit ses reçus/slots privés avant I/O et scelle le
 premier échec avant tout await d'abort. Un
 certificat n'est écrit qu'après fermeture réussie de Chromium et drainage des
-handlers à `inFlight=0`. Le lot n'exécute aucun POST de production et ne publie
-aucune archive; le pointeur public reste 1.0.43. Le smoke neuf de deux favoris
+handlers à `inFlight=0`. La campagne protégée 36253775721 exécute une seule
+paire de canaris frais, tous deux VERIFIED avec un appel fournisseur et un
+résultat accepté chacun, sans 429 ni échec Queue. Elle publie ensuite uniquement
+les deux objets R2 versionnés et les relit en HTTP 200 avec les tailles et
+hashes ci-dessus. Le pointeur public est avancé séparément à 1.0.44. Le smoke
+neuf de deux favoris
 réels passe hors ligne après les deux redémarrages, avec zéro sortie réseau. La
 session temporaire complète reprise termine aussi `offline-regression-passed` :
 1 522 / 1 522 sources, zéro traitement actif, 1 483 retryable, 39 unsupported,
 redémarrages vérifiés et zéro sortie réseau. Aucun profil personnel
 correspondant n'a été trouvé. Ces preuves certifient l'import hors ligne, pas la
-convergence fournisseur des 1 522.
+convergence fournisseur des 1 522. Les archives 1.0.42 et 1.0.43 restent
+immuables pour le rollback.
 
 ## Publication corrective 1.0.43 — 23 septembre 2026
 

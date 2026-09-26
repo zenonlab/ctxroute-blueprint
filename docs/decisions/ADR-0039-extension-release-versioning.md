@@ -139,11 +139,12 @@ version was `2905a076-d107-4a29-8408-f24f86c97555`.
 
 ## Consequences
 
-La candidate locale `1.0.44` corrige le receiver et les clés de reprise,
-les continuations MV3 et les scans de projection. `1.0.43` étant déjà publiée,
-ses ZIP restent immuables. Le pointeur Web reste `1.0.43` pendant la
-certification; aucun résultat local n'atteste une publication R2. Le lockfile
-porte la même version candidate que le manifeste extension.
+La version `1.0.44` corrige le receiver et les clés de reprise, les
+continuations MV3 et les scans de projection. Ses ZIP reproductibles sont
+publiés par un plan R2 limité aux deux objets, relus avec leurs tailles et
+SHA-256 avant l'avancement séparé du pointeur Web à `1.0.44`. Les ZIP `1.0.42`
+et `1.0.43` restent immuables. Le lockfile porte la même version que le
+manifeste extension.
 
 `1.0.39` livre la reprise R2/Queue, les modèles D1 courants et la propagation
 locale des corrections, avec ETag par page et invalidation des annonces et
