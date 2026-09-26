@@ -77,7 +77,8 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
   let cacheScanAfterId: FavoriteSourceId | undefined;
   let diagnosticFailureCode: 'INVENTORY_UNAVAILABLE' | 'RESOLUTION_UNAVAILABLE' = 'RESOLUTION_UNAVAILABLE';
   const recordDiagnostic = async (event: Parameters<NonNullable<FavoriteResolutionRuntimeDependencies['diagnostics']>['record']>[0]) => {
-    await dependencies.diagnostics?.record(event).catch(() => undefined);
+    try { await dependencies.diagnostics?.record(event); }
+    catch { return; }
   };
   const prepareResolutionCaches = async () => {
     const startedAt = Date.now();
@@ -106,7 +107,7 @@ export function createFavoriteResolutionRuntime(dependencies: FavoriteResolution
       publicKeys.set(key.fingerprint, key);
     }
     await dependencies.publicDiscovery?.lookup?.([...publicKeys.values()]).catch(() => undefined);
-    await dependencies.diagnostics?.record({ operation: 'cache-prepare', durationMs: Math.min(3_600_000, Math.max(0, Date.now() - startedAt)), outcome: 'complete', runId: 'cache-prepare', stage: 'transport' });
+    await recordDiagnostic({ operation: 'cache-prepare', durationMs: Math.min(3_600_000, Math.max(0, Date.now() - startedAt)), outcome: 'complete', runId: 'cache-prepare', stage: 'transport' });
   };
   const runOnce = (runId: string, inventoryRequested: boolean) => dependencies.ensureReady()
     .then(async () => {

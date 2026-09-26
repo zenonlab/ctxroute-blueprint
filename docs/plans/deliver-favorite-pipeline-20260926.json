@@ -1,0 +1,70 @@
+{
+  "goalId": "goal-deliver-favorite-pipeline-20260926",
+  "title": "Livrer le refactoring favoris par PR protégée",
+  "approved": true,
+  "executionMode": "autonomous",
+  "modeOffered": true,
+  "validationEvidence": [
+    "Le refactoring et le raccordement Review sont DONE avec npm run verify, Playwright 11/1 opt-in et deux builds isolés reproductibles.",
+    "L’utilisateur a répondu go après le bilan local; la publication extension reste désactivée et aucune migration ou mutation D1 n’est incluse."
+  ],
+  "steps": [
+    {
+      "id": "version-and-audit",
+      "title": "Auditer la candidate non publiée",
+      "acceptance": [
+        "La PR ne publie ni ne remplace les archives immuables 1.0.44; toute publication future exigera une nouvelle version.",
+        "La documentation distingue le code livré, la publication désactivée et les limites du test synthétique 1 532.",
+        "Le diff part de origin/main, exclut tout secret, profil, artefact généré et modification étrangère."
+      ],
+      "files": [
+        "docs/plans/deliver-favorite-pipeline-20260926.json"
+      ],
+      "commands": [
+        "git diff --check",
+        "npm run validate:docs -- --all"
+      ]
+    },
+    {
+      "id": "verify-candidate",
+      "title": "Revalider archives et parcours complet",
+      "acceptance": [
+        "npm run verify et Playwright complet passent sur 1.0.45.",
+        "Chrome et Firefox sont reproductibles sur deux builds isolés sans devenir des artefacts publiables sous 1.0.44.",
+        "Les deux dataflows Archify passent 9/9 sans erreur ni avertissement."
+      ],
+      "files": [
+        "docs/systems/favorite-resolution-rebuild-pipeline.md"
+      ],
+      "commands": [
+        "npm run package:extension",
+        "npm run package:extension -- --verify-isolated",
+        "npm run verify",
+        "npm run test:e2e --workspace @tobirink/web -- --workers=1",
+        "npm run archify:validate -- discovery-recovery.dataflow",
+        "npm run archify:validate -- real-favorite-resolution.dataflow"
+      ]
+    },
+    {
+      "id": "deliver-protected-pr",
+      "title": "Livrer par PR et CI protégée",
+      "acceptance": [
+        "Un commit ciblé part de origin/main sur une branche refactor.",
+        "La PR contient le diff audité et la CI obligatoire passe avant fusion.",
+        "La fusion peut déployer le Worker inchangé via le plan borné; publish_extension reste false, aucun canari ni réarmement D1.",
+        "Le statut final rapporte SHA, PR, CI et limites sans certifier le profil personnel."
+      ],
+      "files": [
+        ".project/progress.json",
+        "docs/progress.md"
+      ],
+      "commands": [
+        "git commit",
+        "git push",
+        "gh pr create",
+        "gh pr checks",
+        "gh pr merge"
+      ]
+    }
+  ]
+}

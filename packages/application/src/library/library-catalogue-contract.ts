@@ -1,4 +1,4 @@
-import type { FavoriteSource, LibraryId, Progress, ProviderCandidate, Work } from '@tobirink/domain';
+import type { FavoriteMediaKind, FavoriteSource, LibraryId, Progress, ProviderCandidate, Work } from '@tobirink/domain';
 
 export const libraryCatalogueScanLimit = 500;
 export const libraryCatalogueReadBatchSize = 100;
@@ -27,6 +27,7 @@ export interface LibraryCatalogueItem {
   readonly mediaKind: 'anime' | 'manga' | 'unknown';
   readonly progress?: Progress;
   readonly source?: FavoriteSource;
+  readonly sourceMediaKind?: FavoriteMediaKind;
   readonly state: 'preparation' | 'ready' | 'retryable' | 'review';
   readonly title: string;
   readonly work?: Work;

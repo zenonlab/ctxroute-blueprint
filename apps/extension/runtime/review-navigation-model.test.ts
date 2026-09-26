@@ -17,6 +17,13 @@ const firstCandidates = {
 };
 
 describe('createLocalReviewNavigation', () => {
+  it('carries comparable references to the resolver without manufacturing candidates', () => {
+    const providerReferences = [{ provider: 'mangaupdates' as const, externalId: '123' }, { provider: 'mangaupdates' as const, externalId: '456' }];
+    const navigation = createLocalReviewNavigation({ state: 'ready', snapshot: { items: [{ id: 'review_source1', sourceLabel: 'Source', title: 'Synthetic ambiguity' }], status: 'pending' } }, 0, callbacks(), {
+      state: 'ready', snapshot: { ...firstCandidates.snapshot, candidates: [], reason: 'AMBIGUOUS', providerReferences },
+    });
+    expect(navigation.resolver.item).toMatchObject({ candidates: [], providerReferences, revision: firstCandidates.snapshot.revision });
+  });
   it('maps loading, errors and an empty local queue without fixtures', () => {
     const actions = callbacks();
     expect(createLocalReviewNavigation({ state: 'loading' }, 0, actions).resolver.state).toBe('loading');

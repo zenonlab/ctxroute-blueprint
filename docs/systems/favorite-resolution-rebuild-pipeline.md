@@ -29,6 +29,64 @@ l’extension.
 
 ## État implémenté vérifié
 
+### Invariants du parcours refactorisé
+
+La recherche utilise une compatibilité de famille commune aux matchers local
+et portable : MANGA, MANHWA et MANHUA peuvent désigner la même identité;
+ANIME reste séparé. Le sous-type est conservé, pas remplacé par une nouvelle
+clé COMIC. Les clés publiques v3 existantes sont inchangées. Les contraintes
+de saison et de format issues du parser atteignent la recherche portable;
+une fiche hydratée qui contredit la sélection ne devient pas VERIFIED.
+Les références explicites restent prioritaires. Les hints synchronisés sont
+validés avant cette priorité, sans accepter un fournisseur incompatible.
+
+Le transport partage un échange automatique seulement entre appels simultanés
+de même clé et même requête validées. Une requête différente n'hérite pas de
+ce résultat en vol. La réservation d'admission persiste le délai par clé
+avant le POST, pour la résolution et la récupération explicite. Après une
+réponse perdue et un redémarrage, MISS n'efface pas ce délai : le client
+renvoie ADMISSION_WAIT, pas un PENDING inventé. Une lecture terminale reste
+prioritaire et UNAVAILABLE ne provoque pas de réarmement automatique.
+
+Une ambiguïté publique transporte des références, pas des fiches complètes.
+Le stockage Review distingue ces références des candidats hydratés et exige
+au moins deux identités distinctes; aucune œuvre n'est créée pour contourner
+l'invariant. Un échec de diagnostic ne modifie pas la décision métier ni sa
+transaction. Le choix humain reste soumis aux révisions et à une réponse
+VERIFIED avant association locale.
+
+Les références sont proposées dans Review sans couverture ni titre fabriqués.
+Le bouton réutilise l'action manuelle, bloque les doubles soumissions et
+affiche l'attente tant que la référence n'est pas vérifiée. Une erreur libère
+le verrou sans rejouer la mutation. WebBridge négocie la lecture enrichie
+avec un repli borné vers le contrat précédent : une ancienne page reçoit
+toujours son enveloppe stricte, et une ancienne extension reste utilisable.
+Le client extension place la révision dans l'enveloppe de commande uniquement,
+pas dans la décision manuelle imbriquée : le schéma strict rejetait auparavant
+ce clic avant tout appel HTTP. Le test installé exerce ce message réel, puis
+PENDING sans Work et VERIFIED avant association humaine.
+
+Les cartes provisoires conservent `sourceMediaKind` pour les facettes : un
+MANHWA parsé reste filtrable avant hydratation. Une classification fournisseur
+vérifiée devient ensuite prioritaire. L'extension explique les raisons
+d'attente, de réseau et de Review; le détail Web reste générique tant que son
+contrat ne transporte pas ces raisons.
+
+Ces régressions déterministes ne certifient ni une classification de 1 200
+favoris réels comme manhwa, ni leur convergence en production. Le test de
+projection de 1 522 sources est synthétique. Les sources observées, sources
+résolues, œuvres uniques et cartes provisoires sont des dimensions différentes;
+plusieurs favoris peuvent légitimement pointer vers une seule œuvre. Les
+anciennes entrées D1 ne sont ni invalidées ni réarmées par ce refactoring.
+
+Une preuve de redémarrage du service worker exige l'observation CDP de l'état
+`stopped`, puis `running` pour la même version, avec réponse au health check.
+Un `Target.closeTarget` réussi n'est pas une preuve d'interruption. Les anciens
+rapports qui utilisaient seulement cet accusé ne certifient donc pas cet arrêt,
+même si les contrôles de conservation et de redémarrage navigateur passent.
+L'outil installé borne cette observation et échoue si elle manque; aucun ancien
+rapport du corpus privé n'est rétroactivement transformé en certificat complet.
+
 ### Récupération comparative locale
 
 Les adaptateurs `generic-url-comparative-v1` et `generic-bookmark-query-v1`

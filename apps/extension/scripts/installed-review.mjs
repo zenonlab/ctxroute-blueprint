@@ -161,14 +161,62 @@ export function assertPreserved(before, after, expected) {
   assert.ok(before.integrity.progress.every((entry) => progress.has(entry.identity) && progress.get(entry.identity) >= entry.value), 'Private progress regressed.');
 }
 
-async function stopServiceWorker(context, extensionId) {
-  const debugging = await context.browser().newBrowserCDPSession();
-  const targets = await debugging.send('Target.getTargets');
-  const worker = targets.targetInfos.find((target) => target.type === 'service_worker' && target.url.startsWith('chrome-extension://' + extensionId + '/'));
-  assert.ok(worker, 'The installed service worker must exist before the interruption.');
-  const result = await debugging.send('Target.closeTarget', { targetId: worker.targetId });
-  assert.ok(result.success, 'The service-worker interruption must be observed.');
-  await debugging.detach();
+export async function restartInstalledReviewWorker(context, page, extensionId, deadline = Date.now() + 15_000) {
+  const remaining = Math.min(15_000, deadline - Date.now());
+  assert.ok(Number.isFinite(remaining) && remaining > 0, 'The service-worker restart requires a positive deadline.');
+  let timeout;
+  const expired = new Promise((_resolve, reject) => { timeout = setTimeout(() => reject(new Error('service-worker-restart-timeout')), remaining); });
+  const bounded = (operation) => Promise.race([operation, expired]);
+  let resolveReady;
+  let resolveStopped;
+  let resolveRestarted;
+  const ready = new Promise((done) => { resolveReady = done; });
+  const stopped = new Promise((done) => { resolveStopped = done; });
+  const restarted = new Promise((done) => { resolveRestarted = done; });
+  let versionId;
+  let interrupting = false;
+  let observedStopped = false;
+  const onVersions = ({ versions }) => {
+    for (const version of versions) {
+      if (version.scriptURL !== 'chrome-extension://' + extensionId + '/background.js') continue;
+      if (!interrupting) {
+        if (version.runningStatus === 'running' && versionId === undefined) {
+          versionId = version.versionId;
+          resolveReady();
+        }
+        continue;
+      }
+      if (version.versionId !== versionId) continue;
+      if (version.runningStatus === 'stopped') {
+        observedStopped = true;
+        resolveStopped();
+      }
+      if (version.runningStatus === 'running' && observedStopped) resolveRestarted();
+    }
+  };
+  let debugging;
+  const attachment = context.newCDPSession(page);
+  try {
+    debugging = await bounded(attachment);
+    debugging.on('ServiceWorker.workerVersionUpdated', onVersions);
+    await bounded(debugging.send('ServiceWorker.enable'));
+    await bounded(ready);
+    interrupting = true;
+    await bounded(debugging.send('ServiceWorker.stopWorker', { versionId }));
+    await bounded(stopped);
+    const health = await bounded(page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'health.check', version: 1 })));
+    assert.equal(health.ok, true, 'The restarted service worker must answer its health check.');
+    await bounded(restarted);
+    return true;
+  } finally {
+    if (debugging !== undefined) {
+      debugging.off('ServiceWorker.workerVersionUpdated', onVersions);
+      await bounded(debugging.detach()).catch(() => undefined);
+    } else {
+      void attachment.then((lateSession) => lateSession.detach()).catch(() => undefined);
+    }
+    clearTimeout(timeout);
+  }
 }
 
 export async function runInstalledReview(argv = process.argv.slice(2), env = process.env) {
@@ -325,7 +373,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       log({ event: 'installed-upgrade', previousVersion: oldVersion, version: session.version, retained: true });
     }
     stage = 'service-worker-restart';
-    await stopServiceWorker(context, session.extensionId);
+    const workerRestartObserved = await restartInstalledReviewWorker(context, page, session.extensionId, Math.min(deadline - 15_000, Date.now() + 15_000));
     const afterWorker = await observe('after-service-worker-restart');
     assertPreserved(before, afterWorker, session.expected);
     stage = 'browser-restart';
@@ -385,9 +433,9 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       assert.equal(final.aggregate.library.total, session.expected - unsupported);
     }
     const converged = installedConverged(final.aggregate, session.expected);
-    await writeFile(join(descriptorRoot, session.token + '.report.json'), JSON.stringify({ schemaVersion: 2, verdict, converged, dataOrigin, restartsVerified: true, upgradeVerified: upgraded,
+    await writeFile(join(descriptorRoot, session.token + '.report.json'), JSON.stringify({ schemaVersion: 2, verdict, converged, dataOrigin, restartsVerified: true, workerRestartObserved, upgradeVerified: upgraded,
       expected: session.expected, version: session.version, network: networkEvidence, observations }, null, 2) + '\n', { mode: 0o600 });
-    log({ event: 'installed-result', verdict, converged, network: networkEvidence, restartsVerified: true, selected: session.expected, session: session.token });
+    log({ event: 'installed-result', verdict, converged, network: networkEvidence, restartsVerified: true, workerRestartObserved, selected: session.expected, session: session.token });
     return verdict === 'incomplete' ? 2 : 0;
   } catch (error) {
     await closeContext(false);

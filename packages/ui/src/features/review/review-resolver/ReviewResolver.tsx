@@ -15,10 +15,12 @@ const matchLabels = new Map([
 ]);
 const provenanceLabels = new Map([
   ['local-alias', 'Alias local'], ['hydrated-title', 'Fiche locale'], ['provider-search', 'Recherche fournisseur'],
+  ['public-discovery', 'Identités proposées par les fournisseurs'],
 ]);
 
 export interface ReviewResolverProps {
   busy?: boolean;
+  pending?: boolean;
   canNext: boolean;
   canPrevious: boolean;
   item?: ReviewItem;
@@ -47,6 +49,7 @@ function validHttpUrl(value: string) {
 
 export function ReviewResolver({
   busy = false,
+  pending = false,
   canNext,
   canPrevious,
   item,
@@ -146,9 +149,12 @@ export function ReviewResolver({
   }
 
   if (!item) return null;
+  const providerReferences = item.providerReferences ?? [];
+  const comparableCount = item.candidates.length + providerReferences.length;
 
   return (
     <section aria-busy={busy || undefined} className={styles.resolver}>
+      {pending ? <Status live="polite" tone="accent">Vérification en cours · réessayez dans quelques instants</Status> : null}
       {state === 'partial' && item.reason === undefined ? <Status tone="accent">Une source est indisponible · décision conservée</Status> : null}
       {item.reason === 'NOT_FOUND' ? <Status tone="accent">Aucune identité trouvée après recherche complète</Status> : null}
       {state === 'offline' ? <Status tone="warning">Hors ligne · les détails seront complétés à la reconnexion</Status> : null}
@@ -171,6 +177,20 @@ export function ReviewResolver({
       ) : (
         <>
           <h3 className={styles.question}>Quelle œuvre correspond à ce favori&nbsp;?</h3>
+          {providerReferences.length > 0 ? (
+            <section aria-label="Identités fournisseur à vérifier" className={styles.manualPanel}>
+              <p className={styles.noCandidates}>Plusieurs identifiants sont proposés. Vérifiez une référence avant de l’associer à ce favori.</p>
+              {providerReferences.map((reference) => (
+                <Button
+                  disabled={busy}
+                  key={`${reference.provider}:${reference.externalId}`}
+                  onClick={() => onSubmitDecision({ kind: 'manual', revision: item.revision, source: 'id', value: `${reference.provider}:${reference.externalId}` })}
+                >
+                  {`Vérifier ${reference.provider}:${reference.externalId}`}
+                </Button>
+              ))}
+            </section>
+          ) : null}
           <div className={styles.candidates}>
             {item.candidates.map((candidate) => (
               <WorkCard
@@ -202,11 +222,11 @@ export function ReviewResolver({
               type="button"
             >
               <Icon aria-hidden="true" name="plus" size="lg" />
-              <span>{item.candidates.length > 0 ? 'Autre œuvre' : 'Saisie manuelle'}</span>
+              <span>{comparableCount > 0 ? 'Autre œuvre' : 'Saisie manuelle'}</span>
             </button>
           </div>
-          {item.candidates.length === 0 ? <p className={styles.noCandidates}>Aucun candidat proposé par les sources disponibles.</p> : null}
-          {item.totalCandidates !== undefined && item.totalCandidates > item.candidates.length ? <p className={styles.noCandidates}>{item.candidates.length} candidats affichés sur {item.totalCandidates} identités comparées.</p> : null}
+          {comparableCount === 0 ? <p className={styles.noCandidates}>Aucun candidat proposé par les sources disponibles.</p> : null}
+          {item.totalCandidates !== undefined && item.totalCandidates > comparableCount ? <p className={styles.noCandidates}>{comparableCount} identités affichées sur {item.totalCandidates} identités comparées.</p> : null}
         </>
       )}
 

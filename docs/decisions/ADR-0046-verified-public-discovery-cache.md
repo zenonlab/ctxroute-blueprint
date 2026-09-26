@@ -210,6 +210,35 @@ réseau, timeout, indisponibilité, conflit et réponse invalide restent distinc
 Les attentes et indisponibilités transitoires ne consomment pas de tentative
 locale; les erreurs de contrat restent actionnables et bornées.
 
+Le client partage un échange en vol uniquement entre appels portant la même
+clé et la même requête validées. Une requête différente n'hérite jamais du
+résultat d'une admission concurrente. L'échéance écrite avant le POST reste
+opposable après une réponse perdue et un redémarrage, même si la lecture
+suivante répond encore `MISS` : le client expose alors `ADMISSION_WAIT`, sans
+inventer un état serveur `PENDING`. Une lecture terminale garde la priorité.
+
+Une ambiguïté publique transporte des références, pas nécessairement des
+profils complets. La Review locale conserve cette preuve distincte des
+candidats hydratés; elle ne fabrique ni titre fournisseur ni Work vérifié.
+Le choix humain d'une référence passe par Public Discovery avant tout commit.
+Les messages Review extension et WebBridge exposent cette liste via le champ
+optionnel `providerReferences`, limité à dix identités validées. L'interface
+réutilise l'action manuelle pour vérifier une référence; elle ne présente pas
+un identifiant comme une fiche hydratée ni un PENDING comme un choix confirmé.
+WebBridge v4 transmet ce champ seulement sur une lecture qui demande
+explicitement les références. Une requête ancienne conserve sa réponse stricte
+historique. Le nouveau client essaie une lecture enrichie bornée puis une
+lecture ancienne si nécessaire; cette négociation ne rejoue jamais une
+mutation et sa capacité est réévaluée après reconnexion.
+Les diagnostics locaux restent observationnels même lorsque leur stockage
+échoue. Aucun résultat métier ne devient une erreur interne pour cette raison.
+
+La projection provisoire conserve le sous-type détecté par le parseur pour ses
+facettes; le candidat fournisseur fait autorité après résolution. Les clés v3
+ne sont ni renommées `COMIC` ni réécrites. Une famille compatible pour la
+recherche ne prouve pas le sous-type réel d'une œuvre. Les comptes de sources,
+de Works uniques et de cartes provisoires ne sont pas interchangeables.
+
 Chaque écriture du catalogue et l’écriture terminale sont conditionnées dans le
 même batch D1 par le bail non expiré, son token, le digest de demande et
 l’absence de conflit de référence fournisseur. L’adaptateur n’accepte la

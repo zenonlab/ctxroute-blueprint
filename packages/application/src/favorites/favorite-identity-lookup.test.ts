@@ -20,6 +20,15 @@ describe('synchronized favorite identity lookup', () => {
     expect(() => favoriteIdentityKeySchema.parse({ ...key, title: input.title })).toThrow();
   });
 
+  it('retains the v3 key bytes and source adapter namespace for every media kind', async () => {
+    for (const mediaKind of ['ANIME', 'MANGA', 'MANHWA', 'MANHUA', 'UNKNOWN'] as const) {
+      const changed = { ...artifact, mediaKind, identityKey: 'synthetic series', sourceAdapterVersion: 'different-site-v1' };
+      const expectedBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([1, mediaKind, null, 'synthetic series'])));
+      const fingerprint = [...new Uint8Array(expectedBytes)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      expect(await favoriteIdentityKey(changed)).toEqual({ fingerprint, mediaKind, parserVersion: artifact.parserVersion, siteRulesVersion: 'different-site-v1' });
+    }
+  });
+
   it('uses a distinct stable key for each explicit manual provider identity', async () => {
     const titleKey = await favoriteIdentityKey(artifact);
     const manual = await favoriteManualIdentityKey(artifact, { externalId: '1', provider: 'anilist' });

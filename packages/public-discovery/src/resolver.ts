@@ -1,13 +1,13 @@
-import { publicDiscoveryCandidateSchema } from './contracts.js';
-import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoveryTerminalResolution } from './contracts.js';
-import { favoriteProviderInspectionLimit, FavoriteProviderRetryError, inspectFavoriteTitleCandidates } from './provider-kit.js';
-import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit.js';
-import { AniListFavoriteProviderAdapter } from './providers/anilist.js';
-import { KitsuFavoriteProviderAdapter } from './providers/kitsu.js';
-import { MangaDexFavoriteProviderAdapter } from './providers/mangadex.js';
-import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates.js';
-import { FavoriteProviderHttpError, FavoriteProviderRateGate } from './provider-http.js';
-import type { FavoriteProviderFetch, FavoriteProviderRuntimeControlPort } from './provider-http.js';
+import { publicDiscoveryCandidateSchema } from './contracts';
+import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoveryTerminalResolution } from './contracts';
+import { favoriteProviderInspectionLimit, FavoriteProviderRetryError, inspectFavoriteTitleCandidates, isPublicDiscoveryCandidateCompatible } from './provider-kit';
+import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit';
+import { AniListFavoriteProviderAdapter } from './providers/anilist';
+import { KitsuFavoriteProviderAdapter } from './providers/kitsu';
+import { MangaDexFavoriteProviderAdapter } from './providers/mangadex';
+import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates';
+import { FavoriteProviderHttpError, FavoriteProviderRateGate } from './provider-http';
+import type { FavoriteProviderFetch, FavoriteProviderRuntimeControlPort } from './provider-http';
 
 export type PublicDiscoveryProviderPorts = Readonly<Record<ResolutionProvider, FavoriteProviderPort>>;
 
@@ -32,8 +32,10 @@ interface LaneDecision {
   readonly unavailable?: Error;
 }
 interface MutableTitleMatchQuery {
+  explicitSeason?: number;
   mediaKind?: ProviderCandidate['mediaKind'];
   preSerialization?: boolean;
+  sourceFormat?: string;
   sourceTitles: readonly string[];
 }
 const animeProviders = ['anilist', 'kitsu-anime'] as const;
@@ -52,16 +54,18 @@ function matchQueryFor(request: PublicDiscoveryClaimedRequest, titles: readonly 
   const query: MutableTitleMatchQuery = { sourceTitles: request.query.sourceTitles.length > 0 ? request.query.sourceTitles : titles };
   if (request.query.mediaKind !== 'UNKNOWN') query.mediaKind = request.query.mediaKind;
   if (request.query.preSerialization !== undefined) query.preSerialization = request.query.preSerialization;
+  if (request.query.season !== undefined) query.explicitSeason = request.query.season;
+  if (request.query.sourceFormat !== undefined) query.sourceFormat = request.query.sourceFormat;
   return query;
 }
 
 function matchCandidates(candidates: readonly ProviderCandidate[], query: FavoriteTitleMatchQuery, aliasesExhausted: boolean): LaneDecision | undefined {
   const evidence = inspectFavoriteTitleCandidates(query, candidates);
   if (!aliasesExhausted) {
-    if (evidence.candidateReferences.length === 1 && (evidence.level === 'source-id' || evidence.level === 'ordered-exact')) {
+    if (evidence.candidateReferences.length === 1 && (evidence.level === 'source-id' || evidence.level === 'ordered-exact' || evidence.level === 'explicit-season')) {
       return { candidates, references: evidence.candidateReferences, state: 'MATCH' };
     }
-    if (evidence.candidateReferences.length > 1 && evidence.level === 'ordered-exact') {
+    if (evidence.candidateReferences.length > 1 && (evidence.level === 'ordered-exact' || evidence.level === 'explicit-season')) {
       return { candidates, references: evidence.candidateReferences, state: 'AMBIGUOUS' };
     }
     return undefined;
@@ -143,7 +147,7 @@ function retainProviderFailure(current: Error | undefined, incoming: Error): Err
 }
 
 function isProviderInvariantError(error: Error): boolean {
-  return /(?:provider-envelope-mismatch|provider-matching-decision-missing|hydrated-identity-mismatch)/u.test(error.message);
+  return /(?:provider-envelope-mismatch|provider-matching-decision-missing|hydrated-identity-mismatch|hydrated-candidate-incompatible)/u.test(error.message);
 }
 
 async function searchLane(
@@ -250,6 +254,7 @@ async function hydrateReference(
   reference: PublicDiscoveryReferenceV3,
   notFoundReason: 'exact-provider-identity-not-found' | 'matched-provider-identity-not-found',
   searched?: ProviderCandidate,
+  matchQuery?: FavoriteTitleMatchQuery,
 ): Promise<PublicDiscoveryTerminalResolution> {
   let candidate: ProviderCandidate | undefined;
   try { candidate = await providers[reference.provider].hydrate(reference); }
@@ -259,6 +264,7 @@ async function hydrateReference(
   }
   if (candidate === undefined) return { reason: notFoundReason, state: 'NOT_FOUND' };
   if (candidate.provider !== reference.provider || candidate.externalId !== reference.externalId) throw new Error('hydrated-identity-mismatch');
+  if (matchQuery !== undefined && !isPublicDiscoveryCandidateCompatible(matchQuery, candidate, searched)) throw new Error('hydrated-candidate-incompatible');
   return verified(candidate);
 }
 
@@ -270,8 +276,10 @@ async function hydrateWithTransientFallback(
   deadline: number,
   retainedFailure: Error | undefined,
 ): Promise<PublicDiscoveryTerminalResolution> {
+  const titles = request.query.discoveryTitles.slice(0, 4);
+  const query = matchQueryFor(request, titles);
   try {
-    const resolution = await hydrateReference(providers, reference, 'matched-provider-identity-not-found', searched);
+    const resolution = await hydrateReference(providers, reference, 'matched-provider-identity-not-found', searched, query);
     if (resolution.state === 'NOT_FOUND' && retainedFailure !== undefined) throw retainedFailure;
     return resolution;
   } catch (error) {
@@ -279,8 +287,6 @@ async function hydrateWithTransientFallback(
     const order = providerOrderFor(request);
     const start = Math.max(0, order.indexOf(reference.provider) + 1);
     let lastUnavailable = retainProviderFailure(retainedFailure, error);
-    const titles = request.query.discoveryTitles.slice(0, 4);
-    const query = matchQueryFor(request, titles);
     for (const provider of order.slice(start)) {
       let lane: LaneDecision;
       try {
@@ -298,7 +304,7 @@ async function hydrateWithTransientFallback(
       if (fallbackReference === undefined) continue;
       const fallbackCandidate = lane.candidates.find((candidate) => candidate.provider === fallbackReference.provider && candidate.externalId === fallbackReference.externalId);
       try {
-        const resolution = await hydrateReference(providers, fallbackReference, 'matched-provider-identity-not-found', fallbackCandidate);
+        const resolution = await hydrateReference(providers, fallbackReference, 'matched-provider-identity-not-found', fallbackCandidate, query);
         if (resolution.state !== 'NOT_FOUND') return resolution;
       } catch (fallbackError) {
         if (!(fallbackError instanceof Error) || isProviderInvariantError(fallbackError)) throw fallbackError;

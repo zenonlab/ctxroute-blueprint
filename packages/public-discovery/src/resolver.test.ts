@@ -39,6 +39,127 @@ function providers(values: Partial<Record<ResolutionProvider, ProviderCandidate>
 }
 
 describe('standalone provider resolver', () => {
+  it.each([
+    ['NON_OVA', 'OVA'],
+    ['OVA', 'TV'],
+  ] as const)('does not verify a %s request with a %s candidate', async (sourceFormat, format) => {
+    const ports = providers({ anilist: { ...candidate('anilist', 'ANIME', '42', 'Target'), format } });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, sourceFormat } })).resolves.toMatchObject({ state: 'NOT_FOUND' });
+    expect(ports.anilist.hydrate).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, 1])('requires season two corroboration instead of season %s', async (season) => {
+    const target = candidate('anilist', 'ANIME', '42', 'Target');
+    const ports = providers({ anilist: season === undefined ? target : { ...target, season } });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 2 } })).resolves.toMatchObject({ state: 'NOT_FOUND' });
+    expect(ports.anilist.hydrate).not.toHaveBeenCalled();
+  });
+
+  it('matches a corroborated season suffix without confusing intrinsic title numbers', async () => {
+    const target = candidate('anilist', 'ANIME', '42', 'Area 51 2nd Season');
+    const ports = providers({ anilist: target });
+    ports.anilist.search.mockResolvedValue({ candidates: [target, candidate('anilist', 'ANIME', '43', 'Area 52 2nd Season')], complete: true, digest: 'season-fixture', provider: 'anilist', truncated: false });
+    const input = request('ANIME', 'Area 51 Saison 2');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 2 } })).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { externalId: '42' } } });
+  });
+
+  it('does not use approximate matching to replace an intrinsic title number', async () => {
+    const ports = providers({ anilist: { ...candidate('anilist', 'ANIME', '42', 'Area 52'), season: 2 } });
+    const input = request('ANIME', 'Area 51');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 2 } })).resolves.toMatchObject({ state: 'NOT_FOUND' });
+  });
+
+  it('does not turn an incompatible candidate on an incomplete page into NOT_FOUND', async () => {
+    const target = { ...candidate('anilist', 'ANIME', '42', 'Target'), format: 'OVA' };
+    const ports = providers({ anilist: target });
+    ports.anilist.search.mockResolvedValue({ candidates: [target], complete: false, digest: 'partial-ova', provider: 'anilist', truncated: true });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, sourceFormat: 'NON_OVA' } })).rejects.toThrow('incomplete-provider-search');
+    expect(ports.anilist.hydrate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { mediaKind: 'MANGA' as const },
+    { format: 'OVA' },
+    { season: 1 },
+    { preSerialization: true },
+  ])('rejects searched hydration constraint drift: %j', async (drift) => {
+    const target = { ...candidate('anilist', 'ANIME', '42', 'Target'), format: 'TV', season: 2 };
+    const ports = providers({ anilist: target });
+    ports.anilist.hydrate.mockResolvedValue({ ...target, ...drift });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 2, sourceFormat: 'NON_OVA', preSerialization: false } })).rejects.toThrow('hydrated-candidate-incompatible');
+    expect(ports['kitsu-anime'].search).not.toHaveBeenCalled();
+  });
+
+  it('keeps an UNKNOWN searched identity in its proven lane during hydration', async () => {
+    const target = candidate('anilist', 'ANIME', '42', 'Target');
+    const ports = providers({ anilist: target });
+    ports.anilist.hydrate.mockResolvedValue({ ...target, mediaKind: 'MANGA' });
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('UNKNOWN'))).rejects.toThrow('hydrated-candidate-incompatible');
+  });
+
+  it('checks searched hydration constraints after a provider fallback too', async () => {
+    const first = { ...candidate('anilist', 'ANIME', '42', 'Target'), format: 'TV' };
+    const second = { ...candidate('kitsu-anime', 'ANIME', '43', 'Target'), format: 'TV' };
+    const ports = providers({ anilist: first, 'kitsu-anime': second });
+    ports.anilist.hydrate.mockRejectedValue(new Error('network unavailable'));
+    ports['kitsu-anime'].hydrate.mockResolvedValue({ ...second, format: 'OVA' });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, sourceFormat: 'NON_OVA' } })).rejects.toThrow('hydrated-candidate-incompatible');
+  });
+
+  it('accepts a comic subtype correction while keeping the exact searched reference', async () => {
+    const target = candidate('mangadex', 'MANGA', '42', 'Target');
+    const ports = providers({ mangadex: target });
+    ports.mangadex.hydrate.mockResolvedValue({ ...target, mediaKind: 'MANHWA' });
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { provider: 'mangadex', externalId: '42', mediaKind: 'MANHWA' } } });
+  });
+
+  it.each(['season', 'format'] as const)('retains search evidence when the same exact hydrated identity omits %s', async (omitted) => {
+    const target = { ...candidate('anilist', 'ANIME', '42', 'Target'), format: 'OVA', season: 2 };
+    const ports = providers({ anilist: target });
+    const hydrated = omitted === 'season'
+      ? { ...candidate('anilist', 'ANIME', '42', 'Hydrated Title'), format: 'OVA' }
+      : { ...candidate('anilist', 'ANIME', '42', 'Hydrated Title'), season: 2 };
+    ports.anilist.hydrate.mockResolvedValue(hydrated);
+    const input = request('ANIME');
+    const result = await createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 2, sourceFormat: 'OVA' } });
+    expect(result).toMatchObject({ state: 'VERIFIED', profile: { candidate: hydrated } });
+    if (result.state !== 'VERIFIED') throw new Error('Expected a verified result.');
+    expect(result.profile.candidate).not.toHaveProperty(omitted);
+    expect(result.profile.candidate.titles).toEqual(['Hydrated Title']);
+  });
+
+  it('does not replace a contradictory hydrated season title with search evidence', async () => {
+    const target = { ...candidate('anilist', 'ANIME', '42', 'Target'), season: 2 };
+    const ports = providers({ anilist: target });
+    ports.anilist.hydrate.mockResolvedValue(candidate('anilist', 'ANIME', '42', 'Target Season 1'));
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 2 } })).rejects.toThrow('hydrated-candidate-incompatible');
+  });
+
+  it.each([
+    { provider: 'anilist' as const, externalId: '43' },
+    { provider: 'kitsu-anime' as const, externalId: '42' },
+  ])('never carries search evidence to a different hydrated identity: %j', async (reference) => {
+    const target = { ...candidate('anilist', 'ANIME', '42', 'Target'), format: 'OVA', season: 2 };
+    const ports = providers({ anilist: target });
+    ports.anilist.hydrate.mockResolvedValue(candidate(reference.provider, 'ANIME', reference.externalId, 'Hydrated Title'));
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 2, sourceFormat: 'OVA' } })).rejects.toThrow('hydrated-identity-mismatch');
+  });
+
+  it('keeps explicit reference hydration authoritative over title-derived season and format', async () => {
+    const target = { ...candidate('anilist', 'ANIME', '42', 'Another Title'), format: 'OVA', season: 1 };
+    const ports = providers({ anilist: target });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, explicitProviderReference: { provider: 'anilist', externalId: '42' }, season: 2, sourceFormat: 'NON_OVA' } })).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: target } });
+    expect(ports.anilist.search).not.toHaveBeenCalled();
+  });
+
   it('follows a real MangaUpdates search cursor before deciding the work is absent', async () => {
     let now = 0;
     let nextAllowedAt = 0;

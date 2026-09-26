@@ -42,7 +42,7 @@
     { "id": "publicWorker", "type": "cloud", "label": "Worker Public Discovery", "sublabel": "HTTPS v3 sans owner", "stage": 3, "row": 0, "width": 170, "tag": "60/min/IP · admission ≥ 1,1 s" },
     { "id": "publicD1", "type": "database", "label": "Cache public D1", "sublabel": "MISS · PENDING · VERIFIED", "stage": 3, "row": 2, "width": 170, "tag": "lecture 200" },
     { "id": "providerQueue", "type": "messagebus", "label": "Collecteur serveur", "sublabel": "Queue ou secours borné", "stage": 3, "row": 4, "width": 170, "tag": "claim 1 · concurrence 1" },
-    { "id": "libraryView", "type": "frontend", "label": "Library locale", "sublabel": "Work + projection provisoire", "stage": 4, "row": 0, "width": 170, "tag": "visible avant hydratation" },
+    { "id": "libraryView", "type": "frontend", "label": "Library locale", "sublabel": "type source puis type vérifié", "stage": 4, "row": 0, "width": 170, "tag": "visible avant hydratation" },
     { "id": "review", "type": "frontend", "label": "Review manuelle", "sublabel": "candidats / identité explicite", "stage": 4, "row": 2, "width": 170, "tag": "choix contrôlé" },
     { "id": "diagnostics", "type": "database", "label": "Diagnostic local", "sublabel": "états + codes bornés", "stage": 4, "row": 4, "width": 170, "tag": "100 événements" }
   ],
@@ -55,8 +55,8 @@
     { "from": "publicD1", "to": "providerQueue", "label": "claim + profil", "classification": "Queue ou claim direct · publication atomique", "variant": "security", "route": "straight", "labelDy": 53 }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Résultat observé", "items": ["1 522 sources du profil de test sont conservées après redémarrage", "1 338 états restaient non terminaux dans la dernière session en ligne", "Conservation des sources et convergence des Work restent deux preuves distinctes"] },
+    { "dot": "emerald", "title": "Identités et projection", "items": ["Les clés v3 existantes restent inchangées", "Manga, manhwa et manhua partagent la compatibilité de recherche", "Le sous-type source reste filtrable avant le résultat fournisseur", "Sources conservées, sources résolues et œuvres uniques sont distinctes"] },
     { "dot": "cyan", "title": "Frontière réseau", "items": ["Aucune URL brute, aucun dossier, aucune progression ni décision privée ne sont envoyés", "La directive connect-src autorise uniquement HTTPS vers l’origine TobiRink", "Les WebSockets ne sont pas autorisés par le manifeste", "Public Discovery expose un cache PENDING/VERIFIED", "Seul le runtime serveur appelle les fournisseurs"] },
-    { "dot": "rose", "title": "Reprise fidèle", "items": ["Identité et référence partagées entre résolution et reprise", "L’admission D1 est cadencée à au moins 1,1 s, puis le runtime serveur poursuit le traitement", "PROVIDER_UNAVAILABLE ne se réarme que par une action utilisateur explicite", "Le curseur avance après réponse ; Retry-After survit aux interruptions", "15 s et 10 soumissions au plus ; alarme restaurée au réveil et après pause", "Un échec permanent reste visible sans bloquer les sources suivantes", "Le secours Worker quotidien préserve le cron Agenda hebdomadaire"] }
+    { "dot": "rose", "title": "Reprise fidèle", "items": ["Même clé et même requête : un échange concurrent partagé", "Après réponse perdue, l’échéance persistée protège aussi MISS", "AMBIGUOUS conserve les références en Review sans fausse fiche", "PROVIDER_UNAVAILABLE exige une reprise explicite", "Les diagnostics ne changent jamais le résultat métier", "Saison et format contraignent la preuve avant VERIFIED"] }
   ]
 }

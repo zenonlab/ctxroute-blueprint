@@ -4,6 +4,8 @@ import type { StoragePort } from '../ports/storage-port';
 import { localReviewRevisionPort } from './read-review-candidates';
 import { searchLocalLibrary } from './search-local-library';
 import { favoriteCandidateWorkId } from '../favorites/favorite-resolution-commit';
+import { favoritePublicReferenceSchema } from '../favorites/favorite-identity-lookup';
+import type { FavoritePublicReference } from '../favorites/favorite-identity-lookup';
 
 export interface LocalReviewCandidate {
   candidate?: ProviderCandidate;
@@ -12,6 +14,7 @@ export interface LocalReviewCandidate {
 }
 
 export interface LocalReviewCandidateSnapshot {
+  providerReferences?: readonly FavoritePublicReference[] | undefined;
   reason?: 'AMBIGUOUS' | 'NOT_FOUND' | undefined;
   matchLevel?: string | undefined;
   provenance?: string | undefined;
@@ -68,11 +71,16 @@ export async function readLocalReviewCandidates(
   if (context.review.reason !== undefined && context.source.resolution?.kind !== 'REVIEW_REQUIRED') throw new Error('Review resolution is still processing.');
 
   const persisted = await storage.getFavoriteReviewCandidateSet(context.review.id);
+  if (persisted?.references !== undefined && persisted.references.length > 10) throw new Error('REVIEW_REFERENCE_LIMIT');
+  const references = persisted?.references?.map((reference) => favoritePublicReferenceSchema.parse(reference));
+  const providerReferences = references === undefined ? []
+    : [...new Map(references.map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
   const candidates = persisted !== undefined || context.review.reason !== undefined
     ? persisted?.candidates.map(providerCandidate).filter((candidate): candidate is LocalReviewCandidate => candidate !== undefined && (input.showAdultContent === undefined || isContentVisible(candidate.candidate, input.showAdultContent))).slice(0, 6) ?? []
     : await readLegacyCandidates(storage, input.libraryId, context.review.title, input.showAdultContent ?? true);
   const revision = await localReviewRevisionPort.createRevision({ candidateDigest: persisted?.digest, review: context.review, source: context.source });
   return Object.freeze({
+    providerReferences: providerReferences.length === 0 ? undefined : Object.freeze(providerReferences),
     candidates: Object.freeze(candidates),
     reason: context.review.reason,
     matchLevel: persisted?.matchLevel,
@@ -80,7 +88,7 @@ export async function readLocalReviewCandidates(
     totalCandidates: persisted?.totalCandidates,
     reviewId: context.review.id,
     revision,
-    state: context.review.reason === 'NOT_FOUND' || candidates.length > 0 ? 'ready' : 'partial',
+    state: context.review.reason === 'NOT_FOUND' || candidates.length > 0 || providerReferences.length > 0 ? 'ready' : 'partial',
     title: context.review.title,
   });
 }

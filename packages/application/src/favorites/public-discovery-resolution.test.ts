@@ -10,6 +10,40 @@ const observation = createFavoriteObservation({ bookmarkId: input.sourceKey, fol
 const artifact = parseFavoriteObservation(observation, extractFavoriteSourceEvidence(input));
 
 describe('public favorite discovery request', () => {
+  it.each(['MANGA', 'MANHWA', 'MANHUA'] as const)('reuses a typed compatible sync hint for a %s source without changing its key contract', async (mediaKind) => {
+    const comic = { ...artifact, mediaKind };
+    const key = await favoriteIdentityKey(comic);
+    const reference = { provider: 'mangaupdates' as const, externalId: '123' };
+    const lookup = vi.fn(async () => [{ kind: 'FOUND' as const, fingerprint: key.fingerprint, mediaKind: 'MANHWA' as const, references: [reference] }]);
+    await expect(preparePublicFavoriteDiscoveryIdentity(comic, { lookup })).resolves.toEqual({ key: await favoriteManualIdentityKey(comic, reference), reference });
+    expect(await favoriteIdentityKey(comic)).toEqual(key);
+  });
+
+  it('rejects a synchronized anime identity carrying a manga-only provider', async () => {
+    const key = await favoriteIdentityKey(artifact);
+    const lookup = async () => [{ kind: 'FOUND' as const, fingerprint: key.fingerprint, mediaKind: 'ANIME' as const, references: [{ provider: 'mangaupdates' as const, externalId: '123' }] }];
+    await expect(preparePublicFavoriteDiscoveryIdentity(artifact, { lookup })).resolves.toEqual({ key, reference: undefined });
+  });
+
+  it('ignores malformed synchronized identity envelopes', async () => {
+    const key = await favoriteIdentityKey(artifact);
+    const lookup = async () => [{ kind: 'FOUND' as const, fingerprint: key.fingerprint, mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: '123' }], unexpected: true }];
+    await expect(preparePublicFavoriteDiscoveryIdentity(artifact, { lookup })).resolves.toEqual({ key, reference: undefined });
+  });
+
+  it('uses a typed UNKNOWN hint but never replaces an explicit source reference', async () => {
+    const unknown = { ...artifact, mediaKind: 'UNKNOWN' as const };
+    const key = await favoriteIdentityKey(unknown);
+    const reference = { provider: 'mangaupdates' as const, externalId: '123' };
+    const lookup = vi.fn(async () => [{ kind: 'FOUND' as const, fingerprint: key.fingerprint, mediaKind: 'MANHWA' as const, references: [reference] }]);
+    await expect(preparePublicFavoriteDiscoveryIdentity(unknown, { lookup })).resolves.toEqual({ key: await favoriteManualIdentityKey(unknown, reference), reference });
+    const explicit = { provider: 'anilist' as const, externalId: '42' };
+    lookup.mockClear();
+    await expect(preparePublicFavoriteDiscoveryIdentity({ ...unknown, sourceEvidence: { ...unknown.sourceEvidence, explicitProviderReference: explicit } }, { lookup }))
+      .resolves.toEqual({ key: await favoriteManualIdentityKey(unknown, explicit), reference: explicit });
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
   it('shares exact-reference and synchronized-hint keys with the normal request', async () => {
     const reference = { externalId: '123', provider: 'anilist' as const };
     const exactArtifact = { ...artifact, sourceEvidence: { ...artifact.sourceEvidence, explicitProviderReference: reference } };

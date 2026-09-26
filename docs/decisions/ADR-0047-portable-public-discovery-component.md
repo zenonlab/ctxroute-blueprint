@@ -81,6 +81,37 @@ la priorité des preuves, ni le comportement fermé d'une réponse incomplète :
 faute de preuve exacte chez les fournisseurs rapides, MangaUpdates reste
 interrogé et ses bornes restent applicables.
 
+La compatibilité des médias est une fonction pure partagée entre le matcher
+portable, le matcher local et les indices synchronisés : `MANGA`, `MANHWA` et
+`MANHUA` appartiennent à la même famille de recherche, jamais à la lane anime.
+La classification hydratée reste précise. Cette fonction ne change ni les
+empreintes, ni les versions de parseur/adaptateur, ni les clés publiques v3.
+Un indice synchronisé doit respecter le schéma fermé, la corrélation, la
+famille du média et les fournisseurs compatibles déjà définis par le sélecteur
+existant. La préparation publique conserve sa limite d'une seule référence ;
+une référence explicite de la source reste prioritaire et ne lit pas cet indice.
+
+Le matcher portable consomme les marqueurs de format et de saison déjà
+présents dans la requête v3. OVA et pré-sérialisation restent symétriques ;
+une saison explicite doit être corroborée par la métadonnée du candidat ou
+une saison unique extraite de ses titres. Le suffixe saisonnier
+corroboré peut être retiré des deux titres comparés, sans retirer leurs nombres
+intrinsèques. Les numéros différents interdisent aussi une correspondance
+approximative. Avant publication d'une identité découverte par titre, son
+hydratation respecte les mêmes contraintes et la même lane prouvée. Lorsque
+le fournisseur et l'identifiant sont strictement identiques, l'absence de
+format ou de preuve de saison dans l'hydratation conserve seulement la preuve
+de recherche correspondante pour ce contrôle. Une métadonnée présente ou une
+saison portée par les titres hydratés ne peut pas être remplacée par cette
+preuve ; les champs et titres du profil publié restent ceux de l'hydratation,
+sans enrichissement artificiel ni union d'aliases. Une dérive
+de média, format, pré-sérialisation ou saison constitue une erreur d'invariant,
+jamais un `VERIFIED` ou un faux `NOT_FOUND`, y compris après fallback. Ce
+contrôle ne modifie pas l'hydratation directe d'une référence explicite,
+prioritaire sur les indices de titre. Les gardes des recherches incomplètes
+et des deux lanes `UNKNOWN` restent inchangées. Aucun ancien résultat D1 n'est
+réarmé, migré ou invalidé automatiquement par ce refactoring.
+
 Une projection de recherche ne transforme pas un champ fournisseur optionnel
 non fiable en perte de l'identité entière. Pour Kitsu, une couverture dont
 l'origine ne respecte pas l'allowlist est omise sans élargir cette allowlist.

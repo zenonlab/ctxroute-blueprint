@@ -82,6 +82,7 @@ export async function projectFavoriteSources(storage: StoragePort, resolvedWorkI
         id: `work_pending_${source.id.slice('source_'.length)}`,
         mediaKind: projectedMediaKind(artifact.mediaKind),
         source,
+        sourceMediaKind: artifact.mediaKind,
         state: pendingState(source.resolution),
         title,
       });

@@ -1,8 +1,8 @@
-import { assertFavoriteProviderSearchQuery, createProviderCandidate, createProviderCandidateEnvelope, favoriteProviderPage, favoriteProviderPolicy } from '../provider-kit.js';
-import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ProviderCandidate } from '../provider-kit.js';
+import { assertFavoriteProviderSearchQuery, createProviderCandidate, createProviderCandidateEnvelope, favoriteProviderPage, favoriteProviderPolicy } from '../provider-kit';
+import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ProviderCandidate } from '../provider-kit';
 import { z } from 'zod';
-import { FavoriteProviderRateGate, readFavoriteProviderJson } from '../provider-http.js';
-import type { FavoriteProviderFetch } from '../provider-http.js';
+import { FavoriteProviderRateGate, readFavoriteProviderJson } from '../provider-http';
+import type { FavoriteProviderFetch } from '../provider-http';
 
 export const anilistGraphqlEndpoint = 'https://graphql.anilist.co';
 const mediaProjection = 'id type format status isAdult siteUrl title { romaji english native } synonyms genres coverImage { extraLarge large medium } startDate { year } endDate { year } episodes chapters volumes popularity';

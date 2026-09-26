@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { chromium, expect, test } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
+import { restartInstalledReviewWorker } from '../../extension/scripts/installed-review.mjs';
 
 const mangaDexId = '12345678-1234-4234-8234-123456789abc';
 const anilistMedia = {
@@ -190,6 +192,263 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
   }
 });
 
+test('packaged extension preserves a pending manhwa across worker and browser restarts before mocked verification', async ({ browserName }) => {
+  test.setTimeout(180_000);
+  expect(browserName).toBe('chromium');
+  const repository = resolve(import.meta.dirname, '../../..');
+  const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
+  const archive = process.env.TOBIRINK_TEST_ARCHIVE ?? resolve(repository, `apps/extension/.output/packages/tobirink-chrome-mv3-${version}.zip`);
+  const extensionPath = mkdtempSync(resolve(tmpdir(), 'tobirink-pending-extension-'));
+  const profilePath = mkdtempSync(resolve(tmpdir(), 'tobirink-pending-profile-'));
+  execFileSync('unzip', ['-q', archive, '-d', extensionPath]);
+  const title = 'Synthetic Continuation River';
+  const bookmarkUrl = 'https://manhwaz.com/webtoon/synthetic-continuation-river/chapter-7';
+  const servedStates: string[] = [];
+  const forbiddenRequests: string[] = [];
+  let admissions = 0;
+  let admittedAt = 0;
+  let providerCompleted = false;
+  let context: BrowserContext | undefined;
+  let page: Page | undefined;
+  let options: Page | undefined;
+  const discoveryState = () => {
+    if (admissions === 0) return { state: 'MISS' };
+    if (!providerCompleted) return { retryAt: new Date(admittedAt + 60_000).toISOString(), state: 'PENDING' };
+    return {
+      state: 'VERIFIED', verifiedAt: new Date().toISOString(), nextRefreshAt: new Date(Date.now() + 86_400_000).toISOString(),
+      profile: {
+        candidate: { displayTitle: title, externalId: '12345', mediaKind: 'MANHWA', preSerialization: false, provider: 'mangaupdates', titles: [title] },
+        references: [{ externalId: '12345', provider: 'mangaupdates' }], workId: 'work_synthetic-continuation-river',
+      },
+    };
+  };
+  const launch = async () => {
+    const opened = await chromium.launchPersistentContext(profilePath, {
+      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, '--host-resolver-rules=MAP * 127.0.0.1, EXCLUDE localhost'],
+      channel: 'chromium', headless: true,
+    });
+    context = opened;
+    await opened.routeWebSocket('**/*', async (socket) => {
+      forbiddenRequests.push(new URL(socket.url()).origin);
+      await socket.close();
+    });
+    await opened.route('**/*', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') { await route.continue(); return; }
+      if (url.origin !== 'https://tobirink.com') {
+        forbiddenRequests.push(url.origin);
+        await route.abort('blockedbyclient');
+        return;
+      }
+      if (url.pathname === '/v3/catalogue/discoveries/requests' && request.method() === 'POST') {
+        const submission = request.postDataJSON();
+        expect(submission.query.mediaKind).toBe('MANHWA');
+        expect(submission.key.mediaKind).toBe('MANHWA');
+        expect(submission.query).not.toHaveProperty('url');
+        admissions += 1;
+        if (admissions === 1) admittedAt = Date.now();
+        const state = discoveryState();
+        servedStates.push(state.state);
+        await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify(state) });
+        return;
+      }
+      if (url.pathname === '/v3/catalogue/discoveries/lookup' && request.method() === 'POST') {
+        const submission = request.postDataJSON();
+        expect(submission.keys).toHaveLength(1);
+        const state = discoveryState();
+        servedStates.push(state.state);
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(submission.keys.map((key: Record<string, string>) => ({ key, state }))) });
+        return;
+      }
+      if (url.pathname === '/v3/catalogue/discoveries' && request.method() === 'GET') {
+        expect(url.searchParams.get('mediaKind')).toBe('MANHWA');
+        const state = discoveryState();
+        servedStates.push(state.state);
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state) });
+        return;
+      }
+      await route.fulfill({ status: 404, body: '' });
+    });
+    return opened;
+  };
+  const readState = async (surface: Page) => surface.evaluate(async (url) => ({
+    bookmarks: await chrome.bookmarks.search({ url }),
+    catalogue: await chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, facets: { type: { MANHWA: 'include' } }, sort: 'TITLE_ASC' }),
+    status: await chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }),
+  }), bookmarkUrl);
+  try {
+    context = await launch();
+    const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+    const extensionId = new URL(worker.url()).host;
+    const bookmark = await worker.evaluate(async (input) => chrome.bookmarks.create(input), { title, url: bookmarkUrl });
+    options = await context.newPage();
+    await options.goto(`chrome-extension://${extensionId}/options.html`);
+    await options.getByRole('button', { name: /^(Commencer l’analyse|Reprendre maintenant|Vérifier à nouveau)$/u }).click();
+    await expect.poll(() => admissions, { timeout: 30_000 }).toBe(1);
+    page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/library.html`);
+    await expect.poll(async () => (await readState(options!)).status.counts?.publicDiscoveryPending, { timeout: 30_000 }).toBe(1);
+    const pending = await readState(options);
+    expect(pending.status.counts).toMatchObject({ observed: 1, resolved: 0, retryable: 1 });
+    expect(pending.catalogue.snapshot).toMatchObject({ total: 1, items: [{ state: 'retryable', detail: 'Manhwa (source) · Traitement distant en cours' }] });
+    expect(pending.bookmarks).toMatchObject([{ id: bookmark.id, title, url: bookmarkUrl }]);
+    await expect(page.getByText('Manhwa (source) · Traitement distant en cours')).toBeVisible();
+
+    expect(await restartInstalledReviewWorker(context, options, extensionId)).toBe(true);
+    const afterWorker = await readState(options);
+    expect(afterWorker.catalogue.snapshot.items).toEqual(pending.catalogue.snapshot.items);
+    expect(afterWorker.bookmarks).toEqual(pending.bookmarks);
+    expect(afterWorker.status.counts).toMatchObject({ observed: 1, resolved: 0, publicDiscoveryPending: 1 });
+    expect(admissions).toBe(1);
+
+    await context.close();
+    context = await launch();
+    const resumedWorker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+    expect(new URL(resumedWorker.url()).host).toBe(extensionId);
+    options = await context.newPage();
+    await options.goto(`chrome-extension://${extensionId}/options.html`);
+    page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/library.html`);
+    const afterBrowser = await readState(options);
+    expect(afterBrowser.bookmarks).toEqual(pending.bookmarks);
+    expect(afterBrowser.catalogue.snapshot.items).toEqual(pending.catalogue.snapshot.items);
+    expect(afterBrowser.status.counts).toMatchObject({ observed: 1, resolved: 0, publicDiscoveryPending: 1 });
+    providerCompleted = true;
+    await expect.poll(async () => (await readState(options!)).status.counts?.resolved, { timeout: 100_000, intervals: [500, 1_000, 2_000] }).toBe(1);
+    const verified = await readState(options);
+    expect(verified.catalogue.snapshot).toMatchObject({ total: 1, items: [{ id: 'work_synthetic-continuation-river', state: 'ready', title, source: 'mangaupdates' }] });
+    expect(verified.bookmarks).toEqual(pending.bookmarks);
+    expect(verified.status.counts).toMatchObject({ observed: 1, resolved: 1, processing: 0, retryable: 0 });
+    expect(servedStates).toEqual(expect.arrayContaining(['MISS', 'PENDING', 'VERIFIED']));
+    expect(servedStates.indexOf('MISS')).toBeLessThan(servedStates.indexOf('PENDING'));
+    expect(servedStates.indexOf('PENDING')).toBeLessThan(servedStates.indexOf('VERIFIED'));
+    expect(admissions).toBe(1);
+    expect(forbiddenRequests).toEqual([]);
+
+    const exchanges = servedStates.length;
+    await context.setOffline(true);
+    await page.reload();
+    await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
+    const offline = await readState(options);
+    expect(offline.catalogue.snapshot.items).toEqual(verified.catalogue.snapshot.items);
+    expect(offline.bookmarks).toEqual(pending.bookmarks);
+    expect(offline.status.counts).toMatchObject({ observed: 1, resolved: 1 });
+    expect(servedStates).toHaveLength(exchanges);
+    expect(forbiddenRequests).toEqual([]);
+  } finally {
+    await context?.close();
+  }
+});
+
+test('packaged Review verifies an ambiguous reference before committing a human association', async () => {
+  test.setTimeout(90_000);
+  const repository = resolve(import.meta.dirname, '../../..');
+  const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
+  const archive = process.env.TOBIRINK_TEST_ARCHIVE ?? resolve(repository, `apps/extension/.output/packages/tobirink-chrome-mv3-${version}.zip`);
+  const extensionPath = mkdtempSync(resolve(tmpdir(), 'tobirink-reference-extension-'));
+  const profilePath = mkdtempSync(resolve(tmpdir(), 'tobirink-reference-profile-'));
+  execFileSync('unzip', ['-q', archive, '-d', extensionPath]);
+  const context = await chromium.launchPersistentContext(profilePath, {
+    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, '--host-resolver-rules=MAP * 127.0.0.1, EXCLUDE localhost'],
+    channel: 'chromium', headless: true, viewport: { width: 390, height: 844 },
+  });
+  const title = 'Synthetic Ambiguous River';
+  const references = [{ provider: 'mangaupdates', externalId: '123' }, { provider: 'mangaupdates', externalId: '456' }];
+  const forbiddenRequests: string[] = [];
+  let automaticFingerprint: string | undefined;
+  let manualPosts = 0;
+  let manualVerified = false;
+  const stateFor = (fingerprint: string) => {
+    automaticFingerprint ??= fingerprint;
+    if (fingerprint === automaticFingerprint) return { state: 'AMBIGUOUS', candidates: references, reason: 'comparable-identities', verifiedAt: new Date().toISOString() };
+    if (manualPosts === 0) return { state: 'MISS' };
+    if (!manualVerified) return { state: 'PENDING', retryAt: new Date(Date.now() + 60_000).toISOString() };
+    return {
+      state: 'VERIFIED', verifiedAt: new Date().toISOString(), nextRefreshAt: new Date(Date.now() + 86_400_000).toISOString(),
+      profile: { candidate: { externalId: '123', mediaKind: 'MANHWA', preSerialization: false, provider: 'mangaupdates', titles: [title] }, references: [references[0]], workId: 'work_synthetic_ambiguous' },
+    };
+  };
+  try {
+    await context.routeWebSocket('**/*', async (socket) => { forbiddenRequests.push(new URL(socket.url()).origin); await socket.close(); });
+    await context.route('**/*', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.protocol !== 'https:' && url.protocol !== 'http:') { await route.continue(); return; }
+      if (url.origin !== 'https://tobirink.com') { forbiddenRequests.push(url.origin); await route.abort('blockedbyclient'); return; }
+      if (url.pathname === '/v3/catalogue/discoveries/lookup' && request.method() === 'POST') {
+        const submission = request.postDataJSON();
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(submission.keys.map((key: { fingerprint: string }) => ({ key, state: stateFor(key.fingerprint) }))) });
+        return;
+      }
+      if (url.pathname === '/v3/catalogue/discoveries' && request.method() === 'GET') {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stateFor(url.searchParams.get('fingerprint')!)) });
+        return;
+      }
+      if (url.pathname === '/v3/catalogue/discoveries/requests' && request.method() === 'POST') {
+        const submission = request.postDataJSON();
+        expect(submission.query.explicitProviderReference).toEqual(references[0]);
+        expect(submission.key.fingerprint).not.toBe(automaticFingerprint);
+        expect(submission.query).not.toHaveProperty('url');
+        manualPosts += 1;
+        await route.fulfill({ status: 202, contentType: 'application/json', body: JSON.stringify(stateFor(submission.key.fingerprint)) });
+        return;
+      }
+      await route.fulfill({ status: 404, body: '' });
+    });
+    const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+    const extensionId = new URL(worker.url()).host;
+    const bookmark = await worker.evaluate(async (input) => chrome.bookmarks.create(input), { title, url: 'https://manhwaz.com/webtoon/synthetic-ambiguous-river/chapter-7' });
+    const options = await context.newPage();
+    await options.goto(`chrome-extension://${extensionId}/options.html`);
+    await options.getByRole('button', { name: /^(Commencer l’analyse|Reprendre maintenant|Vérifier à nouveau)$/u }).click();
+    const page = await context.newPage();
+    await page.goto(`chrome-extension://${extensionId}/review.html`);
+    const readPrivate = () => page.evaluate(() => new Promise<{ works: unknown[]; reviews: { status: string; decisionOrigin?: string }[]; sources: { resolution?: { kind: string }; bookmarkId?: string }[] }>((resolveState, rejectState) => {
+      const opening = indexedDB.open('tobirink-private');
+      opening.onerror = () => rejectState(opening.error);
+      opening.onsuccess = () => {
+        const database = opening.result;
+        const transaction = database.transaction(['favoriteSources', 'reviews', 'works'], 'readonly');
+        const works = transaction.objectStore('works').getAll();
+        const reviews = transaction.objectStore('reviews').getAll();
+        const sources = transaction.objectStore('favoriteSources').getAll();
+        transaction.oncomplete = () => { database.close(); resolveState({ works: works.result, reviews: reviews.result, sources: sources.result }); };
+        transaction.onerror = () => { database.close(); rejectState(transaction.error); };
+      };
+    }));
+    await expect.poll(async () => (await readPrivate()).reviews.length, { timeout: 30_000 }).toBe(1);
+    await page.reload();
+    await page.getByRole('button', { name: 'Correspondances à vérifier', exact: true }).click();
+    const choice = page.getByRole('button', { name: 'Vérifier mangaupdates:123', exact: true });
+    await expect(choice).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Vérifier mangaupdates:456', exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Identités fournisseur à vérifier' }).locator('img')).toHaveCount(0);
+    expect((await readPrivate()).works).toEqual([]);
+    expect(manualPosts).toBe(0);
+    await choice.focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(() => manualPosts).toBe(1);
+    await expect(page.getByText('Vérification en cours · réessayez dans quelques instants')).toBeVisible();
+    expect(await readPrivate()).toMatchObject({ works: [], reviews: [{ status: 'pending' }], sources: [{ bookmarkId: bookmark.id, resolution: { kind: 'REVIEW_REQUIRED' } }] });
+    await expect(choice).toBeEnabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    manualVerified = true;
+    expect(await restartInstalledReviewWorker(context, page, extensionId)).toBe(true);
+    await choice.click();
+    await expect.poll(async () => (await readPrivate()).reviews[0]?.status).toBe('resolved');
+    const resolved = await readPrivate();
+    expect(resolved.reviews).toMatchObject([{ status: 'resolved', decisionOrigin: 'human' }]);
+    expect(resolved.works).toMatchObject([{ externalReferences: [{ provider: 'mangaupdates', externalId: '123' }], preferredTitle: title }]);
+    expect(resolved.sources).toMatchObject([{ bookmarkId: bookmark.id, resolution: { kind: 'RESOLVED' } }]);
+    await expect(page.getByRole('dialog', { name: 'Correspondances à vérifier', exact: true }).getByRole('heading', { name: 'Aucune correspondance à vérifier', exact: true })).toBeVisible();
+    expect(manualPosts).toBe(1);
+    expect(forbiddenRequests).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
 test('installed site Library sorts the full private catalogue promptly', async () => {
   test.setTimeout(150_000);
   const repository = resolve(import.meta.dirname, '../../..');
@@ -258,13 +517,8 @@ test('installed site Library sorts the full private catalogue promptly', async (
     }
     process.stdout.write(`Installed extension Library: worker sorts ${workerTimings.join(', ')} ms.\n`);
     expect(Math.max(...workerTimings)).toBeLessThan(45_000);
-    const devtools = await context.browser()!.newBrowserCDPSession();
-    const targets = await devtools.send('Target.getTargets');
-    const workerTarget = targets.targetInfos.find((entry) => entry.type === 'service_worker' && entry.url === worker.url());
-    expect(workerTarget).toBeDefined();
-    await devtools.send('Target.closeTarget', { targetId: workerTarget!.targetId });
-    await devtools.detach();
     const coldStartedAt = Date.now();
+    expect(await restartInstalledReviewWorker(context, privateLibrary, extensionId)).toBe(true);
     const coldCatalogue = await privateLibrary.evaluate(async () => chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_DESC' }));
     expect(coldCatalogue.ok, coldCatalogue.error).toBe(true);
     expect(coldCatalogue.snapshot.items[0]?.title).toBe('Synthetic 1399');

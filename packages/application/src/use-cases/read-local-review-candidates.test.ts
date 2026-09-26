@@ -4,6 +4,21 @@ import { MemoryStoragePort } from '@tobirink/contracts';
 import { readLocalReviewCandidates } from './read-local-review-candidates';
 
 describe('readLocalReviewCandidates', () => {
+  it('exposes remote ambiguity references without creating candidate works or reading the library', async () => {
+    const storage = new MemoryStoragePort();
+    const review = createReview({ id: reviewId('review_remote_references'), reason: 'AMBIGUOUS', sourceLabel: 'Source', status: 'pending', title: 'Synthetic ambiguity' });
+    const references = [{ provider: 'mangaupdates' as const, externalId: '123' }, { provider: 'mangaupdates' as const, externalId: '456' }];
+    await storage.putReview(review);
+    await storage.putFavoriteSource(createFavoriteSource({ bookmarkId: 'references', folderPath: [], id: favoriteSourceId('source_remote_references'), importedAt: '2026-09-08T00:00:00.000Z', order: 0, resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, reviewId: review.id, title: review.title, url: 'https://reader.example/manga/ambiguity' }));
+    await storage.putFavoriteReviewCandidateSet({ candidates: [], references, digest: 'references-v1', totalCandidates: 2, provenance: 'public-discovery', recordedAt: '2026-09-08T00:00:00.000Z', reviewId: review.id });
+    const libraryRead = vi.spyOn(storage, 'getLibrary').mockRejectedValue(new Error('Unrelated library unavailable'));
+    const snapshot = await readLocalReviewCandidates(storage, { libraryId: libraryId('library_unrelated'), reviewId: review.id });
+    expect(snapshot).toMatchObject({ candidates: [], providerReferences: references, reason: 'AMBIGUOUS', state: 'ready', totalCandidates: 2 });
+    expect(libraryRead).not.toHaveBeenCalled();
+    expect(await storage.listWorks({ limit: 100 })).toEqual([]);
+    await storage.putFavoriteReviewCandidateSet({ candidates: [], references: [references[0]!, { provider: 'mangaupdates', externalId: '789' }], digest: 'references-v2', recordedAt: '2026-09-08T00:00:00.000Z', reviewId: review.id });
+    expect((await readLocalReviewCandidates(storage, { libraryId: libraryId('library_unrelated'), reviewId: review.id })).revision).not.toBe(snapshot.revision);
+  });
   it('keeps a terminal not-found actionable without reading unrelated library entries', async () => {
     const storage = new MemoryStoragePort();
     const review = createReview({ id: reviewId('review_notfound'), reason: 'NOT_FOUND', sourceLabel: 'Source', status: 'pending', title: 'Synthetic missing title' });

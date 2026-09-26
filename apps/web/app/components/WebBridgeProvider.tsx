@@ -33,6 +33,7 @@ export type WebBridgeStatus = 'loading' | 'extension-missing' | 'reconnecting' |
 interface BridgeSession {
   expiresAt: number;
   nonce: string;
+  reviewReferences?: boolean;
 }
 
 type BridgeJson = boolean | null | number | string | BridgeJson[] | { [key: string]: BridgeJson };
@@ -51,6 +52,8 @@ interface WebBridgeContextValue {
   refreshReview: () => Promise<void>;
   retry: () => void;
   review?: WebReviewSnapshot;
+  reviewBusy: boolean;
+  reviewPending: boolean;
   status: WebBridgeStatus;
 }
 
@@ -73,6 +76,9 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
   const [status, setStatus] = useState<WebBridgeStatus>('loading');
   const [bootstrap, setBootstrap] = useState<WebBootstrapSnapshot>();
   const [review, setReview] = useState<WebReviewSnapshot>();
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [pendingReviewId, setPendingReviewId] = useState<string>();
+  const reviewBusyRef = useRef(false);
   const pendingRef = useRef(new Map<string, PendingResponse>());
   const sessionRef = useRef<BridgeSession | undefined>(undefined);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -107,7 +113,7 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
     return response;
   }, [postAndWait]);
 
-  const rawRequest = useCallback(async <T,>(request: WebRequestInput, schema: ZodType<T>): Promise<T> => {
+  const rawRequest = useCallback(async <T,>(request: WebRequestInput, schema: ZodType<T>, timeoutMs = requestTimeoutMs): Promise<T> => {
     const session = sessionRef.current;
     if (!session || session.expiresAt <= Date.now()) throw bridgeError('expired-web-session');
     const id = requestId();
@@ -118,9 +124,25 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
       protocolVersion: webProtocolVersion,
       request: { ...request, requestId: id },
     });
-    const response = await postAndWait(envelope, id, requestTimeoutMs);
+    const response = await postAndWait(envelope, id, timeoutMs);
     return schema.parse(response);
   }, [postAndWait]);
+
+  const readReview = useCallback(async () => {
+    const session = sessionRef.current;
+    if (session?.reviewReferences === false) return rawRequest({ type: 'review.read' }, webReviewSnapshotSchema);
+    try {
+      const snapshot = await rawRequest({ type: 'review.read', includeProviderReferences: true }, webReviewSnapshotSchema, session?.reviewReferences === true ? requestTimeoutMs : detectionTimeoutMs);
+      if (session !== undefined) session.reviewReferences = true;
+      return snapshot;
+    } catch (caught) {
+      const reason = caught instanceof Error ? caught.message : 'webbridge-error';
+      if (session?.reviewReferences === true || !['webbridge-timeout', 'unsupported-web-request', 'invalid-web-request'].includes(reason)) throw caught;
+      const snapshot = await rawRequest({ type: 'review.read' }, webReviewSnapshotSchema);
+      if (session !== undefined) session.reviewReferences = false;
+      return snapshot;
+    }
+  }, [rawRequest]);
 
   const establishConnection = useCallback(async (reconnecting: boolean, preserveConnectedView = false) => {
     if (!preserveConnectedView) setStatus(reconnecting ? 'reconnecting' : 'loading');
@@ -128,7 +150,7 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
       const connectedSession = await handshake();
       const [nextBootstrap, nextReview] = await Promise.all([
         rawRequest({ type: 'bootstrap.read' }, webBootstrapSnapshotSchema),
-        rawRequest({ type: 'review.read' }, webReviewSnapshotSchema),
+        readReview(),
       ]);
       if (!mountedRef.current) return;
       setBootstrap(nextBootstrap);
@@ -154,7 +176,7 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
       else if (!reconnecting && reason === 'webbridge-timeout') setStatus('extension-missing');
       else setStatus('error');
     }
-  }, [handshake, rawRequest]);
+  }, [handshake, rawRequest, readReview]);
 
   const withReconnect = useCallback(async <T,>(operation: () => Promise<T>): Promise<T> => {
     try {
@@ -217,16 +239,32 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
   }, [establishConnection]);
 
   const refreshReview = useCallback(async () => {
-    const nextReview = await withReconnect(() => rawRequest({ type: 'review.read' }, webReviewSnapshotSchema));
+    const nextReview = await withReconnect(readReview);
     setReview(nextReview);
-  }, [rawRequest, withReconnect]);
+  }, [readReview, withReconnect]);
 
   const decideReview = useCallback(async (command: WebReviewDecisionCommand) => {
-    const nextReview = await withReconnect(() => rawRequest({ command, type: 'review.decision.write' }, webReviewSnapshotSchema));
-    setReview(nextReview);
-    const nextBootstrap = await withReconnect(() => rawRequest({ type: 'bootstrap.read' }, webBootstrapSnapshotSchema));
-    setBootstrap(nextBootstrap);
-  }, [rawRequest, withReconnect]);
+    if (reviewBusyRef.current) return;
+    reviewBusyRef.current = true;
+    setReviewBusy(true);
+    setPendingReviewId(undefined);
+    try {
+      await rawRequest({ command, type: 'review.decision.write' }, webReviewSnapshotSchema);
+      const [nextReview, nextBootstrap] = await Promise.all([
+        withReconnect(readReview),
+        withReconnect(() => rawRequest({ type: 'bootstrap.read' }, webBootstrapSnapshotSchema)),
+      ]);
+      setReview(nextReview);
+      setBootstrap(nextBootstrap);
+      if (command.decision.kind === 'manual' && nextReview.reviewId === command.reviewId && nextReview.revision === command.revision) setPendingReviewId(command.reviewId);
+    } catch (caught) {
+      setStatus('error');
+      throw caught;
+    } finally {
+      reviewBusyRef.current = false;
+      setReviewBusy(false);
+    }
+  }, [rawRequest, readReview, withReconnect]);
 
   const readAgenda = useCallback((from: string, to: string) => withReconnect(() => rawRequest({ from, to, type: 'agenda.read' }, webAgendaPeriodSchema)), [rawRequest, withReconnect]);
   const readLibrary = useCallback((query: WebLibraryQuery) => withReconnect(() => rawRequest({ query, type: 'library.read' }, webLibraryPageSchema)), [rawRequest, withReconnect]);
@@ -242,8 +280,10 @@ export function WebBridgeProvider({ children }: Readonly<{ children: ReactNode }
       void establishConnection(false);
     },
     review,
+    reviewBusy,
+    reviewPending: pendingReviewId !== undefined && pendingReviewId === review?.reviewId,
     status,
-  }), [bootstrap, decideReview, establishConnection, readAgenda, readLibrary, refreshReview, review, status]);
+  }), [bootstrap, decideReview, establishConnection, pendingReviewId, readAgenda, readLibrary, refreshReview, review, reviewBusy, status]);
 
   return <WebBridgeContext.Provider value={value}>{children}</WebBridgeContext.Provider>;
 }

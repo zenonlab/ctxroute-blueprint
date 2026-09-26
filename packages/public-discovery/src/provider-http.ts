@@ -1,5 +1,5 @@
-import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-kit.js';
-import type { FavoriteProvider } from './provider-kit.js';
+import { favoriteProviderPolicy, FavoriteProviderRetryError } from './provider-kit';
+import type { FavoriteProvider } from './provider-kit';
 import type { z } from 'zod';
 
 export const favoriteProviderResponseByteLimit = 512 * 1024;

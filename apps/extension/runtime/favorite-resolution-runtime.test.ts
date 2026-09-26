@@ -20,6 +20,39 @@ function resolutionTaskId(bookmarkId: string): string {
 }
 
 describe('createFavoriteResolutionRuntime', () => {
+  it('continues the actual HTTP resolution pipeline when diagnostic persistence fails', async () => {
+    const storage = new MemoryStoragePort();
+    const now = () => new Date().toISOString();
+    const profile = { candidate: { externalId: '1', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Synthetic diagnostics'] }, references: [{ provider: 'anilist', externalId: '1' }], workId: 'work_diagnostics' };
+    const publicDiscovery = new HttpPublicDiscoveryAdapter('https://tobirink.com', async (input, init) => {
+      const state = { state: 'VERIFIED', verifiedAt: now(), nextRefreshAt: '2026-10-01T12:00:00.000Z', profile };
+      if (input.endsWith('/lookup')) {
+        const { keys } = publicDiscoveryLookupSubmissionSchema.parse(JSON.parse(String(init.body)));
+        return Response.json(keys.map((key) => ({ key, state })));
+      }
+      return Response.json(state);
+    });
+    const id = resolutionTaskId('diagnostic-failure');
+    const reconcile = createFavoriteResolutionRuntime({
+      bookmarks: { readBookmarkBatch: async () => ({ complete: true, records: [{ bookmarkId: 'diagnostic-failure', folderPath: [], order: 0, title: 'Synthetic diagnostics', url: 'https://reader.invalid/anime/synthetic-diagnostics' }] }) },
+      candidates: unavailableCandidates, hydration: emptyHydration, ensureReady: async () => ({ schemaVersion: 12 }),
+      libraryId: libraryId('library_primary'), now, sourceAdapters: [], storage, token: () => 'diagnostic-failure', publicDiscovery,
+      diagnostics: { record: () => { throw new Error('DIAGNOSTICS_UNAVAILABLE'); } },
+      outbox: {
+        block: vi.fn(), retry: vi.fn(), nextAvailableAt: async () => undefined,
+        claimNext: async (input: FavoriteResolutionClaim) => {
+          const task = await storage.getFavoriteResolutionTask(id);
+          if (!task || !isTaskAvailable(task, input.claimedAt)) return undefined;
+          const claimed = claimTask(task, input.claimToken, input.claimedAt, input.claimExpiresAt);
+          await storage.putFavoriteResolutionTask(claimed);
+          return claimed;
+        },
+      },
+    });
+    await expect(reconcile()).resolves.toBeUndefined();
+    expect(await storage.getFavoriteResolutionTask(id)).toMatchObject({ state: 'COMMITTED' });
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RESOLVED' });
+  });
   it.each(['inventory', 'lookup'] as const)('admits work after six seconds of %s with the real HTTP adapter', async (slowStage) => {
     vi.useFakeTimers();
     vi.setSystemTime('2026-09-18T12:00:00.000Z');

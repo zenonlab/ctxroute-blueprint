@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { webReviewSnapshotSchema } from '@tobirink/contracts/web-bridge';
 
 const version = 1 as const;
 const reviewIdSchema = z.string().regex(/^review_[a-z0-9][a-z0-9_-]{5,}$/u);
@@ -28,6 +29,7 @@ export const reviewQueueResponseSchema = z.discriminatedUnion('ok', [
 export const reviewCandidatesResponseSchema = z.discriminatedUnion('ok', [
   z.strictObject({ ok: z.literal(true), snapshot: z.strictObject({
     reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']).optional(),
+    providerReferences: webReviewSnapshotSchema.shape.providerReferences,
     matchLevel: z.string().min(1).max(100).optional(),
     provenance: z.string().min(1).max(100).optional(),
     totalCandidates: z.number().int().min(0).max(1000).optional(),

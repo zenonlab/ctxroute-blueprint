@@ -26,10 +26,11 @@ function isState(value: string): value is ReviewResolverState {
   return reviewResolverStates.some((state) => state === value);
 }
 
-function ReviewResolverDemo({ state, notFound }: { state: ReviewResolverState; notFound: boolean }) {
+function ReviewResolverDemo({ state, notFound, referenceOnly }: { state: ReviewResolverState; notFound: boolean; referenceOnly: boolean }) {
   const [result, setResult] = useState<ReviewDecision | null>(null);
   const [position, setPosition] = useState(1);
   const currentItem = notFound ? { ...item, candidates: [], position, reason: 'NOT_FOUND' as const }
+    : referenceOnly ? { ...item, candidates: [], providerReferences: [{ provider: 'mangaupdates', externalId: '123' }, { provider: 'mangaupdates', externalId: '456' }], position, reason: 'AMBIGUOUS' as const }
     : state === 'partial' ? { ...item, candidates: [], position } : { ...item, position, reason: 'AMBIGUOUS' as const };
   return (
     <section className={styles.preview}>
@@ -42,6 +43,7 @@ function ReviewResolverDemo({ state, notFound }: { state: ReviewResolverState; n
         onRefresh={() => setResult(null)}
         onRetry={() => setResult(null)}
         onSubmitDecision={setResult}
+        pending={referenceOnly && result?.kind === 'manual'}
         state={state}
       />
       <p aria-live="polite">{result ? `Décision prête · ${result.kind}` : ''}</p>
@@ -55,9 +57,9 @@ const reviewResolverPreview = definePreview({
   category: 'Métier',
   level: 'domain',
   purpose: 'Résoudre un favori ambigu sans transformer la source en carte candidate.',
-  variants: ['candidate-only', 'not-found'],
+  variants: ['candidate-only', 'not-found', 'reference-only'],
   states: [...reviewResolverStates],
-  fixtures: ['1 favori compact · 2 candidates WorkCard · décision directe', 'file sans candidats en état partiel', 'introuvable terminal avec saisie manuelle et report'],
+  fixtures: ['1 favori compact · 2 candidates WorkCard · décision directe', 'file sans candidats en état partiel', 'introuvable terminal avec saisie manuelle et report', '2 références distantes · vérification explicite sans fiche inventée'],
   sources: [
     { label: 'API publique', path: 'features/review/review-resolver/index.ts' },
     { label: 'Contrat', path: 'features/review/review-resolver/review-resolver.contract.ts' },
@@ -72,10 +74,11 @@ const reviewResolverPreview = definePreview({
     'Les flèches parcourent la file sans produire de décision et se désactivent aux bornes',
     'Le formulaire manuel possède un label persistant et des erreurs associées',
     'Busy désactive toutes les décisions tandis que la source reste consultable',
+    'Les références sont des boutons natifs nommés et utilisables au clavier, sans carte ni titre inventé',
     'Le format étroit conserve deux cartes sans débordement horizontal',
   ],
   usage: `import { ReviewResolver } from '@tobirink/ui';`,
-  render: ({ state, variant }) => <ReviewResolverDemo key={`${state}:${variant}`} notFound={variant === 'not-found'} state={isState(state) ? state : 'ready'} />,
+  render: ({ state, variant }) => <ReviewResolverDemo key={`${state}:${variant}`} notFound={variant === 'not-found'} referenceOnly={variant === 'reference-only'} state={isState(state) ? state : 'ready'} />,
 });
 
 export default reviewResolverPreview;

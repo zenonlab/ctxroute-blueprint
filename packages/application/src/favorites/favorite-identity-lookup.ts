@@ -62,7 +62,7 @@ type SynchronizedIdentity =
   | { readonly kind: 'REVIEW_REQUIRED'; readonly reason: 'AMBIGUOUS' | 'NOT_FOUND'; readonly candidates?: readonly ProviderCandidate[] }
   | { readonly kind: 'RESOLVED'; readonly candidate: ProviderCandidate; readonly references: readonly FavoritePublicReference[] };
 
-function selectReference(media: z.infer<typeof mediaKind>, references: readonly FavoritePublicReference[]): FavoritePublicReference | undefined {
+export function selectFavoriteIdentityReference(media: z.infer<typeof mediaKind>, references: readonly FavoritePublicReference[]): FavoritePublicReference | undefined {
   const priorities = media === 'ANIME' ? ['anilist', 'kitsu-anime'] : ['mangaupdates', 'mangadex', 'anilist', 'kitsu-manga'];
   const provider = priorities.find((value) => references.some((reference) => reference.provider === value));
   const reference = references.find((value) => value.provider === provider);
@@ -82,7 +82,7 @@ export async function resolveSynchronizedFavoriteIdentity(port: FavoriteIdentity
       stage = 'HYDRATION';
       const candidates: ProviderCandidate[] = [];
       for (const identity of result.identities) {
-        const reference = selectReference(identity.mediaKind, identity.references);
+        const reference = selectFavoriteIdentityReference(identity.mediaKind, identity.references);
         if (reference === undefined) throw new Error('Synchronized ambiguity has incompatible providers.');
         const adapter = hydration[reference.provider];
         if (adapter === undefined) throw new Error('Synchronized hydration provider is unavailable.');
@@ -92,7 +92,7 @@ export async function resolveSynchronizedFavoriteIdentity(port: FavoriteIdentity
       }
       return candidates.length >= 2 ? { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS', candidates } : { kind: 'MISS' };
     }
-    const reference = selectReference(result.mediaKind, result.references);
+    const reference = selectFavoriteIdentityReference(result.mediaKind, result.references);
     if (reference === undefined) throw new Error('Synchronized identity has incompatible providers.');
     const adapter = hydration[reference.provider];
     if (adapter === undefined) throw new Error('Synchronized hydration provider is unavailable.');

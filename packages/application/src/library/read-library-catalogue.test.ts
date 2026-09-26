@@ -1,7 +1,9 @@
 import { createFavoriteSource, createLibrary, createProgress, createSourceEvidence, createWork, libraryId, progressId, workId } from '@tobirink/domain';
+import type { FavoriteMediaKind } from '@tobirink/domain';
 import { MemoryStoragePort } from '../../../contracts/src/memory-storage-port';
 import { describe, expect, it } from 'vitest';
 import { importFavoriteSources } from '../use-cases/import-favorite-sources';
+import type { FavoriteSourceAdapter } from '../favorites/source-evidence';
 import { readLibraryBootstrapSummary, readLibraryCatalogue } from './read-library-catalogue';
 
 function work(id: string, input: { classification?: 'adult' | 'non-adult' | 'unknown'; genre: string; popularity: number; status: 'COMPLETED' | 'ONGOING'; title: string; year: number }) {
@@ -14,7 +16,72 @@ function work(id: string, input: { classification?: 'adult' | 'non-adult' | 'unk
   });
 }
 
+function pendingAdapter(mediaKind: FavoriteMediaKind): FavoriteSourceAdapter {
+  return {
+    id: 'fixture-media',
+    origins: ['https://reader.example'],
+    analyze: (input, url) => createSourceEvidence({ aliases: [], canonicalUrl: url.url, diagnostics: [], key: input.sourceKey, mediaKind, proofs: ['CATEGORY_PATH'], sourceAdapter: 'fixture-media', strategy: 'exact-origin', title: input.title }),
+  };
+}
+
 describe('readLibraryCatalogue', () => {
+  it.each([
+    ['MANGA', 'Manga'], ['MANHWA', 'Manhwa'], ['MANHUA', 'Manhua'], ['UNKNOWN', 'Inconnu'],
+  ] as const)('preserves the parsed %s facet before hydration with include and exclude filters', async (mediaKind, label) => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([{ bookmarkId: 'typed-pending', folderPath: [], order: 1, state: 'eligible', title: 'Local River', url: 'https://reader.example/series/local-river' }], storage, '2026-09-26T00:00:00.000Z', [pendingAdapter(mediaKind)]);
+
+    const included = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary'), facets: { type: { [mediaKind]: 'include' } } });
+    expect(included.total).toBe(1);
+    expect(included.items[0]).toMatchObject({ sourceMediaKind: mediaKind, state: 'preparation', title: 'Local River' });
+    expect(included.items[0]?.candidate).toBeUndefined();
+    expect(included.facets.type).toEqual([{ count: 1, label, value: mediaKind }]);
+    const excluded = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary'), facets: { type: { [mediaKind]: 'exclude' } } });
+    expect(excluded.total).toBe(0);
+    expect(excluded.facets.type).toEqual(included.facets.type);
+  });
+
+  it('replaces two provisional sources with one canonical work and uses its provider subtype', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([0, 1].map((index) => ({ bookmarkId: `duplicate-${index}`, folderPath: [], order: index, state: 'eligible' as const, title: 'Local River', url: `https://reader.example/series/local-river?source=${index}` })), storage, '2026-09-26T00:00:00.000Z', [pendingAdapter('MANGA')]);
+    const before = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary') });
+    expect(before.total).toBe(2);
+    expect(new Set(before.items.map(({ id }) => id)).size).toBe(2);
+    expect(before.facets.type).toEqual([{ count: 2, label: 'Manga', value: 'MANGA' }]);
+
+    const canonical = createWork({
+      id: workId('work_canonical-river'), mediaKind: 'manga', preferredTitle: 'Canonical River',
+      externalReferences: [{ externalId: '12345', provider: 'mangaupdates' }],
+      hydration: {
+        candidate: { externalId: '12345', mediaKind: 'MANHWA', preSerialization: false, provider: 'mangaupdates', titles: ['Canonical River'] },
+        favoriteAliasKeys: [], hydratedAt: '2026-09-26T00:00:00.000Z', matcherVersion: 'matcher-v1', providerTitleKeys: [],
+      },
+    });
+    await storage.putWork(canonical);
+    await storage.putLibrary(createLibrary(libraryId('library_primary'), [canonical.id]));
+    for (const source of await storage.listFavoriteSources({ limit: 100 })) await storage.putFavoriteSource(createFavoriteSource({ ...source, matchedWorkId: canonical.id, resolution: { kind: 'RESOLVED' } }));
+
+    const after = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary'), facets: { type: { MANHWA: 'include' } } });
+    expect(after).toMatchObject({ total: 1, statistics: { total: 1 }, items: [{ id: canonical.id, state: 'ready' }] });
+    expect(after.items[0]?.sourceMediaKind).toBeUndefined();
+    expect(after.facets.type).toEqual([{ count: 1, label: 'Manhwa', value: 'MANHWA' }]);
+    await expect(storage.readFavoriteResolutionCounts()).resolves.toMatchObject({ observed: 2, resolved: 2 });
+    await expect(readLibraryBootstrapSummary(storage, libraryId('library_primary'))).resolves.toEqual({ libraryCount: 1 });
+  });
+
+  it('keeps all 1522 synthetic pending sources visible and all 1200 parsed manhwa filterable', async () => {
+    const storage = new MemoryStoragePort();
+    for (const [mediaKind, count] of [['MANHWA', 1200], ['MANHUA', 200], ['UNKNOWN', 122]] as const) {
+      await importFavoriteSources(Array.from({ length: count }, (_, index) => ({ bookmarkId: `${mediaKind}-${index}`, folderPath: [], order: index, state: 'eligible' as const, title: `Synthetic ${mediaKind} ${String(index).padStart(4, '0')}`, url: `https://reader.example/series/${mediaKind.toLowerCase()}-${index}` })), storage, '2026-09-26T00:00:00.000Z', [pendingAdapter(mediaKind)]);
+    }
+    const snapshot = await readLibraryCatalogue(storage, { libraryId: libraryId('library_primary'), facets: { type: { MANHWA: 'include' } }, offset: 1192, sort: 'TITLE_ASC' });
+    expect(snapshot).toMatchObject({ total: 1200, statistics: { total: 1522 }, truncated: false });
+    expect(snapshot.items).toHaveLength(8);
+    expect(snapshot.items.at(-1)?.title).toBe('Synthetic MANHWA 1199');
+    expect(snapshot.facets.type).toContainEqual({ count: 1200, label: 'Manhwa', value: 'MANHWA' });
+    expect(snapshot.items.every((item) => item.work === undefined && item.candidate === undefined)).toBe(true);
+    await expect(readLibraryBootstrapSummary(storage, libraryId('library_primary'))).resolves.toEqual({ libraryCount: 1522 });
+  });
   it('hides only explicit adult works before statistics and keeps unknown visible', async () => {
     const storage = new MemoryStoragePort();
     const works = [

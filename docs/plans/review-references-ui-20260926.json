@@ -1,0 +1,56 @@
+{
+  "goalId": "goal-review-references-ui-20260926",
+  "title": "Rendre les références ambiguës sélectionnables",
+  "approved": true,
+  "executionMode": "autonomous",
+  "modeOffered": true,
+  "validationEvidence": [
+    "Confirmation explicite utilisateur: Oui, inclure Review et ses tests.",
+    "Audit: le lecteur conserve les références mais le contrat strict et ReviewResolver ne transportent que des candidats hydratés."
+  ],
+  "steps": [
+    {
+      "id": "connect-reference-review",
+      "title": "Raccorder Review sans profils inventés",
+      "acceptance": [
+        "Les contrats optionnels extension/WebBridge transportent au plus dix références fournisseur validées et les anciennes enveloppes restent valides.",
+        "Review affiche les références sans couverture ni titre fabriqués et réutilise la décision manuelle existante avec états attente/erreur/verrouillage.",
+        "Le vrai clic navigateur passe par PENDING puis VERIFIED avant de créer une association humaine; révisions et données privées restent protégées.",
+        "Tests de contrats, runtime, UI, Playwright, vérification globale et Archify passent; aucun déploiement ni écriture production."
+      ],
+      "files": [
+        "packages/ui/src/features/review/review-resolver/review-resolver.contract.ts",
+        "packages/ui/src/features/review/review-resolver/ReviewResolver.tsx",
+        "packages/ui/src/features/review/review-resolver/ReviewResolver.test.tsx",
+        "packages/ui/src/features/review/review-resolver/ReviewResolver.preview.tsx",
+        "packages/contracts/src/web-bridge.ts",
+        "packages/contracts/src/web-bridge.test.ts",
+        "apps/extension/runtime/local-review-runtime.ts",
+        "apps/extension/runtime/local-review-runtime.test.ts",
+        "apps/extension/runtime/review-messages.ts",
+        "apps/extension/runtime/review-navigation-model.ts",
+        "apps/extension/runtime/review-navigation-model.test.ts",
+        "apps/extension/runtime/web-bridge-adapter.ts",
+        "apps/extension/runtime/web-bridge-adapter.test.ts",
+        "apps/web/app/components/SiteShell.tsx",
+        "apps/web/app/components/WebBridgeProvider.tsx",
+        "apps/web/tests/WebBridgeProvider.test.tsx",
+        "apps/web/tests/LocalReviewNavigation.test.tsx",
+        "apps/extension/runtime/use-local-review-navigation.ts",
+        "apps/web/e2e/packaged-extension.spec.ts",
+        "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+        "docs/systems/favorite-resolution-rebuild-pipeline.md"
+      ],
+      "commands": [
+        "npm test --workspace @tobirink/ui",
+        "npm test --workspace @tobirink/contracts",
+        "npm test --workspace @tobirink/extension",
+        "npm run typecheck",
+        "npm run verify",
+        "npm run test:e2e --workspace @tobirink/web -- --workers=1",
+        "npm run archify:validate -- real-favorite-resolution.dataflow",
+        "git diff --check"
+      ]
+    }
+  ]
+}

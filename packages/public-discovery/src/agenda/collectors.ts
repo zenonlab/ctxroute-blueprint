@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { FavoriteProviderFetch } from '../provider-http.js';
-import { publicAgendaReleaseEventSchema, type PublicAgendaPageCheckpoint, type PublicAgendaReleaseEvent } from './contracts.js';
-import { createMangaUpdatesAgendaEvent, parseAniListAgendaPage, parseMangaUpdatesAgendaPage } from './provider-pages.js';
+import type { FavoriteProviderFetch } from '../provider-http';
+import { publicAgendaReleaseEventSchema, type PublicAgendaPageCheckpoint, type PublicAgendaReleaseEvent } from './contracts';
+import { createMangaUpdatesAgendaEvent, parseAniListAgendaPage, parseMangaUpdatesAgendaPage } from './provider-pages';
 
 const aniListPageLimit = 100;
 const mangaUpdatesPageLimit = 250;

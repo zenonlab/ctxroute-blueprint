@@ -1,8 +1,8 @@
-import { assertFavoriteProviderSearchQuery, createProviderCandidate, createProviderCandidateEnvelope, favoriteProviderPage, favoriteProviderPolicy } from '../provider-kit.js';
-import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ProviderCandidate, ResolutionProvider } from '../provider-kit.js';
+import { assertFavoriteProviderSearchQuery, createProviderCandidate, createProviderCandidateEnvelope, favoriteProviderPage, favoriteProviderPolicy } from '../provider-kit';
+import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ProviderCandidate, ResolutionProvider } from '../provider-kit';
 import { z } from 'zod';
-import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from '../provider-http.js';
-import type { FavoriteProviderFetch } from '../provider-http.js';
+import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from '../provider-http';
+import type { FavoriteProviderFetch } from '../provider-http';
 
 export const kitsuApiOrigin = 'https://kitsu.io/api/edge';
 type KitsuProvider = Extract<ResolutionProvider, 'kitsu-anime' | 'kitsu-manga'>;

@@ -22,7 +22,7 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   const mutation = { bookmarkId: source.bookmarkId, kind: 'changed' as const, recordedAt: '2026-09-07T00:01:00.000Z', sequence: 'mutation-contract' };
   const rate = { nextAllowedAt: 1_788_739_260_000, provider: 'anilist' as const };
   const receipt = { completedAt: '2026-09-07T00:02:00.000Z', effectDigest: 'resolved:anilist:contract', id: `${source.id}:favorite-resolution`, idempotencyKey: 'resolution-contract', sourceId: source.id };
-  const candidateSet = { candidates: [{ externalId: 'contract', mediaKind: 'MANGA' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Contract work'] }], digest: 'candidate-contract', recordedAt: '2026-09-07T00:02:00.000Z', reviewId: review.id };
+  const candidateSet = { candidates: [{ externalId: 'contract', mediaKind: 'MANGA' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Contract work'] }], references: [{ provider: 'mangaupdates' as const, externalId: '123' }, { provider: 'mangaupdates' as const, externalId: '456' }], digest: 'candidate-contract', recordedAt: '2026-09-07T00:02:00.000Z', reviewId: review.id };
 
   await storage.transaction(['works', 'libraries', 'organizer', 'progress', 'reviews', 'favoriteSources', 'agenda'], async (session) => {
     await session.putWork(work);
@@ -58,6 +58,7 @@ export async function verifyStoragePortContract(createStorage: () => Promise<Sto
   assert((await storage.getFavoriteProviderRateCheckpoint('anilist'))?.nextAllowedAt === rate.nextAllowedAt, 'favorite provider rate checkpoint round-trip');
   assert((await storage.getFavoriteResolutionReceipt(receipt.id))?.effectDigest === receipt.effectDigest, 'favorite resolution receipt round-trip');
   assert((await storage.getFavoriteReviewCandidateSet(review.id))?.candidates.length === 1, 'favorite Review candidate set round-trip');
+  assert(JSON.stringify((await storage.getFavoriteReviewCandidateSet(review.id))?.references) === JSON.stringify(candidateSet.references), 'favorite Review reference identities round-trip');
   assert((await storage.findFavoriteSourceByReviewId(review.id))?.id === source.id, 'favorite source lookup by Review');
   assert((await storage.listFavoriteSources({ limit: 1 }))[0]?.id === source.id, 'favorite source bounded listing');
   assert((await storage.listFavoriteSources({ afterId: alternateSource.id, limit: 1 })).length === 0, 'favorite source stable cursor');

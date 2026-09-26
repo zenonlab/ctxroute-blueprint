@@ -276,6 +276,39 @@ async function verifyReviewCorrection(name: string): Promise<void> {
   reopened.database.close();
 }
 
+async function verifyReviewReferenceIntegrity(name: string): Promise<void> {
+  document.body.dataset.phase = 'review-reference-integrity';
+  const storage = new DexieStoragePort(name);
+  const review = createReview({ id: reviewId('review_reference_integrity'), reason: 'AMBIGUOUS', sourceLabel: 'Synthetic', status: 'pending', title: 'Synthetic reference integrity' });
+  await storage.putReview(review);
+  const legacy = { candidates: [], digest: 'legacy-candidate-set', recordedAt: '2026-09-26T00:00:00.000Z', reviewId: review.id };
+  await storage.putFavoriteReviewCandidateSet(legacy);
+  await verifyDatabaseIntegrity(storage.database);
+  if ((await storage.getFavoriteReviewCandidateSet(review.id))?.references !== undefined) throw new Error('Legacy candidate set gained invented references.');
+  const references = [{ provider: 'mangaupdates' as const, externalId: '123' }, { provider: 'mangaupdates' as const, externalId: '456' }];
+  const comparable = { ...legacy, candidates: [], digest: 'reference-candidate-set', references };
+  await storage.putFavoriteReviewCandidateSet(comparable);
+  storage.close();
+  const reopened = new DexieStoragePort(name);
+  if (JSON.stringify(await reopened.getFavoriteReviewCandidateSet(review.id)) !== JSON.stringify(comparable)) throw new Error('Comparable references did not survive IndexedDB reopening.');
+  await verifyDatabaseIntegrity(reopened.database);
+  const invalidCases = [
+    { label: 'invalid identity', references: [{ provider: 'mangaupdates' as const, externalId: 'invalid-decimal' }] },
+    { label: 'reference overflow', references: Array.from({ length: 11 }, (_, index) => ({ provider: 'mangaupdates' as const, externalId: String(index + 1) })) },
+    { label: 'duplicate identities', references: [references[0]!, references[0]!] },
+  ];
+  for (const invalid of invalidCases) {
+    await reopened.database.favoriteReviewCandidateSets.put({ ...comparable, references: invalid.references });
+    let rejected = false;
+    try { await verifyDatabaseIntegrity(reopened.database); }
+    catch (error) { rejected = error instanceof Error; }
+    if (!rejected) throw new Error(`Review reference integrity accepted ${invalid.label}.`);
+  }
+  await reopened.putFavoriteReviewCandidateSet(comparable);
+  await verifyDatabaseIntegrity(reopened.database);
+  reopened.close();
+}
+
 const versionOneName = `tobirink-migration-v1-${Date.now()}`;
 const versionTwoName = `tobirink-migration-v2-${Date.now()}`;
 const versionThreeName = `tobirink-migration-v3-${Date.now()}`;
@@ -288,6 +321,7 @@ const interruptedName = `tobirink-migration-interrupted-${Date.now()}`;
 const reviewCorrectionName = `tobirink-migration-review-${Date.now()}`;
 const releaseContractName = `tobirink-migration-release-${Date.now()}`;
 const sharedReleaseName = `tobirink-release-shared-${Date.now()}`;
+const reviewReferenceName = `tobirink-review-reference-${Date.now()}`;
 try {
   await verifySuccessfulMigration(versionOneName, seedVersion1);
   await verifySuccessfulMigration(versionTwoName, seedVersion2);
@@ -301,6 +335,7 @@ try {
   await verifyReviewCorrection(reviewCorrectionName);
   await verifyReleaseContractMigration(releaseContractName);
   await verifySharedReleasePromotion(sharedReleaseName);
+  await verifyReviewReferenceIntegrity(reviewReferenceName);
   document.body.dataset.status = 'passed';
   document.body.textContent = 'IndexedDB migrations passed';
 } catch (error) {
@@ -318,4 +353,5 @@ try {
   await deleteDatabase(interruptedName);
   await deleteDatabase(releaseContractName);
   await deleteDatabase(sharedReleaseName);
+  await deleteDatabase(reviewReferenceName);
 }

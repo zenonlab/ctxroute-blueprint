@@ -1,9 +1,11 @@
 import { mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { EventEmitter } from 'node:events';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
+import { restartInstalledReviewWorker } from './installed-review.mjs';
 
 const key = (index = 1) => ({
   fingerprint: index.toString(16).padStart(64, '0'),
@@ -77,6 +79,90 @@ async function writeManifest(root, policy, overrides = {}) {
     ...overrides,
   }));
 }
+
+function restartFixture(overrides = {}) {
+  const session = new EventEmitter();
+  const emit = (state, version = overrides.version) => session.emit('ServiceWorker.workerVersionUpdated', { versions: [{ scriptURL: 'chrome-extension://fixture/background.js', versionId: 'version-1', runningStatus: state, ...version }] });
+  session.send = vi.fn(async (method) => {
+    if (overrides.failMethod === method) throw new Error('protocol-failed');
+    if (overrides.hangMethod === method) return new Promise(() => {});
+    if (method === 'ServiceWorker.enable') {
+      if (!overrides.omitInitial) emit('running');
+    } else if (method === 'ServiceWorker.stopWorker') {
+      for (const state of overrides.stopStates ?? ['stopping', 'stopped']) emit(state, overrides.stopVersion ?? overrides.version);
+    } else throw new Error('unexpected-protocol-method');
+    return { success: true };
+  });
+  session.detach = vi.fn(async () => undefined);
+  const context = { newCDPSession: vi.fn(async () => session) };
+  const page = { evaluate: vi.fn(async () => {
+    if (overrides.wakeError) throw new Error('wake-failed');
+    for (const state of overrides.wakeStates ?? ['starting', 'running']) emit(state);
+    return { ok: overrides.healthOk ?? true };
+  }) };
+  return { context, page, session };
+}
+
+describe('installed review service-worker restart evidence', () => {
+  it('requires running then stopped then running for the same extension version', async () => {
+    const fixture = restartFixture();
+    await expect(restartInstalledReviewWorker(fixture.context, fixture.page, 'fixture')).resolves.toBe(true);
+    expect(fixture.session.send.mock.calls).toEqual([
+      ['ServiceWorker.enable'], ['ServiceWorker.stopWorker', { versionId: 'version-1' }],
+    ]);
+    expect(fixture.page.evaluate).toHaveBeenCalledOnce();
+    expect(fixture.session.listenerCount('ServiceWorker.workerVersionUpdated')).toBe(0);
+    expect(fixture.session.detach).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['initial worker event missing', { omitInitial: true }],
+    ['successful stop response without stopped event', { stopStates: ['running'] }],
+    ['stopped worker without resumed event', { wakeStates: [] }],
+    ['foreign worker events', { version: { scriptURL: 'chrome-extension://foreign/background.js' } }],
+    ['different version stopped', { stopVersion: { versionId: 'version-2' } }],
+    ['running only before the stop', { stopStates: ['running', 'stopped'], wakeStates: [] }],
+    ['suspended stop command', { hangMethod: 'ServiceWorker.stopWorker' }],
+  ])('times out instead of certifying %s and cleans up the CDP session', async (_label, overrides) => {
+    vi.useFakeTimers();
+    try {
+      const fixture = restartFixture(overrides);
+      const result = expect(restartInstalledReviewWorker(fixture.context, fixture.page, 'fixture', Date.now() + 100)).rejects.toThrow('service-worker-restart-timeout');
+      await vi.advanceTimersByTimeAsync(101);
+      await result;
+      expect(fixture.session.listenerCount('ServiceWorker.workerVersionUpdated')).toBe(0);
+      expect(fixture.session.detach).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each(['ServiceWorker.enable', 'ServiceWorker.stopWorker'])('preserves the %s protocol error and releases the listener', async (failMethod) => {
+    const fixture = restartFixture({ failMethod });
+    await expect(restartInstalledReviewWorker(fixture.context, fixture.page, 'fixture')).rejects.toThrow('protocol-failed');
+    expect(fixture.session.listenerCount('ServiceWorker.workerVersionUpdated')).toBe(0);
+    expect(fixture.session.detach).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a failed wake instead of treating the observed stop as a restart', async () => {
+    const fixture = restartFixture({ wakeError: true });
+    await expect(restartInstalledReviewWorker(fixture.context, fixture.page, 'fixture')).rejects.toThrow('wake-failed');
+    expect(fixture.session.listenerCount('ServiceWorker.workerVersionUpdated')).toBe(0);
+    expect(fixture.session.detach).toHaveBeenCalledOnce();
+  });
+
+  it('refuses a failed health response even when restart events exist', async () => {
+    const fixture = restartFixture({ healthOk: false });
+    await expect(restartInstalledReviewWorker(fixture.context, fixture.page, 'fixture')).rejects.toThrow('must answer its health check');
+    expect(fixture.session.listenerCount('ServiceWorker.workerVersionUpdated')).toBe(0);
+    expect(fixture.session.detach).toHaveBeenCalledOnce();
+  });
+
+  it('does not attach when the deadline has expired', async () => {
+    const fixture = restartFixture();
+    await expect(restartInstalledReviewWorker(fixture.context, fixture.page, 'fixture', Date.now() - 1)).rejects.toThrow('positive deadline');
+    expect(fixture.context.newCDPSession).not.toHaveBeenCalled();
+  });
+});
 
 describe('installed review network guard', () => {
   it('requires the packaged HTTPS-only connection policy before loading', async () => {

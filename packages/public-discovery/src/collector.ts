@@ -9,8 +9,8 @@ import {
   type PublicDiscoveryResult,
   type PublicDiscoveryResultBatch,
   type PublicDiscoveryTerminalResolution,
-} from './contracts.js';
-import { FavoriteProviderRetryError } from './provider-kit.js';
+} from './contracts';
+import { FavoriteProviderRetryError } from './provider-kit';
 
 export interface PublicDiscoveryGatewayPort {
   claim(limit: number): Promise<PublicDiscoveryClaimBatch>;

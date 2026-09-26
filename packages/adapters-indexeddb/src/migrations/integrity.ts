@@ -8,7 +8,7 @@ import {
   createReview,
   createWork,
 } from '@tobirink/domain';
-import { createFavoriteParseArtifactRecord, localAgendaEventSchema, localNotificationDeliverySchema, localReleaseEvidenceSchema, parseFavoriteResolutionTaskPayload, publicReleaseEventSchema, restoreDurableTask } from '@tobirink/application';
+import { createFavoriteParseArtifactRecord, favoritePublicReferenceSchema, localAgendaEventSchema, localNotificationDeliverySchema, localReleaseEvidenceSchema, parseFavoriteResolutionTaskPayload, publicReleaseEventSchema, restoreDurableTask } from '@tobirink/application';
 import type { TobirinkDatabase } from '../database';
 import { providerIdentityRecoveryRecordSchema } from '../recovery/provider-identity-recovery-state-adapter';
 
@@ -92,6 +92,11 @@ export async function verifyDatabaseIntegrity(database: TobirinkDatabase): Promi
   }
   for (const set of favoriteReviewCandidateSets) {
     if (!reviewIds.has(set.reviewId) || set.candidates.length > 6 || !set.digest.trim()) throw new Error(`Favorite Review candidate set ${set.reviewId} is invalid.`);
+    if (set.references !== undefined) {
+      if (set.references.length > 10) throw new Error('Favorite Review references exceed their limit.');
+      const references = set.references.map((reference) => favoritePublicReferenceSchema.parse(reference));
+      if (new Set(references.map((reference) => `${reference.provider}:${reference.externalId}`)).size !== references.length) throw new Error('Favorite Review references must be unique.');
+    }
   }
 
   const recovery = await database.providerIdentityRecovery.limit(2).toArray();
