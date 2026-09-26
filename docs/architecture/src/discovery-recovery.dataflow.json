@@ -22,7 +22,7 @@
     { "id": "rearm", "type": "backend", "label": "Runner serveur v3", "sublabel": "dry-run · payload v3", "stage": 2, "row": 2, "tag": "un POST · arrêt 429/503" },
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "PENDING · PROCESSING", "stage": 2, "row": 0, "tag": "cache public" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "HTTP direct · Queue", "stage": 3, "row": 0, "tag": "Queue 1/1 · claim(1)" },
-    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "projection sûre", "stage": 3, "row": 2, "tag": "incomplet ≠ NOT_FOUND" },
+    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "MANHWA/MANHUA rapides", "stage": 3, "row": 2, "tag": "preuve exacte · échec fermé" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · candidat lié", "stage": 4, "row": 1, "width": 150, "tag": "pas de preuve Library" }
   ],
   "flows": [
@@ -32,11 +32,11 @@
     { "from": "approval", "to": "rearm", "label": "autorise le lot exact", "classification": "confirmation immédiate", "variant": "security", "labelDy": 53 },
     { "from": "rearm", "to": "d1", "label": "admission FAILED vers PENDING", "classification": "digest recalculé identique", "variant": "emphasis", "labelDy": -23 },
     { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "jeton opaque · arrêt 429/503", "variant": "emphasis", "labelDy": -53 },
-    { "from": "queue", "to": "collector", "label": "claim exact borné", "classification": "digest D1 · un travail", "variant": "emphasis", "labelDy": 24 },
+    { "from": "queue", "to": "collector", "label": "claim exact borné", "classification": "digest D1 · ordre rapide", "variant": "emphasis", "labelDy": 24 },
     { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "terminal ou continuation durable confirmée", "variant": "emphasis", "labelDx": 100 }
   ],
   "cards": [
-    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Huit échecs consommés : FAILED après expiration du bail", "Cadence ou 429 seuls : report sans essai", "Projection incomplète : essai consommé, jamais NOT_FOUND", "Timeout Worker 30 s : report inchangé, preuve distincte"] },
+    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Huit échecs consommés : FAILED après expiration du bail", "Cadence ou 429 seuls : report sans essai", "MANHWA/MANHUA : MangaDex et Kitsu avant MangaUpdates", "Projection incomplète : essai consommé, jamais NOT_FOUND"] },
     { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST puis VERIFIED terminal", "Chaque appel fournisseur corrélé, zéro 429/Queue", "Coût D1 cumulé direct + continuations ≤ 300"] }
   ]
 }

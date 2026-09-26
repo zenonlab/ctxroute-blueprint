@@ -38,6 +38,7 @@ interface MutableTitleMatchQuery {
 }
 const animeProviders = ['anilist', 'kitsu-anime'] as const;
 const mangaProviders = ['mangaupdates', 'mangadex', 'kitsu-manga'] as const;
+const webtoonProviders = ['mangadex', 'kitsu-manga', 'mangaupdates'] as const;
 const searchPageLimit = 4;
 const searchDurationMilliseconds = 20_000;
 
@@ -181,7 +182,9 @@ async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, re
   const query = matchQueryFor(request, titles);
   const lanes = request.query.mediaKind === 'ANIME'
     ? [await searchLane(providers, animeProviders, titles, query, deadline)]
-    : request.query.mediaKind !== 'UNKNOWN'
+    : request.query.mediaKind === 'MANHWA' || request.query.mediaKind === 'MANHUA'
+      ? [await searchLane(providers, webtoonProviders, titles, query, deadline)]
+      : request.query.mediaKind !== 'UNKNOWN'
       ? [await searchLane(providers, mangaProviders, titles, query, deadline)]
       : [
           await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }, deadline),
@@ -198,7 +201,8 @@ async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, re
 
 function providerOrderFor(request: PublicDiscoveryClaimedRequest): readonly ResolutionProvider[] {
   if (request.query.mediaKind === 'ANIME') return animeProviders;
-  if (request.query.mediaKind === 'MANGA' || request.query.mediaKind === 'MANHWA' || request.query.mediaKind === 'MANHUA') return mangaProviders;
+  if (request.query.mediaKind === 'MANHWA' || request.query.mediaKind === 'MANHUA') return webtoonProviders;
+  if (request.query.mediaKind === 'MANGA') return mangaProviders;
   return [];
 }
 
