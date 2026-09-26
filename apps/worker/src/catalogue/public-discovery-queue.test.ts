@@ -601,6 +601,19 @@ describe('public discovery queue trigger', () => {
     } finally { warn.mockRestore(); }
   });
 
+  it('accepts an incomplete fallback only when its durable continuation was scheduled', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const fallbackKey = { ...key('8'), fingerprint: `${'8'.repeat(63)}1` };
+    const queueFallback = vi.fn(async () => ({ claimed: 1, continuationScheduled: true, deferred: 0, failed: 1, published: 0, replayed: 0 }));
+    const app = createPublicDiscoveryApp({ deliveryMode: 'worker-direct', publicDiscoveryV3: adapter, queueFallback });
+    const response = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', {
+      body: JSON.stringify({ ...submission('8', 'Continued fallback'), key: fallbackKey }), headers: { 'Content-Type': 'application/json' }, method: 'POST',
+    });
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ state: 'PENDING' });
+    expect(queueFallback).toHaveBeenCalledExactlyOnceWith(fallbackKey);
+  });
+
   it('claims only the fallback admission instead of older pending requests', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const now = new Date().toISOString();

@@ -33,7 +33,7 @@
     { "from": "rearm", "to": "d1", "label": "admission FAILED vers PENDING", "classification": "digest recalculé identique", "variant": "emphasis", "labelDy": -23 },
     { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "HTTP ou signal Queue · arrêt 429/503", "variant": "emphasis", "labelDy": -53 },
     { "from": "queue", "to": "collector", "label": "claim borné", "classification": "un travail par collecteur", "variant": "emphasis", "labelDy": 24 },
-    { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "VERIFIED · jamais de faux NOT_FOUND", "variant": "emphasis" }
+    { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "terminal ou continuation durable confirmée", "variant": "emphasis", "labelDx": 100 }
   ],
   "cards": [
     { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Huit échecs consommés : FAILED après expiration du bail", "Cadence ou 429 seuls : report sans essai", "Projection incomplète : essai consommé, jamais NOT_FOUND", "Timeout Worker 30 s : report inchangé, preuve distincte"] },

@@ -17,7 +17,7 @@ interface DiscoveryQueuePort {
   send(body: NativeCollectorSignal, options?: { contentType?: 'json' }): Promise<QueueSendResponse | void>;
 }
 type DiscoveryDeliveryMode = 'queue' | 'worker-direct';
-type DiscoveryFallbackReport = { claimed: number; deferred?: number; failed: number; published: number; replayed: number };
+type DiscoveryFallbackReport = { claimed: number; continuationScheduled?: boolean; deferred?: number; failed: number; published: number; replayed: number };
 type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: (key: PublicDiscoveryKeyV3) => Promise<DiscoveryFallbackReport | void>; deliveryMode?: DiscoveryDeliveryMode; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
 
 function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
@@ -28,7 +28,7 @@ function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'serv
   if (services.publicDiscoveryQueue) selected.queue = services.publicDiscoveryQueue;
   selected.queueFallback = async (key) => {
     const startedAt = Date.now();
-    const report = await processPublicDiscoveryQueue(context.env, key, false);
+    const report = await processPublicDiscoveryQueue(context.env, key, true);
     const metrics = report.metrics;
     if (metrics !== undefined) {
       emitWorkerCostDiagnostic(context.env, {
@@ -155,8 +155,12 @@ function startQueueFallback(services: DiscoveryServices): ((key: PublicDiscovery
   return async (key) => {
     try {
       const report = await services.queueFallback!(key);
-      if (report !== undefined && (report.claimed !== 1 || report.failed !== 0 || (report.deferred ?? 0) !== 0 || report.published + report.replayed !== 1)) {
-        throw new Error('public-discovery-fallback-incomplete');
+      if (report !== undefined) {
+        const deferred = report.deferred ?? 0;
+        const terminal = report.failed === 0 && deferred === 0 && report.published + report.replayed === 1;
+        const continued = report.continuationScheduled === true && report.published + report.replayed === 0
+          && report.failed + deferred === 1;
+        if (report.claimed !== 1 || !(terminal || continued)) throw new Error('public-discovery-fallback-incomplete');
       }
     }
     catch (error) {

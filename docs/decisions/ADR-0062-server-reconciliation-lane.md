@@ -1,5 +1,7 @@
 ---
 scope:
+  - apps/worker/src/catalogue/public-discovery-routes.ts
+  - apps/worker/src/catalogue/public-discovery-queue.test.ts
   - apps/extension/scripts/installed-review.mjs
   - apps/extension/scripts/installed-review-network.mjs
   - apps/extension/scripts/installed-review.test.mjs
@@ -42,6 +44,10 @@ public non authentifié et ne remplace pas la Queue `claim(1)`/concurrency `1`.
 Le test installé peut capturer les soumissions exactes dans des fichiers locaux
 `0600` tout en gardant un budget de mutation nul ; il ne journalise jamais leur
 contenu et ne les transmet pas au Worker pendant cette phase.
+En mode `worker-direct`, un premier passage qui consomme un essai sans résultat
+terminal n'est accepté en `202` que si le Worker a effectivement programmé une
+continuation Queue différée. Si cette programmation échoue, la réponse reste
+`503` et le runner s'arrête ; aucun état `PENDING` n'est présenté comme livré.
 Toute exécution distante appliquée passe par le workflow protégé et une
 confirmation immédiate du lot exact.
 
