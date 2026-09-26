@@ -1289,3 +1289,45 @@ Le risque opérationnel attendu est la terminalisation de demandes auparavant
 réessayées sans fin ; aucun FAILED n'est réarmé automatiquement. Le rollback
 porte uniquement sur le commit de qualification des erreurs, sans migration
 ou suppression ; il ne doit pas effacer les résultats terminaux existants.
+
+### Certificat canari corrélé en mode direct
+
+Le certificat ne peut plus être établi par différence des compteurs de toute
+une fenêtre de trafic. En mode `worker-direct`, la réponse d'admission porte
+déjà `X-Tobirink-Request-Id`. Le même UUID aléatoire figure dans l'événement
+`worker.request` de l'invocation ; celle-ci attend son collecteur ciblé puis
+émet ses coûts `discovery` et `discovery-admission`. L'observateur conserve
+cette association uniquement en mémoire. Aucun identifiant, corps, en-tête,
+URL ou événement brut ne doit figurer dans les rapports de certification.
+
+Pour chaque clé neuve, il faut simultanément un terminal `VERIFIED` avec la
+référence exacte attendue, une seule enveloppe HTTP reconnue, le fournisseur
+attendu, au moins un appel réel et exactement un résultat accepté par le
+collecteur. Les coûts D1 du collecteur et de l'admission sont instrumentés
+séparément : leur somme doit être présente, avec au plus 300 lignes lues.
+Les écritures sont mesurées mais ne sont pas confondues avec les lectures.
+Un trafic étranger, un coût incomplet, un doublon ou une trace absente ne peut
+remplacer cette preuve. Une lecture de readiness peut légitimement coûter
+zéro ligne ; sa corrélation, et non un appel fournisseur, établit la réception.
+
+Le tail observe les invocations sans filtre textuel qui masquerait un échec
+CPU avant émission de coût. Un outcome anormal, une exception, un 429 ou un
+échec Queue observé arrête le lot. Les autres erreurs fournisseur et résultats
+non publiés de l'invocation canari interdisent aussi le certificat. Les limites
+de durée, d'octets et de mémoire restent fermées ; une saturation ou un
+échantillonnage qui prive l'observateur de sa preuve produit `INCOMPLETE`.
+Cette méthode ne certifie pas le chemin Queue asynchrone, qui ne partage pas
+l'invocation HTTP. Elle n'affirme rien sur les événements non observés.
+
+La campagne reste limitée à Odd Taxi/AniList et Spirit Circle/MangaUpdates,
+une admission par clé neuve, sans retry de POST ni réarmement historique.
+Le POST d'admission dispose de 45 secondes pour recevoir la réponse du
+collecteur direct (deadline de résolution 30 secondes, hors D1) ; les lectures
+restent à 15 secondes et la campagne entière à 24 minutes.
+Un échec interdit la seconde admission si elle n'a pas encore eu lieu.
+Les totaux du certificat ne comptent que les deux admissions corrélées ; ils
+ne décrivent pas le trafic global de la fenêtre.
+Le rollback du seul script revient à un observateur moins strict et ne doit
+donc jamais être utilisé pour autoriser une reprise sur un ancien certificat
+agrégé. Aucun changement Worker, protocole public ou archive d'extension
+n'est nécessaire à cette corrélation déjà exposée par le runtime.
