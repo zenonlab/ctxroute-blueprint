@@ -1407,3 +1407,45 @@ pas à attribuer chaque transition; la ligne horodatée et la télémétrie
 corrélée établissent la reprise ciblée. Cette preuve ne certifie ni la voie
 Queue asynchrone, ni la projection Library, ni la convergence des 1 522
 favoris conservés.
+
+### Diagnostic Kitsu et lecture réelle du profil — 26 septembre 2026
+
+Ne pas attribuer un échec global de Discovery à la gateway sans distinguer les
+transports. En mode `selective-gateway`, AniList et MangaUpdates passent par
+Deno ; MangaDex et Kitsu sortent directement du Worker. Le probe
+`GET https://tobirink-provider-gateway.tobirink.deno.net/healthz` répond
+`200 {"status":"healthy"}` et les canaris corrélés AniList/MangaUpdates sont
+`VERIFIED`. D1 contient 458 `VERIFIED`, 418 `FAILED/ATTEMPT_LIMIT`,
+28 `NOT_FOUND`, 16 `AMBIGUOUS` et aucun travail actif. La Queue principale
+reste vide avec batch 1/concurrence 1 ; sa DLQ conserve 13 messages
+historiques sans reprise automatique.
+
+La reproduction sûre relit seulement les trois demandes anime historiques
+`FAILED`, garde leurs titres en mémoire et exécute l'adaptateur Kitsu local.
+Deux recherches aboutissent ; la troisième reçoit HTTP 200 puis rejette une
+couverture dont l'origine n'appartient pas à l'allowlist. Aucun titre, URL,
+empreinte ou corps fournisseur n'est journalisé. Ce signal prouve une erreur
+de projection Kitsu directe après réponse, pas une panne Deno.
+
+Le correctif conserve l'allowlist : une couverture étrangère optionnelle est
+omise au lieu d'invalider l'identité. Une ressource du mauvais type ou dont
+l'identité ne peut pas être encodée est écartée. Toute omission marque la page
+incomplète et arrête sa pagination locale afin qu'elle ne produise jamais un
+faux `NOT_FOUND`. Si aucun candidat exact n'est retenu, le résolveur transforme
+ce signal en code fermé `provider-search-cursor`, sans donnée fournisseur, et
+l'essai est consommé. La validation et la projection restent sous la gate
+fournisseur ; un rejet résiduel alimente donc le circuit au lieu d'être compté
+à tort comme succès. Les exceptions réellement levées et les erreurs D1/Queue
+utilisent seulement des codes fermés, sans reprendre le message brut. Le rejeu
+local des trois mêmes
+demandes passe de deux succès et un rejet à trois succès, zéro erreur, treize
+candidats et une enveloppe incomplète ; aucune ligne D1 n'est modifiée.
+
+Le profil Chromium temporaire `Ujbd9g` exécute ensuite la lecture réseau réelle
+avec budgets admission/refresh nuls. Il conserve 1 522 sources, transmet
+1 064 GET et zéro POST, projette 301 Work et une Library de 1 413 entrées,
+vérifie les redémarrages et termine `incomplete`. Les 640 `ADMISSION_WAIT`,
+299 `PROVIDER_UNAVAILABLE`, 143 `NETWORK` et 39 `IDENTITY_MISSING` interdisent
+de déclarer la convergence. Cette preuve ne justifie aucun réarmement massif :
+déployer d'abord le correctif, exiger un canari par titre corrélé, puis reprendre
+au plus une demande historique expressément autorisée.

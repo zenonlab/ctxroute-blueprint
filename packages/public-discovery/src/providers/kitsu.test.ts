@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { FavoriteProviderRateGate } from '../provider-http';
 import { KitsuFavoriteProviderAdapter } from './kitsu';
 
 const anime = {
@@ -91,6 +92,111 @@ describe('KitsuFavoriteProviderAdapter', () => {
     const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => new Response(JSON.stringify({ data: [anime], links: { next: 'https://kitsu.io/next' }, meta: { count: 2 } }), { headers: { 'content-type': 'application/vnd.api+json' } }));
     await expect(adapter.search({ limit: 1, provider: 'kitsu-anime', titles: ['Frieren'] })).resolves.toMatchObject({ complete: false, truncated: true });
     await expect(adapter.search({ limit: 1, provider: 'kitsu-manga', titles: ['Frieren'] })).rejects.toThrow(/requires provider/u);
+  });
+
+  it('preserves a Kitsu identity when its cover host is not allowlisted', async () => {
+    const attributes = { ...anime.attributes, posterImage: { large: 'https://images.example.test/anime/46474.jpeg' } };
+    const search = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes }], links: { next: null }, meta: { count: 1 } }));
+    const searchResult = await search.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
+    expect(searchResult).toMatchObject({ candidates: [{ externalId: anime.id }], complete: false, truncated: true });
+    expect(searchResult).not.toHaveProperty('nextCursor');
+    expect(searchResult.candidates[0]).not.toHaveProperty('cover');
+
+    const hydration = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: { ...anime, attributes } }));
+    const hydrated = await hydration.hydrate({ externalId: anime.id, provider: 'kitsu-anime' });
+    expect(hydrated).toMatchObject({ externalId: anime.id });
+    expect(hydrated).not.toHaveProperty('cover');
+  });
+
+  it.each([
+    'javascript://media.kitsu.app/alert',
+    'http://media.kitsu.app/anime/46474.jpeg',
+    'https://media.kitsu.app:8443/anime/46474.jpeg',
+    'blob:https://media.kitsu.app/00000000-0000-0000-0000-000000000000',
+    'https://user:password@media.kitsu.app/anime/46474.jpeg',
+  ])('rejects a non-exact Kitsu cover origin without losing the identity: %s', async (large) => {
+    const attributes = { ...anime.attributes, posterImage: { large } };
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes }], links: { next: null }, meta: { count: 1 } }));
+
+    const envelope = await adapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
+
+    expect(envelope).toMatchObject({ candidates: [{ externalId: anime.id }], complete: false, truncated: true });
+    expect(envelope.candidates[0]).not.toHaveProperty('cover');
+  });
+
+  it('uses the first safe Kitsu cover fallback while retaining foreign-variant incompleteness', async () => {
+    const medium = 'https://media.kitsu.app/anime/46474/poster_image/medium-example.jpeg';
+    const attributes = { ...anime.attributes, posterImage: { large: 'https://images.example.test/anime/46474.jpeg', medium } };
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes }], links: { next: null }, meta: { count: 1 } }));
+
+    const envelope = await adapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
+
+    expect(envelope).toMatchObject({ candidates: [{ cover: { attribution: 'Kitsu', url: medium }, externalId: anime.id }], complete: false, truncated: true });
+  });
+
+  it('keeps a safe preferred cover but marks a malformed later variant incomplete', async () => {
+    const attributes = { ...anime.attributes, posterImage: { large: anime.attributes.posterImage.large, tiny: 'not a URL' } };
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes }], links: { next: null }, meta: { count: 1 } }));
+
+    const envelope = await adapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
+
+    expect(envelope).toMatchObject({ candidates: [{ cover: { attribution: 'Kitsu', url: anime.attributes.posterImage.large }, externalId: anime.id }], complete: false, truncated: true });
+  });
+
+  it('keeps the identity when an optional Kitsu poster variant exceeds its bound', async () => {
+    const attributes = { ...anime.attributes, posterImage: { large: `https://media.kitsu.app/${'x'.repeat(2049)}` } };
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [{ ...anime, attributes }], links: { next: null }, meta: { count: 1 } }));
+
+    const envelope = await adapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
+
+    expect(envelope).toMatchObject({ candidates: [{ externalId: anime.id }], complete: false, truncated: true });
+    expect(envelope.candidates[0]).not.toHaveProperty('cover');
+  });
+
+  it('omits unusable search identities and marks the exhausted page incomplete', async () => {
+    const invalidId = { ...anime, id: '\ud800' };
+    const invalidSlug = { ...anime, attributes: { ...anime.attributes, slug: '\ud800' } };
+    const wrongType = { ...manga, attributes: { ...manga.attributes, canonicalTitle: 'Wrong lane' } };
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: [wrongType, invalidId, invalidSlug, anime], links: { next: null }, meta: { count: 4 } }));
+
+    const envelope = await adapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] });
+
+    expect(envelope).toMatchObject({ candidates: [{ externalId: anime.id }], complete: false, truncated: true });
+    expect(envelope).not.toHaveProperty('nextCursor');
+  });
+
+  it('does not forget a local projection omission behind upstream pagination', async () => {
+    const wrongType = { ...manga, attributes: { ...manga.attributes, canonicalTitle: 'Wrong lane' } };
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({
+      data: [wrongType, anime],
+      links: { next: 'https://kitsu.io/api/edge/anime?page%5Boffset%5D=2' },
+      meta: { count: 3 },
+    }));
+
+    const envelope = await adapter.search({ limit: 2, provider: 'kitsu-anime', titles: ['Frieren'] });
+
+    expect(envelope).toMatchObject({ candidates: [{ externalId: anime.id }], complete: false, truncated: true });
+    expect(envelope).not.toHaveProperty('nextCursor');
+  });
+
+  it.each(['search', 'hydrate'] as const)('records remaining %s projection failures inside the rate gate', async (operation) => {
+    const controls = {
+      recordFailure: vi.fn(async () => undefined),
+      recordSuccess: vi.fn(async () => undefined),
+      reserve: vi.fn(async () => 10_000),
+    };
+    const gate = new FavoriteProviderRateGate('kitsu-anime', controls, () => 10_000, async () => undefined);
+    const invalid = { ...anime, attributes: { ...anime.attributes, canonicalTitle: 'x'.repeat(201) } };
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json(operation === 'search'
+      ? { data: [invalid], links: { next: null }, meta: { count: 1 } }
+      : { data: invalid }), gate);
+
+    const result = operation === 'search'
+      ? adapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] })
+      : adapter.hydrate({ externalId: anime.id, provider: 'kitsu-anime' });
+    await expect(result).rejects.toThrow();
+    expect(controls.recordFailure).toHaveBeenCalledOnce();
+    expect(controls.recordSuccess).not.toHaveBeenCalled();
   });
 
   it('hydrates the exact numeric identity', async () => {

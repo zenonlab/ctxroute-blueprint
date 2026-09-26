@@ -335,13 +335,20 @@ Corrigé ensuite par la PR 111 ; preuve réelle distincte dans le suivi canari.
 
 ### 16. P1 — La convergence des 1 522 favoris et la base personnelle restent non certifiées
 
-**Preuve manquante, et non affirmation que tous les favoris échouent aujourd'hui.**
+**Preuve partielle réelle, sans affirmation de convergence complète.**
 
 - Dernier rapport du clone :
-  `build/installed-review/tobirink-installed-review-WK2Ywp.report.json:1`,
-  25/09 22:03 UTC, version 1.0.44, `offline-regression-passed`,
-  **converged=false**, 1 522 favoris, **0 identifié**, 1 483 NETWORK,
-  39 IDENTITY_MISSING, données conservées aux redémarrages.
+  `build/installed-review/tobirink-installed-review-Ujbd9g.report.json:1`,
+  26/09, version 1.0.44, `incomplete`, **converged=false**. Il conserve
+  **1 522 / 1 522** favoris, transmet 1 064 lectures au Worker et zéro POST,
+  refresh ou appel fournisseur depuis l'extension. Après 895 secondes, il
+  compte 369 résolutions, 301 Work projetés et une Library de 1 413 entrées ;
+  les redémarrages du service worker et du navigateur sont vérifiés.
+- Les 1 096 sources retryable restantes se répartissent en 640 admissions
+  interdites par le budget nul, 299 fournisseurs indisponibles, 143 erreurs
+  réseau et 14 erreurs internes. Les 41 exclusions sont 39 identités absentes
+  et deux taxonomies bloquées. Cette exécution prouve la lecture du cache et
+  la projection locale, pas l'admission ni la convergence fournisseur.
 - `privateDatabaseCopied=false`, `personalProfileCertified=false` : le
   runner réimporte titres/URLs dans un profil temporaire, pas l'IndexedDB
   personnelle avec progressions et décisions (`installed-review.mjs:159`).
@@ -676,6 +683,36 @@ convergence fournisseur. Aucun profil navigateur personnel non temporaire avec
 exactement 1 522 favoris et la base TobiRink correspondante n'a été trouvé; la
 base personnelle reste donc non certifiée. Aucun POST de production n'est
 exécuté par ce lot.
+
+### Lecture réelle non mutante du profil — 26 septembre 2026
+
+Une nouvelle session Chromium temporaire charge le véritable export avec
+l'archive Chrome 1.0.44 de SHA-256
+`d04072bc846a90e66b820647469da50934eb2a74d3873fabe23c4fc5063f4a17`.
+Le budget de lecture vaut 5 000, mais les budgets d'admission et de refresh
+restent à zéro. Le rapport privé `Ujbd9g`, mode `0600`, observe exactement
+1 522 sources à chaque jalon et termine avec 1 064 GET transmis, 287 mutations
+tentées puis bloquées, zéro POST, zéro refresh et zéro appel direct aux
+fournisseurs. Les origines étrangères, WebSockets inattendus et requêtes en
+vol restent à zéro.
+
+Le cache public hydrate 369 résolutions et matérialise 301 Work ; la Library
+termine à 1 413 entrées avec `missingProjectedWorks=0`. L'état survit aux deux
+redémarrages. Le verdict demeure `incomplete` : 1 096 sources sont retryable,
+dont 640 `ADMISSION_WAIT`, 299 `PROVIDER_UNAVAILABLE` et 143 `NETWORK`. Ce run
+n'exerce pas Deno par construction et ne peut donc pas l'accuser ni certifier
+les 1 522.
+
+Un diagnostic séparé, sans réarmement ni affichage de titre, relit les trois
+demandes anime historiques `FAILED` et exécute l'adaptateur Kitsu localement.
+Deux recherches réussissent ; la troisième reproduit un rejet de couverture
+hors origine autorisée après une réponse HTTP 200. La gateway Deno répond
+simultanément `200 healthy`, tandis que les canaris AniList et MangaUpdates qui
+la traversent restent `VERIFIED`. La cause active reproduite appartient donc à
+la projection Kitsu directe du Worker, pas à Deno. Avec le correctif local, les
+trois mêmes recherches réussissent sans erreur : treize candidats sont
+projetés et la réponse concernée reste explicitement incomplète au lieu de
+rejeter toute l'identité.
 
 Le contrôle Cloudflare MCP strictement en lecture seule de 10:14 à 10:16 UTC
 retrouve le Worker `85e6f045-dc3b-4f22-be8e-f095179bf9f7` actif à 100 %, la

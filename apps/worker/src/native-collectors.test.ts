@@ -12,23 +12,51 @@ describe('native collector queue', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('emits bounded provider failure codes without error payloads', () => {
+    const privateTitle = 'private title';
+    const privateUrl = 'https://private.example/favorites/secret';
     expect(providerFailureCode(new FavoriteProviderRetryError('Provider cadence requires a later wake.', Date.now() + 1_000))).toBe('provider-cadence-deferred');
     expect(providerFailureCode(new Error('incomplete-provider-search:deadline'))).toBe('provider-search-deadline');
     expect(providerFailureCode(new Error('incomplete-provider-search:page-limit'))).toBe('provider-search-page-limit');
     expect(providerFailureCode(new Error('Favorite provider request failed with HTTP 429.'))).toBe('provider-http-429');
     expect(providerFailureCode(new Error('Public discovery resolution exceeded its bounded execution window.'))).toBe('provider-resolution-deadline');
     expect(providerFailureCode(new Error('fetch failed'))).toBe('provider-network');
-    expect(providerFailureCode(new Error('private title from unexpected error'))).toBe('provider-unavailable');
-    const invalid = new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['data', 0, 'attributes', 'titles', 'private-language'], message: 'private title' }]);
+    expect(providerFailureCode(new Error(`${privateTitle} from unexpected error`))).toBe('provider-unavailable');
+    const invalid = new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['data', 0, 'attributes', 'titles', 'private-language'], message: privateTitle }]);
     expect(providerFailureCode(invalid)).toBe('provider-response-invalid-titles-invalid_type');
-    expect(providerFailureCode(new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['private-title'], message: 'private title' }]))).toBe('provider-response-invalid-unknown-invalid_type');
-    expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 16, inclusive: true, path: ['data', 0, 'attributes', 'abbreviatedTitles'], message: 'private title' }]))).toBe('provider-response-invalid-abbreviatedTitles-too_big');
-    expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 25, inclusive: true, path: ['private-field'], message: 'private title' }]))).toBe('provider-response-invalid-unknown-too_big-max25');
-    expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 2048, inclusive: true, path: ['private-field'], message: 'private title' }]))).toBe('provider-response-invalid-unknown-too_big');
+    expect(providerFailureCode(new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['private-title'], message: privateTitle }]))).toBe('provider-response-invalid-unknown-invalid_type');
+    expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 16, inclusive: true, path: ['data', 0, 'attributes', 'abbreviatedTitles'], message: privateTitle }]))).toBe('provider-response-invalid-abbreviatedTitles-too_big');
+    expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 25, inclusive: true, path: ['private-field'], message: privateTitle }]))).toBe('provider-response-invalid-unknown-too_big-max25');
+    expect(providerFailureCode(new z.ZodError([{ code: 'too_big', origin: 'array', maximum: 2048, inclusive: true, path: ['private-field'], message: privateTitle }]))).toBe('provider-response-invalid-unknown-too_big');
+    const classified = [
+      providerFailureCode(new SyntaxError(`Unexpected token in ${privateTitle} from ${privateUrl}`)),
+      providerFailureCode(new Error('Kitsu hydration returned a different media identity.')),
+      providerFailureCode(new TypeError('cover origin is not allowed for kitsu-anime')),
+      providerFailureCode(new URIError(`URI malformed for ${privateTitle} at ${privateUrl}`)),
+      providerFailureCode(new TypeError(`Invalid URL: ${privateUrl}`)),
+      providerFailureCode(new TypeError(`The encoded data was not valid for encoding utf-8: ${privateTitle}`)),
+      providerFailureCode(new Error('provider-runtime-state-missing')),
+      providerFailureCode(new TypeError('invalid-provider-runtime-reservation')),
+      providerFailureCode(new Error(`D1_ERROR: ${privateTitle} ${privateUrl}`)),
+    ];
+    expect(classified).toEqual([
+      'provider-response-invalid-json',
+      'provider-response-invalid-kitsu-identity',
+      'provider-response-invalid-cover-origin',
+      'provider-response-invalid-uri',
+      'provider-response-invalid-uri',
+      'provider-response-invalid-encoding',
+      'provider-runtime-state-missing',
+      'provider-runtime-reservation-invalid',
+      'provider-runtime-d1',
+    ]);
+    expect(JSON.stringify(classified)).not.toContain(privateTitle);
+    expect(JSON.stringify(classified)).not.toContain(privateUrl);
   });
 
   it('logs only a bounded provider operation code for an invalid response', async () => {
-    const invalid = new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['data', 0, 'attributes', 'titles', 'private-language'], message: 'private title' }]);
+    const privateTitle = 'private title';
+    const privateUrl = 'https://private.example/favorites/secret';
+    const invalid = new SyntaxError(`Unexpected token in ${privateTitle} from ${privateUrl}`);
     const port = (provider: keyof PublicDiscoveryProviderPorts): FavoriteProviderPort => ({
       hydrate: async () => undefined,
       search: async () => ({ candidates: [], complete: true, digest: 'fixture', provider, truncated: false }),
@@ -46,8 +74,9 @@ describe('native collector queue', () => {
       requestDigest: 'b'.repeat(64), schemaVersion: 3,
     })).rejects.toThrow('private title');
     expect(search).toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith('public-discovery-provider-operation-failed', 'kitsu-manga', 'search', 'provider-response-invalid-titles-invalid_type');
-    expect(JSON.stringify(warn.mock.calls)).not.toContain('private title');
+    expect(warn).toHaveBeenCalledWith('public-discovery-provider-operation-failed', 'kitsu-manga', 'search', 'provider-response-invalid-json');
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(privateTitle);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(privateUrl);
   });
 
   it('routes an operational recovery signal without invoking collectors or resetting requests', async () => {
@@ -167,6 +196,20 @@ describe('native collector queue', () => {
     await handleNativeCollectorQueue([item], { agenda: async () => { throw new Error('upstream'); }, discovery: vi.fn() });
     expect(item.retry).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 240 }); expect(item.ack).not.toHaveBeenCalled();
     expect(JSON.parse(String(warn.mock.calls[0]?.[0]))).toMatchObject({ code: 'collector-internal', disposition: 'retry', messageType: 'agenda-refresh' });
+  });
+
+  it.each([
+    [new Error('D1_ERROR: private title https://private.example/secret'), 'collector-d1'],
+    [new TypeError('private title https://private.example/secret'), 'collector-type-error'],
+  ])('logs only the closed collector code %s', async (failure, expectedCode) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const item = message({ scheduledFor: '2026-09-15T14:00:00.000Z', type: 'agenda-refresh', version: 1 });
+
+    await handleNativeCollectorQueue([item], { agenda: async () => { throw failure; }, discovery: vi.fn() });
+
+    const event = JSON.parse(String(warn.mock.calls[0]?.[0]));
+    expect(event).toMatchObject({ code: expectedCode, disposition: 'retry', messageType: 'agenda-refresh' });
+    expect(JSON.stringify(event)).not.toMatch(/private|https|secret/iu);
   });
 
   it('uses an Agenda provider Retry-After delay instead of generic backoff', async () => {

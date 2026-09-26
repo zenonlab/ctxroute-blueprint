@@ -66,14 +66,17 @@ export function favoriteProviderPage(cursor?: string): number {
 export function createProviderCandidate(input: ProviderCandidate, provider: FavoriteProvider): ProviderCandidate {
   if (input.provider !== provider) throw new TypeError('candidate provider mismatch');
   if (input.cover !== undefined) {
-    const allowedHosts: Readonly<Record<FavoriteProvider, readonly string[]>> = {
-      anilist: ['s4.anilist.co'],
-      mangaupdates: ['cdn.mangaupdates.com'],
-      mangadex: ['uploads.mangadex.org'],
-      'kitsu-anime': ['media.kitsu.app'],
-      'kitsu-manga': ['media.kitsu.app'],
+    const allowedOrigins: Readonly<Record<FavoriteProvider, readonly string[]>> = {
+      anilist: ['https://s4.anilist.co'],
+      mangaupdates: ['https://cdn.mangaupdates.com'],
+      mangadex: ['https://uploads.mangadex.org'],
+      'kitsu-anime': ['https://media.kitsu.app'],
+      'kitsu-manga': ['https://media.kitsu.app'],
     };
-    if (!allowedHosts[provider].includes(new URL(input.cover.url).hostname)) throw new TypeError(`cover origin is not allowed for ${provider}`);
+    const coverUrl = new URL(input.cover.url);
+    if (coverUrl.protocol !== 'https:' || coverUrl.username !== '' || coverUrl.password !== '' || !allowedOrigins[provider].includes(coverUrl.origin)) {
+      throw new TypeError(`cover origin is not allowed for ${provider}`);
+    }
   }
   return Object.freeze(publicDiscoveryCandidateSchema.parse(input));
 }

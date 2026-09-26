@@ -63,8 +63,15 @@ describe('AniListFavoriteProviderAdapter', () => {
     expect(candidate).not.toHaveProperty('relations');
   });
 
-  it('rejects a cover outside the AniList image origin', async () => {
-    const adapter = new AniListFavoriteProviderAdapter(async () => Response.json({ data: { Media: { ...media, coverImage: { extraLarge: 'https://images.invalid/cover.jpg', large: null, medium: null } } } }));
+  it.each([
+    'https://images.invalid/cover.jpg',
+    'http://s4.anilist.co/cover.jpg',
+    'https://s4.anilist.co:444/cover.jpg',
+    'javascript://s4.anilist.co/alert',
+    'blob:https://s4.anilist.co/00000000-0000-0000-0000-000000000000',
+    'https://user:password@s4.anilist.co/cover.jpg',
+  ])('rejects a cover outside the exact AniList HTTPS origin: %s', async (coverUrl) => {
+    const adapter = new AniListFavoriteProviderAdapter(async () => Response.json({ data: { Media: { ...media, coverImage: { extraLarge: coverUrl, large: null, medium: null } } } }));
     await expect(adapter.hydrate({ externalId: '154587', provider: 'anilist' })).rejects.toThrow(/not allowed/u);
   });
 });
