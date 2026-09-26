@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MemberNavigationConfig, MemberNavigationItemId } from '@tobirink/ui';
 import type { ReviewDecision } from '@tobirink/ui';
 import { openSearchMessage, readReviewCandidatesMessage, readReviewQueueMessage, writeReviewDecisionMessage } from './messages';
@@ -11,6 +11,8 @@ export function useLocalReviewNavigation(activeId?: MemberNavigationItemId): Mem
   const [queue, setQueue] = useState<LocalReviewQueueState>({ state: 'loading' });
   const [candidates, setCandidates] = useState<LocalReviewCandidateState>({ state: 'loading' });
   const [busy, setBusy] = useState(false);
+  const [pendingReviewId, setPendingReviewId] = useState<string>();
+  const busyRef = useRef(false);
   const retry = useCallback(() => setLoadKey((key) => key + 1), []);
 
   useEffect(() => {
@@ -40,21 +42,24 @@ export function useLocalReviewNavigation(activeId?: MemberNavigationItemId): Mem
   }, [loadKey, selectedId]);
 
   const submitDecision = useCallback((decision: ReviewDecision) => {
-    if (!selectedId || busy) return;
+    if (!selectedId || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
+    setPendingReviewId(undefined);
     const localDecision = decision.kind === 'candidate'
       ? { kind: 'candidate' as const, workId: decision.candidateId }
       : decision.kind === 'manual'
-        ? decision
+        ? { kind: 'manual' as const, source: decision.source, value: decision.value }
         : { kind: decision.kind };
     void writeReviewDecisionMessage({ decision: localDecision, reviewId: selectedId, revision: decision.revision })
       .then((result) => {
+        if (result.ok && result.status === 'pending') setPendingReviewId(selectedId);
         if (result.ok) setLoadKey((key) => key + 1);
         else setCandidates({ state: result.error === 'conflict' ? 'conflict' : 'error' });
       })
       .catch(() => setCandidates({ state: 'error' }))
-      .finally(() => setBusy(false));
-  }, [busy, selectedId]);
+      .finally(() => { busyRef.current = false; setBusy(false); });
+  }, [selectedId]);
 
   const review = useMemo(() => createLocalReviewNavigation(queue, index, {
     onIndexChange: setIndex,
@@ -66,7 +71,7 @@ export function useLocalReviewNavigation(activeId?: MemberNavigationItemId): Mem
     if (query) void openSearchMessage(query);
   }, []);
 
-  const configuredReview = useMemo(() => ({ ...review, resolver: { ...review.resolver, busy } }), [busy, review]);
+  const configuredReview = useMemo(() => ({ ...review, resolver: { ...review.resolver, busy, pending: pendingReviewId !== undefined && pendingReviewId === review.resolver.item?.id } }), [busy, pendingReviewId, review]);
 
   return activeId === undefined
     ? { onSearch, review: configuredReview }

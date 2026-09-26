@@ -56,6 +56,46 @@ async function fixture(input = favorite, adapters: Parameters<typeof importFavor
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('commits remote ambiguity as comparable references without inventing provider profiles', async () => {
+    const { storage, outbox, task } = await fixture();
+    const references = [{ provider: 'anilist' as const, externalId: '154587' }, { provider: 'anilist' as const, externalId: '154588' }];
+    const result = await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'remote-ambiguity',
+      publicDiscovery: { resolveOrRequest: async () => ({ state: 'AMBIGUOUS', candidates: [...references, references[0]!], reason: 'EXACT_TITLE_COLLISION', verifiedAt: now }) },
+    });
+    expect(result).toMatchObject({ completed: 1, retried: 0, blocked: 0 });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toEqual({ kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' });
+    expect(source?.reviewId && await storage.getFavoriteReviewCandidateSet(source.reviewId)).toMatchObject({ candidates: [], references, totalCandidates: 2, provenance: 'public-discovery' });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'COMMITTED' });
+    expect(await storage.listWorks({ limit: 100 })).toEqual([]);
+  });
+
+  it('rejects a duplicate remote reference instead of inventing an ambiguity', async () => {
+    const { storage, outbox } = await fixture();
+    const reference = { provider: 'anilist' as const, externalId: '154587' };
+    await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'duplicate-ambiguity',
+      publicDiscovery: { resolveOrRequest: async () => ({ state: 'AMBIGUOUS', candidates: [reference, reference], reason: 'EXACT_TITLE_COLLISION', verifiedAt: now }) },
+    });
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' });
+  });
+
+  it('commits a verified result even when every observational trace fails', async () => {
+    const { storage, outbox, task } = await fixture();
+    const result = await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'trace-failure',
+      trace: async () => { throw new Error('DIAGNOSTIC_STORAGE_UNAVAILABLE'); },
+      publicDiscovery: { resolveOrRequest: async () => ({ state: 'VERIFIED', verifiedAt: now, profile: { candidate, references: [{ provider: candidate.provider, externalId: candidate.externalId }], workId: 'work_verified_trace' } }) },
+    });
+    expect(result).toMatchObject({ completed: 1, retried: 0, blocked: 0 });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'COMMITTED' });
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RESOLVED' });
+  });
   it('reuses a canonical public work for an exact provider URL without a slug', async () => {
     const { storage, outbox } = await fixture({ ...favorite, url: 'https://anilist.co/anime/154587', title: 'Local bookmark' }, [{
       id: 'exact-test', origins: ['https://anilist.co'], analyze: (source, url) => createSourceEvidence({
@@ -631,6 +671,33 @@ describe('runFavoriteResolutionSlice', () => {
       { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:invalid-empty',
     )).rejects.toThrow('AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES');
     await expect(storage.listReviews({ limit: 100, status: 'pending' })).resolves.toEqual([]);
+  });
+
+  it('does not count duplicate hydrated candidates as distinct comparable identities', async () => {
+    const { storage, task } = await fixture();
+    const claimed = claimTask(task, 'duplicate-token', now, '2026-09-07T12:01:00.000Z');
+    await storage.putFavoriteResolutionTask(claimed);
+    await expect(persistFavoriteResolutionCompletion(
+      { libraryId: libraryId('library_primary'), now: () => now, storage }, claimed, 'duplicate-token',
+      { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:invalid-duplicates', undefined,
+      { candidates: [candidate, candidate], digest: 'duplicate-candidates', recordedAt: now, totalCandidates: 2 },
+    )).rejects.toThrow('AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES');
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+  });
+
+  it.each([{ externalId: '154587', accepted: false }, { externalId: '154588', accepted: true }])('counts candidate and reference identities distinctly: $externalId', async ({ externalId, accepted }) => {
+    const { storage, task } = await fixture();
+    const claimed = claimTask(task, 'mixed-token', now, '2026-09-07T12:01:00.000Z');
+    await storage.putFavoriteResolutionTask(claimed);
+    const completion = persistFavoriteResolutionCompletion(
+      { libraryId: libraryId('library_primary'), now: () => now, storage }, claimed, 'mixed-token',
+      { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:mixed-identities', undefined,
+      { candidates: [candidate], references: [{ provider: 'anilist', externalId }], digest: `mixed-${externalId}`, recordedAt: now, totalCandidates: 2 },
+    );
+    if (accepted) await expect(completion).resolves.toBeUndefined();
+    else await expect(completion).rejects.toThrow('AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES');
+    expect(await storage.listReviews({ limit: 100, status: 'pending' })).toHaveLength(accepted ? 1 : 0);
+    expect(await storage.listWorks({ limit: 100 })).toEqual([]);
   });
 
   it('keeps a terminal NOT_FOUND actionable instead of making a no-match decision', async () => {

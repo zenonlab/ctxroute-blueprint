@@ -130,6 +130,81 @@ describe('HttpPublicDiscoveryAdapter', () => {
     expect(fetcher.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(3);
   });
 
+  it('shares one read and admission for four identical concurrent submissions', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-26T12:00:00.000Z');
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => Response.json(init.method === 'GET'
+      ? { state: 'MISS' }
+      : { state: 'PENDING', retryAt: '2026-09-26T12:01:00.000Z' }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    const requests = Promise.all(Array.from({ length: 4 }, () => adapter.resolveOrRequest({ ...key }, { ...query })));
+    await vi.runAllTimersAsync();
+    expect(await requests).toEqual(Array.from({ length: 4 }, () => ({ state: 'PENDING', retryAt: '2026-09-26T12:01:00.000Z' })));
+    expect(fetcher.mock.calls.map(([, init]) => init.method)).toEqual(['GET', 'POST']);
+  });
+
+  it('does not share a submitted result with a different query for the same key', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-26T12:00:00.000Z');
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => Response.json(init.method === 'GET'
+      ? { state: 'MISS' }
+      : { state: 'PENDING', retryAt: '2026-09-26T12:01:00.000Z' }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher);
+    const first = adapter.resolveOrRequest(key, query);
+    const different = expect(adapter.resolveOrRequest(key, { ...query, season: 2 })).rejects.toMatchObject({ code: 'ADMISSION_WAIT' });
+    await vi.runAllTimersAsync();
+    await expect(first).resolves.toMatchObject({ state: 'PENDING' });
+    await different;
+    expect(fetcher.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(1);
+  });
+
+  it.each(['resolveOrRequest', 'requestRecovery'] as const)('persists a lost %s response lease across restart even when D1 still reads MISS', async (method) => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-26T12:00:00.000Z');
+    const clocks: Record<string, number> = {};
+    const storage = { get: async () => clocks, set: async (values: Record<string, number>) => { Object.assign(clocks, values); } };
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
+      if (init.method === 'GET') return Response.json({ state: 'MISS' });
+      throw new TypeError('Response lost');
+    });
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage);
+    await expect(adapter[method](key, query)).rejects.toMatchObject({ code: 'NETWORK' });
+    await vi.advanceTimersByTimeAsync(1_101);
+    const restarted = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage);
+    await expect(restarted.resolveOrRequest(key, query)).rejects.toMatchObject({ code: 'ADMISSION_WAIT', retryAt: '2026-09-26T12:01:00.000Z' });
+    expect(fetcher.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await expect(restarted.resolveOrRequest(key, query)).rejects.toMatchObject({ code: 'NETWORK' });
+    expect(fetcher.mock.calls.filter(([, init]) => init.method === 'POST')).toHaveLength(2);
+  });
+
+  it('keeps the key reservation atomic even when durable storage takes longer than admission cadence', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-26T12:00:00.000Z');
+    const clocks: Record<string, number> = {};
+    const storage = {
+      get: async () => clocks,
+      set: async (values: Record<string, number>) => {
+        if (Object.keys(values).some((name) => name.startsWith('public-discovery-pending-v1:'))) await new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+        Object.assign(clocks, values);
+      },
+    };
+    const fetcher = vi.fn(async () => Response.json({ state: 'PENDING', retryAt: new Date(Date.now() + 60_000).toISOString() }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage);
+    const requests = Promise.allSettled([adapter.requestRecovery(key, query), adapter.requestRecovery(key, { ...query, season: 2 })]);
+    await vi.runAllTimersAsync();
+    expect(await requests).toMatchObject([{ status: 'fulfilled', value: { state: 'PENDING' } }, { status: 'rejected', reason: { code: 'ADMISSION_WAIT' } }]);
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it('releases a rejected shared read so a later terminal result wins over an active lease', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-26T12:00:00.000Z');
+    const clocks = { [`public-discovery-pending-v1:${JSON.stringify(key)}`]: Date.now() + 60_000 };
+    const storage = { get: async () => clocks, set: async () => undefined };
+    const fetcher = vi.fn().mockRejectedValueOnce(new TypeError('Offline')).mockResolvedValue(Response.json({ state: 'NOT_FOUND', reason: 'NO_MATCH', verifiedAt: new Date().toISOString() }));
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage);
+    const failed = await Promise.allSettled(Array.from({ length: 4 }, () => adapter.resolveOrRequest(key, query)));
+    expect(failed.every((result) => result.status === 'rejected')).toBe(true);
+    await expect(adapter.resolveOrRequest(key, query)).resolves.toMatchObject({ state: 'NOT_FOUND' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it('returns a full D1 profile without a second request', async () => {
     const profile = {
       candidate: { externalId: '154587', mediaKind: 'ANIME', preSerialization: false, provider: 'anilist', titles: ['Frieren'] },

@@ -3,7 +3,8 @@ import { importFavoriteSources, readLocalReviewCandidates } from '@tobirink/appl
 import type { PublicDiscoveryRequestClientPort } from '@tobirink/application';
 import { MemoryStoragePort } from '@tobirink/contracts';
 import { createReview, libraryId, reviewId } from '@tobirink/domain';
-import { writeLocalReviewDecision } from './local-review-runtime';
+import { readLocalReviewCandidateSnapshot, writeLocalReviewDecision } from './local-review-runtime';
+import { reviewCandidatesResponseSchema } from './review-messages';
 
 async function fixture() {
   const storage = new MemoryStoragePort();
@@ -24,6 +25,29 @@ async function fixture() {
 }
 
 describe('Manual Review public discovery', () => {
+  it('verifies a selected remote ambiguity reference through the existing manual action', async () => {
+    const { discovery, library, resolveOrRequest, review, source, storage } = await fixture();
+    const references = [{ provider: 'anilist' as const, externalId: '123' }, { provider: 'anilist' as const, externalId: '456' }];
+    await storage.putReview({ ...review, reason: 'AMBIGUOUS' });
+    await storage.putFavoriteSource({ ...source, resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' } });
+    await storage.putFavoriteReviewCandidateSet({ candidates: [], references, digest: 'remote-ambiguity', totalCandidates: 2, provenance: 'public-discovery', recordedAt: '2026-09-08T00:00:00.000Z', reviewId: review.id });
+    const snapshot = await readLocalReviewCandidates(storage, { libraryId: library, reviewId: review.id });
+    expect(snapshot).toMatchObject({ candidates: [], providerReferences: references, state: 'ready' });
+    const response = reviewCandidatesResponseSchema.parse({ ok: true, snapshot: await readLocalReviewCandidateSnapshot(storage, library, review.id) });
+    expect(response).toMatchObject({ ok: true, snapshot: { candidates: [], providerReferences: references, reason: 'AMBIGUOUS', state: 'ready' } });
+    const selected = snapshot.providerReferences?.[0];
+    if (selected === undefined) throw new Error('Expected a comparable public reference.');
+    const command = { decision: { kind: 'manual' as const, source: 'id' as const, value: `${selected.provider}:${selected.externalId}` }, reviewId: review.id, revision: snapshot.revision };
+    resolveOrRequest.mockResolvedValueOnce({ state: 'PENDING', retryAt: '2026-09-15T00:10:00.000Z' });
+    await expect(writeLocalReviewDecision(storage, library, command, discovery)).resolves.toEqual({ status: 'pending' });
+    expect(await storage.listWorks({ limit: 100 })).toEqual([]);
+    expect(await storage.getReview(review.id)).toMatchObject({ reason: 'AMBIGUOUS', status: 'pending' });
+    await expect(writeLocalReviewDecision(storage, library, command, discovery)).resolves.toMatchObject({ decisionOrigin: 'human', status: 'resolved' });
+    expect(resolveOrRequest).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ explicitProviderReference: selected }));
+    expect(await storage.listWorks({ limit: 100 })).toHaveLength(1);
+    await expect(writeLocalReviewDecision(storage, library, command, discovery)).rejects.toThrow(/stale/u);
+    expect(resolveOrRequest).toHaveBeenCalledTimes(2);
+  });
   it.each([{ source: 'id' as const, value: 'anilist:123' }, { source: 'url' as const, value: 'https://anilist.co/anime/123' }])('commits an explicit $source only from a verified D1 profile', async (manual) => {
     const { discovery, library, resolveOrRequest, review, snapshot, source, storage } = await fixture();
     const result = await writeLocalReviewDecision(storage, library, { decision: { kind: 'manual', ...manual }, reviewId: review.id, revision: snapshot.revision }, discovery);

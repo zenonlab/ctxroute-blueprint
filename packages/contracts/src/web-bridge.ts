@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { favoritePublicReferenceSchema } from '@tobirink/application';
 
 const workIdSchema = z.string().regex(/^work_[a-z0-9_]+$/u);
 const boundedText = (max: number) => z.string().trim().min(1).max(max);
@@ -105,6 +106,8 @@ const webAgendaReadRequestSchema = z.object({
 });
 
 export const webReviewSnapshotSchema = z.object({
+  providerReferences: z.array(favoritePublicReferenceSchema).max(10)
+    .refine((references) => new Set(references.map((reference) => `${reference.provider}:${reference.externalId}`)).size === references.length).optional(),
   reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']).optional(),
   matchLevel: boundedText(100).optional(),
   provenance: boundedText(100).optional(),
@@ -146,7 +149,7 @@ export const webRequestSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('bootstrap.read'), requestId: boundedText(128) }).strict(),
   z.object({ type: z.literal('library.read'), requestId: boundedText(128), query: webLibraryQuerySchema }).strict(),
   webAgendaReadRequestSchema,
-  z.object({ type: z.literal('review.read'), requestId: boundedText(128) }).strict(),
+  z.object({ type: z.literal('review.read'), requestId: boundedText(128), includeProviderReferences: z.literal(true).optional() }).strict(),
   z.object({ type: z.literal('review.decision.write'), requestId: boundedText(128), command: webReviewDecisionCommandSchema }).strict(),
 ]);
 

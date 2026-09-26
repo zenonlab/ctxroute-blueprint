@@ -84,8 +84,8 @@ function libraryOffset(cursor: string | undefined): number {
   return offset;
 }
 
-function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCandidateSnapshot>>): WebReviewSnapshot {
-  return {
+function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCandidateSnapshot>>, includeProviderReferences = false): WebReviewSnapshot {
+  const projected: WebReviewSnapshot = {
     reason: snapshot.reason,
     matchLevel: snapshot.matchLevel,
     provenance: snapshot.provenance,
@@ -102,6 +102,8 @@ function mapReviewSnapshot(snapshot: Awaited<ReturnType<typeof readLocalReviewCa
     revision: snapshot.revision,
     title: snapshot.title,
   };
+  if (includeProviderReferences && snapshot.providerReferences !== undefined) projected.providerReferences = [...snapshot.providerReferences];
+  return projected;
 }
 
 export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscovery?: PublicDiscoveryRequestClientPort, localAgenda?: LocalReleaseAgendaPort, readShowAdultContent: () => Promise<boolean> = async () => true): WebBridgeRequestHandler {
@@ -172,7 +174,7 @@ export function createWebBridgeRequestHandler(storage: StoragePort, publicDiscov
     if (request.type === 'review.read') {
       const queue = await readReviewQueue(storage, await readShowAdultContent());
       if (!queue.items[0]) return { candidates: [], context: 'local' };
-      return mapReviewSnapshot(await readLocalReviewCandidateSnapshot(storage, primaryLibraryId, queue.items[0].id, await readShowAdultContent()));
+      return mapReviewSnapshot(await readLocalReviewCandidateSnapshot(storage, primaryLibraryId, queue.items[0].id, await readShowAdultContent()), request.includeProviderReferences);
     }
     if (request.type === 'review.decision.write') {
       await writeLocalReviewDecision(storage, primaryLibraryId, request.command, publicDiscovery, await readShowAdultContent());

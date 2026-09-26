@@ -97,9 +97,13 @@ function failureCode(error: Error | undefined): string {
   return 'INTERNAL_FAILURE';
 }
 
+async function traceEvent(dependencies: FavoriteResolutionRunnerDependencies, event: FavoriteResolutionTraceEvent): Promise<void> {
+  try { await dependencies.trace?.(event); }
+  catch { return; }
+}
+
 async function traceFailure(dependencies: FavoriteResolutionRunnerDependencies, code: string): Promise<void> {
-  try { await dependencies.trace?.({ operation: 'resolution-commit', outcome: 'failed', code }); }
-  catch { /* Diagnostics are observational and cannot change resolution behavior. */ }
+  await traceEvent(dependencies, { operation: 'resolution-commit', outcome: 'failed', code });
 }
 
 export interface FavoriteResolutionSliceResult {
@@ -295,16 +299,16 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     }
     let discovery;
     const admissionStartedAt = Date.now();
-    await dependencies.trace?.({ operation: 'admission', outcome: 'started' });
+    await traceEvent(dependencies, { operation: 'admission', outcome: 'started' });
     try { discovery = await requestPublicFavoriteDiscovery(dependencies.publicDiscovery, identityKey, artifact, reference === undefined ? undefined : { explicitProviderReference: reference }); }
     catch (error) {
       const retryAt = error instanceof PublicDiscoveryError && error.retryAt !== undefined ? error.retryAt : new Date(timestamp(dependencies.now()) + 60_000).toISOString();
       const reason = error instanceof PublicDiscoveryError ? error.code : 'INTERNAL_FAILURE';
-      await dependencies.trace?.({ operation: 'admission', outcome: 'retryable', code: reason, durationMs: Math.min(3_600_000, Math.max(0, Date.now() - admissionStartedAt)) });
+      await traceEvent(dependencies, { operation: 'admission', outcome: 'retryable', code: reason, durationMs: Math.min(3_600_000, Math.max(0, Date.now() - admissionStartedAt)) });
       if (error instanceof PublicDiscoveryError && ['ADMISSION_WAIT', 'RATE_LIMITED', 'NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE'].includes(error.code)) return deferClaimWithoutAttempt(dependencies, task, token, retryAt, reason);
       return retryClaim(dependencies, task, token, retryAt, reason);
     }
-    await dependencies.trace?.({
+    await traceEvent(dependencies, {
       operation: 'admission',
       outcome: discovery.state === 'PENDING' ? 'pending' : discovery.state === 'VERIFIED' ? 'verified' : 'retryable',
       code: discovery.state,
@@ -318,7 +322,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       return 'completed';
     }
     if (discovery.state === 'AMBIGUOUS') {
-      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:d1-ambiguous');
+      const references = discovery.candidates.map((reference) => favoritePublicReferenceSchema.parse(reference));
+      const comparable = [...new Map(references.map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:d1-ambiguous', undefined, {
+        candidates: [], references: comparable, digest: JSON.stringify([identityKey, discovery.verifiedAt, comparable]),
+        provenance: 'public-discovery', totalCandidates: comparable.length, recordedAt: dependencies.now(),
+      });
       return 'completed';
     }
     const discoveredCandidate = providerCandidateSchema.parse(discovery.profile.candidate);
@@ -335,7 +344,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       ? { hydratedAt: discovery.verifiedAt, references, workId: workId(discovery.profile.workId) }
       : { hydratedAt: discovery.verifiedAt, publicDiscovery: { ...identityKey, nextRefreshAt: discovery.nextRefreshAt, verifiedAt: discovery.verifiedAt }, references, workId: workId(discovery.profile.workId) };
     await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'RESOLVED' }, 'resolved:d1-verified-discovery', discoveredCandidate, undefined, identity);
-    await dependencies.trace?.({ operation: 'resolution-commit', outcome: 'committed', code: 'VERIFIED' });
+    await traceEvent(dependencies, { operation: 'resolution-commit', outcome: 'committed', code: 'VERIFIED' });
     return 'completed';
   }
   if (explicit !== undefined) {
@@ -443,10 +452,10 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'completed';
   }
   const lanes = await resolveFavoriteProviderLanes(dependencies.candidates, matchQuery, artifact.mediaKind, checkpoints, async (event) => {
-    await dependencies.trace?.({ operation: 'provider-result', outcome: event.outcome, code: `${event.provider}:${event.code ?? 'started'}` });
+    await traceEvent(dependencies, { operation: 'provider-result', outcome: event.outcome, code: `${event.provider}:${event.code ?? 'started'}` });
   });
   if (lanes.kind === 'PAGE_PENDING') {
-    await dependencies.trace?.({ operation: 'queue-wait', outcome: 'pending', code: 'PAGE_PENDING' });
+    await traceEvent(dependencies, { operation: 'queue-wait', outcome: 'pending', code: 'PAGE_PENDING' });
     await dependencies.storage.transaction(['favoriteResolutionTasks'], async (session) => {
       const current = await session.getFavoriteResolutionTask(task.id);
       if (current?.idempotencyKey !== task.idempotencyKey) throw new Error('STALE_PRIVATE_REFERENCE');
@@ -455,7 +464,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     return 'retried';
   }
   if (lanes.kind === 'RETRYABLE') {
-    await dependencies.trace?.({ operation: 'provider-result', outcome: 'retryable', code: lanes.reason });
+    await traceEvent(dependencies, { operation: 'provider-result', outcome: 'retryable', code: lanes.reason });
     const exponent = Math.max(0, task.attempt - 1);
     const retryAt = new Date(Math.max(lanes.retryAt ?? 0, timestamp(dependencies.now()) + Math.min(favoriteResolutionMaximumBackoffMs, 30_000 * (2 ** exponent)))).toISOString();
     return retryClaim(dependencies, task, token, retryAt, lanes.reason);

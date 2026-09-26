@@ -88,11 +88,13 @@ export function createProviderCandidateEnvelope(input: ProviderCandidateEnvelope
   return Object.freeze({ ...input, candidates: Object.freeze(input.candidates.map((candidate) => createProviderCandidate(candidate, input.provider))) });
 }
 
-export type MatchLevel = 'source-id' | 'ordered-exact' | 'reordered-significant-words' | 'bounded-edit-distance';
+export type MatchLevel = 'source-id' | 'ordered-exact' | 'explicit-season' | 'reordered-significant-words' | 'bounded-edit-distance';
 export interface FavoriteTitleMatchQuery {
   readonly explicitProviderReference?: FavoriteProviderReference;
+  readonly explicitSeason?: number;
   readonly mediaKind?: ProviderCandidate['mediaKind'];
   readonly preSerialization?: boolean;
+  readonly sourceFormat?: string;
   readonly sourceTitles: readonly string[];
 }
 
@@ -102,8 +104,35 @@ function normalize(value: string): string {
 
 function compact(value: string): string { return normalize(value).replaceAll(' ', ''); }
 function tokens(value: string): string { return [...new Set(normalize(value).split(' ').filter(Boolean))].sort().join(' '); }
+const labelledSeason = /(?:\b(?:s|season|saison|temporada|stagione|staffel|seizoen|sesong|säsong|kausi|sezon|sezona|sezonas|сезон)[\s._-]*([1-9]\d?)\b)|(?:\b([1-9]\d?)(?:st|nd|rd|th|er|e|eme|ème)[\s._-]+season\b)/giu;
+
+function titleSeason(value: string): number | undefined {
+  let season: number | undefined;
+  for (const match of value.matchAll(labelledSeason)) season = Number(match[1] ?? match[2]);
+  return season;
+}
+
+function seasonTitle(value: string, season: number): string {
+  const trimmed = value.trim();
+  for (const match of trimmed.matchAll(labelledSeason)) {
+    if (Number(match[1] ?? match[2]) === season && match.index + match[0].length === trimmed.length) return compact(trimmed.slice(0, match.index));
+  }
+  return compact(trimmed);
+}
+
+function corroboratesSeason(candidate: ProviderCandidate, season: number): boolean {
+  if (candidate.season !== undefined) return candidate.season === season;
+  const seasons = new Set(candidate.titles.map(titleSeason).filter((value) => value !== undefined));
+  return seasons.size === 1 && seasons.has(season);
+}
+
+export function isFavoriteMediaKindCompatible(mediaKind: FavoriteMediaKind | undefined, candidateKind: ProviderCandidate['mediaKind']): boolean {
+  return mediaKind === undefined || mediaKind === 'UNKNOWN' || mediaKind === candidateKind
+    || mediaKind !== 'ANIME' && candidateKind !== 'ANIME';
+}
 
 function boundedDistance(left: string, right: string): boolean {
+  if ((left.match(/\d+/gu) ?? []).join('|') !== (right.match(/\d+/gu) ?? []).join('|')) return false;
   if (left === right) return true;
   const bound = left.length < 8 || right.length < 8 ? 1 : 2;
   if (Math.abs(left.length - right.length) > bound) return false;
@@ -127,25 +156,40 @@ function boundedDistance(left: string, right: string): boolean {
 
 function compatible(query: FavoriteTitleMatchQuery, candidate: ProviderCandidate): boolean {
   if (query.preSerialization !== undefined && query.preSerialization !== candidate.preSerialization) return false;
-  if (query.mediaKind === undefined || query.mediaKind === candidate.mediaKind) return true;
-  return query.mediaKind !== 'ANIME' && candidate.mediaKind !== 'ANIME';
+  if (query.sourceFormat !== undefined && (normalize(query.sourceFormat) === 'ova') !== (candidate.format !== undefined && normalize(candidate.format) === 'ova')) return false;
+  return isFavoriteMediaKindCompatible(query.mediaKind, candidate.mediaKind);
+}
+
+export function isPublicDiscoveryCandidateCompatible(query: FavoriteTitleMatchQuery, candidate: ProviderCandidate, searchEvidence?: ProviderCandidate): boolean {
+  if (searchEvidence !== undefined && (searchEvidence.provider !== candidate.provider || searchEvidence.externalId !== candidate.externalId
+    || !isFavoriteMediaKindCompatible(searchEvidence.mediaKind, candidate.mediaKind))) return false;
+  const formatEvidence = candidate.format === undefined && searchEvidence?.format !== undefined
+    ? { ...candidate, format: searchEvidence.format } : candidate;
+  const seasonEvidence = candidate.season !== undefined || candidate.titles.some((title) => titleSeason(title) !== undefined)
+    ? candidate : searchEvidence ?? candidate;
+  return compatible(query, formatEvidence) && (query.explicitSeason === undefined || corroboratesSeason(seasonEvidence, query.explicitSeason));
 }
 
 export function inspectFavoriteTitleCandidates(query: FavoriteTitleMatchQuery, candidates: readonly ProviderCandidate[]): Readonly<{ candidateReferences: readonly FavoriteProviderReference[]; level: MatchLevel }> {
   if (query.sourceTitles.length < 1 || query.sourceTitles.length > 16) throw new TypeError('matching requires one to sixteen source titles');
   if (candidates.length > favoriteProviderInspectionLimit) throw new RangeError('candidate inspection exceeds twenty-five candidates');
+  if (query.explicitSeason !== undefined && (!Number.isSafeInteger(query.explicitSeason) || query.explicitSeason <= 0)) throw new TypeError('explicit season must be a positive safe integer');
   const eligible = candidates.filter((candidate) => compatible(query, candidate));
   const explicit = query.explicitProviderReference === undefined ? [] : eligible.filter((candidate) => candidate.provider === query.explicitProviderReference?.provider && candidate.externalId === query.explicitProviderReference.externalId);
+  const titleCandidates = eligible.filter((candidate) => isPublicDiscoveryCandidateCompatible(query, candidate));
   const sourceCompact = query.sourceTitles.map(compact).filter(Boolean);
   const sourceTokens = query.sourceTitles.map(tokens).filter(Boolean);
+  const explicitSeason = query.explicitSeason;
+  const seasonalTitles = explicitSeason === undefined ? [] : query.sourceTitles.map((title) => seasonTitle(title, explicitSeason)).filter(Boolean);
   const levels: readonly [MatchLevel, (candidate: ProviderCandidate) => boolean][] = [
     ['source-id', (candidate) => explicit.includes(candidate)],
     ['ordered-exact', (candidate) => candidate.titles.some((title) => sourceCompact.includes(compact(title)))],
+    ['explicit-season', (candidate) => explicitSeason !== undefined && candidate.titles.some((title) => seasonalTitles.includes(seasonTitle(title, explicitSeason)))],
     ['reordered-significant-words', (candidate) => candidate.titles.some((title) => sourceTokens.includes(tokens(title)))],
     ['bounded-edit-distance', (candidate) => candidate.titles.some((title) => sourceCompact.some((source) => boundedDistance(source, compact(title))))],
   ];
   for (const [level, matches] of levels) {
-    const references = eligible.filter(matches).map(({ provider, externalId }) => ({ provider, externalId }));
+    const references = (level === 'source-id' ? eligible : titleCandidates).filter(matches).map(({ provider, externalId }) => ({ provider, externalId }));
     const unique = [...new Map(references.map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
     if (unique.length > 0) return Object.freeze({ candidateReferences: Object.freeze(unique), level });
   }

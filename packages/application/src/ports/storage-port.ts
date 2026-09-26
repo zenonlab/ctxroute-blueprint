@@ -25,6 +25,7 @@ import type { DurableTask } from '../tasks/task-state';
 import type { BookmarkInventoryCursor } from './capability-ports';
 import { favoriteSearchCheckpointSchema } from '../favorites/provider-search-checkpoint';
 import type { FavoriteSearchCheckpoint } from '../favorites/provider-search-checkpoint';
+import type { FavoritePublicReference } from '../favorites/favorite-identity-lookup';
 
 export interface FavoriteInventoryCheckpoint {
   cursor?: BookmarkInventoryCursor;
@@ -84,6 +85,7 @@ export interface FavoriteResolutionReceipt {
 }
 
 export interface FavoriteReviewCandidateSet {
+  references?: readonly FavoritePublicReference[];
   matchLevel?: string;
   provenance?: string;
   totalCandidates?: number;

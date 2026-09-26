@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '@tobirink/contracts';
+import { webReviewSnapshotSchema } from '@tobirink/contracts/web-bridge';
 import { importFavoriteSources } from '@tobirink/application';
 import type { FavoriteSourceAdapter } from '@tobirink/application';
 import { agendaEntryId, createAgendaEntry, createFavoriteSource, createLibrary, createProgress, createReview, createSourceEvidence, createWork, favoriteSourceId, libraryId, progressId, reviewId, workId } from '@tobirink/domain';
@@ -15,6 +16,38 @@ async function addResolvedWork(storage: MemoryStoragePort, input: { id: string; 
 }
 
 describe('WebBridge private projections', () => {
+  it('exposes reference-only Review only to opted-in reads and keeps legacy writes compatible', async () => {
+    const storage = new MemoryStoragePort();
+    await importFavoriteSources([{ bookmarkId: 'review-references', folderPath: [], order: 0, state: 'eligible', title: 'Synthetic river', url: 'https://reader.example/manhwa/synthetic-river' }], storage, '2026-09-08T00:00:00.000Z');
+    const source = (await storage.listFavoriteSources({ limit: 1 }))[0];
+    if (source === undefined) throw new Error('Missing source');
+    const review = createReview({ id: reviewId('review_web_references'), reason: 'AMBIGUOUS', sourceLabel: source.url, status: 'pending', title: source.title });
+    const references = [{ provider: 'mangaupdates' as const, externalId: '123' }, { provider: 'mangaupdates' as const, externalId: '456' }];
+    await storage.putReview(review);
+    await storage.putFavoriteSource({ ...source, resolution: { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, reviewId: review.id });
+    await storage.putFavoriteReviewCandidateSet({ candidates: [], references, digest: 'web-ambiguity', provenance: 'public-discovery', totalCandidates: 2, recordedAt: '2026-09-08T00:00:00.000Z', reviewId: review.id });
+    const resolveOrRequest = vi.fn().mockResolvedValueOnce({ state: 'PENDING', retryAt: '2026-09-26T12:00:00.000Z' }).mockResolvedValueOnce({
+      state: 'VERIFIED', verifiedAt: '2026-09-26T12:00:00.000Z',
+      profile: { candidate: { externalId: '123', provider: 'mangaupdates', mediaKind: 'MANHWA', preSerialization: false, titles: ['Synthetic river'] }, references: [references[0]], workId: 'work_web_references' },
+    });
+    const handler = createWebBridgeRequestHandler(storage, { resolveOrRequest });
+    const legacy = await handler({ type: 'review.read', requestId: 'legacy_review' });
+    expect(legacy).not.toHaveProperty('providerReferences');
+    expect(webReviewSnapshotSchema.omit({ providerReferences: true }).strict().parse(legacy)).toMatchObject({ candidates: [], reason: 'AMBIGUOUS' });
+    const snapshot = webReviewSnapshotSchema.parse(await handler({ type: 'review.read', requestId: 'enriched_review', includeProviderReferences: true }));
+    expect(snapshot).toMatchObject({ candidates: [], providerReferences: references });
+    const command = { reviewId: review.id, revision: snapshot.revision!, decision: { kind: 'manual' as const, source: 'id' as const, value: 'mangaupdates:123' } };
+    const pending = await handler({ type: 'review.decision.write', requestId: 'write_pending', command });
+    expect(webReviewSnapshotSchema.omit({ providerReferences: true }).strict().parse(pending)).toEqual({ candidates: [], context: 'local' });
+    expect(await storage.listWorks({ limit: 10 })).toEqual([]);
+    expect(await storage.getReview(review.id)).toMatchObject({ status: 'pending' });
+    expect(await handler({ type: 'review.read', requestId: 'refresh_pending', includeProviderReferences: true })).toMatchObject({ providerReferences: references, revision: snapshot.revision });
+    await handler({ type: 'review.decision.write', requestId: 'write_verified', command });
+    expect(await storage.getReview(review.id)).toMatchObject({ status: 'resolved', decisionOrigin: 'human' });
+    expect(await storage.listWorks({ limit: 10 })).toHaveLength(1);
+    expect(resolveOrRequest).toHaveBeenCalledTimes(2);
+  });
+
   it('projects Review covers and the controlled provider fallback through WebBridge', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([{ bookmarkId: 'review-cover', folderPath: [], order: 0, state: 'eligible', title: 'Synthetic cover', url: 'https://reader.example/anime/synthetic-cover' }], storage, '2026-09-08T00:00:00.000Z');

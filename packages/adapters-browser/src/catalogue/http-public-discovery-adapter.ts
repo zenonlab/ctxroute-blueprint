@@ -49,6 +49,7 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
   private readonly origin: string;
   private readonly cache = new Map<string, { expiresAt: number; state: PublicDiscoveryReadState }>();
   private readonly clocks = new Map<string, number>();
+  private readonly inFlight = new Map<string, Promise<PublicDiscoveryReadState>>();
   private gate: Promise<unknown> = Promise.resolve();
   private deadline = Infinity;
   setDeadline(deadline: number): void { this.deadline = deadline; }
@@ -65,14 +66,28 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     if (this.clockStorage !== undefined) await this.clockStorage.set({ [key]: value });
     this.clocks.set(key, value);
   }
-  private async reserveAdmission(allowInlineWait = true): Promise<void> {
+  private shareRequest(mode: 'resolve' | 'recover', key: PublicDiscoveryKey, query: PublicDiscoveryQuery, operation: () => Promise<PublicDiscoveryReadState>): Promise<PublicDiscoveryReadState> {
+    const identity = JSON.stringify({ mode, key, query });
+    const current = this.inFlight.get(identity);
+    if (current !== undefined) return current;
+    const request = operation().finally(() => { this.inFlight.delete(identity); });
+    this.inFlight.set(identity, request);
+    return request;
+  }
+  private async requireAdmissionDue(pendingClock: string): Promise<void> {
+    const due = await this.clock(pendingClock);
+    if (due > Date.now()) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(due).toISOString());
+  }
+  private async reserveAdmission(allowInlineWait = true, pendingClock?: string): Promise<void> {
     const reserved = this.gate.catch(() => undefined).then(async () => {
+      if (pendingClock !== undefined) await this.requireAdmissionDue(pendingClock);
       const next = await this.clock(admissionClockKey);
       const waitMs = next - Date.now();
       if (Math.max(Date.now(), next) + 1_000 > this.deadline) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(Math.max(next, Date.now() + 30_000)).toISOString());
       if (waitMs > 0 && (!allowInlineWait || waitMs > publicDiscoveryAdmissionMaximumInlineWaitMs)) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(next).toISOString());
       if (waitMs > 0) await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
       await this.saveClock(admissionClockKey, Date.now() + publicDiscoveryAdmissionIntervalMs);
+      if (pendingClock !== undefined) await this.saveClock(pendingClock, Date.now() + 60_000);
     });
     this.gate = reserved;
     return reserved;
@@ -139,35 +154,12 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
   async requestRecovery(input: PublicDiscoveryKey, inputQuery: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState> {
     const key = publicDiscoveryKeySchema.parse(input);
     const query = publicDiscoveryQuerySchema.parse(inputQuery);
-    await this.reserveAdmission();
-    const admitted = await this.exchange(new URL('/v3/catalogue/discoveries/requests', this.origin).toString(), {
-      body: JSON.stringify({ key, query, schemaVersion: 3 }), cache: 'no-store', credentials: 'omit',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
-    }, stateSchema);
-    if (admitted.state === 'PENDING') {
-      const next = Math.max(Date.now() + 60_000, Date.parse(admitted.retryAt));
-      await this.saveClock(`public-discovery-pending-v1:${JSON.stringify(key)}`, next);
-      admitted.retryAt = new Date(next).toISOString();
-    }
-    this.cache.set(JSON.stringify(key), { expiresAt: Date.now() + 25_000, state: admitted });
-    return admitted;
+    return this.shareRequest('recover', key, query, () => this.admit(key, query));
   }
 
-  async resolveOrRequest(input: PublicDiscoveryKey, inputQuery: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState> {
-    const key = publicDiscoveryKeySchema.parse(input);
-    const query = publicDiscoveryQuerySchema.parse(inputQuery);
-    const cached = this.cache.get(JSON.stringify(key));
-    const state = cached !== undefined && cached.expiresAt > Date.now() ? cached.state : await this.read(key);
-    if (state.state !== 'MISS' && state.state !== 'PENDING') return state;
+  private async admit(key: PublicDiscoveryKey, query: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState> {
     const pendingClock = `public-discovery-pending-v1:${JSON.stringify(key)}`;
-    if (state.state === 'PENDING') {
-      const due = await this.clock(pendingClock);
-      if (due === 0) { await this.saveClock(pendingClock, Date.parse(state.retryAt)); return state; }
-      if (due > Date.now()) return { state: 'PENDING', retryAt: new Date(due).toISOString() };
-    }
-    await this.reserveAdmission();
-    // Persist before I/O: suspension cannot create an immediate resubmission loop.
-    await this.saveClock(pendingClock, Date.now() + 60_000);
+    await this.reserveAdmission(true, pendingClock);
     const admitted = await this.exchange(new URL('/v3/catalogue/discoveries/requests', this.origin).toString(), {
       body: JSON.stringify({ key, query, schemaVersion: 3 }), cache: 'no-store', credentials: 'omit',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
@@ -179,5 +171,24 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     }
     this.cache.set(JSON.stringify(key), { expiresAt: Date.now() + 25_000, state: admitted });
     return admitted;
+  }
+
+  async resolveOrRequest(input: PublicDiscoveryKey, inputQuery: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState> {
+    const key = publicDiscoveryKeySchema.parse(input);
+    const query = publicDiscoveryQuerySchema.parse(inputQuery);
+    return this.shareRequest('resolve', key, query, () => this.resolve(key, query));
+  }
+
+  private async resolve(key: PublicDiscoveryKey, query: PublicDiscoveryQuery): Promise<PublicDiscoveryReadState> {
+    const cached = this.cache.get(JSON.stringify(key));
+    const state = cached !== undefined && cached.expiresAt > Date.now() ? cached.state : await this.read(key);
+    if (state.state !== 'MISS' && state.state !== 'PENDING') return state;
+    const pendingClock = `public-discovery-pending-v1:${JSON.stringify(key)}`;
+    if (state.state === 'PENDING') {
+      const due = await this.clock(pendingClock);
+      if (due === 0) { await this.saveClock(pendingClock, Date.parse(state.retryAt)); return state; }
+      if (due > Date.now()) return { state: 'PENDING', retryAt: new Date(due).toISOString() };
+    }
+    return this.admit(key, query);
   }
 }

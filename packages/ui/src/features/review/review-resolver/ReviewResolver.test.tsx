@@ -1,12 +1,30 @@
 import { readFileSync } from 'node:fs';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { reviewResolverStates } from './index';
+import { ReviewResolver, reviewResolverStates } from './index';
 
 const component = readFileSync(new URL('./ReviewResolver.tsx', import.meta.url), 'utf8');
 const css = readFileSync(new URL('./ReviewResolver.module.css', import.meta.url), 'utf8');
 const preview = readFileSync(new URL('./ReviewResolver.preview.tsx', import.meta.url), 'utf8');
 
 describe('ReviewResolver', () => {
+  it('renders reference-only choices as explicit verification buttons, never fake WorkCards', () => {
+    const props = {
+      canNext: false, canPrevious: false,
+      item: { candidates: [], id: 'review_references', revision: 'references-v1', reason: 'AMBIGUOUS' as const, sourceLabel: 'Favori local', title: 'Synthetic ambiguity', providerReferences: [{ provider: 'mangaupdates', externalId: '123' }, { provider: 'mangaupdates', externalId: '456' }] },
+      onNext: () => undefined, onPrevious: () => undefined, onRefresh: () => undefined, onRetry: () => undefined, onSubmitDecision: () => undefined,
+      state: 'ready' as const,
+    };
+    const markup = renderToStaticMarkup(createElement(ReviewResolver, props));
+    expect(markup).toContain('Vérifier mangaupdates:123');
+    expect(markup).toContain('Vérifier mangaupdates:456');
+    expect(markup).toContain('Identités fournisseur à vérifier');
+    expect(markup).not.toContain('<img');
+    expect(markup).not.toContain('Aucun candidat proposé');
+    expect(renderToStaticMarkup(createElement(ReviewResolver, { ...props, busy: true }))).toMatch(/disabled=""[^>]*>[\s\S]*Vérifier mangaupdates:123/u);
+    expect(renderToStaticMarkup(createElement(ReviewResolver, { ...props, pending: true }))).toContain('Vérification en cours');
+  });
   it('publishes its complete state contract', () => {
     expect(reviewResolverStates).toEqual(['ready', 'loading', 'empty', 'partial', 'offline', 'error', 'conflict', 'success']);
   });

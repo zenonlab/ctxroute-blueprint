@@ -1,10 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { parseWebMessage, parseWebRequestEnvelope, webAgendaPeriodSchema, webBridgeMessageLimit, webPageBridgeInboundSchema, webProtocolVersion, webRequestSchema } from './web-bridge';
+import { parseWebMessage, parseWebRequestEnvelope, webAgendaPeriodSchema, webBridgeMessageLimit, webPageBridgeInboundSchema, webProtocolVersion, webRequestSchema, webReviewSnapshotSchema } from './web-bridge';
 
 describe('WebBridgePort transport contract', () => {
+  it('preserves bounded distinct Review references without inventing candidate metadata', () => {
+    const references = [{ provider: 'mangaupdates', externalId: '123' }, { provider: 'mangaupdates', externalId: '456' }];
+    const snapshot = { candidates: [], context: 'local', providerReferences: references, reason: 'AMBIGUOUS' };
+    expect(webReviewSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+    for (const providerReferences of [[references[0], references[0]], [{ provider: 'untrusted', externalId: '123' }], [{ provider: 'mangaupdates', externalId: 'invalid' }], Array.from({ length: 11 }, (_, index) => ({ provider: 'mangaupdates', externalId: String(index + 1) }))]) {
+      expect(webReviewSnapshotSchema.safeParse({ ...snapshot, providerReferences }).success).toBe(false);
+    }
+    expect(webReviewSnapshotSchema.parse({ candidates: [], context: 'local' })).toEqual({ candidates: [], context: 'local' });
+  });
   it('accepts only bounded versioned requests', () => {
     expect(webRequestSchema.parse({ type: 'bootstrap.read', requestId: 'req_1' })).toEqual({ type: 'bootstrap.read', requestId: 'req_1' });
     expect(webBridgeMessageLimit).toBe(65536);
+    expect(webRequestSchema.parse({ type: 'review.read', requestId: 'req_review', includeProviderReferences: true })).toMatchObject({ includeProviderReferences: true });
+    expect(webRequestSchema.parse({ type: 'review.read', requestId: 'req_legacy' })).not.toHaveProperty('includeProviderReferences');
+    expect(webRequestSchema.safeParse({ type: 'review.read', requestId: 'req_invalid', includeProviderReferences: false }).success).toBe(false);
   });
 
   it('rejects generic browser messages and unknown fields', () => {

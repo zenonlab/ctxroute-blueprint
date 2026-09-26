@@ -6,6 +6,7 @@ import type { DurableTask } from '../tasks';
 import { favoriteResolutionResultSchema, favoriteResolutionVersions } from './resolution-result-schema';
 import { favoriteArtifactAliasKeys } from './local-favorite-identity';
 import { normalizeFavoriteTitle } from './title-normalization';
+import { favoritePublicReferenceSchema } from './favorite-identity-lookup';
 
 interface FavoriteResolutionCommitDependencies {
   readonly libraryId: LibraryId;
@@ -47,6 +48,12 @@ export async function persistFavoriteResolutionCompletion(
   identity?: FavoriteResolvedIdentity,
 ): Promise<void> {
   const resolution = favoriteResolutionResultSchema.parse(result);
+  if (candidateSet?.references !== undefined && candidateSet.references.length > 10) throw new Error('REVIEW_REFERENCE_LIMIT');
+  const references = candidateSet?.references?.map((reference) => favoritePublicReferenceSchema.parse(reference));
+  const comparableReferences = references === undefined ? undefined
+    : [...new Map(references.map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
+  const compared = candidateSet === undefined ? undefined
+    : comparableReferences === undefined ? candidateSet : { ...candidateSet, references: comparableReferences };
   await dependencies.storage.transaction([
     'favoriteArtifacts', 'favoriteSources', 'favoriteResolutionReceipts',
     'favoriteResolutionTasks', 'favoriteReviewCandidateSets', 'libraries', 'progress', 'reviews', 'works',
@@ -91,11 +98,12 @@ export async function persistFavoriteResolutionCompletion(
         if (existingReview) await session.putReview(createReview({ ...existingReview, decisionOrigin: 'automatic', matchedWorkId: work.id, status: 'resolved' }));
       } else if (resolution.kind === 'REVIEW_REQUIRED') {
         if (source.presence !== 'observed') throw new Error('STALE_PRIVATE_REFERENCE');
-        if (resolution.reason === 'AMBIGUOUS' && (candidateSet === undefined || (candidateSet.totalCandidates ?? candidateSet.candidates.length) < 2 || candidateSet.candidates.length < 2)) throw new Error('AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES');
+        const comparableIdentities = new Set([...(compared?.candidates ?? []), ...(compared?.references ?? [])].map((candidate) => `${candidate.provider}:${candidate.externalId}`));
+        if (resolution.reason === 'AMBIGUOUS' && (compared === undefined || (compared.totalCandidates ?? comparableIdentities.size) < 2 || comparableIdentities.size < 2)) throw new Error('AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES');
         const id = source.reviewId ?? reviewId(`review_${source.id.slice('source_'.length)}`);
         await session.putReview(createReview({ id, reason: resolution.reason, sourceLabel: source.url, status: 'pending', title: source.title }));
-        const compared = candidateSet ?? { candidates: [], digest: `${record.artifact.semanticFingerprint}:${effect}`, provenance: effect, recordedAt: dependencies.now(), totalCandidates: 0 };
-        await session.putFavoriteReviewCandidateSet({ ...compared, reviewId: id });
+        const persisted = compared ?? { candidates: [], digest: `${record.artifact.semanticFingerprint}:${effect}`, provenance: effect, recordedAt: dependencies.now(), totalCandidates: 0 };
+        await session.putFavoriteReviewCandidateSet({ ...persisted, reviewId: id });
         updated = createFavoriteSource({ ...updated, reviewId: id });
       }
       await session.putFavoriteSource(updated);

@@ -1,7 +1,9 @@
 import { createProviderCandidateEnvelope } from '@tobirink/domain';
 import type { FavoriteProvider, ProviderCandidate, ProviderCandidateEnvelope } from '@tobirink/domain';
+import { inspectFavoriteTitleCandidates as inspectPublicCandidates } from '@tobirink/public-discovery';
 import { describe, expect, it } from 'vitest';
-import { hasExactBlockedProviderTaxonomy, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
+import { hasExactBlockedProviderTaxonomy, inspectFavoriteTitleCandidates, isProviderCandidateCompatible, matchFavoriteTitles } from './provider-matcher';
+import type { FavoriteTitleMatchQuery } from './provider-matcher';
 
 function candidate(externalId: string, title: string, provider: FavoriteProvider = 'anilist'): ProviderCandidate {
   return { externalId, mediaKind: provider === 'anilist' ? 'ANIME' : 'MANGA', preSerialization: false, provider, titles: [title] };
@@ -12,6 +14,30 @@ function envelope(candidates: readonly ProviderCandidate[], provider: FavoritePr
 }
 
 describe('deterministic favorite title matcher P-01…P-08', () => {
+  it.each(['MANGA', 'MANHWA', 'MANHUA'] as const)('reuses every hydrated comic subtype for a %s source', (mediaKind) => {
+    for (const candidateKind of ['MANGA', 'MANHWA', 'MANHUA'] as const) {
+      const comic = { ...candidate('comic', 'Synthetic Comic', 'mangadex'), mediaKind: candidateKind };
+      expect(isProviderCandidateCompatible({ mediaKind, sourceTitles: ['Synthetic Comic'] }, comic)).toBe(true);
+      expect(matchFavoriteTitles({ mediaKind, sourceTitles: ['Synthetic Comic'] }, [envelope([comic], 'mangadex')])).toMatchObject({ kind: 'MATCH' });
+      expect(isProviderCandidateCompatible({ mediaKind: 'ANIME', sourceTitles: ['Synthetic Comic'] }, comic)).toBe(false);
+      expect(isProviderCandidateCompatible({ mediaKind, sourceTitles: ['Synthetic Comic'] }, candidate('anime', 'Synthetic Comic'))).toBe(false);
+    }
+  });
+
+  it('keeps local and public candidate eligibility aligned for media, season and format', () => {
+    const cases: readonly [FavoriteTitleMatchQuery, ProviderCandidate][] = [
+      [{ mediaKind: 'MANHWA', sourceTitles: ['Target'] }, { ...candidate('42', 'Target', 'mangadex'), mediaKind: 'MANGA' }],
+      [{ mediaKind: 'ANIME', sourceTitles: ['Target'] }, candidate('42', 'Target', 'mangadex')],
+      [{ sourceFormat: 'NON_OVA', sourceTitles: ['Target'] }, { ...candidate('42', 'Target'), format: 'OVA' }],
+      [{ preSerialization: false, sourceTitles: ['Target'] }, { ...candidate('42', 'Target'), preSerialization: true }],
+      [{ explicitSeason: 2, sourceTitles: ['Target'] }, { ...candidate('42', 'Target'), season: 1 }],
+      [{ explicitSeason: 2, sourceTitles: ['Target'] }, { ...candidate('42', 'Target'), season: 2 }],
+      [{ explicitSeason: 2, sourceTitles: ['Area 51 Saison 2'] }, candidate('42', 'Area 51 2nd Season')],
+      [{ explicitSeason: 2, sourceTitles: ['Area 51'] }, { ...candidate('42', 'Area 52'), season: 2 }],
+    ];
+    for (const [query, value] of cases) expect(inspectPublicCandidates(query, [value])).toEqual(inspectFavoriteTitleCandidates(query, [value]));
+  });
+
   it('P-01 matches accents, case, punctuation and spacing', () => {
     expect(matchFavoriteTitles({ sourceTitles: ["L’Épopée de Frieren"] }, [envelope([candidate('1', 'l epopee de frieren')])])).toMatchObject({ kind: 'MATCH', level: 'ordered-exact' });
   });

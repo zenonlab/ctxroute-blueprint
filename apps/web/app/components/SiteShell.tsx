@@ -18,8 +18,9 @@ function activeNavigation(pathname: string) {
 export function useWebMemberNavigation(): MemberNavigationConfig {
   const router = useRouter();
   const pathname = usePathname();
-  const { bootstrap, decideReview, refreshReview, retry, review, status } = useWebBridge();
+  const { bootstrap, decideReview, refreshReview, retry, review, reviewBusy, reviewPending, status } = useWebBridge();
   const reviewItem = review?.reviewId && review.revision ? {
+    providerReferences: review.providerReferences,
     candidates: review.candidates.map((candidate) => ({
       candidateId: candidate.workId ?? candidate.candidateId,
       coverAlt: candidate.coverAlt,
@@ -47,9 +48,11 @@ export function useWebMemberNavigation(): MemberNavigationConfig {
       : decision.kind === 'manual'
         ? { decision: { kind: 'manual' as const, source: decision.source, value: decision.value }, reviewId: review.reviewId, revision: decision.revision }
         : { decision: { kind: decision.kind }, reviewId: review.reviewId, revision: decision.revision };
-    void decideReview(command);
+    void decideReview(command).catch(() => undefined);
   };
   const resolver: ReviewResolverProps = {
+    busy: reviewBusy,
+    pending: reviewPending,
     canNext: false,
     canPrevious: false,
     extensionRequired: status === 'extension-missing',
@@ -60,7 +63,7 @@ export function useWebMemberNavigation(): MemberNavigationConfig {
     onRefresh: () => void refreshReview(),
     onRetry: status === 'connected' ? () => void refreshReview() : retry,
     onSubmitDecision: submitDecision,
-    state: status === 'loading' || status === 'reconnecting' ? 'loading' : reviewItem ? 'ready' : status === 'connected' || status === 'extension-missing' ? 'empty' : 'error',
+    state: status === 'loading' || status === 'reconnecting' ? 'loading' : status === 'error' || status === 'incompatible' ? 'error' : reviewItem ? 'ready' : status === 'connected' || status === 'extension-missing' ? 'empty' : 'error',
   };
   return {
     activeId: activeNavigation(pathname),

@@ -2,7 +2,8 @@ import type { FavoriteParseArtifact } from '@tobirink/domain';
 import type { PublicDiscoveryKey } from '../public-discovery';
 import type { PublicDiscoveryRequestClientPort } from '../public-discovery';
 import type { PublicDiscoveryQuery, PublicDiscoveryReadState } from '@tobirink/public-discovery';
-import { favoriteIdentityKey, favoriteManualIdentityKey, favoritePublicReferenceSchema } from './favorite-identity-lookup';
+import { isFavoriteMediaKindCompatible } from '@tobirink/public-discovery';
+import { favoriteIdentityKey, favoriteIdentityLookupResultSchema, favoriteManualIdentityKey, selectFavoriteIdentityReference } from './favorite-identity-lookup';
 import type { FavoriteIdentityLookupPort, FavoritePublicReference } from './favorite-identity-lookup';
 import { favoriteProviderDiscoveryTitles, hasFavoriteOvaMarker, hasFavoritePreSerializationMarker, normalizeFavoriteTitle } from './title-normalization';
 
@@ -25,9 +26,10 @@ export async function preparePublicFavoriteDiscoveryIdentity(artifact: FavoriteP
     const syncKey = await favoriteIdentityKey(artifact);
     try {
       const results = await synchronized.lookup([syncKey]);
-      const result = results.length === 1 ? results[0] : undefined;
+      const parsed = favoriteIdentityLookupResultSchema.safeParse(results.length === 1 ? results[0] : undefined);
+      const result = parsed.success ? parsed.data : undefined;
       if (result?.kind === 'FOUND' && result.fingerprint === syncKey.fingerprint && result.references.length === 1
-        && (artifact.mediaKind === 'UNKNOWN' || artifact.mediaKind === result.mediaKind)) reference = favoritePublicReferenceSchema.parse(result.references[0]);
+        && isFavoriteMediaKindCompatible(artifact.mediaKind, result.mediaKind)) reference = selectFavoriteIdentityReference(result.mediaKind, result.references);
     } catch { /* Sync is a hint; unavailable hints do not block local proof. */ }
   }
   const key = reference === undefined ? await favoriteIdentityKey(artifact) : await favoriteManualIdentityKey(artifact, reference);

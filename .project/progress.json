@@ -5480,6 +5480,263 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-favorite-pipeline-refactor-20260926",
+      "title": "Refactoriser la pipeline favoris avec preuves de bout en bout",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "contracts-and-flow",
+          "title": "Définir les invariants et le flux",
+          "status": "DONE",
+          "acceptance": [
+            "Les défauts démontrés sont distingués des hypothèses COMIC et des effets du test à budget zéro.",
+            "Les clés v3, D1, données privées, limites réseau et décisions humaines restent compatibles.",
+            "Les diagrammes produit et ADR décrivent familles de média, Review et admission dédupliquée avant changement des contrats."
+          ],
+          "files": [
+            "docs/architecture/src/real-favorite-resolution.dataflow.json",
+            "docs/architecture/src/discovery-recovery.dataflow.json",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/decisions/ADR-0047-portable-public-discovery-component.md"
+          ],
+          "commands": [
+            "npm run archify:validate -- real-favorite-resolution.dataflow",
+            "npm run archify:validate -- discovery-recovery.dataflow",
+            "npm run validate:decisions"
+          ],
+          "evidence": [
+            "Deux dataflows showcase 9/9, zéro erreur/avertissement; ADR0046 distingue clés stables, état distant et projection locale; git diff --check passe."
+          ]
+        },
+        {
+          "id": "refactor-pipeline",
+          "title": "Refactoriser identité, admission et projection",
+          "status": "DONE",
+          "acceptance": [
+            "Famille manga compatible sans confondre anime, saison ou format; références explicites prioritaires et clés inchangées.",
+            "Quatre appels concurrents de même clé et requête partagent un seul échange; requêtes différentes non confondues; reprise durable et erreurs préservées.",
+            "Un résultat distant AMBIGUOUS conserve des références comparables en Review sans faux candidat ni boucle INTERNAL_FAILURE.",
+            "MANHWA/MANHUA restent filtrables avant résolution; résultat fournisseur prioritaire; raisons de reprise lisibles sans données privées distantes.",
+            "Régressions ciblées exécutées avant et après les corrections."
+          ],
+          "files": [
+            "packages/public-discovery/src/provider-kit.ts",
+            "packages/public-discovery/src/resolver.ts",
+            "packages/public-discovery/src/index.ts",
+            "packages/public-discovery/src/*.test.ts",
+            "packages/application/src/favorites/**",
+            "packages/application/src/ports/storage-port.ts",
+            "packages/application/src/use-cases/read-local-review-candidates.ts",
+            "packages/application/src/use-cases/read-local-review-candidates.test.ts",
+            "packages/application/src/library/**",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.ts",
+            "packages/adapters-browser/src/catalogue/http-public-discovery-adapter.test.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.ts",
+            "apps/extension/runtime/local-library-catalogue-runtime.test.ts",
+            "apps/extension/runtime/local-review-runtime.ts",
+            "apps/extension/runtime/local-review-runtime.test.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.ts",
+            "apps/extension/runtime/favorite-resolution-runtime.test.ts",
+            "packages/contracts/src/storage-port-contract.ts",
+            "packages/adapters-indexeddb/src/migrations/integrity.ts",
+            "packages/adapters-indexeddb/test/migrations-entry.ts",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/decisions/ADR-0047-portable-public-discovery-component.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/public-discovery",
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/adapters-browser",
+            "npm test --workspace @tobirink/extension",
+            "npm run test:migrations --workspace @tobirink/adapters-indexeddb",
+            "npm run typecheck",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Régressions rouge→vert: identité/famille/saison, AMBIGUOUS, diagnostics, facettes et admission atomique; suites finales portable174, application454 et HTTP22 passent.",
+            "Intégrité IndexedDB dans Chromium: anciennes lignes, références après réouverture, borne10, schéma et dédoublonnage validés.",
+            "Complément UI approuvé et validé dans goal-review-references-ui-20260926: références sélectionnables, pending visible, compatibilité v4 et correction de revision imbriquée."
+          ]
+        },
+        {
+          "id": "verify-complete-path",
+          "title": "Vérifier le parcours et ses limites",
+          "status": "DONE",
+          "acceptance": [
+            "Parcours déterministe MISS→PENDING→VERIFIED, Review et attente testés avec reprise et sans accès fournisseur extension.",
+            "npm run verify et Playwright complets passent; les fixtures simulées ne certifient pas une convergence réelle en production.",
+            "Rapport final sépare sources conservées, sources résolues, œuvres uniques et sous-types; aucune garantie de 1200 œuvres inventée.",
+            "Diff final audité; aucun fichier local étranger, migration, suppression, déploiement ou publication."
+          ],
+          "files": [
+            "apps/web/e2e/packaged-extension.spec.ts",
+            "apps/extension/scripts/installed-review.mjs",
+            "apps/extension/scripts/installed-review.test.mjs",
+            "docs/operations/cloudflare.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md",
+            "docs/architecture/src/real-favorite-resolution.dataflow.json",
+            "docs/architecture/src/discovery-recovery.dataflow.json"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run test:e2e --workspace @tobirink/web -- --workers=1",
+            "npm run archify:validate -- real-favorite-resolution.dataflow",
+            "npm run archify:validate -- discovery-recovery.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "npm run verify final exit0; Playwright11 passed/1 opt-in réseau skipped; deux builds isolés Chrome/Firefox identiques; Archify deux dataflows9/9 et diff-check passent.",
+            "Harness corrigé:34 tests; smoke20 SYNTHETIQUE offline conserve sources/cartes et observe stopped→running+health, workerRestartObserved=true, zéro réseau sortant.",
+            "Limite conservée: run1532 SYNTHETIQUE offline incomplete à235s,1532 sources/1400 cartes provisoires/0Work; aucun test du profil personnel ni certification production des1522 réels.",
+            "AGENTS, CLAUDE, hooks, CI et ressources production inchangés; travail dans clone isolé; aucune suppression de données, migration, publication ou déploiement."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-review-references-ui-20260926",
+      "title": "Rendre les références ambiguës sélectionnables",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "connect-reference-review",
+          "title": "Raccorder Review sans profils inventés",
+          "status": "DONE",
+          "acceptance": [
+            "Les contrats optionnels extension/WebBridge transportent au plus dix références fournisseur validées et les anciennes enveloppes restent valides.",
+            "Review affiche les références sans couverture ni titre fabriqués et réutilise la décision manuelle existante avec états attente/erreur/verrouillage.",
+            "Le vrai clic navigateur passe par PENDING puis VERIFIED avant de créer une association humaine; révisions et données privées restent protégées.",
+            "Tests de contrats, runtime, UI, Playwright, vérification globale et Archify passent; aucun déploiement ni écriture production."
+          ],
+          "files": [
+            "packages/ui/src/features/review/review-resolver/review-resolver.contract.ts",
+            "packages/ui/src/features/review/review-resolver/ReviewResolver.tsx",
+            "packages/ui/src/features/review/review-resolver/ReviewResolver.test.tsx",
+            "packages/ui/src/features/review/review-resolver/ReviewResolver.preview.tsx",
+            "packages/contracts/src/web-bridge.ts",
+            "packages/contracts/src/web-bridge.test.ts",
+            "apps/extension/runtime/local-review-runtime.ts",
+            "apps/extension/runtime/local-review-runtime.test.ts",
+            "apps/extension/runtime/review-messages.ts",
+            "apps/extension/runtime/review-navigation-model.ts",
+            "apps/extension/runtime/review-navigation-model.test.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/runtime/web-bridge-adapter.test.ts",
+            "apps/web/app/components/SiteShell.tsx",
+            "apps/web/app/components/WebBridgeProvider.tsx",
+            "apps/web/tests/WebBridgeProvider.test.tsx",
+            "apps/web/tests/LocalReviewNavigation.test.tsx",
+            "apps/extension/runtime/use-local-review-navigation.ts",
+            "apps/web/e2e/packaged-extension.spec.ts",
+            "docs/decisions/ADR-0046-verified-public-discovery-cache.md",
+            "docs/systems/favorite-resolution-rebuild-pipeline.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/ui",
+            "npm test --workspace @tobirink/contracts",
+            "npm test --workspace @tobirink/extension",
+            "npm run typecheck",
+            "npm run verify",
+            "npm run test:e2e --workspace @tobirink/web -- --workers=1",
+            "npm run archify:validate -- real-favorite-resolution.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Opt-in v4 compatible ancien client, fallback lecture borné, gates atomiques et aucun replay mutation; tests Web18, extension223, contrats15, UI130 verts.",
+            "Playwright vrai clic clavier: AMBIGUOUS→PENDING sans Work→redémarrage réellement observé→VERIFIED puis association humaine; un POST, zéro appel fournisseur.",
+            "Vérification finale npm run verify exit0; Playwright11 passed/1 opt-in réseau skipped; Chrome/Firefox reproductibles sur deux builds isolés; diff et deux Archify9/9 sans erreur/avertissement."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-deliver-favorite-pipeline-20260926",
+      "title": "Livrer le refactoring favoris par PR protégée",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "version-and-audit",
+          "title": "Versionner et auditer la candidate",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "La version corrective devient 1.0.45 dans le paquet et le lock, sans remplacer les archives 1.0.44.",
+            "ADR-0039 et le runbook distinguent candidate locale, publication désactivée et limites du test synthétique 1 532.",
+            "Le diff part de origin/main, exclut tout secret, profil, artefact généré et modification étrangère."
+          ],
+          "files": [
+            "apps/extension/package.json",
+            "package-lock.json",
+            "docs/decisions/ADR-0039-extension-release-versioning.md",
+            "docs/release.md",
+            "docs/plans/deliver-favorite-pipeline-20260926.json"
+          ],
+          "commands": [
+            "git diff --check",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all"
+          ],
+          "evidence": [
+            "origin/main rafraîchi; branche refactor dédiée; publication extension et canaris désactivés par défaut."
+          ]
+        },
+        {
+          "id": "verify-candidate",
+          "title": "Revalider archives et parcours complet",
+          "status": "TODO",
+          "acceptance": [
+            "npm run verify et Playwright complet passent sur 1.0.45.",
+            "Chrome et Firefox sont reproductibles sur deux builds isolés et leurs SHA-256 sont consignés.",
+            "Les deux dataflows Archify passent 9/9 sans erreur ni avertissement."
+          ],
+          "files": [
+            "apps/extension/.output/packages/release-manifest.json",
+            "docs/release.md"
+          ],
+          "commands": [
+            "npm run package:extension",
+            "npm run package:extension -- --verify-isolated",
+            "npm run verify",
+            "npm run test:e2e --workspace @tobirink/web -- --workers=1",
+            "npm run archify:validate -- discovery-recovery.dataflow",
+            "npm run archify:validate -- real-favorite-resolution.dataflow"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "deliver-protected-pr",
+          "title": "Livrer par PR et CI protégée",
+          "status": "TODO",
+          "acceptance": [
+            "Un commit ciblé part de origin/main sur une branche refactor.",
+            "La PR contient le diff audité et la CI obligatoire passe avant fusion.",
+            "La fusion peut déployer le Worker inchangé via le plan borné; publish_extension reste false, aucun canari ni réarmement D1.",
+            "Le statut final rapporte SHA, PR, CI et limites sans certifier le profil personnel."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "git commit",
+            "git push",
+            "gh pr create",
+            "gh pr checks",
+            "gh pr merge"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

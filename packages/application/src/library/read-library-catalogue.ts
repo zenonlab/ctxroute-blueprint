@@ -10,7 +10,7 @@ function key(value: string): string {
 }
 
 function detailedType(item: LibraryCatalogueItem): string {
-  return item.candidate?.mediaKind ?? item.mediaKind.toUpperCase();
+  return item.candidate?.mediaKind ?? item.sourceMediaKind ?? item.mediaKind.toUpperCase();
 }
 
 function progressState(progress: Progress | undefined): string {

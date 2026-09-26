@@ -1,5 +1,6 @@
 import { createResolutionDecision, favoriteAliasLimit, providerCandidateLimit } from '@tobirink/domain';
 import type { FavoriteMatchMethod, ProviderCandidate, ProviderCandidateEnvelope, ProviderCandidateReference, ResolutionDecision } from '@tobirink/domain';
+import { isFavoriteMediaKindCompatible } from '@tobirink/public-discovery';
 import { isWithinFavoriteEditDistance, normalizeFavoriteTitle, readSafeParenthesizedFavoriteTitle } from './title-normalization';
 import { readLabelledFavoriteSeason, stripFavoriteSeasonSuffix } from './season-extraction';
 
@@ -51,11 +52,7 @@ function isOva(value?: string): boolean {
 }
 
 export function isProviderCandidateCompatible(query: FavoriteTitleMatchQuery, candidate: ProviderCandidate): boolean {
-  if (query.mediaKind !== undefined && query.mediaKind !== candidate.mediaKind) {
-    const mangaFamily = query.mediaKind === 'MANGA' && candidate.mediaKind !== 'ANIME';
-    const kitsuManga = query.mediaKind !== 'ANIME' && candidate.provider === 'kitsu-manga' && candidate.mediaKind === 'MANGA';
-    if (!mangaFamily && !kitsuManga) return false;
-  }
+  if (!isFavoriteMediaKindCompatible(query.mediaKind, candidate.mediaKind)) return false;
   if (query.sourceFormat !== undefined && isOva(query.sourceFormat) !== isOva(candidate.format)) return false;
   if (query.preSerialization !== undefined && query.preSerialization !== candidate.preSerialization) return false;
   return true;
