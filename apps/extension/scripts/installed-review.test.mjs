@@ -2,7 +2,7 @@ import { mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes } from './installed-review-network.mjs';
+import { createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
 
 const key = (index = 1) => ({
@@ -38,6 +38,7 @@ async function guard(overrides = {}) {
   return {
     instance: await createInstalledReviewNetworkGuard({
       mutationBudget: 0,
+      captureSubmissions: false,
       onFailure,
       online: false,
       readBudget: 0,
@@ -126,6 +127,18 @@ describe('installed review network guard', () => {
       receipts: 0,
     });
     expect(() => instance.throwIfFailed()).not.toThrow();
+  });
+
+  it('captures canonical submissions privately without forwarding mutations', async () => {
+    const { instance, receiptRoot } = await guard({ captureSubmissions: true, online: true, readBudget: 1 });
+    const body = { key: key(), query, schemaVersion: 3 };
+    const request = fakeRoute({ body, method: 'POST', url: 'https://tobirink.com/v3/catalogue/discoveries/requests' });
+    await instance.handle(request);
+    expect(request.fetch).not.toHaveBeenCalled();
+    expect(instance.snapshot()).toMatchObject({ attemptedMutations: 1, blockedByBudget: 1, capturedRequests: 1, forwardedRequests: 0 });
+    expect(await readInstalledReviewSubmissions(receiptRoot, 'tobirink-installed-review-Abc123')).toEqual([body]);
+    const [name] = (await readdir(receiptRoot)).filter((value) => value.includes('.submission-'));
+    expect((await stat(join(receiptRoot, name))).mode & 0o077).toBe(0);
   });
 
   it('allows only the exact read contracts and local extension scheme', async () => {
