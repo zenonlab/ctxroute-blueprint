@@ -19,7 +19,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-14
-- Revised: 2026-09-23
+- Revised: 2026-09-26
 
 ## Contexte
 
@@ -63,10 +63,26 @@ incomplète ou une borne atteinte produit `incomplete-provider-search`, jamais
 un cache négatif. Cette erreur consomme un essai du bail existant; elle ne
 devient pas un report de cadence sans essai. Après huit échecs, le contrat D1
 expose toujours `UNAVAILABLE/ATTEMPT_LIMIT`, récupérable explicitement. Une
-véritable cadence ou réponse `429` conserve son échéance et son report sans
-consommation d'essai. Le timeout HTTP reste indépendant et l'appel déjà en
+véritable cadence ou réponse `429`, sans autre échec consommant retenu,
+conserve son échéance et son report sans consommation d'essai. Le timeout
+HTTP reste indépendant et l'appel déjà en
 vol n'est pas annulé par le budget du résolveur; aucune nouvelle page n'est
 démarrée après son expiration.
+
+Les erreurs ordinaires de transport, HTTP hors `429` et validation remontent
+sans conversion en `FavoriteProviderRetryError`. Le résolveur garde la cause
+prioritaire : recherche incomplète, erreur ordinaire, puis report typé avec
+l'échéance maximale. Une erreur ordinaire ne peut donc disparaître derrière
+une cadence ultérieure dans une recherche, une lane `UNKNOWN` ou un fallback
+d'hydratation. Un fallback réussi conserve son résultat. Le collecteur
+existant compte l'erreur non remboursable sans modifier les tables, les
+contrats publics ou les profils déjà vérifiés.
+
+Cette règle borne les erreurs remontées par le résolveur portable ; elle ne
+modifie pas le timeout de composition Worker de trente secondes, qui reste
+un report typé. Elle ne constitue pas un budget universel pour toute
+interruption, ni un checkpoint durable de pagination. Les huit essais
+consommés reprennent au bail existant, pouvant durer quinze minutes chacun.
 
 Les curseurs restent locaux à une exécution : aucun checkpoint de pagination
 n'est ajouté à D1 dans ce correctif. Le gate attend déjà les créneaux de huit

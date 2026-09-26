@@ -57,7 +57,134 @@ function countedD1(database: D1Database, limit: number) {
 
 beforeEach(async () => applyD1Migrations(env.PUBLIC_DB, env.TEST_MIGRATIONS));
 
+async function preserveProviderRuntime() {
+  const snapshot = await env.PUBLIC_DB.prepare(`SELECT provider, next_allowed_at AS nextAllowed, active_until AS activeUntil,
+    consecutive_failures AS failures, circuit_open_until AS circuitOpen, updated_at AS updated
+    FROM public_discovery_provider_runtime`).all<{
+      provider: string; nextAllowed: number; activeUntil: number; failures: number; circuitOpen: number; updated: string;
+    }>();
+  return () => env.PUBLIC_DB.batch(snapshot.results.map(row => env.PUBLIC_DB.prepare(`UPDATE public_discovery_provider_runtime
+    SET next_allowed_at = ?1, active_until = ?2, consecutive_failures = ?3, circuit_open_until = ?4, updated_at = ?5 WHERE provider = ?6`)
+    .bind(row.nextAllowed, row.activeUntil, row.failures, row.circuitOpen, row.updated, row.provider)));
+}
+
 describe('public discovery queue trigger', () => {
+  it('spends eight unavailable-provider attempts across fresh consumers, then stops without rearming FAILED', async () => {
+    const restoreRuntime = await preserveProviderRuntime();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-01T00:00:00.000Z'));
+    const discoveryKey = { ...key('a'), fingerprint: 'a503'.padStart(64, '0'), mediaKind: 'UNKNOWN' as const };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({}, { status: 503 }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      await adapter.request({ key: discoveryKey, query: { discoveryTitles: ['Synthetic unavailable work'], sourceTitles: ['Synthetic unavailable work'], mediaKind: 'UNKNOWN' }, requestDigest: 'd'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
+      for (let passage = 1; passage <= 10; passage += 1) {
+        const report = await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, discoveryKey, false);
+        expect(report).toMatchObject({ claimed: passage <= 8 ? 1 : 0, deferred: 0, failed: passage <= 8 ? 1 : 0, published: 0 });
+        expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+          .bind(discoveryKey.fingerprint).first()).toEqual({ state: passage <= 8 ? 'PROCESSING' : 'FAILED', attempts: Math.min(passage, 8) });
+        vi.setSystemTime(Date.now() + 16 * 60_000);
+      }
+      expect(provider).toHaveBeenCalledTimes(8 * 5);
+      await expect(new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB).read(discoveryKey, new Date().toISOString()))
+        .resolves.toEqual({ state: 'UNAVAILABLE', reason: 'ATTEMPT_LIMIT' });
+    } finally {
+      provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
+      await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
+      await restoreRuntime();
+    }
+  });
+
+  it('does not refund a spent primary failure when the fallback is cadence-deferred', async () => {
+    const restoreRuntime = await preserveProviderRuntime();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-02T00:00:00.000Z'));
+    const discoveryKey = { ...key('b'), fingerprint: 'b503'.padStart(64, '0') };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({}, { status: 503 }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      await env.PUBLIC_DB.prepare("UPDATE public_discovery_provider_runtime SET next_allowed_at = ?1 WHERE provider = 'kitsu-anime'")
+        .bind(Date.now() + 120_000).run();
+      await adapter.request({ ...submission('b', 'Synthetic mixed failure'), key: discoveryKey, requestDigest: 'e'.repeat(64) }, new Date().toISOString());
+      expect(await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, discoveryKey, false))
+        .toMatchObject({ claimed: 1, deferred: 0, failed: 1, published: 0 });
+      expect(provider).toHaveBeenCalledTimes(1);
+      expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PROCESSING', attempts: 1 });
+    } finally {
+      provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
+      await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
+      await restoreRuntime();
+    }
+  });
+
+  it.each(['cadence', '429'])('preserves a pure %s deadline without spending an attempt', async (scenario) => {
+    const restoreRuntime = await preserveProviderRuntime();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-03T00:00:00.000Z'));
+    const discoveryKey = { ...key('c'), fingerprint: (scenario === 'cadence' ? 'c503' : 'c429').padStart(64, '0') };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const retryAt = new Date(Date.now() + 120_000).toISOString();
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({}, { status: 429, headers: { 'Retry-After': '120' } }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      if (scenario === 'cadence') await env.PUBLIC_DB.prepare('UPDATE public_discovery_provider_runtime SET next_allowed_at = ?1')
+        .bind(Date.now() + 120_000).run();
+      await adapter.request({ ...submission('c', 'Synthetic deferred work'), key: discoveryKey, requestDigest: 'f'.repeat(64) }, new Date().toISOString());
+      expect(await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, discoveryKey, false))
+        .toMatchObject({ claimed: 1, deferred: 1, failed: 0, published: 0 });
+      expect(provider).toHaveBeenCalledTimes(scenario === 'cadence' ? 0 : 2);
+      expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, retry_at AS retryAt FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 0, retryAt });
+      vi.setSystemTime(Date.now() + 119_000);
+      expect(await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, discoveryKey, false)).toMatchObject({ claimed: 0 });
+      expect(provider).toHaveBeenCalledTimes(scenario === 'cadence' ? 0 : 2);
+    } finally {
+      provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
+      await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
+      await restoreRuntime();
+    }
+  });
+
+  it('keeps VERIFIED data after exhausting eight failed refresh attempts', async () => {
+    const restoreRuntime = await preserveProviderRuntime();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-04T00:00:00.000Z'));
+    const discoveryKey = { ...key('d'), fingerprint: 'd503'.padStart(64, '0') };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const initialAt = '2026-09-01T00:00:00.000Z';
+    const requestDigest = 'a'.repeat(64);
+    const profile = {
+      workId: 'work_preserved_failed_refresh',
+      candidate: { displayTitle: 'Synthetic preserved failed refresh', externalId: '905030', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Synthetic preserved failed refresh'] },
+      references: [{ externalId: '905030', provider: 'anilist' as const }],
+    };
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({}, { status: 503 }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      await adapter.request({ ...submission('d', 'Synthetic preserved failed refresh'), key: discoveryKey, requestDigest }, initialAt);
+      const claim = await adapter.claimBatch({ claimToken: 'a'.repeat(48), tokenDigest: 'b'.repeat(64), key: discoveryKey, now: initialAt, leaseUntil: '2026-09-01T00:15:00.000Z', limit: 1 });
+      await adapter.publishBatch({ claimToken: claim.claimToken, nonce: crypto.randomUUID(), results: [{ key: discoveryKey, requestDigest, resolution: { state: 'VERIFIED', profile } }], schemaVersion: 3, verifiedAt: initialAt }, 'b'.repeat(64), 'c'.repeat(64), initialAt);
+      expect((await adapter.requestRefresh(discoveryKey, new Date().toISOString())).outcome).toBe('created');
+      for (let passage = 1; passage <= 10; passage += 1) {
+        expect(await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, discoveryKey, false))
+          .toMatchObject({ claimed: passage <= 8 ? 1 : 0, deferred: 0, failed: passage <= 8 ? 1 : 0, published: 0 });
+        await expect(new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB).read(discoveryKey, new Date().toISOString()))
+          .resolves.toMatchObject({ state: 'VERIFIED', profile, verifiedAt: initialAt });
+        vi.setSystemTime(Date.now() + 16 * 60_000);
+      }
+      expect(provider).toHaveBeenCalledTimes(8);
+      expect(await env.PUBLIC_DB.prepare('SELECT state, refresh_state AS refreshState, refresh_attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'VERIFIED', refreshState: 'IDLE', attempts: 0 });
+    } finally {
+      provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
+      await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
+      await restoreRuntime();
+    }
+  });
+
   it('overrides a resolver-converted budget error and defers later claims without calling any provider', async () => {
     const provider: FavoriteProviderPort = { search: vi.fn(), hydrate: vi.fn() };
     const providers = { anilist: provider, mangaupdates: provider, mangadex: provider, 'kitsu-anime': provider, 'kitsu-manga': provider };
