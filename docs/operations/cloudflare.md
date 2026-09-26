@@ -62,6 +62,29 @@ cible `worker:tobirink-public-api`. Il ne migre pas D1 et ne modifie pas les
 secrets; le déploiement conserve les réglages Queue du fichier Wrangler.
 Aucun autre runner ne peut recevoir cette lane de production.
 
+Un lancement manuel sur une branche conserve les vérifications et le plan en
+lecture seule, mais n'applique aucun Worker et n'admet aucun canari. Ces étapes,
+ainsi que les probes post-déploiement, exigent `refs/heads/main`. La publication
+des archives conserve sa condition distincte sur `main` et ses deux options.
+
+Le diagnostic agrégé reçoit explicitement `CLOUDFLARE_ACCOUNT_ID` et le token
+depuis les secrets existants. Il refuse un compte absent ou invalide avant de
+lancer Wrangler ; aucun élargissement de permission ni découverte automatique
+de compte n'est requis. Les erreurs 9109 observées le 26 septembre concernaient
+la lecture `/accounts`, pas une panne D1 prouvée. Un ID explicite ne garantit
+pas les droits D1 : une lecture avec l'identité CI doit encore réussir.
+
+Chaque requête SELECT utilise directement le CLI Wrangler verrouillé dans
+un processus enfant via l'exécutable Node courant, avec une limite de quinze secondes et de 1 Mio
+de sortie. Le processus est tué à l'échéance ; aucun wrapper npm intermédiaire
+n'est conservé. Les quatre requêtes ne sont pas réessayées et l'étape CI est
+limitée à deux minutes. Les logs disque et rapports d'erreur Wrangler sont
+désactivés. Le rapport ajoute seulement des échecs `{query, code}` issus d'une
+liste fermée : compte absent/invalide, accès refusé, authentification, timeout,
+sortie excessive, commande absente, transport, requête ou réponse invalide.
+Ni stdout/stderr brut, ni token, ni corps privé ne quitte cette frontière.
+Toute requête manquante garde `ok=false` et interdit le plan/application.
+
 L'input `publish_extension` reste faux par défaut : les pushes ne publient
 aucun objet R2. Un lancement manuel sur `main` doit aussi activer
 `run_manga_canary`; le prévol refuse toute autre combinaison avant l'apply
