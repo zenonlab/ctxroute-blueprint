@@ -41,6 +41,16 @@ test('local verification retains the complete quality boundary', () => {
   assert.equal(read('.github/code-review-graph-constraints.txt').trim().endsWith('code-review-graph==2.3.8'), true);
 });
 
+test('Playwright Chromium is reused by the repository verification', () => {
+  const workflow = read('.github/workflows/deploy-production.yml');
+  const install = workflow.split('- name: Install Playwright Chromium')[1]?.split('- name:')[0];
+  assert.ok(install);
+  assert.match(install, /chromium\.executablePath\(\)/u);
+  assert.match(install, /test -x "\$CHROME_BIN"/u);
+  assert.match(install, /CHROME_BIN=%s\\n.*GITHUB_ENV/u);
+  assert.ok(workflow.indexOf('- name: Install Playwright Chromium') < workflow.indexOf('- name: Verify repository'));
+});
+
 test('fresh production canaries require bounded provider observation', () => {
   const workflow = read('.github/workflows/deploy-production.yml');
   const canaryStep = workflow.split('- name: Run fresh bounded anime and manga canaries')[1]?.split('- name:')[0];
