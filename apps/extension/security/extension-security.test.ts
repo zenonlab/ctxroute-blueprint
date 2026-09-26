@@ -18,11 +18,14 @@ const generatedManifestSchema = z.object({
   declarative_net_request: z.never().optional(),
   host_permissions: z.array(z.string()).optional(),
   externally_connectable: z.object({ matches: z.array(z.string()).min(1) }),
-  content_scripts: z.array(z.object({ matches: z.array(z.string()).min(1) })),
+  content_scripts: z.array(z.strictObject({ js: z.array(z.string()).min(1), matches: z.array(z.string()).min(1), run_at: z.literal('document_start') })),
   minimum_chrome_version: z.string().optional(),
+  optional_host_permissions: z.array(z.string()).optional(),
+  optional_permissions: z.array(z.string()).optional(),
   icons: z.record(z.string(), z.string()),
   manifest_version: z.number(),
   permissions: z.array(z.string()),
+  web_accessible_resources: z.never().optional(),
 });
 
 async function chromeManifest() {
@@ -43,8 +46,11 @@ describe('extension security boundary', () => {
     expect(value.manifest_version).toBe(3);
     expect(value.permissions).not.toContain('declarativeNetRequestWithHostAccess');
     expect(value.declarative_net_request).toBeUndefined();
+    expect(value.web_accessible_resources).toBeUndefined();
     if (_target === 'chrome-mv3') expect(value.minimum_chrome_version).toBe('140');
     expect(value.host_permissions ?? []).toEqual(['https://tobirink.com/*']);
+    expect(value.optional_host_permissions).toBeUndefined();
+    expect(value.optional_permissions).toBeUndefined();
     expect(value.externally_connectable.matches).toEqual(['https://tobirink.com/*']);
     expect(value.content_scripts).toEqual([
       expect.objectContaining({ matches: ['https://tobirink.com/*'] }),
@@ -60,9 +66,8 @@ describe('extension security boundary', () => {
     expect(value.action.default_icon).toEqual(value.icons);
     expect(value.action.default_popup).toBe('popup.html');
     const policy = value.content_security_policy.extension_pages;
-    expect(policy).toContain("script-src 'self'");
-    expect(policy).toContain("object-src 'none'");
-    expect(policy).not.toMatch(/https?:|unsafe-eval/);
+    expect(policy).toBe("script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; connect-src https://tobirink.com;");
+    expect(policy).not.toMatch(/unsafe-eval|wss?:/u);
   });
 
   it('accepts only the closed versioned message contract', () => {

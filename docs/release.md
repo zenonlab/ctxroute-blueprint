@@ -1,5 +1,37 @@
 # Extension packaging and rollback
 
+## Candidate 1.0.44 — garde du profil installé — 26 septembre 2026
+
+Les candidates locales 1.0.44 contiennent chacune 20 fichiers. Le ZIP Chrome
+possède le SHA-256
+`d04072bc846a90e66b820647469da50934eb2a74d3873fabe23c4fc5063f4a17`
+et le ZIP Firefox
+`862049a83d831dacbc2f7cf7b3c6571273e332482299e74d0a9db6f1ca2afe5a`.
+Ces nouveaux octets ajoutent une directive CSP `connect-src` limitée à
+l'origine HTTPS TobiRink; le packager refuse désormais toute divergence de CSP,
+permissions, origine, content script ou clés racine du manifeste. L'ancien hash
+Chrome `fe737a9235…` reste une preuve historique, pas le certificat de cette
+candidate.
+
+La dernière session en ligne historique compte 132 résolus, 11 Review,
+41 exclus, 603 retryable et 735 processing. Les deux dernières catégories
+forment 1 338 états non terminaux. Ces mesures précèdent le garde-fou courant
+et ne doivent pas être présentées comme l'état actuel de production.
+
+Le runner vérifie cette CSP et le manifeste avant chargement, refuse tout HTTP
+ou en-tête hors contrat TobiRink, partage un budget mutationnel fermé entre
+admission et refresh, écrit ses reçus/slots privés avant I/O et scelle le
+premier échec avant tout await d'abort. Un
+certificat n'est écrit qu'après fermeture réussie de Chromium et drainage des
+handlers à `inFlight=0`. Le lot n'exécute aucun POST de production et ne publie
+aucune archive; le pointeur public reste 1.0.43. Le smoke neuf de deux favoris
+réels passe hors ligne après les deux redémarrages, avec zéro sortie réseau. La
+session temporaire complète reprise termine aussi `offline-regression-passed` :
+1 522 / 1 522 sources, zéro traitement actif, 1 483 retryable, 39 unsupported,
+redémarrages vérifiés et zéro sortie réseau. Aucun profil personnel
+correspondant n'a été trouvé. Ces preuves certifient l'import hors ligne, pas la
+convergence fournisseur des 1 522.
+
 ## Publication corrective 1.0.43 — 23 septembre 2026
 
 Les archives immuables `1.0.43` ont été produites par le packager verrouillé,

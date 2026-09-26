@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createDeterministicZip } from './deterministic-zip.mjs';
+import { assertExtensionManifestRootSurface } from './extension-manifest-surface.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const extensionRoot = join(root, 'apps/extension');
@@ -11,6 +12,10 @@ const outputRoot = join(extensionRoot, '.output');
 const packageRoot = join(outputRoot, 'packages');
 const version = JSON.parse(readFileSync(join(extensionRoot, 'package.json'), 'utf8')).version;
 const siteOrigin = 'https://tobirink.com';
+const siteMatch = `${siteOrigin}/*`;
+const extensionPagesPolicy = `script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; connect-src ${siteOrigin};`;
+const extensionPermissions = ['storage', 'bookmarks', 'alarms', 'notifications', 'activeTab'];
+const contentScripts = [{ matches: [siteMatch], run_at: 'document_start', js: ['content-scripts/web-bridge.js'] }];
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, encoding: 'utf8', env: { ...process.env, WXT_PUBLIC_SITE_ORIGIN: siteOrigin }, stdio: 'inherit' });
@@ -31,10 +36,16 @@ function filesUnder(directory) {
 function packageTarget(target, sourceRoot = outputRoot, destination = packageRoot) {
   const source = join(sourceRoot, target);
   const builtManifest = JSON.parse(readFileSync(join(source, 'manifest.json'), 'utf8'));
-  const expectedMatch = `${siteOrigin}/*`;
+  assertExtensionManifestRootSurface(builtManifest, target);
   if (builtManifest.version !== version) throw new Error(`Manifest version mismatch for ${target}.`);
-  if (!builtManifest.content_scripts?.some((entry) => entry.matches?.includes(expectedMatch))) throw new Error(`WebBridge origin missing for ${target}.`);
-  if (!builtManifest.externally_connectable?.matches?.includes(expectedMatch)) throw new Error(`External origin missing for ${target}.`);
+  if (JSON.stringify(builtManifest.content_scripts) !== JSON.stringify(contentScripts)) throw new Error(`Content script surface mismatch for ${target}.`);
+  if (JSON.stringify(builtManifest.externally_connectable?.matches) !== JSON.stringify([siteMatch])) throw new Error(`External origin mismatch for ${target}.`);
+  if (JSON.stringify(builtManifest.host_permissions) !== JSON.stringify([siteMatch])) throw new Error(`Host permissions mismatch for ${target}.`);
+  if ((builtManifest.optional_host_permissions ?? []).length !== 0) throw new Error(`Optional host permissions forbidden for ${target}.`);
+  if ((builtManifest.optional_permissions ?? []).length !== 0) throw new Error(`Optional extension permissions forbidden for ${target}.`);
+  if (builtManifest.declarative_net_request !== undefined) throw new Error(`Declarative network rules forbidden for ${target}.`);
+  if (JSON.stringify(builtManifest.permissions) !== JSON.stringify(extensionPermissions)) throw new Error(`Extension permissions mismatch for ${target}.`);
+  if (builtManifest.content_security_policy?.extension_pages !== extensionPagesPolicy) throw new Error(`Extension connection policy mismatch for ${target}.`);
   const entries = filesUnder(source).map((path) => ({ content: readFileSync(path), name: relative(source, path) }));
   const first = createDeterministicZip(entries);
   const second = createDeterministicZip(entries);

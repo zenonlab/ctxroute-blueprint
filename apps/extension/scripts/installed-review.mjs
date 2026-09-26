@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { cp, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes } from './installed-review-network.mjs';
+import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
+
+export { createInstalledReviewNetworkGuard } from './installed-review-network.mjs';
 
 const descriptorRoot = fileURLToPath(new URL('../../../build/installed-review/', import.meta.url));
 const countNames = ['observed', 'processing', 'resolved', 'review', 'retryable', 'blocked', 'unsupported', 'internalErrors', 'publicDiscoveryPending', 'admissionWaiting', 'rateLimited', 'networkErrors', 'actionRequired', 'providerPaused'];
@@ -21,13 +26,18 @@ export function installedReviewConfig(env = process.env) {
   assert.ok(!online || env.TOBIRINK_FAVORITES_EXPORT, 'Online testing requires an explicit private bookmark export.');
   const budgetSeconds = integer(env.TOBIRINK_INSTALLED_BUDGET_SECONDS, online ? 600 : 240, 30, 1800);
   const bookmarkLimit = integer(env.TOBIRINK_INSTALLED_BOOKMARK_LIMIT, 100_000, 1, 100_000);
+  const mutationBudget = integer(env.TOBIRINK_INSTALLED_MUTATION_BUDGET, 0, 0, 2);
+  const refreshBudget = integer(env.TOBIRINK_INSTALLED_REFRESH_BUDGET, 0, 0, 2);
+  const readBudget = integer(env.TOBIRINK_INSTALLED_READ_BUDGET, online ? 200 : 0, 0, 5000);
+  assert.ok(online || mutationBudget === 0 && refreshBudget === 0 && readBudget === 0, 'Offline installed review cannot forward network requests.');
+  assert.ok(refreshBudget <= mutationBudget, 'Refresh budget must fit inside the combined mutation budget.');
   const milestones = env.TOBIRINK_INSTALLED_OBSERVE_SECONDS === undefined
     ? [15, 60, 180, Math.floor(budgetSeconds / 2)]
     : env.TOBIRINK_INSTALLED_OBSERVE_SECONDS.split(',').map((value) => integer(value, 0, 1, budgetSeconds - 1));
   assert.ok(milestones.length <= 12, 'At most twelve observation milestones are allowed.');
   const session = env.TOBIRINK_INSTALLED_SESSION;
   assert.ok(session === undefined || /^tobirink-installed-review-[A-Za-z0-9]{6,32}$/u.test(session), 'Invalid installed-review session token.');
-  return { online, budgetSeconds, bookmarkLimit, favoritesExport: env.TOBIRINK_FAVORITES_EXPORT, session,
+  return { online, budgetSeconds, bookmarkLimit, mutationBudget, refreshBudget, readBudget, favoritesExport: env.TOBIRINK_FAVORITES_EXPORT, session,
     milestones: [...new Set(milestones.filter((value) => value < budgetSeconds - 5))].sort((left, right) => left - right) };
 }
 
@@ -36,6 +46,10 @@ export function importedBookmarks(html) {
   return [...html.matchAll(/<A\s+[^>]*HREF="([^"]+)"[^>]*>([\s\S]*?)<\/A>/giu)]
     .map((match) => ({ title: decode(match[2].replace(/<[^>]+>/gu, '').trim()), url: decode(match[1]) }))
     .filter(({ title, url }) => title.length > 0 && /^https?:\/\//iu.test(url));
+}
+
+export function installedBookmarkCorpusDigest(bookmarks) {
+  return createHash('sha256').update(JSON.stringify(bookmarks.map(({ title, url }) => ({ title, url })))).digest('hex');
 }
 
 function syntheticBookmarks() {
@@ -66,6 +80,11 @@ export function installedVerdict(snapshot, expected, online) {
     && snapshot.counts.processing === 0 && snapshot.counts.blocked === 0
     && snapshot.counts.resolved + snapshot.counts.review + snapshot.counts.retryable + snapshot.counts.unsupported === expected
     && snapshot.unresolved === 0 && snapshot.missingProjectedWorks === 0 ? 'offline-regression-passed' : 'incomplete';
+}
+
+export function installedFailureVerdict(error, expired, deadline, now, networkFailure, closeFailure = false) {
+  if (closeFailure || networkFailure !== undefined || error instanceof assert.AssertionError) return 'failed';
+  return expired || now >= deadline - 15_000 ? 'incomplete' : 'failed';
 }
 
 function extractArchive(archive, destination) {
@@ -159,40 +178,65 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
   const dataOrigin = { source: config.favoritesExport === undefined ? 'synthetic' : 'private-bookmark-export', privateDatabaseCopied: false, personalProfileCertified: false };
   let stage = 'prepare';
   let context;
+  let closeFailure = false;
+  let closePromise;
+  let networkGuard;
   let session;
   let expired = false;
   const log = (value) => process.stdout.write(JSON.stringify(value) + '\n');
   const checkpoint = async () => writeFile(join(descriptorRoot, session.token + '.json'), JSON.stringify(session, null, 2) + '\n', { mode: 0o600 });
-  const watchdog = setTimeout(() => { expired = true; void context?.close().catch(() => undefined); }, config.budgetSeconds * 1000);
+  const closeContext = async (required = true) => {
+    if (closePromise === undefined && context !== undefined) {
+      const closing = context;
+      closePromise = closing.close()
+        .then(() => { if (context === closing) context = undefined; })
+        .finally(() => { closePromise = undefined; });
+    }
+    if (closePromise === undefined) return;
+    try { await closePromise; }
+    catch (error) {
+      closeFailure = true;
+      if (required) throw error;
+    }
+  };
+  const watchdog = setTimeout(() => { expired = true; void closeContext(false); }, config.budgetSeconds * 1000);
   try {
     const corpus = config.favoritesExport === undefined ? syntheticBookmarks() : importedBookmarks(await readFile(config.favoritesExport, 'utf8'));
     assert.ok(corpus.length > 0, 'No importable HTTP favorites.');
     const bookmarks = corpus.slice(0, config.bookmarkLimit);
+    const corpusDigest = installedBookmarkCorpusDigest(bookmarks);
     await mkdir(descriptorRoot, { recursive: true, mode: 0o700 });
+    const network = { mutationBudget: config.mutationBudget, readBudget: config.readBudget, refreshBudget: config.refreshBudget };
     if (config.session !== undefined) {
       session = JSON.parse(await readFile(join(descriptorRoot, config.session + '.json'), 'utf8'));
-      assert.equal(session.schemaVersion, 1);
+      assert.equal(session.schemaVersion, 3, 'Sessions created before the exact corpus and network guard cannot be resumed.');
       assert.equal(session.token, config.session);
       assert.equal(session.root, join(tmpdir(), session.token), 'Resume must use the generated temporary profile.');
       assert.equal(session.online, config.online, 'Resume must preserve the configured network mode.');
+      assert.deepEqual(session.network, network, 'Resume must preserve the configured network budgets.');
       assert.equal(session.source ?? 'synthetic', dataOrigin.source, 'Resume must preserve the source provenance.');
       assert.equal(session.expected, bookmarks.length, 'Resume must preserve the source count.');
+      assert.equal(session.corpusDigest, corpusDigest, 'Resume must preserve the exact private source corpus.');
       assert.equal(previousArchive, undefined, 'A resumed session must not be reseeded or downgraded.');
     } else {
       const root = await mkdtemp(join(tmpdir(), 'tobirink-installed-review-'));
-      session = { schemaVersion: 1, token: basename(root), root, expected: bookmarks.length, online: config.online, source: dataOrigin.source, seeded: false };
+      session = { schemaVersion: 3, token: basename(root), root, corpusDigest, expected: bookmarks.length, network, online: config.online, source: dataOrigin.source, seeded: false };
       await mkdir(join(root, 'extension'), { mode: 0o700 });
       if (archive !== undefined) extractArchive(previousArchive ?? archive, join(root, 'extension'));
       else await cp(fileURLToPath(new URL('../.output/chrome-mv3', import.meta.url)), join(root, 'extension'), { recursive: true });
       await checkpoint();
     }
-    log({ event: 'installed-session', session: session.token, mode: config.online ? 'online-private-copy' : 'offline', dataOrigin, selected: session.expected, available: corpus.length, budgetSeconds: config.budgetSeconds });
+    await assertInstalledReviewExtensionSurface(join(session.root, 'extension'));
+    networkGuard = await createInstalledReviewNetworkGuard({ ...network, online: config.online, receiptRoot: descriptorRoot, token: session.token,
+      onFailure: async () => { void closeContext(false); } });
+    log({ event: 'installed-session', session: session.token, mode: config.online ? 'online-private-copy' : 'offline', dataOrigin, selected: session.expected, available: corpus.length, budgetSeconds: config.budgetSeconds, network });
     const require = createRequire(new URL('../../web/package.json', import.meta.url));
     const { chromium } = require('@playwright/test');
     const launchOptions = { args: ['--enable-unsafe-extension-debugging'], ignoreDefaultArgs: ['--disable-extensions'], channel: 'chromium', headless: true };
     if (!config.online) launchOptions.args.push('--host-resolver-rules=MAP * 127.0.0.1, EXCLUDE localhost', '--proxy-server=http://127.0.0.1:9', '--proxy-bypass-list=<-loopback>');
     const launch = async () => {
       context = await chromium.launchPersistentContext(join(session.root, 'profile'), { ...launchOptions, timeout: Math.max(1, Math.min(30_000, deadline - Date.now())) });
+      await installInstalledReviewNetworkRoutes(context, networkGuard);
       await context.setOffline(!config.online);
       context.setDefaultTimeout(Math.max(1, Math.min(20_000, deadline - Date.now())));
       return context.browser().newBrowserCDPSession();
@@ -215,26 +259,35 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       await checkpoint();
     }
     const loadExtension = async () => {
+      networkGuard.throwIfFailed();
       const loaded = await debugging.send('Extensions.loadUnpacked', { path: join(session.root, 'extension') });
       if (session.extensionId !== undefined) assert.equal(loaded.id, session.extensionId, 'Extension identity must survive upgrades and restarts.');
       session.extensionId = loaded.id;
       await page.goto('chrome-extension://' + loaded.id + '/options.html');
       const health = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'health.check', version: 1 }));
       assert.equal(health.ok, true);
+      networkGuard.throwIfFailed();
       session.version = await page.evaluate(() => globalThis.chrome.runtime.getManifest().version);
       await checkpoint();
     };
     stage = 'install';
     await loadExtension();
     const observe = async (label) => {
+      networkGuard.throwIfFailed();
       const snapshot = await capture(page);
+      networkGuard.throwIfFailed();
       const entry = { event: 'installed-observation', label, elapsedSeconds: Math.round((Date.now() - startedAt) / 1000), version: session.version, ...snapshot.aggregate };
       entry.converged = installedConverged(entry, session.expected);
       observations.push(entry);
       log(entry);
       return snapshot;
     };
-    const readStatus = () => page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }));
+    const readStatus = async () => {
+      networkGuard.throwIfFailed();
+      const status = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }));
+      networkGuard.throwIfFailed();
+      return status;
+    };
     const waitForInventory = async () => {
       let lastProgress = 0;
       while (Date.now() < deadline - 15_000) {
@@ -254,8 +307,9 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     if (previousArchive !== undefined || config.session !== undefined && archive !== undefined) {
       stage = 'upgrade';
       const oldVersion = session.version;
-      await context.close();
+      await closeContext();
       extractArchive(archive, join(session.root, 'extension'));
+      await assertInstalledReviewExtensionSurface(join(session.root, 'extension'));
       debugging = await launch();
       page = await context.newPage();
       await loadExtension();
@@ -272,7 +326,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     const afterWorker = await observe('after-service-worker-restart');
     assertPreserved(before, afterWorker, session.expected);
     stage = 'browser-restart';
-    await context.close();
+    await closeContext();
     debugging = await launch();
     page = await context.newPage();
     await loadExtension();
@@ -301,6 +355,22 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     }
     const final = await observe('final');
     assertPreserved(afterBrowser, final, session.expected);
+    await closeContext();
+    await networkGuard.drain();
+    networkGuard.throwIfFailed();
+    const networkEvidence = networkGuard.snapshot();
+    assert.equal(networkEvidence.inFlight, 0, 'Installed-review network handlers must drain before certification.');
+    if (!config.online) {
+      assert.ok(networkEvidence.attemptedMutations >= 1, 'Offline smoke must observe a blocked mutation attempt.');
+      assert.ok(networkEvidence.blockedByBudget >= 1, 'Offline smoke must prove the zero mutation budget.');
+      assert.equal(networkEvidence.forwardedRequests, 0, 'Offline smoke must not forward admissions.');
+      assert.equal(networkEvidence.forwardedRefreshes, 0, 'Offline smoke must not forward refreshes.');
+      assert.equal(networkEvidence.receipts, 0, 'Offline smoke must not create mutation receipts.');
+      assert.equal(networkEvidence.providerAttempts, 0, 'The extension must not contact providers directly.');
+      assert.equal(networkEvidence.foreignAttempts, 0, 'The extension must not contact foreign origins.');
+      assert.equal(networkEvidence.webSocketAttempts, 0, 'The extension must not open WebSockets.');
+      assert.equal(networkEvidence.readSlots, 0, 'Offline smoke must not consume online read slots.');
+    }
     const verdict = installedVerdict(final.aggregate, session.expected, config.online);
     if (verdict === 'offline-regression-passed' && config.favoritesExport === undefined) {
       const unsupported = bookmarks.filter((item) => item.url.includes('/search/')).length;
@@ -312,20 +382,24 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       assert.equal(final.aggregate.library.total, session.expected - unsupported);
     }
     const converged = installedConverged(final.aggregate, session.expected);
-    await writeFile(join(descriptorRoot, session.token + '.report.json'), JSON.stringify({ schemaVersion: 1, verdict, converged, dataOrigin, restartsVerified: true, upgradeVerified: upgraded,
-      expected: session.expected, version: session.version, observations }, null, 2) + '\n', { mode: 0o600 });
-    log({ event: 'installed-result', verdict, converged, restartsVerified: true, selected: session.expected, session: session.token });
+    await writeFile(join(descriptorRoot, session.token + '.report.json'), JSON.stringify({ schemaVersion: 2, verdict, converged, dataOrigin, restartsVerified: true, upgradeVerified: upgraded,
+      expected: session.expected, version: session.version, network: networkEvidence, observations }, null, 2) + '\n', { mode: 0o600 });
+    log({ event: 'installed-result', verdict, converged, network: networkEvidence, restartsVerified: true, selected: session.expected, session: session.token });
     return verdict === 'incomplete' ? 2 : 0;
   } catch (error) {
-    const verdict = !(error instanceof assert.AssertionError) && (expired || Date.now() >= deadline - 15_000) ? 'incomplete' : 'failed';
+    await closeContext(false);
+    await networkGuard?.drain();
+    const networkEvidence = networkGuard?.snapshot();
+    const verdict = installedFailureVerdict(error, expired, deadline, Date.now(), networkEvidence?.failure, closeFailure);
     if (session !== undefined) {
-      await writeFile(join(descriptorRoot, session.token + '.report.json'), JSON.stringify({ schemaVersion: 1, verdict, dataOrigin, stage, observations }, null, 2) + '\n', { mode: 0o600 });
-      log({ event: 'installed-result', verdict, stage, session: session.token, error: error instanceof assert.AssertionError ? 'assertion-failed' : 'stage-unavailable' });
+      await writeFile(join(descriptorRoot, session.token + '.report.json'), JSON.stringify({ schemaVersion: 2, verdict, dataOrigin, stage, network: networkEvidence, observations }, null, 2) + '\n', { mode: 0o600 });
+      log({ event: 'installed-result', verdict, stage, session: session.token, network: networkEvidence, error: error instanceof assert.AssertionError ? 'assertion-failed' : 'stage-unavailable' });
     } else log({ event: 'installed-result', verdict, stage, error: 'input-unavailable' });
     return verdict === 'incomplete' ? 2 : 1;
   } finally {
     clearTimeout(watchdog);
-    await context?.close().catch(() => undefined);
+    await closeContext(false);
+    await networkGuard?.drain();
   }
 }
 
