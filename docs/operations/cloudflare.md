@@ -1331,3 +1331,46 @@ Le rollback du seul script revient à un observateur moins strict et ne doit
 donc jamais être utilisé pour autoriser une reprise sur un ancien certificat
 agrégé. Aucun changement Worker, protocole public ou archive d'extension
 n'est nécessaire à cette corrélation déjà exposée par le runtime.
+
+### Premier lot de reprise historique — 26 septembre 2026
+
+Après les deux canaris corrélés, une seule demande historique
+`FAILED/ATTEMPT_LIMIT` a été resoumise par l'API v3 avec sa clé, son payload et
+son digest vérifiés en mémoire. Le reçu privé a été créé en mode `0600` avant
+l'I/O réseau. L'unique POST a répondu `202`; il ne doit pas être rejoué et
+aucun SQL de mutation, second lot, migration ou publication d'extension n'a
+été exécuté.
+
+La même invocation corrèle deux appels MangaUpdates, un résultat accepté et
+le terminal `VERIFIED`. Ses coûts sont 236 lectures et 100 écritures D1 pour
+le collecteur, puis 20 lectures et 6 écritures pour l'admission, soit 256
+lectures et 106 écritures au total. Les compteurs 429, erreurs HTTP/réseau,
+échecs Queue et retries sont tous à zéro. L'enveloppe Worker répond `202`,
+porte `outcome=ok`, consomme 31 ms CPU, n'est pas tronquée et ne contient
+aucun événement d'erreur corrélé. La version
+`eaa9fa6c-22c1-4353-a10e-7ddfe05d1de2` reste active à 100 %; la Queue n'est
+pas pausée et son consumer conserve batch 1/concurrence 1/huit retries.
+
+La lecture D1 postérieure, sans écriture, retrouve exactement une ligne
+terminale dans cette fenêtre : requête `MANGA`, candidat `MANHWA`, compteur
+d'essai réinitialisé à 1, raison et date d'échec effacées, candidat lié et
+`request_json` minimisé. Le matcher métier de production accepte cette
+classification compatible avec un titre `ordered-exact`. Le runner privé a
+néanmoins refusé son propre certificat `result-media-mismatch`, car sa garde
+locale exigeait une égalité stricte des médias. Cette erreur de preuve est
+conservatrice : la mutation métier a réussi, mais le runner ne doit pas être
+relancé pour fabriquer un autre certificat.
+
+L'observateur autorise désormais `provider: 'any'` uniquement pour une reprise
+dont le fournisseur réel n'est pas prédictible. Cette valeur exige toujours
+un fournisseur différent de `none`, au moins un appel, exactement un résultat
+accepté et toutes les bornes de coût et d'erreur ordinaires. Une attente omise
+ou mal formée est refusée avant la corrélation.
+
+Les compteurs agrégés après l'opération sont 458 `VERIFIED`, 418 `FAILED`,
+28 `NOT_FOUND` et 16 `AMBIGUOUS`, pour 920 demandes. Une autre demande
+`PROCESSING` a terminalisé dans la même période, donc ces totaux ne suffisent
+pas à attribuer chaque transition; la ligne horodatée et la télémétrie
+corrélée établissent la reprise ciblée. Cette preuve ne certifie ni la voie
+Queue asynchrone, ni la projection Library, ni la convergence des 1 522
+favoris conservés.
