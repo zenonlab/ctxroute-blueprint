@@ -78,7 +78,11 @@ jobs:
         run: node scripts/release/package-extension.mjs --verify-isolated
 
       - name: Install Playwright Chromium
-        run: npm run setup:browser --workspace @tobirink/web
+        run: |
+          npm run setup:browser --workspace @tobirink/web
+          CHROME_BIN="$(node -e "const { chromium } = require('playwright'); process.stdout.write(chromium.executablePath())")"
+          test -x "$CHROME_BIN"
+          printf 'CHROME_BIN=%s\n' "$CHROME_BIN" >> "$GITHUB_ENV"
 
       - name: Run browser E2E suite
         run: npm run test:e2e --workspace @tobirink/web -- --workers=1

@@ -84,7 +84,10 @@ les métriques du consumer; l'absence de métriques reste explicitement absente.
 Le packaging construit déjà Chrome et Firefox : la précompilation identique
 immédiatement précédente est supprimée du workflow. Les deux builds isolés
 de reproductibilité et les builds de la gate performance restent distincts.
-Le build Web initial reste nécessaire au serveur statique Playwright.
+Le build Web initial reste nécessaire au serveur statique Playwright. Après
+l'installation Chromium, le workflow publie son chemin exécutable dans
+`CHROME_BIN` pour que le contrat IndexedDB de `npm run verify` réutilise le
+même navigateur au lieu de dépendre d'une installation système implicite.
 
 ## Conséquences
 

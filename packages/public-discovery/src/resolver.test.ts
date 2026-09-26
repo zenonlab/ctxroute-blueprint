@@ -69,7 +69,8 @@ describe('standalone provider resolver', () => {
     expect(fetcher.mock.calls.slice(0, 2).map(([, init]) => JSON.parse(String(init.body)).page)).toEqual([1, 2]);
     expect(wait.mock.calls).toEqual([[6_000], [6_000]]);
     expect(controls.recordFailure).not.toHaveBeenCalled();
-    expect(ports.mangadex.search).not.toHaveBeenCalled();
+    expect(ports.mangadex.search).toHaveBeenCalledOnce();
+    expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
   });
 
   it('does not publish NOT_FOUND when every manga provider returns an incomplete page', async () => {
@@ -210,12 +211,28 @@ describe('standalone provider resolver', () => {
     expect(ports.mangaupdates.search).not.toHaveBeenCalled();
   });
 
-  it('uses MangaUpdates, MangaDex and Kitsu Manga in order', async () => {
-    const ports = providers({ 'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target') });
-    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { provider: 'kitsu-manga' } } });
+  it('searches MangaDex, Kitsu Manga and MangaUpdates in order', async () => {
+    const ports = providers({ mangaupdates: candidate('mangaupdates', 'MANGA', '84', 'Target') });
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { provider: 'mangaupdates' } } });
     expect(ports.mangaupdates.search).toHaveBeenCalledOnce();
     expect(ports.mangadex.search).toHaveBeenCalledOnce();
     expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
+    expect(ports.mangadex.search.mock.invocationCallOrder[0]).toBeLessThan(ports['kitsu-manga'].search.mock.invocationCallOrder[0] ?? 0);
+    expect(ports['kitsu-manga'].search.mock.invocationCallOrder[0]).toBeLessThan(ports.mangaupdates.search.mock.invocationCallOrder[0] ?? 0);
+  });
+
+  it('accepts an exact MangaDex manga before MangaUpdates can exhaust the shared page budget', async () => {
+    const target = candidate('mangadex', 'MANGA', 'md-manga-fast', 'Target');
+    const ports = providers({ mangadex: target });
+    ports.mangaupdates.search.mockImplementation(async ({ cursor }) => ({
+      candidates: [], complete: false, digest: `page-${cursor}`, nextCursor: String(Number(cursor) + 1), provider: 'mangaupdates', truncated: true,
+    }));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({
+      profile: { candidate: { externalId: 'md-manga-fast', provider: 'mangadex' } }, state: 'VERIFIED',
+    });
+    expect(ports.mangadex.search).toHaveBeenCalledOnce();
+    expect(ports['kitsu-manga'].search).not.toHaveBeenCalled();
+    expect(ports.mangaupdates.search).not.toHaveBeenCalled();
   });
 
   it('accepts an exact MangaDex identity before MangaUpdates can exhaust the shared page budget', async () => {
@@ -282,12 +299,12 @@ describe('standalone provider resolver', () => {
     expect(ports['kitsu-anime'].search).toHaveBeenCalledOnce();
   });
 
-  it('falls back from MangaUpdates to MangaDex after a transient failure', async () => {
-    const ports = providers({ mangadex: candidate('mangadex', 'MANGA', 'md-1', 'Target') });
-    ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 429'));
-    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { provider: 'mangadex' } } });
-    expect(ports.mangadex.search).toHaveBeenCalledOnce();
-    expect(ports['kitsu-manga'].search).not.toHaveBeenCalled();
+  it('falls back from MangaDex to Kitsu Manga after a transient failure', async () => {
+    const ports = providers({ 'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target') });
+    ports.mangadex.search.mockRejectedValueOnce(new Error('HTTP 429'));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { provider: 'kitsu-manga' } } });
+    expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
+    expect(ports.mangaupdates.search).not.toHaveBeenCalled();
   });
 
   it('does not publish an explicit identity when hydration returns another reference', async () => {
@@ -306,15 +323,16 @@ describe('standalone provider resolver', () => {
     await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({
       profile: { candidate: { externalId: '12345', provider: 'mangaupdates' } }, state: 'VERIFIED',
     });
-    expect(ports.mangadex.search).not.toHaveBeenCalled();
+    expect(ports.mangadex.search).toHaveBeenCalledOnce();
+    expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
   });
 
-  it('falls back to Kitsu when a matched MangaUpdates identity cannot be hydrated transiently', async () => {
+  it('falls back to Kitsu when a matched MangaDex identity cannot be hydrated transiently', async () => {
     const ports = providers({
-      mangaupdates: candidate('mangaupdates', 'MANGA', '12345', 'Target'),
+      mangadex: candidate('mangadex', 'MANGA', 'md-1', 'Target'),
       'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target'),
     });
-    ports.mangaupdates.hydrate.mockRejectedValueOnce(new Error('HTTP 503'));
+    ports.mangadex.hydrate.mockRejectedValueOnce(new Error('HTTP 503'));
     await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({
       profile: { candidate: { provider: 'kitsu-manga', externalId: '84' } }, state: 'VERIFIED',
     });
@@ -322,9 +340,9 @@ describe('standalone provider resolver', () => {
     expect(ports['kitsu-manga'].hydrate).toHaveBeenCalledOnce();
   });
 
-  it('falls back from MangaUpdates to Kitsu after a method failure', async () => {
+  it('falls back from MangaDex to Kitsu after a method failure', async () => {
     const ports = providers({ 'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target') });
-    ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 401'));
+    ports.mangadex.search.mockRejectedValueOnce(new Error('HTTP 401'));
     await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({
       state: 'VERIFIED', profile: { candidate: { provider: 'kitsu-manga', externalId: '84' } },
     });
@@ -334,9 +352,9 @@ describe('standalone provider resolver', () => {
   it('preserves the last spent error when every manga search provider is unavailable', async () => {
     const ports = providers();
     const failure = new Error('TimeoutError');
-    ports.mangaupdates.search.mockRejectedValueOnce(new Error('HTTP 503'));
     ports.mangadex.search.mockRejectedValueOnce(new Error('HTTP 429'));
-    ports['kitsu-manga'].search.mockRejectedValueOnce(failure);
+    ports['kitsu-manga'].search.mockRejectedValueOnce(new Error('HTTP 503'));
+    ports.mangaupdates.search.mockRejectedValueOnce(failure);
     await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).rejects.toBe(failure);
   });
 
@@ -420,11 +438,11 @@ describe('standalone provider resolver', () => {
 
   it.each(['search', 'hydrate'] as const)('does not publish NOT_FOUND after a %s failure and a missing fallback identity', async (phase) => {
     const ports = providers({
-      mangaupdates: candidate('mangaupdates', 'MANGA', '12345', 'Target'),
       mangadex: candidate('mangadex', 'MANGA', 'md-1', 'Target'),
+      'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target'),
     });
-    ports.mangaupdates[phase].mockRejectedValueOnce(new Error('HTTP 503'));
-    ports.mangadex.hydrate.mockResolvedValueOnce(undefined);
+    ports.mangadex[phase].mockRejectedValueOnce(new Error('HTTP 503'));
+    ports['kitsu-manga'].hydrate.mockResolvedValueOnce(undefined);
     const gateway = {
       claim: async () => ({ claimToken: 'x'.repeat(64), requests: [request('MANGA')], schemaVersion: 3 as const }),
       defer: vi.fn(async () => undefined),
@@ -437,20 +455,21 @@ describe('standalone provider resolver', () => {
     expect(report).toEqual({ claimed: 1, deferred: 0, failed: 1, published: 0, replayed: 0 });
     expect(gateway.publish).not.toHaveBeenCalled();
     expect(gateway.defer).not.toHaveBeenCalled();
-    expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
+    expect(ports.mangaupdates.search).toHaveBeenCalledOnce();
   });
 
   it.each(['search', 'hydrate'] as const)('preserves the latest %s Retry-After through a missing fallback identity', async (phase) => {
     const ports = providers({
-      mangaupdates: candidate('mangaupdates', 'MANGA', '12345', 'Target'),
       mangadex: candidate('mangadex', 'MANGA', 'md-1', 'Target'),
+      'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target'),
     });
     const latest = new FavoriteProviderRetryError('HTTP 429', Date.now() + 240_000);
-    ports.mangaupdates[phase].mockRejectedValueOnce(latest);
-    ports.mangadex.hydrate.mockResolvedValueOnce(undefined);
-    ports['kitsu-manga'].search.mockRejectedValueOnce(new FavoriteProviderRetryError('cadence', Date.now() + 120_000));
+    ports.mangadex[phase].mockRejectedValueOnce(latest);
+    ports['kitsu-manga'].hydrate.mockResolvedValueOnce(undefined);
+    ports.mangaupdates.search.mockRejectedValueOnce(new FavoriteProviderRetryError('cadence', Date.now() + 120_000));
     await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).rejects.toBe(latest);
     expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
+    expect(ports.mangaupdates.search).toHaveBeenCalledOnce();
   });
 
   it.each(['search', 'hydrate'] as const)('continues to a VERIFIED fallback after a %s failure and missing identity', async (phase) => {
@@ -459,10 +478,10 @@ describe('standalone provider resolver', () => {
       mangadex: candidate('mangadex', 'MANGA', 'md-1', 'Target'),
       'kitsu-manga': candidate('kitsu-manga', 'MANGA', '84', 'Target'),
     });
-    ports.mangaupdates[phase].mockRejectedValueOnce(new Error('HTTP 503'));
-    ports.mangadex.hydrate.mockResolvedValueOnce(undefined);
+    ports.mangadex[phase].mockRejectedValueOnce(new Error('HTTP 503'));
+    ports['kitsu-manga'].hydrate.mockResolvedValueOnce(undefined);
     await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).resolves.toMatchObject({
-      state: 'VERIFIED', profile: { candidate: { provider: 'kitsu-manga', externalId: '84' } },
+      state: 'VERIFIED', profile: { candidate: { provider: 'mangaupdates', externalId: '12345' } },
     });
   });
 

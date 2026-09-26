@@ -48,27 +48,31 @@ function launchChrome(executable, arguments_) {
 async function pageTarget(debuggerUrl) {
   const endpoint = new URL(debuggerUrl);
   if (endpoint.hostname !== '127.0.0.1' || !/^\d+$/u.test(endpoint.port)) throw new Error('Chromium exposed a non-local DevTools endpoint.');
-  const targets = await new Promise((resolve, reject) => {
-    const request = get({ hostname: '127.0.0.1', path: '/json/list', port: Number(endpoint.port) }, (response) => {
-      if (response.statusCode !== 200) {
-        reject(new Error(`Chromium target list returned HTTP ${response.statusCode}.`));
-        return;
-      }
-      response.setEncoding('utf8');
-      let body = '';
-      response.on('data', (chunk) => {
-        body += chunk;
-        if (body.length > 65536) request.destroy(new Error('Chromium target list exceeded 64 KiB.'));
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline) {
+    const targets = await new Promise((resolve, reject) => {
+      const request = get({ hostname: '127.0.0.1', path: '/json/list', port: Number(endpoint.port) }, (response) => {
+        if (response.statusCode !== 200) {
+          reject(new Error(`Chromium target list returned HTTP ${response.statusCode}.`));
+          return;
+        }
+        response.setEncoding('utf8');
+        let body = '';
+        response.on('data', (chunk) => {
+          body += chunk;
+          if (body.length > 65536) request.destroy(new Error('Chromium target list exceeded 64 KiB.'));
+        });
+        response.on('end', () => {
+          try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
+        });
       });
-      response.on('end', () => {
-        try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
-      });
+      request.on('error', reject);
     });
-    request.on('error', reject);
-  });
-  const page = targets.find((target) => target.type === 'page' && target.url?.includes(fixturePath));
-  if (!page?.webSocketDebuggerUrl) throw new Error('Chromium did not expose a page target.');
-  return page.webSocketDebuggerUrl;
+    const page = targets.find((target) => target.type === 'page' && target.url?.includes(fixturePath));
+    if (page?.webSocketDebuggerUrl) return page.webSocketDebuggerUrl;
+    await delay(50);
+  }
+  throw new Error('Chromium did not expose a page target within 10 seconds.');
 }
 
 async function connectRuntime(webSocketUrl) {
