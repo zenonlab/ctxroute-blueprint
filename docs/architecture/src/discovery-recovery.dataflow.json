@@ -17,7 +17,7 @@
   "nodes": [
     { "id": "snapshot", "type": "database", "label": "Export D1 frais", "sublabel": "intégrité · SHA-256", "stage": 0, "row": 0, "tag": "lecture seule" },
     { "id": "inventory", "type": "backend", "label": "Inventaire agrégé", "sublabel": "FAILED/ATTEMPT_LIMIT", "stage": 0, "row": 2, "tag": "sans titres ni clés" },
-    { "id": "canaries", "type": "backend", "label": "Canaris neufs", "sublabel": "anime · manga · fournisseur", "stage": 1, "row": 0, "width": 150, "tag": "VERIFIED requis" },
+    { "id": "canaries", "type": "backend", "label": "Canaris neufs", "sublabel": "anime · manga · trace HTTP", "stage": 1, "row": 0, "width": 150, "tag": "VERIFIED requis" },
     { "id": "approval", "type": "security", "label": "Confirmation ciblée", "sublabel": "lot · seuils · arrêt", "stage": 1, "row": 2, "tag": "avant écriture" },
     { "id": "rearm", "type": "backend", "label": "Resoumission API v3", "sublabel": "même clé · même payload", "stage": 2, "row": 2, "tag": "un POST · aucun SQL" },
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "PENDING · PROCESSING", "stage": 2, "row": 0, "tag": "cache public" },
@@ -28,7 +28,7 @@
   "flows": [
     { "from": "snapshot", "to": "canaries", "label": "base de comparaison", "classification": "lecture seule", "variant": "default", "labelDy": 53 },
     { "from": "inventory", "to": "approval", "label": "cibles éligibles", "classification": "comptes agrégés", "variant": "security" },
-    { "from": "canaries", "to": "approval", "label": "preuve fournisseur", "classification": "VERIFIED · D1 ≤ 300", "variant": "security", "labelDy": 24 },
+    { "from": "canaries", "to": "approval", "label": "preuve HTTP corrélée", "classification": "appel réel · D1 ≤ 300", "variant": "security", "labelDy": 24 },
     { "from": "approval", "to": "rearm", "label": "autorise le lot exact", "classification": "confirmation immédiate", "variant": "security", "labelDy": 53 },
     { "from": "rearm", "to": "d1", "label": "admission FAILED vers PENDING", "classification": "digest recalculé identique", "variant": "emphasis", "labelDy": -23 },
     { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "HTTP ou signal Queue", "variant": "emphasis", "labelDy": -53 },
@@ -37,6 +37,6 @@
   ],
   "cards": [
     { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Huit échecs consommés : FAILED après expiration du bail", "Cadence ou 429 seuls : report à échéance conservée", "Timeout Worker 30 s : report inchangé, preuve distincte"] },
-    { "dot": "emerald", "title": "Conditions avant reprise", "items": ["Exiger canari corrélé, terminal et coût D1 au plus 300", "429, échec Queue ou CPU : arrêter le lot", "Comparer D1, œuvres canoniques puis Library"] }
+    { "dot": "emerald", "title": "Conditions avant reprise", "items": ["Fournisseur attendu, résultat et invocation ≤ 300 lectures", "Trace absente, 429, Queue ou CPU : arrêter le lot", "Comparer D1, œuvres canoniques puis Library"] }
   ]
 }

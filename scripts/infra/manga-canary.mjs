@@ -8,10 +8,12 @@ import { z } from 'zod';
 
 const requestInit = { headers: { 'content-type': 'application/json' }, method: 'POST', redirect: 'error' };
 const timeout = 15_000;
+const admissionTimeout = 45_000;
 const maxObservations = 40;
 const observationDelay = 15_000;
 const observerBudget = 24 * 60_000;
 const observerByteLimit = 1024 * 1024;
+const observerEnvelopeLimit = 128;
 const observerReadinessAttempts = 12;
 const observerReadinessDelay = 2_500;
 const fixtureCostObservationAttempts = 12;
@@ -23,11 +25,12 @@ const fixtures = [
 
 async function request(fetcher, path, body, signal) {
   signal?.throwIfAborted();
-  const requestSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout);
+  const deadline = AbortSignal.timeout(path === 'requests' ? admissionTimeout : timeout);
+  const requestSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
   const response = await fetcher(`https://tobirink.com/v3/catalogue/discoveries/${path}`, { ...requestInit, body: JSON.stringify(body), signal: requestSignal });
   const payload = await response.json().catch(() => undefined);
   signal?.throwIfAborted();
-  return { payload, status: response.status };
+  return { payload, status: response.status, requestId: response.headers.get('x-tobirink-request-id') };
 }
 
 function stateOf(payload, key) {
@@ -48,10 +51,10 @@ function assertVerified(state, fixture) {
 }
 
 // Two new public fixture keys, exactly one admission each; never rearm history.
-export async function runDiscoveryCanaries({ fetcher = fetch, wait = sleep, now = Date.now, nonce = randomUUID(), report = writeReport, signal, onFixtureStart, onFixtureVerified } = {}) {
+export async function runDiscoveryCanaries({ fetcher = fetch, wait = sleep, now = Date.now, nonce = randomUUID(), report = writeReport, signal, onFixtureStart, onFixtureAdmission, onFixtureVerified } = {}) {
   const results = [];
   for (const fixture of fixtures) {
-    onFixtureStart?.(fixture);
+    await onFixtureStart?.(fixture);
     const startedAt = now();
     const key = {
       fingerprint: createHash('sha256').update(`release-canary:${nonce}:${fixture.mediaKind}`).digest('hex'),
@@ -64,6 +67,7 @@ export async function runDiscoveryCanaries({ fetcher = fetch, wait = sleep, now 
     const submission = await request(fetcher, 'requests', { key, query, schemaVersion: 3 }, signal);
     if (submission.status !== 202) throw new Error(`discovery-canary-submit-http-${submission.status}`);
     if (submission.payload?.state !== 'PENDING') throw new Error('discovery-canary-admission-not-pending');
+    onFixtureAdmission?.(fixture, submission.requestId);
     report({ media: fixture.mediaKind, state: 'PENDING', elapsedMs: now() - startedAt });
     let verified = false;
     for (let observation = 1; observation <= maxObservations; observation += 1) {
@@ -73,7 +77,7 @@ export async function runDiscoveryCanaries({ fetcher = fetch, wait = sleep, now 
       const state = stateOf(response.payload, key);
       if (state?.state === 'VERIFIED') {
         assertVerified(state, fixture);
-        await onFixtureVerified?.(fixture);
+        await onFixtureVerified?.(fixture, submission.requestId);
         const result = { media: fixture.mediaKind, state: 'VERIFIED', observations: observation, elapsedMs: now() - startedAt };
         results.push(result);
         report(result);
@@ -102,39 +106,116 @@ const costSchema = z.object({
 });
 const observerError = reason => new Error(`discovery-canary-observer-${reason}`);
 const writeReport = value => process.stdout.write(`${JSON.stringify(value)}\n`);
+const requestIdSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+const requestSchema = z.object({ schemaVersion: z.literal(1), type: z.literal('worker.request'), requestId: requestIdSchema,
+  method: z.literal('POST'), routeFamily: z.literal('catalogue'), status: z.number().int(), durationMs: countSchema });
 
-// Keep only aggregate numbers. Wrangler's pretty-printed JSON may span any chunks.
 export function createCostObservation() {
-  const totals = { observedEvents: 0, ...Object.fromEntries(counts.map(key => [key, 0])),
-    results: { backoff: 0, changed: 0, deduplicated: 0, failed: 0, unchanged: 0 } };
+  const records = new Map();
+  const expected = new Map();
+  const matched = new Map();
   const decoder = new StringDecoder('utf8');
   let bytes = 0;
+  let envelopes = 0;
   let frame = '';
   let depth = 0;
   let quoted = false;
   let escaped = false;
+  let failure;
+  function fail(reason) { failure ??= observerError(reason); throw failure; }
+  function check() { if (failure) throw failure; }
+  function validate(requestId) {
+    const expectation = expected.get(requestId);
+    const record = records.get(requestId);
+    if (!expectation || !record) return;
+    matched.delete(requestId);
+    if (record.error) fail(record.error);
+    if (record.request.status !== expectation.status || record.httpStatus !== expectation.status
+      || record.httpTask !== expectation.task) fail('request-mismatch');
+    const selected = record.costs.filter(cost => cost.task === expectation.task);
+    if (selected.length !== 1) fail('ambiguous-cost');
+    const collector = selected[0];
+    for (const cost of record.costs) {
+      if (cost.d1RowsRead === undefined || cost.d1RowsWritten === undefined) fail('invalid-cost');
+      if (['failed', 'backoff'].includes(cost.result)) fail('failed-result');
+      if (cost.providerHttpErrors > 0 || cost.providerNetworkErrors > 0) fail('provider-error');
+    }
+    if (expectation.task === 'discovery-lookup') {
+      if (record.costs.length !== 1 || collector.provider !== 'none' || collector.providerRequests !== 0
+        || collector.acceptedResults !== 0 || collector.result !== 'unchanged') fail('invalid-cost');
+      matched.set(requestId, { ...collector });
+      return;
+    }
+    if (counts.some(key => collector[key] === undefined)) fail('invalid-cost');
+    if (collector.provider !== expectation.provider) fail('provider-mismatch');
+    if (collector.providerRequests === 0) fail('no-provider-calls');
+    if (collector.acceptedResults !== 1 || collector.result !== 'changed') fail('accepted-results');
+    const admissions = record.costs.filter(cost => cost.task === 'discovery-admission');
+    if (admissions.length !== 1 || record.costs.length !== 2) fail('ambiguous-cost');
+    const admission = admissions[0];
+    if (admission.provider !== 'none' || admission.providerRequests !== 0 || admission.acceptedResults !== 0
+      || admission.result !== 'changed') fail('invalid-cost');
+    const summary = Object.fromEntries(counts.map(key => [key, (collector[key] ?? 0) + (admission[key] ?? 0)]));
+    if (Object.values(summary).some(value => !Number.isSafeInteger(value))) fail('count-limit');
+    if (summary.d1RowsRead > 300) fail('d1-budget');
+    summary.durationMs = admission.durationMs;
+    matched.set(requestId, { ...summary, provider: collector.provider, result: collector.result,
+      collectorD1RowsRead: collector.d1RowsRead, admissionD1RowsRead: admission.d1RowsRead });
+  }
   function consume() {
     let envelope;
-    try { envelope = JSON.parse(frame); } catch { throw observerError('invalid-frame'); }
-    if (!Array.isArray(envelope?.logs)) return;
+    try { envelope = JSON.parse(frame); } catch { fail('invalid-frame'); }
+    envelopes += 1;
+    if (envelopes > observerEnvelopeLimit) fail('correlation-limit');
+    if (envelope?.outcome !== 'ok') fail('outcome');
+    if (!Array.isArray(envelope.exceptions) || envelope.exceptions.length !== 0) fail('exception');
+    if (envelope.truncated === true) fail('truncated');
+    if (envelope.event?.response?.status === 429) fail('http-429');
+    if (!Array.isArray(envelope.logs)) fail('invalid-frame');
+    const requests = [];
+    const costs = [];
+    let error;
     for (const log of envelope.logs) for (const message of Array.isArray(log?.message) ? log.message : []) {
       const serialized = z.string().safeParse(message);
       if (!serialized.success) continue;
       let event;
       try { event = JSON.parse(serialized.data); } catch { continue; }
-      if (event?.type !== 'worker.cost') continue;
-      const parsed = costSchema.safeParse(event);
-      if (!parsed.success) throw observerError('invalid-cost');
-      const cost = parsed.data;
-      if (!cost.task.startsWith('discovery')) continue;
-      if ((cost.task === 'discovery' || cost.providerRequests > 0) && counts.some(key => cost[key] === undefined)) throw observerError('invalid-cost');
-      totals.observedEvents += 1;
-      totals.results[cost.result] += 1;
-      for (const key of counts) {
-        const next = totals[key] + (cost[key] ?? 0);
-        if (!Number.isSafeInteger(next)) throw observerError('count-limit');
-        totals[key] = next;
+      if (event?.type === 'native-collector.health') fail('queue-failure');
+      if (event?.type === 'worker.error') fail('exception');
+      if (event?.type === 'worker.request') {
+        if (event.status === 429) fail('http-429');
+        requests.push(event);
       }
+      if (event?.type !== 'worker.cost') continue;
+      if (event.provider429s > 0) fail('provider-429');
+      if (event.queueFailures > 0) fail('queue-failure');
+      const parsed = costSchema.safeParse(event);
+      if (!parsed.success) error = 'invalid-cost';
+      else costs.push(parsed.data);
+    }
+    const parsedRequest = requestSchema.safeParse(requests[0]);
+    if (requests.length !== 1 || !parsedRequest.success) error ??= 'request-mismatch';
+    let httpTask;
+    const requestUrl = z.string().safeParse(envelope.event?.request?.url);
+    if (requestUrl.success && envelope.event?.request?.method === 'POST') {
+      try {
+        const url = new URL(requestUrl.data);
+        if (url.origin === 'https://tobirink.com' && !url.search) {
+          if (url.pathname === '/v3/catalogue/discoveries/requests') httpTask = 'discovery';
+          if (url.pathname === '/v3/catalogue/discoveries/lookup') httpTask = 'discovery-lookup';
+        }
+      } catch { error ??= 'request-mismatch'; }
+    }
+    for (const request of requests) {
+      if (!requestIdSchema.safeParse(request?.requestId).success) continue;
+      const requestId = request.requestId;
+      if (records.has(requestId)) {
+        records.set(requestId, { error: 'duplicate-request' });
+      } else {
+        if (records.size >= observerEnvelopeLimit) fail('correlation-limit');
+        records.set(requestId, { request: parsedRequest.data, costs, error, httpTask, httpStatus: envelope.event?.response?.status });
+      }
+      validate(requestId);
     }
   }
   function scan(value) {
@@ -150,21 +231,46 @@ export function createCostObservation() {
         else if (char === '\\') escaped = true;
         else if (char === '"') quoted = false;
       } else if (char === '"') quoted = true;
-      else if (char === '{') depth += 1;
-      else if (char === '}') depth -= 1;
-      if (depth > 128) throw observerError('depth-limit');
+      else if (char === '{' || char === '[') depth += 1;
+      else if (char === '}' || char === ']') depth -= 1;
+      if (depth > 128) fail('depth-limit');
       if (depth === 0) { consume(); frame = ''; }
     }
   }
   return {
+    check,
+    track(requestId, expectation) {
+      check();
+      if (!requestIdSchema.safeParse(requestId).success) fail('invalid-request-id');
+      if (expected.has(requestId)) fail('duplicate-request');
+      if (expected.size >= observerReadinessAttempts + fixtures.length) fail('correlation-limit');
+      expected.set(requestId, expectation);
+      validate(requestId);
+    },
+    read(requestId) { check(); const value = matched.get(requestId); return value ? { ...value } : undefined; },
     push(chunk) {
+      check();
       const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       bytes += data.length;
-      if (bytes > observerByteLimit) throw observerError('byte-limit');
+      if (bytes > observerByteLimit) fail('byte-limit');
       scan(decoder.write(data));
     },
-    finish() { scan(decoder.end()); if (depth !== 0) throw observerError('truncated'); },
-    snapshot: () => ({ ...totals, results: { ...totals.results } }),
+    finish() { check(); scan(decoder.end()); if (depth !== 0) fail('truncated'); },
+    snapshot() {
+      const totals = { observedEvents: 0, ...Object.fromEntries(counts.map(key => [key, 0])),
+        results: { backoff: 0, changed: 0, deduplicated: 0, failed: 0, unchanged: 0 } };
+      for (const [requestId, cost] of matched) {
+        if (expected.get(requestId).task !== 'discovery') continue;
+        totals.observedEvents += 1;
+        totals.results[cost.result] += 1;
+        for (const key of counts) {
+          const next = totals[key] + cost[key];
+          if (!Number.isSafeInteger(next)) fail('count-limit');
+          totals[key] = next;
+        }
+      }
+      return totals;
+    },
   };
 }
 
@@ -178,7 +284,7 @@ export function startCostObserver({ spawnProcess = spawn, killProcess = process.
   let child;
   try {
     child = spawnProcess('npm', ['exec', '--no', '--', 'wrangler', 'tail', 'tobirink-public-api', '--config', 'apps/worker/wrangler.jsonc',
-      '--format', 'json', '--search', 'worker.cost'], { cwd: new URL('../../', import.meta.url), env, detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
+      '--format', 'json'], { cwd: new URL('../../', import.meta.url), env, detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
   } catch { throw observerError('failed'); }
   const groupId = child.pid;
   const observation = createCostObservation();
@@ -215,11 +321,14 @@ export function startCostObserver({ spawnProcess = spawn, killProcess = process.
     if (failure) throw failure;
     observation.finish();
   }
-  return { failed, snapshot: observation.snapshot, close: () => { closePromise ??= close(); return closePromise; } };
+  function check() { if (failure) throw failure; observation.check(); }
+  return { failed, check, track: (requestId, expectation) => { check(); observation.track(requestId, expectation); },
+    read: requestId => { check(); return observation.read(requestId); }, snapshot: observation.snapshot,
+    close: () => { closePromise ??= close(); return closePromise; } };
 }
 
 async function awaitCostObserverReady(observer, fetcher, wait, signal) {
-  const initialEvents = observer.snapshot().observedEvents;
+  const requestIds = [];
   const key = {
     fingerprint: createHash('sha256').update(`release-canary-observer:${randomUUID()}`).digest('hex'),
     mediaKind: 'UNKNOWN', parserVersion: 'release-canary-observer-v1', siteRulesVersion: 'canary-v1',
@@ -229,24 +338,24 @@ async function awaitCostObserverReady(observer, fetcher, wait, signal) {
     const response = await request(fetcher, 'lookup', body, signal);
     if (response.status !== 200) throw new Error(`discovery-canary-lookup-http-${response.status}`);
     if (stateOf(response.payload, key)?.state !== 'MISS') throw observerError('readiness-probe');
+    observer.track(response.requestId, { task: 'discovery-lookup', status: 200 });
+    requestIds.push(response.requestId);
     await wait(observerReadinessDelay, undefined, { signal });
-    if (observer.snapshot().observedEvents > initialEvents) return;
+    observer.check();
+    if (requestIds.some(requestId => observer.read(requestId))) return;
   }
   throw observerError('not-ready');
 }
 
-async function awaitFixtureCost(observer, before, wait, signal) {
-  let after = before;
+async function awaitFixtureCost(observer, requestId, wait, signal) {
   for (let attempt = 1; attempt <= fixtureCostObservationAttempts; attempt += 1) {
+    const cost = observer.read(requestId);
+    if (cost) return cost;
     await wait(fixtureCostObservationDelay, undefined, { signal });
-    after = observer.snapshot();
-    const provider429s = after.provider429s - before.provider429s;
-    const queueFailures = after.queueFailures - before.queueFailures;
-    if (provider429s > 0) throw observerError('provider-429');
-    if (queueFailures > 0) throw observerError('queue-failure');
-    if (after.providerRequests - before.providerRequests > 0) return after;
   }
-  throw observerError('no-provider-calls');
+  const cost = observer.read(requestId);
+  if (cost) return cost;
+  throw observerError('missing-correlated-cost');
 }
 
 export async function runObservedDiscoveryCanaries({ observerFactory = startCostObserver, observationWait = sleep, signals = process,
@@ -266,22 +375,22 @@ export async function runObservedDiscoveryCanaries({ observerFactory = startCost
   signals.once('SIGINT', onSignal);
   try {
     observer = observerFactory();
-    let before;
+    const guardedFetch = (...args) => { controller.signal.throwIfAborted(); observer.check(); return fetcher(...args); };
     const work = async () => {
-      await awaitCostObserverReady(observer, fetcher, observationWait, controller.signal);
-      const value = await runDiscoveryCanaries({ ...canaryOptions, fetcher, report, now, signal: controller.signal,
-        onFixtureStart: () => { before = observer.snapshot(); },
-        onFixtureVerified: async (fixture) => {
-          const after = await awaitFixtureCost(observer, before, observationWait, controller.signal);
-          const providerRequests = after.providerRequests - before.providerRequests;
-          const provider429s = after.provider429s - before.provider429s;
-          const queueFailures = after.queueFailures - before.queueFailures;
+      await awaitCostObserverReady(observer, guardedFetch, observationWait, controller.signal);
+      const value = await runDiscoveryCanaries({ ...canaryOptions, fetcher: guardedFetch, report, now, signal: controller.signal,
+        onFixtureStart: () => observer.check(),
+        onFixtureAdmission: (fixture, requestId) => observer.track(requestId, { task: 'discovery', provider: fixture.reference.provider, status: 202 }),
+        onFixtureVerified: async (fixture, requestId) => {
+          const cost = await awaitFixtureCost(observer, requestId, observationWait, controller.signal);
+          observer.check();
           report({ schemaVersion: 1, type: 'discovery-canary.fixture-cost', media: fixture.mediaKind,
-            providerRequests, provider429s, queueFailures, acceptedResults: after.acceptedResults - before.acceptedResults,
-            d1RowsRead: after.d1RowsRead - before.d1RowsRead, d1RowsWritten: after.d1RowsWritten - before.d1RowsWritten });
+            ...Object.fromEntries(counts.map(key => [key, cost[key]])), collectorD1RowsRead: cost.collectorD1RowsRead,
+            admissionD1RowsRead: cost.admissionD1RowsRead });
         },
       });
       await observationWait(5000, undefined, { signal: controller.signal });
+      observer.check();
       return value;
     };
     results = await Promise.race([work(), observer.failed, interrupted]);
@@ -294,11 +403,11 @@ export async function runObservedDiscoveryCanaries({ observerFactory = startCost
     try { await observer?.close(); } catch (error) { failure ??= error; }
   }
   const totals = observer?.snapshot() ?? createCostObservation().snapshot();
-  if (!failure && totals.observedEvents === 0) failure = observerError('no-events');
+  if (!failure && totals.observedEvents !== fixtures.length) failure = observerError('missing-correlated-cost');
   if (!failure && totals.providerRequests === 0) failure = observerError('no-provider-calls');
   if (!failure && totals.provider429s > 0) failure = observerError('provider-429');
   if (!failure && totals.queueFailures > 0) failure = observerError('queue-failure');
-  report({ schemaVersion: 1, type: 'discovery-canary.observation', scope: 'discovery-traffic-window',
+  report({ schemaVersion: 1, type: 'discovery-canary.observation', scope: 'correlated-discovery-requests',
     state: failure ? 'INCOMPLETE' : 'COMPLETE', windowDurationMs: Math.max(0, now() - startedAt), ...totals });
   if (failure) throw failure;
   return results;
@@ -307,7 +416,7 @@ export async function runObservedDiscoveryCanaries({ observerFactory = startCost
 export function canaryFailureCode(error) {
   const code = z.string().safeParse(error?.message);
   if (!code.success) return 'discovery-canary-failed';
-  return /^discovery-canary-(?:invalid-arguments|invalid-lookup|not-fresh|admission-not-pending|media-mismatch|title-mismatch|provider-reference-missing|(?:submit|lookup)-http-[1-5][0-9]{2}|terminal-(?:ANIME|MANGA)-(?:UNAVAILABLE|NOT_FOUND|AMBIGUOUS|MISS|INVALID)|observation-timeout-(?:ANIME|MANGA)|observer-(?:invalid-cost|invalid-frame|truncated|byte-limit|depth-limit|count-limit|failed|exited|cleanup-failed|unsupported-platform|invalid-budget|interrupted|budget|readiness-probe|not-ready|no-events|no-provider-calls|provider-429|queue-failure))$/u.test(code.data)
+  return /^discovery-canary-(?:invalid-arguments|invalid-lookup|not-fresh|admission-not-pending|media-mismatch|title-mismatch|provider-reference-missing|(?:submit|lookup)-http-[1-5][0-9]{2}|terminal-(?:ANIME|MANGA)-(?:UNAVAILABLE|NOT_FOUND|AMBIGUOUS|MISS|INVALID)|observation-timeout-(?:ANIME|MANGA)|observer-(?:invalid-cost|invalid-frame|truncated|byte-limit|depth-limit|count-limit|correlation-limit|failed|exited|cleanup-failed|unsupported-platform|invalid-budget|interrupted|budget|readiness-probe|not-ready|no-provider-calls|provider-429|http-429|queue-failure|invalid-request-id|duplicate-request|request-mismatch|ambiguous-cost|failed-result|provider-error|provider-mismatch|accepted-results|d1-budget|outcome|exception|missing-correlated-cost))$/u.test(code.data)
     ? code.data : 'discovery-canary-failed';
 }
 
