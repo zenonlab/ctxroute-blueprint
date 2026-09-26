@@ -14,6 +14,11 @@ function submission(marker: string, title: string) {
   return { key: key(marker), query: { discoveryTitles: [title], mediaKind: 'ANIME' as const, sourceTitles: [title] }, schemaVersion: 3 as const };
 }
 
+async function tokenDigest(token: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 function countedD1(database: D1Database, limit: number) {
   let calls = 0;
   const originals = new WeakMap<D1PreparedStatement, D1PreparedStatement>();
@@ -221,12 +226,13 @@ describe('public discovery queue trigger', () => {
       return Response.json({ data, links: { next: offset < 60 ? 'https://kitsu.io/next' : null }, meta: { count: 80 } });
     });
     const metrics = { backlogBytes: 0, backlogCount: 0 };
-    const queue = { metrics: async () => metrics, send: vi.fn(async () => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    const queue = { metrics: async () => metrics, send: vi.fn(async (_signal: NativeCollectorSignal) => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    const correlationId = '00000000-0000-4000-8000-000000000001';
     try {
       await port.request({ key: discoveryKey, query: { discoveryTitles: titles, sourceTitles: titles, mediaKind: 'UNKNOWN' }, requestDigest: 'e'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
       for (let attempt = 1; attempt <= 8; attempt += 1) {
         const measured = countedD1(env.PUBLIC_DB, 50);
-        const report = await processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_TRANSPORT_MODE: 'direct' });
+        const report = await processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_TRANSPORT_MODE: 'direct' }, undefined, true, correlationId);
         expect(report).toMatchObject({ claimed: 1, failed: 1, deferred: 0, published: 0, continuationScheduled: true });
         expect(measured.calls()).toBeLessThanOrEqual(50);
         expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, result_json AS result FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
@@ -234,6 +240,8 @@ describe('public discovery queue trigger', () => {
         vi.setSystemTime(Date.now() + 16 * 60_000);
       }
       expect(queue.send).toHaveBeenCalledTimes(8);
+      expect(queue.send.mock.calls.every(([signal]) => signal.type === 'public-discovery-ready'
+        && signal.correlationId === correlationId && signal.continuationToken?.length === 43)).toBe(true);
       const measured = countedD1(env.PUBLIC_DB, 50);
       expect(await processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_TRANSPORT_MODE: 'direct' }))
         .toMatchObject({ claimed: 0, continuationScheduled: false });
@@ -361,11 +369,58 @@ describe('public discovery queue trigger', () => {
     expect(claim.requests).toHaveLength(1);
     await adapter.deferClaim(claim.requests[0]!, 'b'.repeat(64), '2026-09-20T12:00:08.000Z', now);
     expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, claim_token_hash AS claim FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
-      .bind(request.key.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 0, claim: null });
+      .bind(request.key.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 0, claim: 'b'.repeat(64) });
     expect((await adapter.claimBatch({ claimToken: 'c'.repeat(48), tokenDigest: 'd'.repeat(64), now: '2026-09-20T12:00:07.000Z', leaseUntil: '2026-09-20T12:15:07.000Z', limit: 1 })).requests).toHaveLength(0);
     const resumed = await adapter.claimBatch({ claimToken: 'c'.repeat(48), tokenDigest: 'd'.repeat(64), now: '2026-09-20T12:00:08.000Z', leaseUntil: '2026-09-20T12:15:08.000Z', limit: 1 });
     expect(resumed.requests[0]?.attempt).toBe(1);
     await adapter.publishBatch({ claimToken: resumed.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440001', results: [{ key: request.key, requestDigest: request.requestDigest, resolution: { reason: 'synthetic-no-match', state: 'NOT_FOUND' } }], schemaVersion: 3, verifiedAt: '2026-09-20T12:00:09.000Z' }, 'd'.repeat(64), 'e'.repeat(64), '2026-09-20T12:00:09.000Z');
+  });
+
+  it('claims only the row bound to an opaque continuation token', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const now = '2026-09-20T12:00:00.000Z';
+    const firstToken = 'a'.repeat(43);
+    const secondToken = 'b'.repeat(43);
+    const first = { ...submission('1', 'First queued work'), requestDigest: '1'.repeat(64) };
+    const second = { ...submission('2', 'Second queued work'), requestDigest: '2'.repeat(64) };
+    await adapter.request(first, now, await tokenDigest(firstToken));
+    await adapter.request(second, now, await tokenDigest(secondToken));
+
+    const claimed = await adapter.claimBatch({
+      claimToken: 'c'.repeat(43),
+      continuationTokenDigest: await tokenDigest(secondToken),
+      leaseUntil: '2026-09-20T12:15:00.000Z',
+      limit: 1,
+      now,
+      tokenDigest: await tokenDigest('c'.repeat(43)),
+    });
+
+    expect(claimed.requests.map(request => request.key.fingerprint)).toEqual([second.key.fingerprint]);
+    expect((await adapter.claimBatch({
+      claimToken: 'd'.repeat(43),
+      continuationTokenDigest: await tokenDigest(secondToken),
+      leaseUntil: '2026-09-20T12:15:00.000Z',
+      limit: 1,
+      now,
+      tokenDigest: await tokenDigest('d'.repeat(43)),
+    })).requests).toHaveLength(0);
+    await adapter.publishBatch({
+      claimToken: claimed.claimToken,
+      nonce: '550e8400-e29b-41d4-a716-446655440011',
+      results: [{ key: second.key, requestDigest: second.requestDigest, resolution: { reason: 'selector-test', state: 'NOT_FOUND' } }],
+      schemaVersion: 3,
+      verifiedAt: now,
+    }, await tokenDigest('c'.repeat(43)), '3'.repeat(64), now);
+    const firstClaim = await adapter.claimBatch({
+      claimToken: 'e'.repeat(43), leaseUntil: '2026-09-20T12:15:00.000Z', limit: 1, now, tokenDigest: await tokenDigest('e'.repeat(43)),
+    });
+    await adapter.publishBatch({
+      claimToken: firstClaim.claimToken,
+      nonce: '550e8400-e29b-41d4-a716-446655440012',
+      results: [{ key: first.key, requestDigest: first.requestDigest, resolution: { reason: 'selector-test', state: 'NOT_FOUND' } }],
+      schemaVersion: 3,
+      verifiedAt: now,
+    }, await tokenDigest('e'.repeat(43)), '4'.repeat(64), now);
   });
 
   it('defers a refresh without losing its verified profile or consuming a refresh attempt', async () => {
@@ -413,7 +468,7 @@ describe('public discovery queue trigger', () => {
   });
 
   it.each(['exact', 'title'] as const)('carries the real extension %s request through admission, Queue, provider validation and D1 publication', async (mode) => {
-    const queue = { send: vi.fn(async () => undefined) };
+    const queue = { send: vi.fn(async (_signal: NativeCollectorSignal) => undefined) };
     const port = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const app = createPublicDiscoveryApp({ publicDiscoveryV3: port, queue });
     const client = () => new HttpPublicDiscoveryAdapter('https://tobirink.test', async (url, init) => {
@@ -441,8 +496,8 @@ describe('public discovery queue trigger', () => {
         ? { Page: { pageInfo: { hasNextPage: false }, media: [media] } } : { Media: media } });
     });
     try {
-      const item = { body: { type: 'public-discovery-ready' as const, version: 1 as const }, attempts: 1, ack: vi.fn(), retry: vi.fn() };
-      await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery: () => processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }) });
+      const item = { body: queue.send.mock.calls[0]![0], attempts: 1, ack: vi.fn(), retry: vi.fn() };
+      await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery: (correlationId, continuationToken) => processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, undefined, true, correlationId, continuationToken) });
       expect(provider).toHaveBeenCalledTimes(mode === 'exact' ? 1 : 2);
       expect(item.ack).toHaveBeenCalledOnce(); expect(item.retry).not.toHaveBeenCalled();
       const result = await client().resolveOrRequest(discoveryKey, query);
@@ -454,11 +509,12 @@ describe('public discovery queue trigger', () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const now = new Date().toISOString();
     await adapter.request({ ...submission('3', 'Synthetic leased work'), requestDigest: 'a'.repeat(64) }, now);
-    await adapter.claimBatch({ claimToken: 'a'.repeat(48), tokenDigest: 'b'.repeat(64), now, leaseUntil: new Date(Date.now() + 15 * 60_000).toISOString(), limit: 1 });
+    const continuationToken = 'a'.repeat(43);
+    await adapter.claimBatch({ claimToken: continuationToken, tokenDigest: await tokenDigest(continuationToken), now, leaseUntil: new Date(Date.now() + 15 * 60_000).toISOString(), limit: 1 });
     const metrics = { backlogBytes: 0, backlogCount: 0 };
     const queue = { metrics: async () => metrics, send: vi.fn(async (_body: NativeCollectorSignal, _options?: { contentType?: string; delaySeconds?: number }) => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
     const bindings = { ...env, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_GATEWAY_HMAC_KEY: 'x'.repeat(32) };
-    expect(await processPublicDiscoveryQueue(bindings)).toMatchObject({ claimed: 0, continuationScheduled: true });
+    expect(await processPublicDiscoveryQueue(bindings, undefined, true, undefined, continuationToken)).toMatchObject({ claimed: 0, continuationScheduled: true });
     expect(queue.send).toHaveBeenCalledOnce();
     expect(queue.send.mock.calls[0]?.[1]?.delaySeconds).toBeGreaterThan(0);
     expect(queue.send.mock.calls[0]?.[1]?.delaySeconds).toBeLessThanOrEqual(900);
@@ -525,7 +581,7 @@ describe('public discovery queue trigger', () => {
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
     expect(response.status).toBe(202);
-    expect(queue.send).toHaveBeenCalledExactlyOnceWith({ type: 'public-discovery-ready', version: 1 });
+    expect(queue.send).toHaveBeenCalledExactlyOnceWith({ continuationToken: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/u), correlationId: expect.any(String), type: 'public-discovery-ready', version: 1 });
     expect(JSON.stringify(queue.send.mock.calls)).not.toContain('Private');
   });
 
@@ -562,7 +618,7 @@ describe('public discovery queue trigger', () => {
     }, undefined, executionCtx);
     expect(response.status).toBe(202);
     expect(queueFallback).toHaveBeenCalledOnce();
-    expect(queueFallback).toHaveBeenCalledWith(fallbackKey);
+    expect(queueFallback).toHaveBeenCalledWith(fallbackKey, expect.any(String));
     await expect(adapter.read(fallbackKey, new Date().toISOString())).resolves.toMatchObject({ state: 'PENDING' });
   });
 
@@ -578,7 +634,7 @@ describe('public discovery queue trigger', () => {
       });
       expect(response.status).toBe(503);
       await expect(response.json()).resolves.toEqual({ error: 'discovery-unavailable' });
-      expect(queueFallback).toHaveBeenCalledExactlyOnceWith(fallbackKey);
+      expect(queueFallback).toHaveBeenCalledExactlyOnceWith(fallbackKey, expect.any(String));
       expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-fallback-failed', errorType: 'error', errorDetail: 'unknown' }));
       expect(JSON.stringify(warn.mock.calls)).not.toContain('private fallback detail');
     } finally { warn.mockRestore(); }
@@ -596,7 +652,7 @@ describe('public discovery queue trigger', () => {
       });
       expect(response.status).toBe(503);
       await expect(response.json()).resolves.toEqual({ error: 'discovery-unavailable' });
-      expect(queueFallback).toHaveBeenCalledExactlyOnceWith(fallbackKey);
+      expect(queueFallback).toHaveBeenCalledExactlyOnceWith(fallbackKey, expect.any(String));
       expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-queue-fallback-failed', errorType: 'error', errorDetail: 'unknown' }));
     } finally { warn.mockRestore(); }
   });
@@ -611,7 +667,7 @@ describe('public discovery queue trigger', () => {
     });
     expect(response.status).toBe(202);
     await expect(response.json()).resolves.toMatchObject({ state: 'PENDING' });
-    expect(queueFallback).toHaveBeenCalledExactlyOnceWith(fallbackKey);
+    expect(queueFallback).toHaveBeenCalledExactlyOnceWith(fallbackKey, expect.any(String));
   });
 
   it('claims only the fallback admission instead of older pending requests', async () => {

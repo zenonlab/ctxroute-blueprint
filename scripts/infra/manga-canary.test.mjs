@@ -185,6 +185,11 @@ function envelope(requestId, events = [cost(), admissionCost()], overrides = {})
     exceptions: [], ...overrides };
 }
 
+function queueEnvelope(correlationId, events = [cost({ correlationId })], overrides = {}) {
+  return { outcome: 'ok', event: { queue: 'tobirink-public-discovery', batchSize: 1 },
+    logs: [{ message: events.map(row => JSON.stringify(row)) }], exceptions: [], ...overrides };
+}
+
 const frame = value => JSON.stringify(value, null, 4) + '\n';
 const expectation = { task: 'discovery', provider: 'anilist', status: 202 };
 
@@ -256,6 +261,52 @@ test('chunked UTF-8 frames correlate costs received before headers and redact al
   assert.equal(summary.results.changed, 1);
   assert.equal(observation.read(identity(1)).collectorD1RowsRead, 10);
   assert.doesNotMatch(JSON.stringify(summary), /private|title|url|https|authorization|secret|payload|exceptions|requestId|00000000/iu);
+});
+
+test('durable Queue continuation completes the same private-free cost certificate', () => {
+  const requestId = identity(1);
+  const observation = createCostObservation();
+  observation.track(requestId, expectation);
+  observation.push(frame(envelope(requestId, [
+    cost({ acceptedResults: 0, correlationId: requestId, d1RowsRead: 40, d1RowsWritten: 8, providerRequests: 2, queueSends: 1, result: 'failed' }),
+    admissionCost({ d1RowsRead: 15, d1RowsWritten: 7 }),
+  ])));
+  assert.equal(observation.read(requestId), undefined);
+  observation.push(frame(queueEnvelope(requestId, [
+    cost({ correlationId: requestId, d1RowsRead: 80, d1RowsWritten: 10 }),
+  ])));
+  const proof = observation.read(requestId);
+  assert.equal(proof.providerRequests, 3);
+  assert.equal(proof.acceptedResults, 1);
+  assert.equal(proof.d1RowsRead, 135);
+  assert.equal(proof.d1RowsWritten, 25);
+  assert.equal(proof.collectorD1RowsRead, 120);
+  assert.doesNotMatch(JSON.stringify(proof), /correlation|requestId|00000000/iu);
+});
+
+test('Queue continuation cannot certify another or missing admission', () => {
+  const requestId = identity(1);
+  const observation = createCostObservation();
+  observation.track(requestId, expectation);
+  assert.throws(() => observation.push(frame(queueEnvelope(requestId))), /request-mismatch/u);
+
+  const foreign = createCostObservation();
+  foreign.track(requestId, expectation);
+  foreign.push(frame(envelope(requestId, [
+    cost({ acceptedResults: 0, correlationId: requestId, queueSends: 1, result: 'failed' }), admissionCost(),
+  ])));
+  foreign.push(frame(queueEnvelope(identity(2))));
+  assert.equal(foreign.read(requestId), undefined);
+
+  const overBudget = createCostObservation();
+  overBudget.track(requestId, expectation);
+  overBudget.push(frame(envelope(requestId, [
+    cost({ acceptedResults: 0, correlationId: requestId, d1RowsRead: 220, queueSends: 1, result: 'failed' }),
+    admissionCost({ d1RowsRead: 30 }),
+  ])));
+  assert.throws(() => overBudget.push(frame(queueEnvelope(requestId, [
+    cost({ correlationId: requestId, d1RowsRead: 51 }),
+  ]))), /d1-budget/u);
 });
 
 test('request headers cannot reuse readiness or earlier admission proof', () => {

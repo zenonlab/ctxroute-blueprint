@@ -18,7 +18,7 @@ interface DiscoveryQueuePort {
 }
 type DiscoveryDeliveryMode = 'queue' | 'worker-direct';
 type DiscoveryFallbackReport = { claimed: number; continuationScheduled?: boolean; deferred?: number; failed: number; published: number; replayed: number };
-type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: (key: PublicDiscoveryKeyV3) => Promise<DiscoveryFallbackReport | void>; deliveryMode?: DiscoveryDeliveryMode; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
+type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: (key: PublicDiscoveryKeyV3, correlationId: string) => Promise<DiscoveryFallbackReport | void>; deliveryMode?: DiscoveryDeliveryMode; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
 
 function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
   if (injected) return injected;
@@ -26,19 +26,21 @@ function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'serv
   const selected: DiscoveryServices = { d1Metrics: services.d1Metrics, publicDiscoveryV3: services.publicDiscoveryV3 };
   selected.deliveryMode = context.env.DISCOVERY_DELIVERY_MODE === 'worker-direct' ? 'worker-direct' : 'queue';
   if (services.publicDiscoveryQueue) selected.queue = services.publicDiscoveryQueue;
-  selected.queueFallback = async (key) => {
+  selected.queueFallback = async (key, correlationId) => {
     const startedAt = Date.now();
-    const report = await processPublicDiscoveryQueue(context.env, key, true);
+    const report = await processPublicDiscoveryQueue(context.env, key, true, correlationId);
     const metrics = report.metrics;
     if (metrics !== undefined) {
-      emitWorkerCostDiagnostic(context.env, {
+      const diagnostic: WorkerCostDiagnosticEvent = {
         acceptedResults: metrics.acceptedResults, d1RowsRead: metrics.rowsRead, d1RowsWritten: metrics.rowsWritten,
         durationMs: boundedDuration(startedAt, Date.now()), pagesRequested: metrics.pagesRequested, provider: metrics.provider,
         provider429s: metrics.provider429s, providerHttpErrors: metrics.providerHttpErrors,
         providerNetworkErrors: metrics.providerNetworkErrors, providerRequests: metrics.providerRequests,
         providerTransportDurationMs: metrics.providerTransportDurationMs, queueFailures: metrics.queueFailures,
         queueSends: metrics.queueSends, result: metrics.result, retries: 0, schemaVersion: 1, task: 'discovery', type: 'worker.cost',
-      });
+      };
+      if (correlationId !== undefined) Object.assign(diagnostic, { correlationId });
+      emitWorkerCostDiagnostic(context.env, diagnostic);
     }
     return report;
   };
@@ -118,7 +120,7 @@ function emitQueueHealth(code: string, error?: Error): void {
   console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code, errorType, ...errorDetail }));
 }
 
-async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string, startFallback?: (key: PublicDiscoveryKeyV3) => Promise<void>): Promise<boolean> {
+async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string, correlationId: string, admissionToken: string, startFallback?: (key: PublicDiscoveryKeyV3) => Promise<void>): Promise<boolean> {
   if (services.deliveryMode === 'worker-direct') {
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
     if (startFallback) {
@@ -134,7 +136,7 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
     return false;
   }
   try {
-    await services.queue.send({ type: 'public-discovery-ready', version: 1 });
+    await services.queue.send({ continuationToken: admissionToken, correlationId, type: 'public-discovery-ready', version: 1 });
   } catch (caught) {
     const error = caught instanceof Error ? caught : undefined;
     emitQueueHealth(queueFailureCode(error), error);
@@ -150,11 +152,11 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
   return true;
 }
 
-function startQueueFallback(services: DiscoveryServices): ((key: PublicDiscoveryKeyV3) => Promise<void>) | undefined {
+function startQueueFallback(services: DiscoveryServices, correlationId: string): ((key: PublicDiscoveryKeyV3) => Promise<void>) | undefined {
   if (services.queueFallback === undefined) return undefined;
   return async (key) => {
     try {
-      const report = await services.queueFallback!(key);
+      const report = await services.queueFallback!(key, correlationId);
       if (report !== undefined) {
         const deferred = report.deferred ?? 0;
         const terminal = report.failed === 0 && deferred === 0 && report.published + report.replayed === 1;
@@ -219,12 +221,14 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     const port = v3Port(services);
     const now = new Date().toISOString();
     try {
-      const admission = await port.request({ ...parsed.data, requestDigest }, now);
+      const admissionToken = randomToken();
+      const admission = await port.request({ ...parsed.data, requestDigest }, now, await digest(admissionToken));
       if (admission.outcome === 'saturated') {
         emitPublicCost(context.env, services, before, 'discovery-admission', 'failed', startedAt);
         return noStore({ error: 'discovery-capacity-unavailable' }, 503);
       }
-      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, requestDigest, startQueueFallback(services)))) {
+      const correlationId = context.get('requestId') ?? crypto.randomUUID();
+      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, requestDigest, correlationId, admissionToken, startQueueFallback(services, correlationId)))) {
         emitPublicCost(context.env, services, before, 'discovery-admission', 'backoff', startedAt);
         return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }
@@ -248,8 +252,10 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     if (!parsed.success) return noStore({ error: 'invalid-request' }, 400);
     const port = v3Port(services);
     try {
-      const admission = await port.requestRefresh(parsed.data.key, new Date().toISOString());
-      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, admission.requestDigest, startQueueFallback(services)))) {
+      const admissionToken = randomToken();
+      const admission = await port.requestRefresh(parsed.data.key, new Date().toISOString(), await digest(admissionToken));
+      const correlationId = context.get('requestId') ?? crypto.randomUUID();
+      if (admission.outcome === 'created' && !(await sendDiscoverySignal(services, port, parsed.data.key, admission.requestDigest, correlationId, admissionToken, startQueueFallback(services, correlationId)))) {
         emitPublicCost(context.env, services, before, 'discovery-refresh', 'backoff', startedAt);
         return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }

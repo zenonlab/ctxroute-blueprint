@@ -1279,8 +1279,12 @@ d'exception. En cas de rejet runtime, il peut seulement qualifier le type fermé
 allowlist de phrases plateforme : toute autre phrase est masquée. Il rend le `503`
 opérable sans élargir les données collectées.
 Le signal d'admission utilise le format JSON par défaut du runtime compatible,
-sans option `contentType` explicite : le corps reste l'objet opaque
-`{ type: 'public-discovery-ready', version: 1 }`.
+sans option `contentType` explicite. Son objet opaque contient `type`, `version`,
+un UUID de corrélation non privé et un jeton de sélection aléatoire de 256 bits.
+Il ne contient jamais la clé Discovery, l'empreinte, le titre, l'URL ou le
+payload. D1 ne conserve que le SHA-256 du jeton; le consumer réclame uniquement
+la ligne portant ce digest et remplace ensuite le claim par son propre jeton.
+Ne jamais imprimer, exporter ou inclure le jeton brut dans un diagnostic.
 Si le runtime Queue rejette ce signal, le Worker conserve l'admission et attend
 un unique traitement borné pour cette clé exacte avant de répondre `202`; il ne réclame
 ni ne réarme une ancienne demande `PENDING` ou `FAILED`. La réclamation D1
@@ -1290,6 +1294,10 @@ de détail ; la reprise cron existante conserve la récupération différée.
 Après un envoi Queue réussi, une confirmation D1 défaillante émet séparément
 `public-discovery-queue-confirm-failed` et conserve l'admission `202` : le
 message opaque est déjà durable et ne doit pas être annulé ni redoublé.
+Une continuation différée conserve le même UUID de corrélation uniquement si
+le claim exact reste actif. Un réveil générique ou un claim vide ne porte aucun
+UUID de certificat, afin qu'un autre travail ne puisse jamais être attribué au
+canari observé.
 
 ### Qualification du budget d'essais fournisseur
 

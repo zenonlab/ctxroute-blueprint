@@ -67,7 +67,7 @@ export default {
     const recover = () => recovery ??= recoverPendingAgenda(env);
     await handleNativeCollectorQueue(batch.messages, {
       agenda: (scheduledFor) => processAgendaQueue(env, scheduledFor),
-      discovery: () => processPublicDiscoveryQueue(env),
+      discovery: (correlationId, continuationToken) => processPublicDiscoveryQueue(env, undefined, true, correlationId, continuationToken),
       recovery: recover,
       forward: async (signal) => { await env.PUBLIC_DISCOVERY_QUEUE.send(signal, { contentType: 'json', delaySeconds: 1 }); },
     });

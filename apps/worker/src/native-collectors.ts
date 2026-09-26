@@ -22,7 +22,12 @@ import { instrumentAgendaR2, instrumentD1, instrumentProviderFetch, instrumentQu
 import { z } from 'zod';
 
 export const nativeCollectorSignalSchema = z.discriminatedUnion('type', [
-  z.strictObject({ type: z.literal('public-discovery-ready'), version: z.literal(1) }),
+  z.strictObject({
+    continuationToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/u).optional(),
+    correlationId: z.uuid().optional(),
+    type: z.literal('public-discovery-ready'),
+    version: z.literal(1),
+  }).refine((signal) => signal.correlationId === undefined || signal.continuationToken !== undefined),
   z.strictObject({ type: z.literal('agenda-recovery'), version: z.literal(1) }),
   z.strictObject({ scheduledFor: z.iso.datetime({ offset: false }), type: z.literal('agenda-refresh'), version: z.literal(1) }),
 ]);
@@ -281,7 +286,7 @@ export function agendaCollectionFailureCode(failures: readonly string[]): string
   return 'agenda-provider-unavailable';
 }
 
-export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings, key?: PublicDiscoveryKeyV3, scheduleContinuation = true): Promise<DiscoveryProcessingReport> {
+export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings, key?: PublicDiscoveryKeyV3, scheduleContinuation = true, correlationId?: string, continuationToken?: string): Promise<DiscoveryProcessingReport> {
   const d1 = instrumentD1(bindings.PUBLIC_DB);
   const queue = instrumentQueueSend(bindings.PUBLIC_DISCOVERY_QUEUE);
   const providers = instrumentProviderFetch(providerFetch(bindings));
@@ -302,6 +307,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
         activeTokenDigest = await digest(activeToken);
         const now = new Date();
         const claimInput: Parameters<typeof port.claimBatch>[0] = { claimToken: activeToken, leaseUntil: new Date(now.valueOf() + 15 * 60_000).toISOString(), limit, now: now.toISOString(), tokenDigest: activeTokenDigest };
+        if (continuationToken !== undefined) claimInput.continuationTokenDigest = await digest(continuationToken);
         if (key) claimInput.key = key;
         const claimed = await port.claimBatch(claimInput);
         claimedCount = claimed.requests.length;
@@ -327,12 +333,18 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       },
     },
   });
-  const nextPendingAt = await port.nextPendingAt();
+  const specificPendingAt = claimedCount > 0 ? await port.nextPendingAt(activeTokenDigest) : undefined;
+  const nextPendingAt = specificPendingAt ?? await port.nextPendingAt();
   let continuationScheduled = false;
   if (scheduleContinuation && nextPendingAt !== undefined) {
     const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(nextPendingAt) - Date.now()) / 1_000)));
+    const signal: NativeCollectorSignal = specificPendingAt === undefined
+      ? { type: 'public-discovery-ready', version: 1 }
+      : correlationId === undefined
+        ? { continuationToken: activeToken, type: 'public-discovery-ready', version: 1 }
+        : { continuationToken: activeToken, correlationId, type: 'public-discovery-ready', version: 1 };
     try {
-      await queue.send({ type: 'public-discovery-ready', version: 1 }, { contentType: 'json', delaySeconds });
+      await queue.send(signal, { contentType: 'json', delaySeconds });
       continuationScheduled = true;
     } catch {
       console.warn('public-discovery-continuation-unsent');
@@ -426,7 +438,7 @@ export async function processAgendaQueue(bindings: NativeCollectorBindings, sche
 
 export async function handleNativeCollectorQueue(
   messages: readonly QueueMessagePort[],
-  processors: { readonly agenda: (scheduledFor: string) => Promise<AgendaProcessingReceipt>; readonly discovery: () => Promise<DiscoveryProcessingReport>; readonly recovery?: () => Promise<void>; readonly forward?: (signal: NativeCollectorSignal) => Promise<void> },
+  processors: { readonly agenda: (scheduledFor: string) => Promise<AgendaProcessingReceipt>; readonly discovery: (correlationId?: string, continuationToken?: string) => Promise<DiscoveryProcessingReport>; readonly recovery?: () => Promise<void>; readonly forward?: (signal: NativeCollectorSignal) => Promise<void> },
 ): Promise<void> {
   const groups: { signal: NativeCollectorSignal; messages: QueueMessagePort[] }[] = [];
   for (const message of messages) {
@@ -438,7 +450,11 @@ export async function handleNativeCollectorQueue(
     }
     const signal = parsedSignal.data;
     const group = groups.find(candidate => candidate.signal.type === signal.type
-      && (signal.type !== 'agenda-refresh' || (candidate.signal.type === 'agenda-refresh' && candidate.signal.scheduledFor === signal.scheduledFor)));
+      && (signal.type === 'public-discovery-ready'
+        ? candidate.signal.type === 'public-discovery-ready'
+          && candidate.signal.correlationId === signal.correlationId
+          && candidate.signal.continuationToken === signal.continuationToken
+        : signal.type !== 'agenda-refresh' || (candidate.signal.type === 'agenda-refresh' && candidate.signal.scheduledFor === signal.scheduledFor)));
     if (group) group.messages.push(message);
     else groups.push({ signal, messages: [message] });
   }
@@ -500,8 +516,10 @@ export async function handleNativeCollectorQueue(
   const [leader, ...duplicates] = discoveryMessages;
   if (!leader) return;
   const startedAt = Date.now();
+  const correlationId = selected.signal.type === 'public-discovery-ready' ? selected.signal.correlationId : undefined;
+  const continuationToken = selected.signal.type === 'public-discovery-ready' ? selected.signal.continuationToken : undefined;
   try {
-    const report = await processors.discovery();
+    const report = await processors.discovery(correlationId, continuationToken);
     if (report.failed > 0 && report.continuationScheduled !== true) {
       const retryDelaySeconds = 15 * 60;
       emitNativeCollectorDiagnostic({
@@ -515,7 +533,7 @@ export async function handleNativeCollectorQueue(
       leader.ack();
     }
     const metrics = report.metrics ?? emptyCollectorCost(report.failed > 0 ? 'backoff' : 'unchanged');
-    emitCollectorCost('discovery', report.failed > 0 ? { ...metrics, result: 'backoff' } : metrics, startedAt, leader.attempts);
+    emitCollectorCost('discovery', report.failed > 0 ? { ...metrics, result: 'backoff' } : metrics, startedAt, leader.attempts, correlationId);
     for (const duplicate of duplicates) duplicate.ack();
   } catch (error) {
     const retryDelaySeconds = Math.min(60 * (2 ** Math.max(0, leader.attempts - 1)), 60 * 60);
@@ -531,7 +549,7 @@ export async function handleNativeCollectorQueue(
   }
 }
 
-function emitCollectorCost(task: 'agenda' | 'agenda-admission' | 'agenda-recovery' | 'discovery', metrics: CollectorCostMetrics, startedAt: number, attempt: number): void {
+function emitCollectorCost(task: 'agenda' | 'agenda-admission' | 'agenda-recovery' | 'discovery', metrics: CollectorCostMetrics, startedAt: number, attempt: number, correlationId?: string): void {
   const agendaCounters = task === 'agenda'
     ? { generationsAvoided: metrics.result === 'unchanged' ? 1 : 0, generationsCreated: metrics.result === 'changed' ? 1 : 0 }
     : {};
@@ -560,6 +578,7 @@ function emitCollectorCost(task: 'agenda' | 'agenda-admission' | 'agenda-recover
     type: 'worker.cost',
     ...agendaCounters,
   };
+  if (correlationId !== undefined) Object.assign(event, { correlationId });
   emitWorkerCostDiagnostic({ TOBIRINK_WORKER_DIAGNOSTICS: workerDiagnosticsLockValue }, event);
 }
 

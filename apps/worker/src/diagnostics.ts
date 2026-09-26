@@ -30,6 +30,7 @@ const durationSchema = countSchema.max(3_600_000);
 // Strip undeclared fields rather than serializing arbitrary properties from a caller.
 const workerCostDiagnosticEventSchema = z.object({
   schemaVersion: z.literal(1), type: z.literal('worker.cost'),
+  correlationId: z.uuid().optional(),
   task: workerCostTaskSchema, provider: workerCostProviderSchema,
   pagesRequested: countSchema, providerRequests: countSchema, acceptedResults: countSchema,
   result: workerCostResultSchema, durationMs: durationSchema, retries: countSchema,
