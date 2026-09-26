@@ -22,6 +22,38 @@ restantes. Aucun canari de cache chaud ne suffit à prouver une nouvelle collect
 Les sections datées ci-dessous sont des preuves historiques, pas une
 description de la version actuellement active.
 
+### Profil installé : barrière réseau
+
+Le parcours installé crée toujours une session neuve pour une mesure réseau;
+les sessions historiques antérieures au garde ne sont pas reprises. Avant de
+charger l'extension, le runner exige dans l'archive les clés racine, le content
+script, les permissions, l'unique `host_permissions` TobiRink et la directive
+CSP native `connect-src https://tobirink.com`. Cette directive interdit
+`ws:`/`wss:` jusque dans le service worker MV3. Le compteur `routeWebSocket` ne
+vaut que tripwire de page. Playwright autorise ensuite seulement
+`chrome-extension:` puis les
+couples exacts de l'origine `https://tobirink.com` nécessaires aux lectures
+Discovery/Agenda et aux routes `/requests` ou `/refreshes`. Toute origine
+fournisseur, autre origine, méthode, chemin, paramètre, corps ou en-tête
+inattendu ferme le contexte. Les valeurs Origin/User-Agent/Content-Type et
+l'ETag Agenda optionnel sont elles aussi bornées.
+
+Le budget mutationnel partagé vaut zéro par défaut et deux au maximum; le
+budget refresh lui est inférieur ou égal. Les lectures en ligne possèdent leur
+propre plafond explicite. Hors ligne, elles ne sortent pas : Discovery reçoit
+un `MISS` local pour prouver une tentative d'admission, ensuite bloquée sans
+`route.fetch`. Avant une vraie mutation, le runner écrit un reçu exclusif en
+mode `0600`; les lectures réservent un slot privé et le premier échec écrit un
+sceau privé, tous relus à la reprise. Le sceau mémoire est posé avant tout
+`await route.abort` ou `await webSocket.close`, puis revérifié sous mutex et
+juste avant I/O pour qu'une requête concurrente ne sorte pas après l'échec. Un reçu
+incertain consomme le budget et ne doit jamais être rejoué. Redirections et
+retries transport restent désactivés. Chromium doit ensuite se fermer sans
+erreur et tous les handlers atteindre `inFlight=0`. Toute admission réelle
+requiert une confirmation immédiate distincte et s'arrête sur 429, statut hors
+contrat, erreur Queue ou réseau. Le runner ne réarme jamais automatiquement un
+`FAILED` historique.
+
 ## Historique extension 1.0.42
 
 Lors de cette livraison, la version source et le pointeur Web ont été alignés
@@ -1348,8 +1380,9 @@ lectures et 106 écritures au total. Les compteurs 429, erreurs HTTP/réseau,
 échecs Queue et retries sont tous à zéro. L'enveloppe Worker répond `202`,
 porte `outcome=ok`, consomme 31 ms CPU, n'est pas tronquée et ne contient
 aucun événement d'erreur corrélé. La version
-`eaa9fa6c-22c1-4353-a10e-7ddfe05d1de2` reste active à 100 %; la Queue n'est
-pas pausée et son consumer conserve batch 1/concurrence 1/huit retries.
+`eaa9fa6c-22c1-4353-a10e-7ddfe05d1de2` était active à 100 % pendant
+l'opération; la Queue était alors non pausée avec batch 1/concurrence 1/huit
+retries.
 
 La lecture D1 postérieure, sans écriture, retrouve exactement une ligne
 terminale dans cette fenêtre : requête `MANGA`, candidat `MANHWA`, compteur

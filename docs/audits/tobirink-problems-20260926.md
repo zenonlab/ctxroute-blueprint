@@ -346,9 +346,10 @@ Corrigé ensuite par la PR 111 ; preuve réelle distincte dans le suivi canari.
   runner réimporte titres/URLs dans un profil temporaire, pas l'IndexedDB
   personnelle avec progressions et décisions (`installed-review.mjs:159`).
 - Rapport online historique du dépôt parent `9glkgj`, 23/09 : `incomplete`,
-  132 identifiés, 603 retryable, 735 sans résolution, 41 exclus, 11 Reviews.
-  Ces mesures précèdent les derniers correctifs et ne décrivent pas l'état
-  actuel. Les catégories des compteurs ne sont pas toutes additives.
+  132 résolus, 11 Review, 41 exclus, 603 retryable et 735 processing. Les deux
+  catégories non terminales totalisent **1 338** sources; 132 seulement sont
+  résolues. Ces mesures précèdent les derniers correctifs et ne décrivent pas
+  l'état actuel.
 - Solution : stabiliser le parcours par titre, tester un échantillon réel
   borné dans une nouvelle session, puis les 1 522 favoris ; vérifier séparément
   une copie autorisée de la base personnelle, sans modifier l'original.
@@ -562,7 +563,8 @@ pour 35 annoncés, dix outcomes `ok`, CPU maximal 46 ms ; aucun worker.error,
 signal health, HTTP 429, dépassement CPU ou outcome d'exception observé.
 Cette fenêtre bornée n'affirme rien sur des événements non reçus ou d'autres
 périodes. À 07:54:38, la version Worker
-`eaa9fa6c-22c1-4353-a10e-7ddfe05d1de2` est active à 100 %, Queue toujours 1/1.
+`eaa9fa6c-22c1-4353-a10e-7ddfe05d1de2` était active à 100 % pendant cette
+fenêtre; la Queue était alors 1/1.
 Le SELECT agrégé D1 retrouve 457 VERIFIED (455 avant), 416 FAILED inchangés,
 3 PROCESSING, 16 AMBIGUOUS et 28 NOT_FOUND. Son propre coût de diagnostic
 est 1 840 lectures, zéro écriture, distinct du coût des canaris.
@@ -618,8 +620,9 @@ La télémétrie corrélée attribue à cette invocation deux appels MangaUpdate
 un résultat accepté, 256 lectures et 106 écritures D1. Elle rapporte zéro
 429, erreur HTTP/réseau, échec Queue ou retry. L'enveloppe Worker répond 202,
 termine avec `outcome=ok`, 31 ms CPU, aucune troncature et aucun événement
-d'erreur. Le Worker `eaa9fa6c-22c1-4353-a10e-7ddfe05d1de2` reste actif à
-100 %; la Queue reste non pausée avec batch 1/concurrence 1.
+d'erreur. Pendant cette opération, le Worker
+`eaa9fa6c-22c1-4353-a10e-7ddfe05d1de2` était actif à 100 %; la Queue était
+non pausée avec batch 1/concurrence 1.
 
 Le runner termine néanmoins par `result-media-mismatch` parce que sa garde
 locale exigeait `MANGA === MANHWA`, plus stricte que la compatibilité métier
@@ -632,6 +635,57 @@ Après l'opération, D1 contient 458 VERIFIED, 418 FAILED, 28 NOT_FOUND et
 totaux agrégés seuls ne prouvent pas l'identité d'une transition. Cette reprise
 unique ne projette toujours aucune œuvre dans la Library du profil conservé et
 ne certifie pas les 1 522 favoris.
+
+### Garde réseau du profil installé — 26 septembre 2026
+
+Le manifeste de l'archive impose désormais une directive CSP native
+`connect-src https://tobirink.com`, une surface racine exacte et des permissions
+exactes. La directive ferme aussi les WebSockets du service worker MV3; le
+compteur Playwright WebSocket n'est qu'un tripwire de page, pas cette preuve. Le
+runner contrôle le manifeste avant chargement puis installe sa barrière HTTP.
+Seules les lectures Discovery/Agenda
+explicitement listées peuvent joindre l'origine TobiRink; admissions et refresh
+partagent un budget de zéro à deux. Reçus mutationnels, slots de lecture et
+sceau d'échec restent privés en `0600` et survivent à la reprise.
+
+La candidate locale porte les SHA-256 Chrome `d04072bc846a90e66b820647469da50934eb2a74d3873fabe23c4fc5063f4a17`
+et Firefox `862049a83d831dacbc2f7cf7b3c6571273e332482299e74d0a9db6f1ca2afe5a`.
+Le packager exige la même CSP, l'unique origine, les permissions, le content
+script et les clés racine exactes dans les deux manifestes. Les tests couvrent
+les en-têtes non déclarés, les capacités manifestes injectées, un 429 tardif
+drainé, le sceau relu à la reprise, un abort suspendu et une fermeture WebSocket
+suspendue : après le sceau, aucune seconde requête ne peut réserver ou sortir.
+La fermeture Chromium est bloquante : une erreur de fermeture ou un handler
+encore actif interdit le certificat.
+
+Un smoke neuf sur deux favoris du véritable export termine
+`offline-regression-passed` après redémarrage du service worker puis du
+navigateur : deux mutations tentées et bloquées, cinq lectures servies
+localement, zéro lecture/admission/refresh transmis, zéro accès
+fournisseur/étranger/WebSocket et `inFlight=0`.
+
+La reprise exacte du profil complet schema 3, sans réimport ni remplacement
+d'archive, termine `offline-regression-passed` en conservant **1 522 / 1 522**
+sources : zéro `processing`, 1 483 `retryable` et 39 `unsupported`. Elle vérifie
+les deux redémarrages; 109 mutations sont tentées et bloquées, 307 lectures sont
+servies localement, et lectures, admissions, refreshes, fournisseurs, origines
+étrangères et WebSockets transmis restent tous à zéro avec `inFlight=0`.
+
+Cette preuve certifie l'import et sa terminalisation hors ligne, pas la
+convergence fournisseur. Aucun profil navigateur personnel non temporaire avec
+exactement 1 522 favoris et la base TobiRink correspondante n'a été trouvé; la
+base personnelle reste donc non certifiée. Aucun POST de production n'est
+exécuté par ce lot.
+
+Le contrôle Cloudflare MCP strictement en lecture seule de 10:14 à 10:16 UTC
+retrouve le Worker `85e6f045-dc3b-4f22-be8e-f095179bf9f7` actif à 100 %, la
+Queue principale à batch 1/concurrence 1 et backlog zéro. La DLQ conserve ses
+13 messages historiques sans lecture de leur contenu. Le SELECT D1 agrégé
+compte 458 VERIFIED, 418 FAILED, 28 NOT_FOUND et 16 AMBIGUOUS, aucun
+PENDING/PROCESSING; il consomme 1 840 lectures, zéro écriture et ne change pas
+la base. La télémétrie retenue depuis ce déploiement contient zéro 429, erreur
+metadata, `exceededCpu` ou exception. Cette preuve est bornée à la fenêtre et
+aux événements conservés par Cloudflare.
 
 ## Preuves encore nécessaires
 

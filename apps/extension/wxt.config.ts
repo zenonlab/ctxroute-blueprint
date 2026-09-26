@@ -5,6 +5,7 @@ const productionSiteOrigin = 'https://tobirink.com';
 const siteOrigin = process.env.WXT_PUBLIC_SITE_ORIGIN?.trim() || productionSiteOrigin;
 if (new URL(siteOrigin).protocol !== 'https:' || new URL(siteOrigin).origin !== siteOrigin) throw new Error('WXT_PUBLIC_SITE_ORIGIN must be an exact HTTPS origin.');
 const externallyConnectableMatches = [`${siteOrigin}/*`];
+const extensionPagesPolicy = `script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; connect-src ${siteOrigin};`;
 
 const extensionIcons = {
   16: 'icons/tobirink-16.png',
@@ -25,7 +26,7 @@ export default defineConfig({
         }
       : undefined,
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none';",
+      extension_pages: extensionPagesPolicy,
     },
     description: 'Bibliothèque manga et anime privée, progression, Review et agenda.',
     externally_connectable: { matches: externallyConnectableMatches },

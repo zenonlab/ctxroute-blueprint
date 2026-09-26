@@ -305,7 +305,56 @@ progression vides ne prouvent pas la conservation du profil personnel.
 Les descripteurs de reprise et rapports locaux sont enregistrés en `0600`
 sous `build/installed-review/`, ignoré par Git. Aucun profil personnel n'est
 ouvert; `TOBIRINK_INSTALLED_SESSION` réutilise seulement un jeton temporaire
-généré par le harness, sans réimporter les favoris.
+généré par le harness, sans réimporter les favoris. Le descripteur schema 3
+contient un SHA-256 privé de la liste ordonnée `{title, url}` sélectionnée :
+une reprise avec un autre export de même cardinalité est refusée, et ce digest
+n'entre ni dans stdout ni dans le rapport. Les sessions antérieures au schema 3
+ne sont pas reprises.
+
+Avant tout `Extensions.loadUnpacked`, le runner vérifie le manifeste réellement
+décompressé : clés racine, content script, permissions et `host_permissions`
+sont exacts, et la directive CSP native `connect-src` des pages d'extension
+n'autorise que `https://tobirink.com`, sans source `ws:` ou `wss:`. Cette
+directive couvre aussi le service worker MV3, contrairement à
+`BrowserContext.routeWebSocket`, conservé seulement comme tripwire des pages.
+Chaque contexte installe ensuite `context.route('**/*')`; il laisse passer
+`chrome-extension:` et refuse toute origine HTTP(S) autre que
+`https://tobirink.com`. L'allowlist ferme aussi les couples méthode/chemin :
+`GET /v3/catalogue/discoveries`,
+`POST /v3/catalogue/discoveries/lookup`, `GET /v4/release-models`,
+`GET /v3/releases`, `POST /v3/catalogue/discoveries/requests` et
+`POST /v3/catalogue/discoveries/refreshes`. Paramètres, corps et noms d'en-tête
+sont fermés avant toute I/O; les valeurs `Origin`, `User-Agent`, `Content-Type`
+et l'ETag Agenda optionnel sont bornées. Aucun domaine fournisseur n'est
+joignable directement.
+
+`TOBIRINK_INSTALLED_MUTATION_BUDGET` borne de zéro à deux le total partagé
+`/requests` + `/refreshes`; `TOBIRINK_INSTALLED_REFRESH_BUDGET` reste inclus
+dans ce total et `TOBIRINK_INSTALLED_READ_BUDGET` borne les lectures. Les
+mutations valent zéro par défaut. Chaque clé n'est admissible qu'une fois; un
+reçu exclusif `0600`, sans titre, URL, corps ni chemin privé, est écrit avant
+`route.fetch` et relu à la reprise. Les lectures consomment elles aussi un slot
+privé persistant avant I/O. Réservation et vérification du sceau d'échec sont
+atomiques; un handler déjà entré ne peut donc obtenir un reçu ou appeler
+`route.fetch` après un échec concurrent. Redirections et retries transport
+sont interdits. Route, origine ou corps inattendu, reçu impossible, erreur
+réseau, 429 ou statut hors contrat pose le sceau d'échec en mémoire avant tout
+`await route.abort` ou `await webSocket.close`, l'écrit en `0600`, le relit à
+la reprise, puis ferme le parcours.
+
+Le smoke hors ligne répond localement `MISS` aux lectures Discovery, exige une
+mutation tentée mais zéro mutation transmise, zéro accès fournisseur, puis
+conserve identité et sources après redémarrage du worker et du navigateur. Ce
+smoke ne certifie ni un appel de production ni la convergence. Les régressions
+couvrent le budget nul (`fetch=0`), le troisième envoi d'un budget partagé, le
+doublon après reçu/reprise, les origines fournisseur ou étrangères, les
+en-têtes supplémentaires, les capacités manifestes injectées et les statuts
+hors contrat. Elles suspendent aussi l'abort d'un 429 puis la fermeture d'un
+WebSocket et prouvent qu'une seconde requête ne réserve ni ne sort après le
+sceau. Avant
+tout certificat, Chromium doit se fermer sans erreur, tous les handlers sont
+drainés jusqu'à `inFlight=0`, puis le sceau est relu. Ces violations, un échec
+de fermeture ou une erreur tardive donnent `failed`, jamais `incomplete`.
 
 `converged` exige inventaire complet, nombre attendu de sources conservé,
 zéro traitement, reprise, blocage ou état indéterminé, et aucun Work résolu
