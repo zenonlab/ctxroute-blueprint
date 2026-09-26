@@ -18,14 +18,13 @@ interface DiscoveryQueuePort {
 }
 type DiscoveryDeliveryMode = 'queue' | 'worker-direct';
 type DiscoveryFallbackReport = { claimed: number; continuationScheduled?: boolean; deferred?: number; failed: number; published: number; replayed: number };
-type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: (key: PublicDiscoveryKeyV3, correlationId: string) => Promise<DiscoveryFallbackReport | void>; defer?: (task: Promise<void>) => void; deliveryMode?: DiscoveryDeliveryMode; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
+type DiscoveryServices = { publicDiscoveryV3?: PublicDiscoveryV3Port; queue?: DiscoveryQueuePort; queueFallback?: (key: PublicDiscoveryKeyV3, correlationId: string) => Promise<DiscoveryFallbackReport | void>; deliveryMode?: DiscoveryDeliveryMode; rateLimiter?: RateLimit; readRateLimiter?: RateLimit; d1Metrics?: Pick<InstrumentedD1, 'snapshot'> };
 
-function routeServices(context: { env: WorkerRuntime['Bindings']; executionCtx: { waitUntil(task: Promise<unknown>): void }; get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
+function routeServices(context: { env: WorkerRuntime['Bindings']; get(key: 'services'): WorkerServices }, injected?: DiscoveryServices): DiscoveryServices {
   if (injected) return injected;
   const services = context.get('services');
   const selected: DiscoveryServices = { d1Metrics: services.d1Metrics, publicDiscoveryV3: services.publicDiscoveryV3 };
   selected.deliveryMode = context.env.DISCOVERY_DELIVERY_MODE === 'worker-direct' ? 'worker-direct' : 'queue';
-  selected.defer = (task) => context.executionCtx.waitUntil(task);
   if (services.publicDiscoveryQueue) selected.queue = services.publicDiscoveryQueue;
   selected.queueFallback = async (key, correlationId) => {
     const startedAt = Date.now();
@@ -125,9 +124,7 @@ async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDisc
   if (services.deliveryMode === 'worker-direct') {
     await port.releaseQueueSignal(key, requestDigest, new Date().toISOString()).catch(() => undefined);
     if (startFallback) {
-      const task = startFallback(key);
-      if (services.defer) services.defer(task);
-      else await task;
+      await startFallback(key);
       return true;
     }
     emitQueueHealth('public-discovery-worker-direct-unavailable');

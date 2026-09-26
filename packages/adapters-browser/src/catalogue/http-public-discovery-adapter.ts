@@ -92,8 +92,8 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     this.gate = reserved;
     return reserved;
   }
-  private async exchange<T>(url: string, init: RequestInit & { credentials: 'omit'; referrerPolicy: 'no-referrer' }, schema: z.ZodType<T>, maximumBytes?: number): Promise<T> {
-    const timeoutMs = Math.min(15_000, this.deadline - Date.now());
+  private async exchange<T>(url: string, init: RequestInit & { credentials: 'omit'; referrerPolicy: 'no-referrer' }, schema: z.ZodType<T>, maximumBytes?: number, timeoutLimitMs = 15_000): Promise<T> {
+    const timeoutMs = Math.min(timeoutLimitMs, this.deadline - Date.now());
     if (timeoutMs < 1_000) throw new PublicDiscoveryError('ADMISSION_WAIT', undefined, new Date(Date.now() + 60_000).toISOString());
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -163,7 +163,7 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     const admitted = await this.exchange(new URL('/v3/catalogue/discoveries/requests', this.origin).toString(), {
       body: JSON.stringify({ key, query, schemaVersion: 3 }), cache: 'no-store', credentials: 'omit',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
-    }, stateSchema);
+    }, stateSchema, undefined, 45_000);
     if (admitted.state === 'PENDING') {
       const next = Math.max(Date.now() + 60_000, Date.parse(admitted.retryAt));
       await this.saveClock(pendingClock, next);

@@ -6,7 +6,6 @@ scope:
   - apps/extension/runtime/favorite-resolution-continuation.ts
   - apps/extension/runtime/favorite-resolution-runtime.ts
   - apps/worker/src/index.ts
-  - apps/worker/src/catalogue/public-discovery-routes.ts
   - apps/worker/wrangler.jsonc
   - apps/extension/runtime/use-resolution-status.ts
   - packages/application/src/favorites/public-discovery-resolution.ts
@@ -51,7 +50,7 @@ La lecture de statut et les reprises automatiques ne réarment jamais `FAILED` :
 
 Un réveil Worker séparé, borné à cinq claims et déclenché quotidiennement à 03:37 UTC, traite les demandes D1 échues lorsqu’un signal Queue a été perdu ; le cron Agenda hebdomadaire est inchangé. Aucun SQL manuel ni endpoint caché n’est ajouté. Le run canari et la reprise historique restent soumis au flux de production protégé et à une confirmation immédiate avant mutation distante.
 
-En mode `worker-direct`, l’admission HTTP accuse `PENDING` dès que l’écriture D1 est durable et programme le collecteur borné avec `waitUntil`. Elle n’attend pas le fournisseur dans la réponse HTTP : le délai client de quinze secondes ne peut donc plus interrompre une collecte déjà admise. Un échec de la tâche différée conserve `PENDING` pour la reprise planifiée, sans second POST automatique.
+En mode `worker-direct`, le client accorde jusqu’à 45 secondes au POST d’admission, comme le canari protégé, afin que le Worker termine son passage borné ou confirme une continuation Queue durable avant de répondre. Les lectures conservent leur délai de 15 secondes. Une interruption ne déclenche jamais un second POST automatique : la reprise lit d’abord l’état D1 exact.
 
 ## Conséquences
 
