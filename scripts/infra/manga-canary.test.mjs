@@ -348,6 +348,22 @@ test('collector contract requires every measured field, provider, one acceptance
   }
 });
 
+test('provider-agnostic recovery proof still requires one real provider', () => {
+  const tracked = { provider: 'any', task: 'discovery', status: 202 };
+  const observation = createCostObservation();
+  observation.track(identity(1), tracked);
+  observation.push(frame(envelope(identity(1), [cost({ provider: 'mangaupdates' }), admissionCost()])));
+  assert.equal(observation.read(identity(1)).provider, 'mangaupdates');
+
+  const missing = createCostObservation();
+  missing.track(identity(2), tracked);
+  assert.throws(() => missing.push(frame(envelope(identity(2), [
+    cost({ provider: 'none' }), admissionCost(),
+  ]))), /provider-mismatch/u);
+
+  assert.throws(() => createCostObservation().track(identity(3), { task: 'discovery', status: 202 }), /request-mismatch/u);
+});
+
 test('invocation budget sums distinct collector and admission D1 work with measured writes', () => {
   for (const [collectorReads, admissionReads, passes] of [[200, 100, true], [200, 101, false], [301, 0, false]]) {
     const observation = createCostObservation();

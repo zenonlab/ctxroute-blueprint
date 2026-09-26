@@ -109,6 +109,11 @@ const writeReport = value => process.stdout.write(`${JSON.stringify(value)}\n`);
 const requestIdSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
 const requestSchema = z.object({ schemaVersion: z.literal(1), type: z.literal('worker.request'), requestId: requestIdSchema,
   method: z.literal('POST'), routeFamily: z.literal('catalogue'), status: z.number().int(), durationMs: countSchema });
+const expectationSchema = z.discriminatedUnion('task', [
+  z.strictObject({ provider: z.enum(['anilist', 'kitsu', 'mangadex', 'mangaupdates', 'mixed', 'any']),
+    status: z.literal(202), task: z.literal('discovery') }),
+  z.strictObject({ status: z.literal(200), task: z.literal('discovery-lookup') }),
+]);
 
 export function createCostObservation() {
   const records = new Map();
@@ -147,7 +152,8 @@ export function createCostObservation() {
       return;
     }
     if (counts.some(key => collector[key] === undefined)) fail('invalid-cost');
-    if (collector.provider !== expectation.provider) fail('provider-mismatch');
+    if (collector.provider === 'none'
+      || (expectation.provider !== 'any' && collector.provider !== expectation.provider)) fail('provider-mismatch');
     if (collector.providerRequests === 0) fail('no-provider-calls');
     if (collector.acceptedResults !== 1 || collector.result !== 'changed') fail('accepted-results');
     const admissions = record.costs.filter(cost => cost.task === 'discovery-admission');
@@ -242,9 +248,11 @@ export function createCostObservation() {
     track(requestId, expectation) {
       check();
       if (!requestIdSchema.safeParse(requestId).success) fail('invalid-request-id');
+      const parsedExpectation = expectationSchema.safeParse(expectation);
+      if (!parsedExpectation.success) fail('request-mismatch');
       if (expected.has(requestId)) fail('duplicate-request');
       if (expected.size >= observerReadinessAttempts + fixtures.length) fail('correlation-limit');
-      expected.set(requestId, expectation);
+      expected.set(requestId, parsedExpectation.data);
       validate(requestId);
     },
     read(requestId) { check(); const value = matched.get(requestId); return value ? { ...value } : undefined; },
