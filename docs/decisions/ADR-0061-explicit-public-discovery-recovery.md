@@ -6,6 +6,7 @@ scope:
   - apps/extension/runtime/favorite-resolution-continuation.ts
   - apps/extension/runtime/favorite-resolution-runtime.ts
   - apps/worker/src/index.ts
+  - apps/worker/src/catalogue/public-discovery-routes.ts
   - apps/worker/wrangler.jsonc
   - apps/extension/runtime/use-resolution-status.ts
   - packages/application/src/favorites/public-discovery-resolution.ts
@@ -49,6 +50,8 @@ L’extension expose une action utilisateur explicite, visible uniquement lorsqu
 La lecture de statut et les reprises automatiques ne réarment jamais `FAILED` : seule l’action explicite initie un lot fini. Une réponse `UNAVAILABLE` persistante termine l’élément de ce lot mais conserve sa raison visible et son action humaine. Sa simple lecture normale ne consomme aucun essai local et est reportée de quinze minutes. Les anciennes limites d’essai locales ne sont pas requalifiées arbitrairement comme des pannes fournisseur. Une erreur permanente de contrat ou interne est enregistrée sur sa source et n’empêche pas le traitement des suivantes. La fin du lot supprime réellement la clé de curseur et l’alarme ; une alarme tardive sans curseur n’initie jamais un nouveau lot.
 
 Un réveil Worker séparé, borné à cinq claims et déclenché quotidiennement à 03:37 UTC, traite les demandes D1 échues lorsqu’un signal Queue a été perdu ; le cron Agenda hebdomadaire est inchangé. Aucun SQL manuel ni endpoint caché n’est ajouté. Le run canari et la reprise historique restent soumis au flux de production protégé et à une confirmation immédiate avant mutation distante.
+
+En mode `worker-direct`, l’admission HTTP accuse `PENDING` dès que l’écriture D1 est durable et programme le collecteur borné avec `waitUntil`. Elle n’attend pas le fournisseur dans la réponse HTTP : le délai client de quinze secondes ne peut donc plus interrompre une collecte déjà admise. Un échec de la tâche différée conserve `PENDING` pour la reprise planifiée, sans second POST automatique.
 
 ## Conséquences
 
