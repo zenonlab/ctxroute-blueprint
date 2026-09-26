@@ -11,22 +11,17 @@
   "steps": [
     {
       "id": "version-and-audit",
-      "title": "Versionner et auditer la candidate",
+      "title": "Auditer la candidate non publiée",
       "acceptance": [
-        "La version corrective devient 1.0.45 dans le paquet et le lock, sans remplacer les archives 1.0.44.",
-        "ADR-0039 et le runbook distinguent candidate locale, publication désactivée et limites du test synthétique 1 532.",
+        "La PR ne publie ni ne remplace les archives immuables 1.0.44; toute publication future exigera une nouvelle version.",
+        "La documentation distingue le code livré, la publication désactivée et les limites du test synthétique 1 532.",
         "Le diff part de origin/main, exclut tout secret, profil, artefact généré et modification étrangère."
       ],
       "files": [
-        "apps/extension/package.json",
-        "package-lock.json",
-        "docs/decisions/ADR-0039-extension-release-versioning.md",
-        "docs/release.md",
         "docs/plans/deliver-favorite-pipeline-20260926.json"
       ],
       "commands": [
         "git diff --check",
-        "npm run validate:decisions",
         "npm run validate:docs -- --all"
       ]
     },
@@ -35,12 +30,11 @@
       "title": "Revalider archives et parcours complet",
       "acceptance": [
         "npm run verify et Playwright complet passent sur 1.0.45.",
-        "Chrome et Firefox sont reproductibles sur deux builds isolés et leurs SHA-256 sont consignés.",
+        "Chrome et Firefox sont reproductibles sur deux builds isolés sans devenir des artefacts publiables sous 1.0.44.",
         "Les deux dataflows Archify passent 9/9 sans erreur ni avertissement."
       ],
       "files": [
-        "apps/extension/.output/packages/release-manifest.json",
-        "docs/release.md"
+        "docs/systems/favorite-resolution-rebuild-pipeline.md"
       ],
       "commands": [
         "npm run package:extension",

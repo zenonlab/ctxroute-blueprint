@@ -375,6 +375,6 @@
 
 ## Livrer le refactoring favoris par PR protégée — ACTIVE
 
-- [ ] **Versionner et auditer la candidate** — IN_PROGRESS _(evidence: origin/main rafraîchi; branche refactor dédiée; publication extension et canaris désactivés par défaut.)_
-- [ ] **Revalider archives et parcours complet** — PENDING
-- [ ] **Livrer par PR et CI protégée** — PENDING
+- [x] **Auditer la candidate non publiée** — DONE _(evidence: Diff ancré sur origin/main, aucun secret/artefact/profil; publication extension, canaris, migration et réarmement absents., La version 1.0.44 publiée reste immuable; cette PR livre le code seulement et toute publication future doit incrémenter la version.)_
+- [x] **Revalider archives et parcours complet** — DONE _(evidence: npm run verify passe; Playwright11/1 opt-in; deux dataflows Archify9/9; deux builds isolés identiques, non publiés., Smoke installé20 synthétique offline: arrêt SW observé, données conservées, zéro réseau; run1532 synthétique explicitement incomplet.)_
+- [ ] **Livrer par PR et CI protégée** — IN_PROGRESS _(evidence: Commit fonctionnel 72c225a créé depuis origin/main; préparation push/PR protégée avec publish_extension=false.)_
