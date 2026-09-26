@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { publicAgendaReleaseEventSchema, type PublicAgendaReleaseEvent } from './contracts.js';
+import { publicAgendaReleaseEventSchema, type PublicAgendaReleaseEvent } from './contracts';
 
 const responseByteLimit = 1_000_000;
 const jsonSchema = z.json();

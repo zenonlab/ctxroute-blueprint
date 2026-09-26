@@ -1,5 +1,5 @@
-import { publicDiscoveryCandidateSchema, publicDiscoveryProviderSchema } from './contracts.js';
-import type { PublicDiscoveryCandidate, PublicDiscoveryReferenceV3 } from './contracts.js';
+import { publicDiscoveryCandidateSchema, publicDiscoveryProviderSchema } from './contracts';
+import type { PublicDiscoveryCandidate, PublicDiscoveryReferenceV3 } from './contracts';
 
 export type FavoriteProvider = PublicDiscoveryReferenceV3['provider'];
 export type ResolutionProvider = FavoriteProvider;

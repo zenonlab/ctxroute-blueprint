@@ -1,13 +1,13 @@
-import { publicDiscoveryCandidateSchema } from './contracts.js';
-import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoveryTerminalResolution } from './contracts.js';
-import { favoriteProviderInspectionLimit, FavoriteProviderRetryError, inspectFavoriteTitleCandidates, isPublicDiscoveryCandidateCompatible } from './provider-kit.js';
-import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit.js';
-import { AniListFavoriteProviderAdapter } from './providers/anilist.js';
-import { KitsuFavoriteProviderAdapter } from './providers/kitsu.js';
-import { MangaDexFavoriteProviderAdapter } from './providers/mangadex.js';
-import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates.js';
-import { FavoriteProviderHttpError, FavoriteProviderRateGate } from './provider-http.js';
-import type { FavoriteProviderFetch, FavoriteProviderRuntimeControlPort } from './provider-http.js';
+import { publicDiscoveryCandidateSchema } from './contracts';
+import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoveryTerminalResolution } from './contracts';
+import { favoriteProviderInspectionLimit, FavoriteProviderRetryError, inspectFavoriteTitleCandidates, isPublicDiscoveryCandidateCompatible } from './provider-kit';
+import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit';
+import { AniListFavoriteProviderAdapter } from './providers/anilist';
+import { KitsuFavoriteProviderAdapter } from './providers/kitsu';
+import { MangaDexFavoriteProviderAdapter } from './providers/mangadex';
+import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates';
+import { FavoriteProviderHttpError, FavoriteProviderRateGate } from './provider-http';
+import type { FavoriteProviderFetch, FavoriteProviderRuntimeControlPort } from './provider-http';
 
 export type PublicDiscoveryProviderPorts = Readonly<Record<ResolutionProvider, FavoriteProviderPort>>;
 

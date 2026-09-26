@@ -1,8 +1,8 @@
-import { assertFavoriteProviderSearchQuery, createProviderCandidate, createProviderCandidateEnvelope, favoriteProviderInspectionLimit, favoriteProviderPage, favoriteProviderPolicy, inspectFavoriteTitleCandidates } from '../provider-kit.js';
-import type { FavoriteMediaKind, FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ProviderCandidate } from '../provider-kit.js';
+import { assertFavoriteProviderSearchQuery, createProviderCandidate, createProviderCandidateEnvelope, favoriteProviderInspectionLimit, favoriteProviderPage, favoriteProviderPolicy, inspectFavoriteTitleCandidates } from '../provider-kit';
+import type { FavoriteMediaKind, FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ProviderCandidate } from '../provider-kit';
 import { z } from 'zod';
-import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from '../provider-http.js';
-import type { FavoriteProviderFetch } from '../provider-http.js';
+import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from '../provider-http';
+import type { FavoriteProviderFetch } from '../provider-http';
 
 export const mangaUpdatesApiOrigin = 'https://api.mangaupdates.com';
 const seriesEndpoint = `${mangaUpdatesApiOrigin}/v1/series`;

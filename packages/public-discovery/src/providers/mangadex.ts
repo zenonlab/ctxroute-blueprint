@@ -1,8 +1,8 @@
-import { assertFavoriteProviderSearchQuery, createProviderCandidate, favoriteProviderPage, favoriteProviderPolicy, inspectFavoriteTitleCandidates } from '../provider-kit.js';
-import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ProviderCandidate } from '../provider-kit.js';
+import { assertFavoriteProviderSearchQuery, createProviderCandidate, favoriteProviderPage, favoriteProviderPolicy, inspectFavoriteTitleCandidates } from '../provider-kit';
+import type { FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ProviderCandidate } from '../provider-kit';
 import { z } from 'zod';
-import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from '../provider-http.js';
-import type { FavoriteProviderFetch } from '../provider-http.js';
+import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from '../provider-http';
+import type { FavoriteProviderFetch } from '../provider-http';
 
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 interface SearchProjection { readonly candidate?: ProviderCandidate; readonly incomplete: boolean }
