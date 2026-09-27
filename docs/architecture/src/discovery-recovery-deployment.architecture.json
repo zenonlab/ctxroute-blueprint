@@ -21,7 +21,7 @@
       "id": "githubCi",
       "type": "cloud",
       "label": "CI protégée GitHub",
-      "sublabel": "verify · plan · apply",
+      "sublabel": "D1→Worker",
       "tag": "main uniquement",
       "row": 1,
       "col": 0
@@ -81,11 +81,12 @@
     {
       "kind": "security-group",
       "label": "Déploiement borné",
-      "wraps": ["githubCi", "worker"]
+      "wraps": ["githubCi", "worker", "d1"]
     }
   ],
   "connections": [
-    { "from": "githubCi", "to": "worker", "label": "plan scellé · cible unique", "variant": "security", "labelDy": 54 },
+    { "from": "githubCi", "to": "d1", "label": "migration scellée avant runtime", "variant": "security", "labelDy": -30 },
+    { "from": "githubCi", "to": "worker", "label": "plan scellé · Worker après D1", "variant": "security", "labelDy": 54 },
     { "from": "worker", "to": "d1", "label": "admission et état", "variant": "emphasis" },
     { "from": "worker", "to": "queue", "label": "signal opaque", "variant": "emphasis" },
     { "from": "queue", "to": "resolver", "label": "claim ciblé", "variant": "emphasis" },
@@ -96,7 +97,7 @@
     {
       "dot": "emerald",
       "title": "Garanties actives",
-      "items": ["Une seule cible Worker par plan", "Queue batch 1 et concurrence 1", "Le reçu privé interdit le doublon POST"]
+      "items": ["Deux cibles exactes : D1 puis Worker", "Queue batch 1 et concurrence 1", "Le reçu privé interdit le doublon POST"]
     },
     {
       "dot": "amber",
