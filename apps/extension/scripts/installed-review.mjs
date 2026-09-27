@@ -6,8 +6,9 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes } from './installed-review-network.mjs';
+import { createInstalledRecoveryObservation, createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
+import { loadSourceScope, validateSourceScope } from '../../../scripts/infra/discovery-recovery-batch.mjs';
 
 export { createInstalledReviewNetworkGuard } from './installed-review-network.mjs';
 
@@ -26,7 +27,12 @@ export function installedReviewConfig(env = process.env) {
   assert.ok(!online || env.TOBIRINK_FAVORITES_EXPORT, 'Online testing requires an explicit private bookmark export.');
   const budgetSeconds = integer(env.TOBIRINK_INSTALLED_BUDGET_SECONDS, online ? 600 : 240, 30, 1800);
   const bookmarkLimit = integer(env.TOBIRINK_INSTALLED_BOOKMARK_LIMIT, 100_000, 1, 100_000);
-  const mutationBudget = integer(env.TOBIRINK_INSTALLED_MUTATION_BUDGET, 0, 0, 2);
+  const sourceScopePath = env.TOBIRINK_INSTALLED_SOURCE_SCOPE;
+  const recoverExhausted = env.TOBIRINK_INSTALLED_RECOVER_EXHAUSTED === '1';
+  assert.ok(env.TOBIRINK_INSTALLED_RECOVER_EXHAUSTED === undefined || recoverExhausted, 'Recovery requires explicit 1.');
+  assert.ok(!recoverExhausted || online && sourceScopePath !== undefined, 'Recovery button requires an online sealed source scope.');
+  assert.ok(sourceScopePath === undefined || sourceScopePath.trim().length > 0, 'Source scope path must not be empty.');
+  const mutationBudget = integer(env.TOBIRINK_INSTALLED_MUTATION_BUDGET, 0, 0, sourceScopePath === undefined ? 2 : 10);
   const captureSubmissions = env.TOBIRINK_INSTALLED_CAPTURE_SUBMISSIONS === '1';
   assert.ok(env.TOBIRINK_INSTALLED_CAPTURE_SUBMISSIONS === undefined || captureSubmissions, 'Submission capture must be explicitly enabled with 1.');
   const refreshBudget = integer(env.TOBIRINK_INSTALLED_REFRESH_BUDGET, 0, 0, 2);
@@ -40,7 +46,7 @@ export function installedReviewConfig(env = process.env) {
   assert.ok(milestones.length <= 12, 'At most twelve observation milestones are allowed.');
   const session = env.TOBIRINK_INSTALLED_SESSION;
   assert.ok(session === undefined || /^tobirink-installed-review-[A-Za-z0-9]{6,32}$/u.test(session), 'Invalid installed-review session token.');
-  return { online, budgetSeconds, bookmarkLimit, mutationBudget, captureSubmissions, refreshBudget, readBudget, favoritesExport: env.TOBIRINK_FAVORITES_EXPORT, session,
+  return { online, budgetSeconds, bookmarkLimit, mutationBudget, captureSubmissions, refreshBudget, readBudget, sourceScopePath, recoverExhausted, favoritesExport: env.TOBIRINK_FAVORITES_EXPORT, session,
     milestones: [...new Set(milestones.filter((value) => value < budgetSeconds - 5))].sort((left, right) => left - right) };
 }
 
@@ -250,6 +256,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
   let closeFailure = false;
   let closePromise;
   let networkGuard;
+  let recoveryObservation;
   let session;
   let expired = false;
   const log = (value) => process.stdout.write(JSON.stringify(value) + '\n');
@@ -275,7 +282,13 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     const bookmarks = corpus.slice(0, config.bookmarkLimit);
     const corpusDigest = installedBookmarkCorpusDigest(bookmarks);
     await mkdir(descriptorRoot, { recursive: true, mode: 0o700 });
+    const sourceScope = config.sourceScopePath === undefined ? undefined : await loadSourceScope(config.sourceScopePath);
+    if (sourceScope !== undefined) {
+      assert.equal(config.mutationBudget, sourceScope.entries.length, 'Scoped pilot must explicitly authorize every identity.');
+      assert.equal(bookmarks.length, sourceScope.entries.length, 'Scoped pilot requires one bookmark per sealed identity.');
+    }
     const network = { captureSubmissions: config.captureSubmissions, mutationBudget: config.mutationBudget, readBudget: config.readBudget, refreshBudget: config.refreshBudget };
+    if (sourceScope !== undefined) network.scopeSeal = validateSourceScope(sourceScope).scopeSeal;
     if (config.session !== undefined) {
       session = JSON.parse(await readFile(join(descriptorRoot, config.session + '.json'), 'utf8'));
       assert.equal(session.schemaVersion, 3, 'Sessions created before the exact corpus and network guard cannot be resumed.');
@@ -296,9 +309,17 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       await checkpoint();
     }
     await assertInstalledReviewExtensionSurface(join(session.root, 'extension'));
-    networkGuard = await createInstalledReviewNetworkGuard({ ...network, online: config.online, receiptRoot: descriptorRoot, token: session.token,
+    networkGuard = await createInstalledReviewNetworkGuard({ ...network, sourceScope, online: config.online, receiptRoot: descriptorRoot, token: session.token,
+      onAdmission: async (submission, response) => recoveryObservation.onAdmission(submission, response),
       onFailure: async () => { void closeContext(false); } });
-    log({ event: 'installed-session', session: session.token, mode: config.online ? 'online-private-copy' : 'offline', dataOrigin, selected: session.expected, available: corpus.length, budgetSeconds: config.budgetSeconds, network });
+    if (sourceScope !== undefined) recoveryObservation = await createInstalledRecoveryObservation({
+      onFailure: async () => networkGuard.fail('correlation-failed'),
+      recordAdmission: async receipt => {
+        const keyDigest = createHash('sha256').update(JSON.stringify(receipt.key)).digest('hex');
+        await writeFile(join(descriptorRoot, `${session.token}.correlation-${keyDigest}.json`), JSON.stringify(receipt) + '\n', { flag: 'wx', mode: 0o600 });
+      },
+    });
+    log({ event: 'installed-session', session: session.token, mode: config.online ? 'online-private-copy' : 'offline', dataOrigin, selected: session.expected, available: corpus.length, budgetSeconds: config.budgetSeconds, network: networkGuard.snapshot() });
     const require = createRequire(new URL('../../web/package.json', import.meta.url));
     const { chromium } = require('@playwright/test');
     const launchOptions = { args: ['--enable-unsafe-extension-debugging'], ignoreDefaultArgs: ['--disable-extensions'], channel: 'chromium', headless: true };
@@ -372,6 +393,10 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     };
     await waitForInventory();
     let before = await observe('initial-inventory');
+    if (config.recoverExhausted) {
+      stage = 'explicit-recovery-button';
+      await page.getByRole('button', { name: 'Relancer les demandes épuisées', exact: true }).click();
+    }
     let upgraded = false;
     if (previousArchive !== undefined || config.session !== undefined && archive !== undefined) {
       stage = 'upgrade';
@@ -428,6 +453,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     await networkGuard.drain();
     networkGuard.throwIfFailed();
     const networkEvidence = networkGuard.snapshot();
+    if (recoveryObservation !== undefined) networkEvidence.correlatedCosts = await recoveryObservation.finish(sourceScope.entries.length);
     assert.equal(networkEvidence.inFlight, 0, 'Installed-review network handlers must drain before certification.');
     if (!config.online) {
       assert.ok(networkEvidence.attemptedMutations >= 1, 'Offline smoke must observe a blocked mutation attempt.');
@@ -469,6 +495,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     clearTimeout(watchdog);
     await closeContext(false);
     await networkGuard?.drain();
+    await recoveryObservation?.close();
   }
 }
 

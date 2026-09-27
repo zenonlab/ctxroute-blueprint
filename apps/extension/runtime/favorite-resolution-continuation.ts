@@ -9,6 +9,7 @@ export const favoriteResolutionContinuationMinimumDelayMs = 30_000;
 export const favoriteProviderRecoveryAlarmName = 'tobirink-provider-recovery-continuation-v1';
 export const favoriteProviderRecoveryMinimumDelayMs = 30_000;
 export const favoriteProviderRecoveryMaximumDurationMs = 15_000;
+const favoriteProviderRecoveryAdmissionDurationMs = 45_000;
 export const favoriteProviderRecoveryMaximumAdmissions = 10;
 export const favoriteProviderRecoveryCursorKey = 'tobirink.favorite-provider-recovery.v1';
 export const favoriteResolutionControlKey = 'tobirink.favorite-resolution-control.v1';
@@ -111,10 +112,12 @@ export function createFavoriteProviderRecovery(dependencies: {
               const artifact = (await dependencies.storage.getFavoriteParseArtifact(source.id))?.artifact;
               if (artifact === undefined) throw new Error('MISSING_RECOVERY_ARTIFACT');
               const { key, reference } = await preparePublicFavoriteDiscoveryIdentity(artifact, dependencies.synchronized);
+              dependencies.client.setDeadline?.(deadline);
               // If suspended after sending, read its result instead of blindly rearming FAILED again.
               const previous = cursor.pendingSourceId === source.id
                 ? (await dependencies.client.lookup?.([key]))?.[0]?.state : undefined;
               await checkpoint({ afterId, pendingSourceId: source.id, retryAt: new Date(now() + 60_000).toISOString() });
+              dependencies.client.setDeadline?.(now() + favoriteProviderRecoveryAdmissionDurationMs);
               const state = previous !== undefined && previous.state !== 'MISS' ? previous
                 : await requestPublicFavoriteDiscoveryRecovery(dependencies.client, key, artifact, reference === undefined ? undefined : { explicitProviderReference: reference });
               if (state.state === 'MISS') throw new PublicDiscoveryError('INVALID_RESPONSE');

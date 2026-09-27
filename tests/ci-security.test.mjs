@@ -101,6 +101,17 @@ test('extension publication is an optional two-object phase after successful can
   assert.match(workflow, /publish_extension:[\s\S]*?default: false[\s\S]*?type: boolean/u);
   const preflight = workflow.indexOf('- name: Check extension publication preconditions');
   assert.ok(preflight > 0 && preflight < workflow.indexOf('- name: Apply only the approved Worker target'));
+  const sealed = workflow.indexOf('- name: Require sealed publication artifacts before production effects');
+  assert.ok(sealed > workflow.indexOf('- name: Verify repository') && sealed < workflow.indexOf('- name: Create expiring Cloudflare plan'));
+  const sealedStep = workflow.slice(sealed).split('\n      - name:')[0];
+  assert.match(sealedStep, /inputs\.publish_extension == true/u);
+  assert.match(sealedStep, /await readExtensionPublicationCandidate\(\)/u);
+  assert.match(sealedStep, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
+  assert.match(sealedStep, /gh release download "\$TOBIRINK_CERTIFIED_RELEASE_TAG" --repo "\$GITHUB_REPOSITORY"/u);
+  assert.match(sealedStep, /--pattern 'publication-manifest\.json'/u);
+  assert.match(sealedStep, /--pattern "tobirink-firefox-mv3-\$EXTENSION_VERSION\.xpi"/u);
+  assert.match(sealedStep, /--json isDraft/u);
+  assert.doesNotMatch(sealedStep, /--clobber|gh release create|gh release upload|web-ext sign/u);
   const publication = workflow.split('- name: Publish and verify immutable extension archives')[1]?.split('- name:')[0];
   assert.ok(publication);
   assert.ok(workflow.indexOf('- name: Run fresh bounded anime and manga canaries') < workflow.indexOf('- name: Publish and verify immutable extension archives'));
@@ -112,6 +123,8 @@ test('extension publication is an optional two-object phase after successful can
   assert.equal((publication.match(/--allow r2:tobirink-public-releases\/downloads\//gu) ?? []).length, 2);
   assert.match(publication, /assertExtensionPublicationPlan/u);
   assert.match(publication, /verifyExtensionPublication/u);
+  assert.match(publication, /r2-publish:tobirink-firefox-mv3-"\$EXTENSION_VERSION"\.xpi/u);
+  assert.doesNotMatch(publication, /firefox-mv3-"\$EXTENSION_VERSION"\.zip/u);
   assert.doesNotMatch(publication, /worker-deploy|d1-migrate|queue-|published-extension\.json|continue-on-error|always\(\)/u);
   const workerPlan = workflow.split('- name: Create expiring Cloudflare plan')[1]?.split('- name:')[0];
   assert.match(workerPlan, /--operation d1-migrate:PUBLIC_DB/u);

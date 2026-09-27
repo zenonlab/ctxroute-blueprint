@@ -23,7 +23,7 @@ revised: true
 
 Date : 2026-09-22
 
-Révisé : 2026-09-27
+Révisé : 2026-09-28
 
 Statut : accepté
 
@@ -40,7 +40,7 @@ L’extension expose une action utilisateur explicite, visible uniquement lorsqu
 - envoie le payload Public Discovery v3 exact via une méthode `requestRecovery` dédiée ;
 - traite les éléments un par un avec la cadence d’admission bornée ;
 - isole les erreurs par élément afin qu’un favori défectueux ne bloque pas le lot ;
-- limite chaque reprise à 15 secondes et dix soumissions, avance le curseur après chaque réponse interprétée et persiste l’échéance des erreurs transitoires ;
+- limite le démarrage de nouveaux éléments à une tranche de 15 secondes et dix soumissions, laisse au POST déjà admis ses 45 secondes, avance le curseur après chaque réponse interprétée et persiste l’échéance des erreurs transitoires ;
 - enregistre la source en cours avant HTTP ; après interruption, lit son état plutôt que réarmer aveuglément un nouvel échec ;
 - restaure l’alarme à chaque démarrage du service worker, du navigateur et après pause ; respecte l’échéance même lors d’une nouvelle action humaine ;
 - refuse deux reprises simultanées et sérialise reprise et runner normal qui partagent le même adaptateur HTTP ;
@@ -61,11 +61,11 @@ sans dépendre d’un artefact généré ou d’un cache de runner.
 
 Le runner opérateur exige `--scope` pour le prévol, la préparation et
 l’exécution. Ce fichier privé provient de la liste réellement importée : son
-schéma de version 1 contient `corpusDigest`, `sourceCount` et exactement dix
-`entries` uniques `MANGA` ou `MANHWA`, chacune avec la clé v3 complète et son
+schéma de version 1 contient `corpusDigest`, `sourceCount` et une à dix
+`entries` uniques `ANIME`, `MANGA`, `MANHWA` ou `MANHUA`, chacune avec la clé v3 complète et son
 `requestDigest`. Sa lecture exige un fichier régulier de 16 Kio au plus et
 des permissions privées. L’empreinte seule ne prouve pas cette identité.
-La sélection D1 est ciblée : une CTE de dix entrées pilote dix recherches
+La sélection D1 est ciblée : une CTE de une à dix entrées pilote autant de recherches
 sur l’index de clé primaire complète, jamais les dix plus anciens échecs
 globaux. Le constructeur sépare SQL et paramètres ; le transport Wrangler
 CLI encode ensuite uniquement les valeurs validées par une allowlist stricte,
@@ -102,6 +102,18 @@ ferme et draine l’observateur, vérifie encore son état et relit le coût fin
 Une erreur tardive ou un coût final invalide empêche donc le reçu terminal.
 Cette évolution ne change ni `claim(1)`, ni Queue 1/1, ni les règles de
 réarmement ou d’arrêt.
+
+Le banc installé utilise le même scope et la même réservation permanente que
+le CLI. Au-delà de deux admissions, un scope est obligatoire; le pilote scellé
+exige exactement une source par clé et un budget explicite égal à la taille du
+lot, sans refresh. Le POST dispose de 45 secondes. L'observateur démarre avant
+le chargement du profil et le clic explicite, puis suit chaque UUID d'admission.
+La clôture draine les événements tardifs et revérifie chaque coût avant preuve.
+`TOBIRINK_INSTALLED_RECOVER_EXHAUSTED=1` commande le véritable bouton; cette
+variable ne remplace pas la confirmation immédiate du lot par l'opérateur.
+Un coût public terminal ne certifie jamais à lui seul la projection Library.
+Le CLI de reprise reste limité aux échecs épuisés : les MISS relèvent de
+l'admission normale, les PENDING de l'observation, sans réarmement implicite.
 
 ## Conséquences
 

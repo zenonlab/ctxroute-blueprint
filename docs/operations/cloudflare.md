@@ -1479,10 +1479,10 @@ aucun `--prepare` ni `--execute` n’a été lancé pendant cette vérification.
 
 Le runner `scripts/infra/discovery-recovery-batch.mjs` impose un fichier
 `--scope` privé pour ses trois modes. Le schéma de scope version 1 contient
-`corpusDigest`, `sourceCount` et exactement dix `entries` uniques, chacune
+`corpusDigest`, `sourceCount` et une à dix `entries` uniques, chacune
 constituée de `key` (`fingerprint`, `mediaKind`, `parserVersion`,
 `siteRulesVersion`) et `requestDigest`. Les seuls médias admis sont `MANGA`
-et `MANHWA`. Construire ce scope à partir des artefacts du profil réel,
+et `MANHWA`, ainsi que `ANIME` et `MANHUA`. Construire ce scope à partir des artefacts du profil réel,
 jamais d’une sélection globale des plus anciens échecs D1. Le scope ne doit
 contenir ni titre, ni URL, ni payload fournisseur. Conserver ce fichier et
 le reçu local sous `build/recovery/`, ignorés par Git, en permissions `0600`.
@@ -1492,7 +1492,7 @@ Le chargement refuse un scope qui n’est pas un fichier régulier, dépasse
 Les sorties CLI ne contiennent aucun `batchSeal`, `scopeSeal` ou digest privé.
 
 Le prévol et la préparation utilisent une requête SQL ciblée dont la CTE
-de dix entrées pilote les recherches par index de clé primaire complète.
+de une à dix entrées pilote les recherches par index de clé primaire complète.
 Le constructeur sépare SQL et paramètres ; la CLI Wrangler reçoit ensuite
 les valeurs encodées après une allowlist stricte, pas des bindings API.
 Ces contrôles exigent un payload v3 et un digest identiques au scope, ainsi

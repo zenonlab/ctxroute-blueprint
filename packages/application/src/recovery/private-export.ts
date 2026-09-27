@@ -68,7 +68,21 @@ export interface RecoveryStorePort {
 }
 
 const workSchema = z.strictObject({
-  hydration: z.strictObject({ candidate: providerCandidateSchema, favoriteAliasKeys: z.array(z.string().min(1).max(2048)).max(64), hydratedAt: z.string(), matcherVersion: z.string().min(1).max(100), providerTitleKeys: z.array(z.string().min(1).max(2048)).max(providerMetadataCollectionLimit) }).optional(),
+  hydration: z.strictObject({
+    candidate: providerCandidateSchema,
+    favoriteAliasKeys: z.array(z.string().min(1).max(2048)).max(64),
+    hydratedAt: z.string(),
+    matcherVersion: z.string().min(1).max(100),
+    publicDiscovery: z.strictObject({
+      fingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+      mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA', 'UNKNOWN']),
+      nextRefreshAt: z.iso.datetime(),
+      parserVersion: z.string().min(1).max(2048),
+      siteRulesVersion: z.string().min(1).max(2048),
+      verifiedAt: z.iso.datetime(),
+    }).optional(),
+    providerTitleKeys: z.array(z.string().min(1).max(2048)).max(providerMetadataCollectionLimit),
+  }).optional(),
   externalReferences: z.array(z.strictObject({ externalId: z.string(), provider: z.string() })),
   id: z.string(), mediaKind: z.enum(['anime', 'manga']), preferredTitle: z.string(),
 });
@@ -139,7 +153,9 @@ function materializeSnapshot(input: z.infer<typeof snapshotSchema>): PrivateSnap
     }),
     works: input.works.map(({ hydration, ...item }) => {
       const base = { ...item, id: workId(item.id) };
-      return createWork(hydration === undefined ? base : { ...base, hydration });
+      if (hydration === undefined) return createWork(base);
+      const { publicDiscovery, ...metadata } = hydration;
+      return createWork({ ...base, hydration: publicDiscovery === undefined ? metadata : { ...metadata, publicDiscovery } });
     }),
   };
   const organizer = input.organizer === undefined ? undefined : parseOrganizerConfiguration(input.organizer);

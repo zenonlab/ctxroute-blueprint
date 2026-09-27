@@ -1,5 +1,101 @@
 # Extension packaging and rollback
 
+## Candidate 1.0.46 — certification en cours
+
+Le pointeur public reste en 1.0.45. La candidate corrige l'export de
+`hydration.publicDiscovery` sans perdre identité, dates ni compatibilité v1–v5.
+Une régression avec le vrai adaptateur HTTP corrige aussi la troncature du POST
+de reprise à 15 secondes : une réponse à 20 secondes est conservée, aucun
+élément supplémentaire ne démarre après la tranche, et le timeout à 45 secondes
+conserve le curseur interrompu pour une lecture plutôt qu'un nouveau POST.
+Le banc installé accepte un scope privé de une à dix identités et partage les
+réservations durables du CLI. `TOBIRINK_INSTALLED_SOURCE_SCOPE` désigne ce scope;
+`TOBIRINK_INSTALLED_MUTATION_BUDGET` doit égaler son nombre de clés. Le profil
+pilote contient exactement autant de favoris. Après confirmation immédiate du
+lot, `TOBIRINK_INSTALLED_RECOVER_EXHAUSTED=1` clique le bouton de reprise réel.
+L'observateur démarre avant le profil et vérifie les coûts après drainage.
+Les scopes, profils et reçus restent privés et hors Git.
+
+Le registre du 28 septembre conserve 1 522 sources et 1 346 identités publiques
+uniques; 137 sources supplémentaires partagent une identité et 39 n'ont pas
+d'identité publique. Vingt-sept lectures D1 indexées lisent 1 305 lignes sans
+écriture ni admission. Par source, les états publics observés comprennent
+483 échecs épuisés, 44 absences, un traitement actif et 955 résultats
+disponibles. Ce sont des états D1 associés aux sources, pas des compteurs de
+convergence Library ni des preuves d'éligibilité d'un futur lot.
+
+La route Firefox `.xpi` impose `application/x-xpinstall` et conserve les anciens
+ZIP. Aucun XPI n'est encore signé ni publié. La signature non listée Mozilla
+est nécessaire pour Firefox stable : voir la
+[documentation Mozilla](https://www.extensionworkshop.com/documentation/publish/signing-and-distribution-overview/).
+L'identité Gecko reste `tobirink@tobirink.local`; un fichier signé ne doit jamais
+être recompressé. La CI Worker ordinaire reste indépendante de Mozilla.
+
+La promotion reste interdite avant certification des fichiers exacts.
+La gate exige désormais `apps/extension/.output/packages/publication-manifest.json`,
+distinct du manifeste reproductible. Ce document scelle `schemaVersion: 1`,
+`siteOrigin`, `version`, le `commit` courant et exactement deux `artifacts`.
+Chaque entrée porte `artifact`, `target` (`chrome-mv3` ou `firefox-mv3`), `version`,
+`format` (`zip` ou `xpi`), `contentType`, `size` et `sha256`. Le ZIP Chrome est
+celui du build; le XPI Firefox conserve chaque fichier du ZIP Firefox et ne
+peut ajouter que les entrées de signature Mozilla autorisées sous `META-INF`.
+Version, identité Gecko, tailles, empreintes et types MIME sont vérifiés.
+La présence structurelle des signatures ne prouve pas leur validité
+cryptographique : l'installation durable du XPI exact sur Firefox stable reste
+obligatoire avant toute certification et création du manifeste final.
+
+Le driver ne charge ces fichiers qu'en prévisualisation/application d'une
+publication, jamais pour un déploiement Worker ordinaire. Le workflow de
+publication vérifie leur présence avant tout effet de production et utilise
+le XPI sans recompression. Le paramètre `certified_release_tag` désigne une
+release GitHub encore brouillon du même dépôt, préparée après certification.
+Le workflow y lit uniquement le XPI nommé pour cette version et
+`publication-manifest.json`, avec son jeton existant `contents: read`, sans
+écrasement. La création du brouillon et l'envoi des fichiers ne sont pas
+automatisés implicitement. Le SHA du Chrome reconstruit doit égaler celui du
+fichier certifié; le payload Firefox doit égaler son build reproductible.
+Aucun compte, secret ni permission Actions n'est ajouté. Sans ces fichiers,
+la publication échoue fermée, sans canari.
+Le transport restera à prouver avec le véritable brouillon signé; les tests
+locaux n'attestent pas l'accès distant à des assets qui n'existent pas encore.
+La signature Mozilla, les reprises confirmées, les parcours durables
+Chrome/Firefox et leur publication restent à accomplir.
+Les preuves historiques et anciennes archives ne sont pas remplacées.
+
+Le premier prévol CI de la PR candidate échoue sur l'attente initiale des
+Options : la capture montre encore « Lecture de l'état local… » après cinq
+secondes. Le test attend désormais la même borne de soixante secondes que
+l'inventaire, sans accepter un état incomplet ni ajouter de retry au produit.
+Le run d'échec `36358211431` reste conservé; seul un nouveau run vert pourra
+certifier la candidate.
+
+Vérifications locales de la candidate : suites des workspaces, 137 tests infra,
+42 tests du banc installé, migrations navigateur et aller-retour privé de
+1 522 sources et 805 œuvres avec `publicDiscovery` réussis. Les E2E Web en
+série passent avec 11 succès et un test ignoré. Les deux builds indépendants
+reproduisent les archives candidates; `web-ext lint` ne rapporte aucune erreur
+et conserve quatre avertissements. Les vues Archify modifiées passent leurs
+validations. Ces résultats ne constituent ni une CI protégée ni une signature.
+
+`npm run verify` passe intégralement dans un clone local propre portant le diff
+candidat, avec dépendances verrouillées, types WXT et runtime CRG préparés.
+Le résultat comprend lint non filtré, couverture, tous les workspaces,
+performance, smoke CRG, intégration, audit sans vulnérabilité et build des vues.
+Dans l'espace historique, six erreurs ESLint proviennent de deux anciens
+scripts privés dans `build/audits`, laissés intacts; la performance non filtrée
+découvre aussi d'anciens worktrees dont les configurations WXT sont absentes.
+Aucun artefact historique n'est supprimé ou exclu de la configuration pour
+verdir le bilan : la preuve complète vient du clone propre.
+Le nouvel import intégral hors ligne conserve les 1 522 sources après les
+redémarrages mais reste incomplet à 240 secondes; il ne certifie pas Library.
+
+Firefox stable 156.0.1 est installé localement et `web-ext` 10.7.0 est disponible
+via le cache npm. Aucun accès Mozilla n'est configuré. Le connecteur Chrome
+installé ne dispose pas de son manifeste de messagerie native : sa réparation
+passe par la réinstallation du plugin dans l'interface Codex/ChatGPT, puis par
+la connexion humaine à Mozilla. Aucun compte, secret, droit ni réglage de
+signature n'a été créé implicitement.
+
 ## Publication 1.0.45 — canaris et profil réel — 27 septembre 2026
 
 Le run protégé `36295558091`, sur le SHA main

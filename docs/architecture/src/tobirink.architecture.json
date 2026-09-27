@@ -20,7 +20,7 @@
           "sync",
           "ui"
         ],
-        "note": "Favoris : présence/progression. IndexedDB : fiches structurées, facettes et statistiques privées. Sync : IDs publics seulement."
+        "note": "IndexedDB : autorité privée. Export v5 : hydratation et publicDiscovery conservés; lecture v1–v5 atomique. Sync : IDs seulement."
       },
       {
         "id": "public-cache",

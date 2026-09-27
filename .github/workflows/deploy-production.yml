@@ -15,6 +15,11 @@ on:
         required: false
         default: false
         type: boolean
+      certified_release_tag:
+        description: 'Tag du brouillon contenant le XPI certifié et publication-manifest.json pour ce commit'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -32,6 +37,7 @@ jobs:
     env:
       TOBIRINK_PUBLISH_EXTENSION: ${{ inputs.publish_extension }}
       TOBIRINK_RUN_MANGA_CANARY: ${{ inputs.run_manga_canary }}
+      TOBIRINK_CERTIFIED_RELEASE_TAG: ${{ inputs.certified_release_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -89,6 +95,22 @@ jobs:
 
       - name: Verify repository
         run: npm run verify
+
+      - name: Require sealed publication artifacts before production effects
+        if: ${{ inputs.publish_extension == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test "$(gh release view "$TOBIRINK_CERTIFIED_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = true
+          EXTENSION_VERSION="$(node -p "require('./apps/extension/package.json').version")"
+          gh release download "$TOBIRINK_CERTIFIED_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern 'publication-manifest.json' \
+            --pattern "tobirink-firefox-mv3-$EXTENSION_VERSION.xpi" \
+            --dir apps/extension/.output/packages
+          node --input-type=module -e "import { readExtensionPublicationCandidate } from './scripts/infra/cloudflare-driver.mjs'; await readExtensionPublicationCandidate();"
 
       - name: Collect aggregate Discovery diagnostics
         timeout-minutes: 2
@@ -169,7 +191,7 @@ jobs:
             --provider cloudflare \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
             --operation r2-publish:tobirink-chrome-mv3-"$EXTENSION_VERSION".zip \
-            --operation r2-publish:tobirink-firefox-mv3-"$EXTENSION_VERSION".zip > .ctxroute-extension-publication-plan.json
+            --operation r2-publish:tobirink-firefox-mv3-"$EXTENSION_VERSION".xpi > .ctxroute-extension-publication-plan.json
           EXTENSION_PLAN_DIGEST="$(node --input-type=module -e "import { readFile } from 'node:fs/promises'; import { assertExtensionPublicationPlan, readExtensionPublicationCandidate } from './scripts/infra/cloudflare-driver.mjs'; const plan = JSON.parse(await readFile('.ctxroute-extension-publication-plan.json', 'utf8')); assertExtensionPublicationPlan(plan, await readExtensionPublicationCandidate(), process.env.CLOUDFLARE_ACCOUNT_ID); process.stdout.write(plan.digest);")"
           npm run --silent infra:apply -- \
             --provider cloudflare \
@@ -177,7 +199,7 @@ jobs:
             --approve "$EXTENSION_PLAN_DIGEST" \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
             --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-"$EXTENSION_VERSION".zip \
-            --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-"$EXTENSION_VERSION".zip
+            --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-"$EXTENSION_VERSION".xpi
           node --input-type=module -e "import { readExtensionPublicationCandidate, verifyExtensionPublication } from './scripts/infra/cloudflare-driver.mjs'; console.log(JSON.stringify(await verifyExtensionPublication(await readExtensionPublicationCandidate())));"
 
       - name: Remove temporary deployment plan

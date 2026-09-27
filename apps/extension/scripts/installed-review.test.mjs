@@ -1,11 +1,14 @@
 import { mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
+import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
+import { createInstalledRecoveryObservation, createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
 import { restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
+import { reserveRecoveryPost } from '../../../scripts/infra/discovery-recovery-batch.mjs';
 
 describe('installed diagnostic failure sample', () => {
   it('bounds the sample and emits only closed codes and operations', () => {
@@ -33,6 +36,111 @@ const key = (index = 1) => ({
   siteRulesVersion: 'rules-v1',
 });
 const query = { discoveryTitles: ['Bounded title'], mediaKind: 'MANGA', sourceTitles: [] };
+
+describe('sealed installed admissions', () => {
+  const submission = index => ({ key: key(index), query, schemaVersion: 3 });
+  const sourceScope = () => ({ corpusDigest: 'a'.repeat(64), sourceCount: 1522, schemaVersion: 1,
+    entries: Array.from({ length: 10 }, (_value, index) => ({ key: key(index + 1),
+      requestDigest: createHash('sha256').update(JSON.stringify(submission(index + 1))).digest('hex') })) });
+  const request = body => fakeRoute({ body, method: 'POST', status: 202, url: 'https://tobirink.com/v3/catalogue/discoveries/requests' });
+
+  it('forwards exactly ten sealed identities with 45-second POSTs and shared CLI reservations', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'tobirink-shared-recovery-'));
+    const recoveryReceiptDirectory = pathToFileURL(directory + '/');
+    const { instance } = await guard({ sourceScope: sourceScope(), recoveryReceiptDirectory, mutationBudget: 10, online: true });
+    for (let index = 1; index <= 10; index += 1) {
+      const route = request(submission(index));
+      await instance.handle(route);
+      expect(route.fetch).toHaveBeenCalledWith({ maxRedirects: 0, maxRetries: 0, timeout: 45_000 });
+      expect(route.fulfill).toHaveBeenCalledOnce();
+      await expect(reserveRecoveryPost(sourceScope().entries[index - 1], recoveryReceiptDirectory)).rejects.toThrow('post-reservation-failed');
+    }
+    expect(instance.snapshot()).toMatchObject({ forwardedRequests: 10, receipts: 10 });
+    const extra = request(submission(11));
+    await instance.handle(extra);
+    expect(extra.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects wrong complete keys and payload drift before reserving or forwarding', async () => {
+    for (const body of [submission(11), { ...submission(1), key: { ...key(1), parserVersion: 'other' } },
+      { ...submission(1), query: { ...query, discoveryTitles: ['Changed'] } }]) {
+      const directory = await mkdtemp(join(tmpdir(), 'tobirink-scope-rejection-'));
+      const { instance } = await guard({ sourceScope: sourceScope(), recoveryReceiptDirectory: pathToFileURL(directory + '/'), mutationBudget: 10, online: true });
+      const route = request(body);
+      await instance.handle(route);
+      expect(route.fetch).not.toHaveBeenCalled();
+      expect(await readdir(directory)).toEqual([]);
+      expect(instance.snapshot().failure).toBe('mutation-scope-rejected');
+    }
+  });
+
+  it('keeps failed submissions consumed across sessions and refuses unscoped expansion', async () => {
+    await expect(guard({ mutationBudget: 10, online: true })).rejects.toThrow('scope');
+    const directory = await mkdtemp(join(tmpdir(), 'tobirink-interrupted-recovery-'));
+    const recoveryReceiptDirectory = pathToFileURL(directory + '/');
+    const options = { sourceScope: sourceScope(), recoveryReceiptDirectory, mutationBudget: 10, online: true };
+    const first = await guard(options);
+    const failed = request(submission(1));
+    failed.fetch.mockRejectedValue(new Error('Interrupted'));
+    await first.instance.handle(failed);
+    const resumed = await guard(options);
+    const replay = request(submission(1));
+    await resumed.instance.handle(replay);
+    expect(replay.fetch).not.toHaveBeenCalled();
+    expect(resumed.instance.snapshot().failure).toBe('mutation-receipt-failed');
+  });
+});
+
+describe('installed recovery correlation', () => {
+  const requestId = '00000000-0000-4000-8000-000000000001';
+  async function fixture(overrides = {}) {
+    const cost = { providerRequests: 1, acceptedResults: 1, provider429s: 0, providerHttpErrors: 0,
+      providerNetworkErrors: 0, queueFailures: 0, d1RowsRead: 200, d1RowsWritten: 20, ...overrides };
+    const observer = { failed: new Promise(() => {}), check: vi.fn(), close: vi.fn(async () => undefined),
+      track: vi.fn(), read: vi.fn(() => cost) };
+    const ready = vi.fn(async () => undefined);
+    const complete = vi.fn(async () => ({ cost, terminal: { state: 'VERIFIED' } }));
+    const observation = await createInstalledRecoveryObservation({ start: () => observer, ready, complete, onFailure: vi.fn() });
+    const response = { headers: () => ({ 'x-tobirink-request-id': requestId }), text: async () => JSON.stringify({ state: 'PENDING' }) };
+    return { observation, response, observer, ready, complete };
+  }
+
+  it('starts observation before admission and drains before certifying final costs', async () => {
+    const context = await fixture();
+    expect(context.ready).toHaveBeenCalledOnce();
+    expect(context.complete).not.toHaveBeenCalled();
+    await context.observation.onAdmission({ key: key() }, context.response);
+    expect(context.observer.track).toHaveBeenCalledWith(requestId, { provider: 'any', status: 202, task: 'discovery' });
+    expect(await context.observation.finish(1)).toEqual([{ providerRequests: 1, d1RowsRead: 200, d1RowsWritten: 20 }]);
+    expect(context.observer.close).toHaveBeenCalledOnce();
+    await context.observation.close();
+  });
+
+  it('rejects missing, duplicate or incomplete admission correlations', async () => {
+    const context = await fixture();
+    await expect(context.observation.onAdmission({ key: key() }, { ...context.response, headers: () => ({}) })).rejects.toThrow();
+    await context.observation.onAdmission({ key: key() }, context.response);
+    await expect(context.observation.onAdmission({ key: key(2) }, context.response)).rejects.toThrow('unique');
+    await expect(context.observation.finish(2)).rejects.toThrow('Every scoped admission');
+    await context.observation.close();
+  });
+
+  it('rejects provider-free, over-budget and late-error observations', async () => {
+    for (const cost of [{ providerRequests: 0 }, { d1RowsRead: 301 }, { provider429s: 1 }, { queueFailures: 1 }]) {
+      const context = await fixture(cost);
+      await context.observation.onAdmission({ key: key() }, context.response);
+      await expect(context.observation.finish(1)).rejects.toThrow('cost policy');
+      await context.observation.close();
+    }
+    const context = await fixture();
+    await context.observation.onAdmission({ key: key() }, context.response);
+    context.observer.close.mockImplementation(async () => {
+      context.observer.check.mockImplementation(() => { throw new Error('late-queue-error'); });
+    });
+    await expect(context.observation.finish(1)).rejects.toThrow('late-queue-error');
+    await context.observation.close();
+  });
+});
 
 function fakeRoute({ body, fetchError, headers, method = 'GET', onAbort, onFetch, onHeaders, status = 200, url }) {
   const response = { status: () => status };

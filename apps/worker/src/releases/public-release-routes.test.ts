@@ -194,4 +194,29 @@ describe('public release routes', () => {
     expect(response.headers.get('Content-Disposition')).toContain('tobirink-chrome-mv3-1.0.0.zip');
     await expect(app.request('https://api.example/downloads/private.zip')).resolves.toMatchObject({ status: 400 });
   });
+
+  it('serves Firefox XPI bytes unchanged and rejects missing artifacts or MIME drift', async () => {
+    const fixture = releaseBindings();
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    let contentType = 'application/x-xpinstall';
+    let present = true;
+    const app = createPublicReleaseApp({ ...fixture.services, releases: {
+      readPointer: (...args) => fixture.services.releases.readPointer(...args),
+      readSnapshot: (...args) => fixture.services.releases.readSnapshot(...args),
+      async readArtifact() {
+        if (!present) return undefined;
+        return { body: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(bytes); controller.close(); } }), contentType, etag: '"signed-xpi"' };
+      },
+    } });
+    const url = 'https://api.example/downloads/tobirink-firefox-mv3-1.0.46.xpi';
+    const response = await app.request(url);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('application/x-xpinstall');
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
+    contentType = 'application/zip';
+    expect((await app.request(url)).status).toBe(503);
+    present = false;
+    expect((await app.request(url)).status).toBe(503);
+    expect((await app.request(url.replace('firefox', 'chrome'))).status).toBe(400);
+  });
 });

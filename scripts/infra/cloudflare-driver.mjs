@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { readdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,31 +18,77 @@ export function assertExtensionPublicationContext(environment = process.env) {
   if (environment.TOBIRINK_PUBLISH_EXTENSION !== 'true'
     || environment.GITHUB_EVENT_NAME !== 'workflow_dispatch'
     || environment.GITHUB_REF !== 'refs/heads/main'
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(environment.TOBIRINK_CERTIFIED_RELEASE_TAG ?? '')
     || environment.TOBIRINK_RUN_MANGA_CANARY !== 'true') throw new Error('extension-publication-preconditions');
   return true;
 }
 
-export async function readExtensionPublicationCandidate({ read = readFile } = {}) {
+export async function inspectFirefoxPublicationArchive({ source, unsignedSource, version }) {
+  const unzip = async args => (await execFileAsync('unzip', args, { encoding: 'buffer', maxBuffer: extensionArchiveLimit })).stdout;
+  const list = async path => (await unzip(['-Z1', path])).toString('utf8').trim().split('\n');
+  const signedFiles = await list(source);
+  const unsignedFiles = await list(unsignedSource);
+  const signatures = new Set(['META-INF/manifest.mf', 'META-INF/mozilla.sf', 'META-INF/mozilla.rsa', 'META-INF/cose.manifest', 'META-INF/cose.sig']);
+  if (signedFiles.length > 200 || new Set(signedFiles).size !== signedFiles.length
+    || signedFiles.some(name => !unsignedFiles.includes(name) && !signatures.has(name))
+    || unsignedFiles.some(name => !signedFiles.includes(name) || signatures.has(name))
+    || !signedFiles.includes('META-INF/mozilla.rsa') || !signedFiles.includes('META-INF/mozilla.sf')
+    || !signedFiles.includes('META-INF/manifest.mf')) throw new Error('extension-publication-xpi-surface');
+  let expandedBytes = 0;
+  for (const name of signedFiles) {
+    if (!/^[A-Za-z0-9_./-]+$/u.test(name) || name.startsWith('/') || name.split('/').includes('..')) throw new Error('extension-publication-xpi-path');
+    const signedBytes = await unzip(['-p', source, name]);
+    expandedBytes += signedBytes.length;
+    if (expandedBytes > extensionArchiveLimit) throw new Error('extension-publication-xpi-size');
+    if (signatures.has(name)) {
+      if (signedBytes.length === 0) throw new Error('extension-publication-xpi-signature-missing');
+    } else if (!signedBytes.equals(await unzip(['-p', unsignedSource, name]))) throw new Error('extension-publication-xpi-payload');
+    if (name === 'manifest.json') {
+      const manifest = JSON.parse(signedBytes);
+      if (manifest.version !== version || manifest.browser_specific_settings?.gecko?.id !== 'tobirink@tobirink.local') throw new Error('extension-publication-xpi-identity');
+    }
+  }
+  if (!signedFiles.includes('manifest.json')) throw new Error('extension-publication-xpi-identity');
+}
+
+export async function readExtensionPublicationCandidate({ read = readFile, inspectFirefox = inspectFirefoxPublicationArchive,
+  expectedCommit = process.env.GITHUB_SHA } = {}) {
   const extensionRoot = fileURLToPath(new URL('../../apps/extension', import.meta.url));
   const { version } = JSON.parse(await read(resolve(extensionRoot, 'package.json'), 'utf8'));
-  const manifest = JSON.parse(await read(resolve(extensionRoot, '.output/packages/release-manifest.json'), 'utf8'));
+  const packageRoot = resolve(extensionRoot, '.output/packages');
+  const buildManifest = JSON.parse(await read(resolve(packageRoot, 'release-manifest.json'), 'utf8'));
+  const manifest = JSON.parse(await read(resolve(packageRoot, 'publication-manifest.json'), 'utf8'));
+  const commit = expectedCommit ?? (await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd: extensionRoot })).stdout.trim();
   if (version !== String(version) || version.length > 32 || !/^\d+\.\d+\.\d+$/u.test(version)
     || manifest.schemaVersion !== 1 || manifest.version !== version || manifest.siteOrigin !== 'https://tobirink.com'
+    || manifest.commit !== commit || !/^[a-f0-9]{40}$/u.test(commit)
+    || buildManifest.schemaVersion !== 1 || buildManifest.version !== version || buildManifest.siteOrigin !== manifest.siteOrigin
+    || !Array.isArray(buildManifest.artifacts) || buildManifest.artifacts.length !== 2
     || !Array.isArray(manifest.artifacts) || manifest.artifacts.length !== 2) throw new Error('extension-publication-manifest');
   const artifacts = [];
   for (const browser of ['chrome', 'firefox']) {
-    const artifact = `tobirink-${browser}-mv3-${version}.zip`;
+    const format = browser === 'chrome' ? 'zip' : 'xpi';
+    const contentType = browser === 'chrome' ? 'application/zip' : 'application/x-xpinstall';
+    const artifact = `tobirink-${browser}-mv3-${version}.${format}`;
     const record = manifest.artifacts.find(item => item.artifact === artifact && item.target === `${browser}-mv3`);
-    if (!record || record.version !== version || record.manifest?.version !== version
+    const build = buildManifest.artifacts.find(item => item.target === `${browser}-mv3` && item.artifact === `tobirink-${browser}-mv3-${version}.zip`);
+    if (!record || record.version !== version || record.format !== format || record.contentType !== contentType
+      || !build || build.version !== version || build.manifest?.version !== version
+      || !/^[a-f0-9]{64}$/u.test(build.sha256) || !Number.isSafeInteger(build.size) || build.size < 1 || build.size > extensionArchiveLimit
       || !/^[a-f0-9]{64}$/u.test(record.sha256) || !Number.isSafeInteger(record.size)
       || record.size < 1 || record.size > extensionArchiveLimit) throw new Error('extension-publication-manifest');
-    const bytes = await read(resolve(extensionRoot, '.output/packages', artifact));
-    if (bytes.length !== record.size || createHash('sha256').update(bytes).digest('hex') !== record.sha256) {
+    const source = resolve(packageRoot, artifact);
+    const unsignedSource = resolve(packageRoot, build.artifact);
+    const bytes = await read(source);
+    const unsigned = await read(unsignedSource);
+    if (bytes.length !== record.size || createHash('sha256').update(bytes).digest('hex') !== record.sha256
+      || unsigned.length !== build.size || createHash('sha256').update(unsigned).digest('hex') !== build.sha256) {
       throw new Error('extension-publication-local-bytes');
     }
-    artifacts.push({ artifact, sha256: record.sha256, size: record.size, target: `r2:tobirink-public-releases/downloads/${artifact}` });
+    if (browser === 'firefox') await inspectFirefox({ source, unsignedSource, version });
+    artifacts.push({ artifact, contentType, sha256: record.sha256, size: record.size, target: `r2:tobirink-public-releases/downloads/${artifact}` });
   }
-  return { version, artifacts };
+  return { version, commit, artifacts };
 }
 
 export function assertExtensionPublicationPlan(plan, candidate, accountId) {
@@ -58,7 +104,7 @@ async function readPublicExtensionArchive(record, fetcher, signal) {
   try {
     response = await fetcher(`https://tobirink.com/downloads/${record.artifact}`, { method: 'GET', redirect: 'error', signal });
   } catch { throw new Error('extension-publication-fetch-failed'); }
-  if (response.status !== 200 || !/^application\/zip(?:\s*;|$)/iu.test(response.headers.get('Content-Type') ?? '')
+  if (response.status !== 200 || (response.headers.get('Content-Type') ?? '').split(';')[0].trim().toLowerCase() !== record.contentType
     || !/(?:^|,)\s*immutable\s*(?:,|$)/iu.test(response.headers.get('Cache-Control') ?? '') || response.body === null) {
     await response.body?.cancel();
     throw new Error('extension-publication-http-contract');
@@ -104,20 +150,12 @@ function releasePublishOperations(config) {
   if (!releaseBucket) return [];
   const extensionRoot = fileURLToPath(new URL('../../apps/extension', import.meta.url));
   const version = JSON.parse(readFileSync(resolve(extensionRoot, 'package.json'), 'utf8')).version;
-  const manifestPath = resolve(extensionRoot, '.output', 'packages', 'release-manifest.json');
-  const releaseManifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  if (releaseManifest.version !== version || !Array.isArray(releaseManifest.artifacts)) {
-    throw new Error('release-manifest-version-mismatch');
-  }
   return ['chrome', 'firefox'].map(browser => {
-    const artifact = `tobirink-${browser}-mv3-${version}.zip`;
-    const record = releaseManifest.artifacts.find(item => item.artifact === artifact && item.target === `${browser}-mv3`);
+    const artifact = `tobirink-${browser}-mv3-${version}.${browser === 'chrome' ? 'zip' : 'xpi'}`;
     const source = resolve(extensionRoot, '.output', 'packages', artifact);
-    if (!record || record.version !== version || !record.sha256 || !Number.isSafeInteger(record.size) || record.size !== statSync(source).size) {
-      throw new Error(`release-manifest-artifact-mismatch:${artifact}`);
-    }
     return [`r2-publish:${artifact}`, {
       artifact,
+      contentType: browser === 'chrome' ? 'application/zip' : 'application/x-xpinstall',
       bucket: releaseBucket.name,
       kind: 'r2-publish',
       source,
@@ -147,7 +185,7 @@ export async function loadCloudflareConfig(path) {
   return { worker, d1, r2, queues: [...queueNames].sort().map(name => ({ name })) };
 }
 
-export function createCloudflareDriver({ config, retiredQueues = [], workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, buildWorkerAssets = runWebBuild, fingerprintWorker = fingerprintWorkerInputs, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET], preserveRoutes = false, r2Fetch = globalThis.fetch, apiToken = process.env.CLOUDFLARE_API_TOKEN }) {
+export function createCloudflareDriver({ config, retiredQueues = [], workerDirectory, releaseDirectory = resolve(workerDirectory, '../../build/releases'), run = runWrangler, read = readFile, readCandidate = readExtensionPublicationCandidate, buildWorkerAssets = runWebBuild, fingerprintWorker = fingerprintWorkerInputs, gatewaySecret = process.env[PROVIDER_GATEWAY_SECRET], preserveRoutes = false, r2Fetch = globalThis.fetch, apiToken = process.env.CLOUDFLARE_API_TOKEN }) {
   validateCloudflareConfig(config);
   validateRetiredQueues(config, retiredQueues);
   const operations = new Map([
@@ -159,6 +197,15 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
     ...config.d1.map(database => [`d1-migrate:${database.binding}`, { kind: 'd1-migrate', target: `d1:${database.name}`, binding: database.binding }]),
   ]);
   let inspectedAccountId;
+  const validatePublication = async actions => {
+    if (!actions.some(action => action.kind === 'r2-publish')) return;
+    const candidate = await readCandidate();
+    for (const action of actions.filter(action => action.kind === 'r2-publish')) {
+      const record = candidate.artifacts.find(item => item.artifact === action.artifact && item.contentType === action.contentType);
+      const bytes = await read(action.source);
+      if (!record || record.size !== bytes.length || record.sha256 !== createHash('sha256').update(bytes).digest('hex')) throw new Error('extension-publication-local-bytes');
+    }
+  };
   const inspectArchive = async (action, accountId) => {
     const remote = await readAuthenticatedArchive(action, accountId, r2Fetch, apiToken);
     const local = await read(action.source);
@@ -212,6 +259,7 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
     },
     async preview(requestedActions) {
       const actions = materializeActions(operations, requestedActions, config, releaseDirectory);
+      await validatePublication(actions);
       const output = {};
       if (actions.some(action => action.kind === 'worker-deploy')) {
         await buildWorkerAssets({ workerDirectory });
@@ -230,6 +278,8 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
     async apply(actions) {
       const selected = materializeActions(operations, actions, config, releaseDirectory)
         .sort((left, right) => operationPriority(left) - operationPriority(right));
+      if (selected.some(action => action.kind === 'r2-publish') && inspectedAccountId === undefined) throw new Error('release-publication-requires-inspection');
+      await validatePublication(selected);
       if (selected.some(action => action.kind === 'worker-deploy')) {
         await buildWorkerAssets({ workerDirectory });
       }
@@ -293,7 +343,7 @@ async function mutationArguments(action, workerDirectory, preserveRoutes) {
   if (action.kind === 'worker-secret-set') return ['secret', 'put', PROVIDER_GATEWAY_SECRET, '--name', action.target.split('/')[0].slice('worker-secret:'.length)];
   if (action.kind === 'd1-migrate') return ['d1', 'migrations', 'apply', action.binding, '--remote'];
   if (action.kind === 'r2-publish') {
-    return ['r2', 'object', 'put', `${action.bucket}/downloads/${action.artifact}`, '--file', action.source, '--content-type', 'application/zip', '--content-disposition', `attachment; filename="${action.artifact}"`, '--cache-control', 'public, max-age=31536000, immutable', '--remote', '--force'];
+    return ['r2', 'object', 'put', `${action.bucket}/downloads/${action.artifact}`, '--file', action.source, '--content-type', action.contentType, '--content-disposition', `attachment; filename="${action.artifact}"`, '--cache-control', 'public, max-age=31536000, immutable', '--remote', '--force'];
   }
   const releaseArguments = releaseMutationArguments(action);
   if (releaseArguments) return releaseArguments;
