@@ -3,6 +3,7 @@ import {
   publicDiscoveryKeyV3Schema,
   publicDiscoveryRequestSchema,
   publicDiscoveryResultBatchSchema,
+  publicDiscoverySearchProgressSchema,
   publicDiscoveryTerminalResolutionSchema,
   publicDiscoveryVerifiedProfileSchema,
   type PublicDiscoveryClaimBatch,
@@ -13,6 +14,7 @@ import {
   type PublicDiscoveryRequest,
   type PublicDiscoveryResult,
   type PublicDiscoveryResultBatch,
+  type PublicDiscoverySearchProgress,
   type PublicDiscoveryVerifiedProfile,
 } from '@tobirink/public-discovery';
 import { favoriteTitlePreparationVersion, normalizeFavoriteTitle } from '@tobirink/application';
@@ -45,6 +47,7 @@ interface DiscoveryRow {
   leaseUntil: string | null;
   requestDigest: string;
   requestJson: string;
+  searchProgressJson: string | null;
   refreshAttemptCount: number;
   refreshState: 'IDLE' | 'PENDING' | 'PROCESSING';
   nextRefreshAt: string | null;
@@ -69,7 +72,7 @@ interface CanonicalFacts {
 }
 export interface PublicDiscoveryV3Port {
   claimBatch(input: { claimToken: string; continuationTokenDigest?: string; key?: PublicDiscoveryKeyV3; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch>;
-  deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string): Promise<void>;
+  deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string, searchProgress?: PublicDiscoverySearchProgress): Promise<void>;
   confirmQueueSignal(key: PublicDiscoveryKeyV3, requestDigest: string, now: string): Promise<void>;
   publishBatch(batch: PublicDiscoveryResultBatch, tokenDigest: string, resultDigest: string, now: string): Promise<{ published: number; replayed: number }>;
   read(key: PublicDiscoveryKeyV3, now: string): Promise<PublicDiscoveryReadState>;
@@ -131,7 +134,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   private row(key: PublicDiscoveryKeyV3): Promise<DiscoveryRow | null> {
     return this.database.prepare(`SELECT attempt_count AS attemptCount, claim_token_hash AS claimTokenHash,
       failure_reason AS failureReason, lease_until AS leaseUntil, request_digest AS requestDigest,
-      request_json AS requestJson, refresh_attempt_count AS refreshAttemptCount,
+      request_json AS requestJson, search_progress_json AS searchProgressJson, refresh_attempt_count AS refreshAttemptCount,
       refresh_state AS refreshState, next_refresh_at AS nextRefreshAt,
       result_expires_at AS resultExpiresAt, result_json AS resultJson,
       retry_at AS retryAt, state, verified_at AS verifiedAt FROM public_discovery_requests_v3
@@ -173,7 +176,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       SELECT requested.fingerprint, requested.mediaKind, requested.parserVersion,
         requested.rulesVersion AS siteRulesVersion, r.attempt_count AS attemptCount, r.claim_token_hash AS claimTokenHash,
         r.failure_reason AS failureReason, r.lease_until AS leaseUntil, r.request_digest AS requestDigest,
-        r.request_json AS requestJson, r.refresh_attempt_count AS refreshAttemptCount,
+        r.request_json AS requestJson, r.search_progress_json AS searchProgressJson, r.refresh_attempt_count AS refreshAttemptCount,
         r.refresh_state AS refreshState, r.next_refresh_at AS nextRefreshAt,
         r.result_expires_at AS resultExpiresAt, r.result_json AS resultJson,
         r.retry_at AS retryAt, r.state, r.verified_at AS verifiedAt
@@ -262,7 +265,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       state = 'PENDING', claim_token_hash = excluded.claim_token_hash, lease_until = NULL, attempt_count = 0,
       failure_reason = NULL, failed_at = NULL, result_json = NULL, verified_at = NULL,
       result_expires_at = NULL, request_digest = excluded.request_digest,
-      request_json = excluded.request_json, admission_priority = excluded.admission_priority,
+      request_json = excluded.request_json, search_progress_json = NULL, admission_priority = excluded.admission_priority,
       queue_signal_state = 'SENDING', queue_signal_lease_until = excluded.queue_signal_lease_until,
       retry_at = excluded.retry_at, updated_at = excluded.updated_at, purge_after = NULL
     WHERE public_discovery_requests_v3.request_digest = excluded.request_digest
@@ -389,18 +392,19 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           AND (?5 IS NULL OR claim_token_hash = ?5)
           AND (?6 IS NULL OR (fingerprint = ?6 AND media_kind = ?7 AND parser_version = ?8 AND rules_version = ?9)))
         ORDER BY admission_priority, updated_at, fingerprint LIMIT ?4)
-      RETURNING request_json AS requestJson, result_json AS resultJson, request_digest AS requestDigest,
+      RETURNING request_json AS requestJson, search_progress_json AS searchProgressJson, result_json AS resultJson, request_digest AS requestDigest,
         state, attempt_count AS attemptCount, refresh_attempt_count AS refreshAttemptCount,
         admission_priority AS admissionPriority, updated_at AS updatedAt,
         fingerprint, media_kind AS mediaKind, parser_version AS parserVersion, rules_version AS siteRulesVersion`)
       .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit, input.continuationTokenDigest ?? null, input.key?.fingerprint ?? null, input.key?.mediaKind ?? null, input.key?.parserVersion ?? null, input.key?.siteRulesVersion ?? null)
-      .all<{ admissionPriority: number; attemptCount: number; fingerprint: string; mediaKind: PublicDiscoveryKeyV3['mediaKind']; parserVersion: string; refreshAttemptCount: number; requestDigest: string; requestJson: string; resultJson: string | null; siteRulesVersion: string; state: DiscoveryRow['state']; updatedAt: string }>();
+      .all<{ admissionPriority: number; attemptCount: number; fingerprint: string; mediaKind: PublicDiscoveryKeyV3['mediaKind']; parserVersion: string; refreshAttemptCount: number; requestDigest: string; requestJson: string; resultJson: string | null; searchProgressJson: string | null; siteRulesVersion: string; state: DiscoveryRow['state']; updatedAt: string }>();
     const ordered = rows.results.sort((left, right) => left.admissionPriority - right.admissionPriority
       || left.updatedAt.localeCompare(right.updatedAt) || left.fingerprint.localeCompare(right.fingerprint));
     const requests = ordered.map((row) => {
       if (row.state !== 'VERIFIED') {
         const request = publicDiscoveryRequestSchema.parse(JSON.parse(row.requestJson));
-        return publicDiscoveryClaimedRequestSchema.parse({ ...request, attempt: row.attemptCount });
+        const searchProgress = row.searchProgressJson === null ? undefined : publicDiscoverySearchProgressSchema.parse(JSON.parse(row.searchProgressJson));
+        return publicDiscoveryClaimedRequestSchema.parse({ ...request, attempt: row.attemptCount, searchProgress });
       }
       if (!row.resultJson) throw new Error('invalid-refresh-profile');
       const resolution = publicDiscoveryTerminalResolutionSchema.parse(JSON.parse(row.resultJson));
@@ -428,15 +432,16 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     return { claimToken: input.claimToken, requests, schemaVersion: 3 };
   }
 
-  async deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string): Promise<void> {
+  async deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string, searchProgress?: PublicDiscoverySearchProgress): Promise<void> {
     if (!Number.isFinite(Date.parse(retryAt)) || retryAt <= now) throw new TypeError('invalid-public-discovery-defer-time');
     const result = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = 'PENDING', attempt_count = attempt_count - 1,
-      lease_until = NULL, retry_at = ?8, updated_at = ?9
+      lease_until = NULL, retry_at = ?8, updated_at = ?9, search_progress_json = ?10
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
         AND request_digest = ?5 AND claim_token_hash = ?6 AND attempt_count = ?7
         AND state = 'PROCESSING' RETURNING fingerprint`)
-      .bind(...keyValues(request.key), request.requestDigest, tokenDigest, request.attempt, retryAt, now).first();
+      .bind(...keyValues(request.key), request.requestDigest, tokenDigest, request.attempt, retryAt, now,
+        searchProgress === undefined ? null : JSON.stringify(publicDiscoverySearchProgressSchema.parse(searchProgress))).first();
     if (result) return;
     const refresh = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       refresh_state = 'PENDING', refresh_attempt_count = refresh_attempt_count - 1,
@@ -709,7 +714,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     statements.push(this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = ?, result_json = ?, verified_at = ?, retry_at = ?,
       result_expires_at = ?, claim_token_hash = NULL, lease_until = NULL,
-      updated_at = ?, request_json = '{}', purge_after = NULL,
+      updated_at = ?, request_json = '{}', search_progress_json = NULL, purge_after = NULL,
       next_refresh_at = CASE WHEN ?1 = 'VERIFIED' THEN ?7 ELSE next_refresh_at END,
       refresh_state = 'IDLE', refresh_attempt_count = 0
       WHERE fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?

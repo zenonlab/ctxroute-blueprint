@@ -95,7 +95,18 @@ export const publicDiscoveryTerminalResolutionSchema = z.discriminatedUnion('sta
   }),
 ]);
 
-export const publicDiscoveryClaimedRequestSchema = publicDiscoveryRequestSchema.extend({ attempt: z.number().int().positive() });
+export const publicDiscoverySearchProgressSchema = z.strictObject({
+  candidates: z.array(publicDiscoveryCandidateSchema).max(25),
+  cursor: z.string().regex(/^[1-9]\d{0,4}$/u),
+  provider: publicDiscoveryProviderSchema,
+  titleIndex: z.number().int().min(0).max(3),
+  version: z.literal(1),
+});
+
+export const publicDiscoveryClaimedRequestSchema = publicDiscoveryRequestSchema.extend({
+  attempt: z.number().int().positive(),
+  searchProgress: publicDiscoverySearchProgressSchema.optional(),
+});
 export const publicDiscoveryClaimBatchSchema = z.strictObject({
   claimToken: z.string().min(32).max(256),
   requests: z.array(publicDiscoveryClaimedRequestSchema).max(50),
@@ -130,6 +141,7 @@ export type PublicDiscoveryRequest = z.output<typeof publicDiscoveryRequestSchem
 export type PublicDiscoveryRefreshSubmission = z.output<typeof publicDiscoveryRefreshSubmissionSchema>;
 export type PublicDiscoveryResult = z.output<typeof publicDiscoveryResultSchema>;
 export type PublicDiscoveryResultBatch = z.output<typeof publicDiscoveryResultBatchSchema>;
+export type PublicDiscoverySearchProgress = z.output<typeof publicDiscoverySearchProgressSchema>;
 export type PublicDiscoveryTerminalResolution = z.output<typeof publicDiscoveryTerminalResolutionSchema>;
 export type PublicDiscoveryVerifiedProfile = z.output<typeof publicDiscoveryVerifiedProfileSchema>;
 export type PublicDiscoverySubmission = z.output<typeof publicDiscoverySubmissionSchema>;

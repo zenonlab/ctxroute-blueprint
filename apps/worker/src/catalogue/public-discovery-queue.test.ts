@@ -376,6 +376,22 @@ describe('public discovery queue trigger', () => {
     await adapter.publishBatch({ claimToken: resumed.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440001', results: [{ key: request.key, requestDigest: request.requestDigest, resolution: { reason: 'synthetic-no-match', state: 'NOT_FOUND' } }], schemaVersion: 3, verifiedAt: '2026-09-20T12:00:09.000Z' }, 'd'.repeat(64), 'e'.repeat(64), '2026-09-20T12:00:09.000Z');
   });
 
+  it('persists a bounded provider cursor and refunds the claim before the next Queue wake', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const request = { ...submission('d', 'Cursor checkpoint work'), requestDigest: 'e'.repeat(64) };
+    const now = '2026-09-20T13:00:00.000Z';
+    const progress = { candidates: [], cursor: '5', provider: 'anilist' as const, titleIndex: 0, version: 1 as const };
+    await adapter.request(request, now);
+    const claim = await adapter.claimBatch({ claimToken: 'a'.repeat(48), tokenDigest: 'b'.repeat(64), now, leaseUntil: '2026-09-20T13:15:00.000Z', limit: 1 });
+    await adapter.deferClaim(claim.requests[0]!, 'b'.repeat(64), '2026-09-20T13:00:08.000Z', now, progress);
+    expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+      .bind(request.key.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 0, progress: JSON.stringify(progress) });
+    const resumed = await adapter.claimBatch({ claimToken: 'c'.repeat(48), tokenDigest: 'd'.repeat(64), now: '2026-09-20T13:00:08.000Z', leaseUntil: '2026-09-20T13:15:08.000Z', limit: 1 });
+    expect(resumed.requests).toHaveLength(1);
+    expect(resumed.requests[0]).toMatchObject({ attempt: 1, searchProgress: progress });
+    await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(request.key.fingerprint).run();
+  });
+
   it('claims only the row bound to an opaque continuation token', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const now = '2026-09-20T12:00:00.000Z';

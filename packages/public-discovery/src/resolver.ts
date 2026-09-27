@@ -1,5 +1,5 @@
 import { publicDiscoveryCandidateSchema } from './contracts';
-import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoveryTerminalResolution } from './contracts';
+import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoverySearchProgress, PublicDiscoveryTerminalResolution } from './contracts';
 import { favoriteProviderInspectionLimit, FavoriteProviderRetryError, inspectFavoriteTitleCandidates, isPublicDiscoveryCandidateCompatible } from './provider-kit';
 import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit';
 import { AniListFavoriteProviderAdapter } from './providers/anilist';
@@ -48,6 +48,13 @@ class IncompleteProviderSearchError extends Error {
   constructor(reason: string) { super(`incomplete-provider-search:${reason}`); }
 }
 
+export class PublicDiscoverySearchContinuationError extends FavoriteProviderRetryError {
+  constructor(readonly searchProgress: PublicDiscoverySearchProgress, retryAt = Date.now() + 1_000) {
+    super('public-discovery-search-continuation', retryAt);
+    this.name = 'PublicDiscoverySearchContinuationError';
+  }
+}
+
 function candidateKey(candidate: ProviderCandidate): string { return `${candidate.provider}:${candidate.externalId}`; }
 
 function matchQueryFor(request: PublicDiscoveryClaimedRequest, titles: readonly string[]): FavoriteTitleMatchQuery {
@@ -80,11 +87,17 @@ async function searchProvider(
   titles: readonly string[],
   matchQuery: FavoriteTitleMatchQuery,
   deadline: number,
+  progress?: PublicDiscoverySearchProgress,
 ): Promise<LaneDecision> {
-  const candidates = new Map<string, ProviderCandidate>();
-  for (const title of [...new Set(titles)].slice(0, 4)) {
-    let cursor = '1';
+  if (progress !== undefined && progress.provider !== provider) throw new Error('provider-search-progress-provider-mismatch');
+  const uniqueTitles = [...new Set(titles)].slice(0, 4);
+  const candidates = new Map((progress?.candidates ?? []).map((candidate) => [candidateKey(candidate), candidate]));
+  for (let titleIndex = progress?.titleIndex ?? 0; titleIndex < uniqueTitles.length; titleIndex += 1) {
+    const title = uniqueTitles[titleIndex];
+    if (title === undefined) throw new Error('provider-search-progress-title-missing');
+    let cursor = progress?.titleIndex === titleIndex ? progress.cursor : '1';
     const seen = new Set(['1']);
+    if (cursor !== '1') seen.add(cursor);
     for (let page = 0; page < searchPageLimit; page += 1) {
       const envelope = await searchBeforeDeadline(port, { cursor, limit: 20, provider, titles: [title] }, deadline);
       if (envelope.provider !== provider) throw new Error('provider-envelope-mismatch');
@@ -103,7 +116,11 @@ async function searchProvider(
       if (envelope.complete || next === undefined || !/^[1-9]\d{0,4}$/u.test(next) || seen.has(next)) {
         throw new IncompleteProviderSearchError('cursor');
       }
-      if (page + 1 === searchPageLimit) throw new IncompleteProviderSearchError('page-limit');
+      if (page + 1 === searchPageLimit) {
+        throw new PublicDiscoverySearchContinuationError({
+          candidates: [...candidates.values()], cursor: next, provider, titleIndex, version: 1,
+        });
+      }
       seen.add(next);
       cursor = next;
     }
@@ -156,16 +173,20 @@ async function searchLane(
   titles: readonly string[],
   query: FavoriteTitleMatchQuery,
   deadline: number,
+  progress?: PublicDiscoverySearchProgress,
 ): Promise<LaneDecision> {
   const inspected: ProviderCandidate[] = [];
   let unavailable: Error | undefined;
-  for (const provider of order) {
+  const startIndex = progress === undefined ? 0 : order.indexOf(progress.provider);
+  if (startIndex < 0) throw new Error('provider-search-progress-lane-mismatch');
+  for (const provider of order.slice(startIndex)) {
     let result: LaneDecision;
     try {
-      result = await searchProvider(provider, providers[provider], titles, query, deadline);
+      result = await searchProvider(provider, providers[provider], titles, query, deadline, provider === progress?.provider ? progress : undefined);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       if (isProviderInvariantError(error)) throw error;
+      if (error instanceof PublicDiscoverySearchContinuationError) throw error;
       // Bounded incomplete searches consume an attempt; do not turn them into
       // cadence-only deferrals that could restart page one without limit.
       unavailable = retainProviderFailure(unavailable, error);
@@ -185,9 +206,9 @@ async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, re
   const titles = request.query.discoveryTitles.slice(0, 4);
   const query = matchQueryFor(request, titles);
   const lanes = request.query.mediaKind === 'ANIME'
-    ? [await searchLane(providers, animeProviders, titles, query, deadline)]
+    ? [await searchLane(providers, animeProviders, titles, query, deadline, request.searchProgress)]
     : request.query.mediaKind !== 'UNKNOWN'
-      ? [await searchLane(providers, mangaSearchProviders, titles, query, deadline)]
+      ? [await searchLane(providers, mangaSearchProviders, titles, query, deadline, request.searchProgress)]
       : [
           await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }, deadline),
           await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }, deadline),
