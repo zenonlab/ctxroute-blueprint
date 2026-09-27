@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { assertMangaProvidersReady, safeFailureCode, selectRemainingCandidates, validateBatch, validateCandidateRow } from './discovery-recovery-batch.mjs';
+import { assertMangaProvidersRegistered, safeFailureCode, selectRemainingCandidates, validateBatch, validateCandidateRow } from './discovery-recovery-batch.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 
@@ -51,16 +51,16 @@ test('redacts unexpected failures', () => {
   assert.equal(safeFailureCode(new Error('discovery-recovery-http-429')), 'discovery-recovery-http-429');
 });
 
-test('refuses recovery when a manga provider cadence is active', () => {
+test('requires every manga provider runtime but lets the Worker serialize an active cadence', () => {
   const ready = [
     { availability: 'READY', provider: 'kitsu-manga' },
     { availability: 'READY', provider: 'mangadex' },
     { availability: 'READY', provider: 'mangaupdates' },
   ];
-  assert.deepEqual(assertMangaProvidersReady(ready), ready);
-  assert.throws(() => assertMangaProvidersReady([...ready.slice(0, 2), { availability: 'DEFERRED', provider: 'mangaupdates' }]),
-    /provider-deferred/u);
-  assert.throws(() => assertMangaProvidersReady(ready.slice(0, 2)), /provider-readiness-invalid/u);
+  assert.deepEqual(assertMangaProvidersRegistered(ready), ready);
+  assert.deepEqual(assertMangaProvidersRegistered([...ready.slice(0, 2), { availability: 'DEFERRED', provider: 'mangaupdates' }]),
+    [...ready.slice(0, 2), { availability: 'DEFERRED', provider: 'mangaupdates' }]);
+  assert.throws(() => assertMangaProvidersRegistered(ready.slice(0, 2)), /provider-readiness-invalid/u);
 });
 
 test('resume selects only sealed unattempted rows and refuses an unfinished POST', () => {

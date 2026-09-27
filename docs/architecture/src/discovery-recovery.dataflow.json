@@ -29,14 +29,14 @@
     { "from": "snapshot", "to": "canaries", "label": "base de comparaison", "classification": "lecture seule", "variant": "default", "labelDy": 53 },
     { "from": "inventory", "to": "approval", "label": "cibles éligibles", "classification": "comptes agrégés", "variant": "security" },
     { "from": "canaries", "to": "approval", "label": "preuve bout en bout corrélée", "classification": "appels réels · D1 cumulé ≤ 300", "variant": "security", "labelDx": 100, "labelDy": 24 },
-    { "from": "approval", "to": "rearm", "label": "prépare le lot exact", "classification": "sceau vérifié · fournisseurs manga prêts", "variant": "security", "labelDy": 53 },
+    { "from": "approval", "to": "rearm", "label": "prépare le lot exact", "classification": "sceau vérifié · runtimes manga présents", "variant": "security", "labelDy": 53 },
     { "from": "rearm", "to": "d1", "label": "reçu avant admission", "classification": "digest identique · arrêt 429/Queue/sans fournisseur/D1 > 300", "variant": "emphasis", "labelDy": -23 },
     { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "terminal ou continuation confirmée", "variant": "emphasis", "labelDy": -53 },
     { "from": "queue", "to": "collector", "label": "claim exact borné", "classification": "clé ciblée · aucun scan global", "variant": "emphasis", "labelDy": 24 },
     { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "terminal ou checkpoint durable remboursé", "variant": "emphasis", "labelDx": 100 }
   ],
   "cards": [
-    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Un reçu POST_STARTED interdit tout doublon", "La garde D1 refuse une cadence manga active avant le reçu et avant chaque POST", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Le curseur reprend après quatre pages sans rejouer la tranche", "UNKNOWN doit être reparsé avant toute admission", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
+    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Un reçu POST_STARTED interdit tout doublon", "Le script vérifie les runtimes manga sans exiger une fenêtre artificiellement vide", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Le curseur reprend après quatre pages sans rejouer la tranche", "UNKNOWN doit être reparsé avant toute admission", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
     { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Continuations fournisseur corrélées au même POST", "Zéro 429/Queue et coût D1 cumulé ≤ 300"] }
   ]
 }
