@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Tobirink — reprise Discovery protégée",
+    "output": "discovery-recovery-deployment.architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1120, 650]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [55, 70],
+    "cols": 4,
+    "gapX": 80,
+    "gapY": 52,
+    "cellW": 170,
+    "cellH": 68
+  },
+  "components": [
+    {
+      "id": "githubCi",
+      "type": "cloud",
+      "label": "CI protégée GitHub",
+      "sublabel": "verify · plan · apply",
+      "tag": "main uniquement",
+      "row": 1,
+      "col": 0
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "Worker public",
+      "sublabel": "admission v3 · 42 s",
+      "tag": "version contrôlée",
+      "row": 1,
+      "col": 1
+    },
+    {
+      "id": "d1",
+      "type": "database",
+      "label": "D1 Discovery v3",
+      "sublabel": "état · tentative · bail",
+      "tag": "mutation v3 exacte",
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "Queue Discovery",
+      "sublabel": "claim(1) · continuation",
+      "tag": "1 / 1",
+      "row": 2,
+      "col": 2
+    },
+    {
+      "id": "resolver",
+      "type": "backend",
+      "label": "Resolver public",
+      "sublabel": "recherche bornée 38 s",
+      "tag": "résultat terminal",
+      "row": 1,
+      "col": 2
+    },
+    {
+      "id": "providers",
+      "type": "external",
+      "label": "APIs publiques",
+      "sublabel": "API contrôlées",
+      "tag": "aucun appel extension",
+      "row": 1,
+      "col": 3
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Cloudflare production",
+      "wraps": ["worker", "d1", "queue", "resolver"]
+    },
+    {
+      "kind": "security-group",
+      "label": "Déploiement borné",
+      "wraps": ["githubCi", "worker"]
+    }
+  ],
+  "connections": [
+    { "from": "githubCi", "to": "worker", "label": "plan scellé · cible unique", "variant": "security", "labelDy": 54 },
+    { "from": "worker", "to": "d1", "label": "admission et état", "variant": "emphasis" },
+    { "from": "worker", "to": "queue", "label": "signal opaque", "variant": "emphasis" },
+    { "from": "queue", "to": "resolver", "label": "claim ciblé", "variant": "emphasis" },
+    { "from": "resolver", "to": "d1", "label": "VERIFIED / NOT_FOUND / AMBIGUOUS", "variant": "security" },
+    { "from": "resolver", "to": "providers", "label": "requête mesurée", "variant": "security" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Garanties actives",
+      "items": ["Une seule cible Worker par plan", "Queue batch 1 et concurrence 1", "Le reçu privé interdit le doublon POST"]
+    },
+    {
+      "dot": "amber",
+      "title": "Certification restante",
+      "items": ["Chaque reprise exige un terminal corrélé", "Arrêt sur 429, Queue, absence fournisseur ou budget D1", "Aucun UNKNOWN n’est réarmé sans reparse"]
+    }
+  ]
+}
