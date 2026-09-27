@@ -197,7 +197,7 @@ export function validateBatch(rows, expectedSeal) {
   return Object.freeze({ batchSeal, candidates });
 }
 
-export function assertMangaProvidersReady(rows) {
+export function assertMangaProvidersRegistered(rows) {
   if (!Array.isArray(rows) || rows.length !== mangaRecoveryProviders.length) throw recoveryError('provider-readiness-invalid');
   const providers = rows.map(row => {
     const parsed = providerReadinessSchema.safeParse(row);
@@ -207,7 +207,6 @@ export function assertMangaProvidersReady(rows) {
   if (providers.map(provider => provider.provider).join('\n') !== mangaRecoveryProviders.join('\n')) {
     throw recoveryError('provider-readiness-invalid');
   }
-  if (providers.some(provider => provider.availability !== 'READY')) throw recoveryError('provider-deferred');
   return Object.freeze(providers);
 }
 
@@ -245,12 +244,12 @@ function queryCandidates() {
   const proof = queryRows(query);
   const batch = validateBatch(proof.rows);
   const providerProof = queryRows(mangaProviderReadinessQuery);
-  const providers = assertMangaProvidersReady(providerProof.rows);
+  const providers = assertMangaProvidersRegistered(providerProof.rows);
   return { ...batch, providers, rowsRead: proof.rowsRead + providerProof.rowsRead, rowsWritten: proof.rowsWritten + providerProof.rowsWritten };
 }
 
-function queryMangaProvidersReady() {
-  return assertMangaProvidersReady(queryRows(mangaProviderReadinessQuery).rows);
+function queryMangaProvidersRegistered() {
+  return assertMangaProvidersRegistered(queryRows(mangaProviderReadinessQuery).rows);
 }
 
 function queryPreparedRows(fingerprints) {
@@ -402,7 +401,7 @@ async function executeCandidate(candidate, index, journal) {
       await awaitObserverReady(observer, controller.signal);
       const initial = await lookup(candidate.submission.key, controller.signal);
       if (initial.state.state !== 'UNAVAILABLE') throw recoveryError(`candidate-${initial.state.state.toLowerCase()}`);
-      queryMangaProvidersReady();
+      queryMangaProvidersRegistered();
       journal.attempts.push({ index, media: candidate.mediaKind, state: 'POST_STARTED' });
       await persistJournal(journal);
       const admission = await postRequest(candidate.submission, controller.signal);
