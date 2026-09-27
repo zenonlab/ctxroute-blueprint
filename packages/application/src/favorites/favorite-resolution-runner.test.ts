@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { publicDiscoveryCandidateSchema } from '@tobirink/public-discovery';
 import { createLibrary, createProviderCandidateEnvelope, createSourceEvidence, createWork, libraryId, workId } from '@tobirink/domain';
 import type { DurableTask, FavoriteResolutionClaim, FavoriteResolutionOutboxPort } from '../tasks';
 import { blockTask, claimTask, isTaskAvailable, retryTask } from '../tasks';
@@ -56,6 +57,83 @@ async function fixture(input = favorite, adapters: Parameters<typeof importFavor
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it('commits all 32 public provider metadata values without provider access or recovery admission', async () => {
+    const { storage, outbox, task } = await fixture({ ...favorite, folderPath: ['Manga'], title: 'Synthetic manga', url: 'https://reader.example/manga/synthetic-manga' });
+    const titles = ['Synthetic manga', ...Array.from({ length: 31 }, (_, index) => `Alias ${index}`)];
+    const discovered = publicDiscoveryCandidateSchema.parse({
+      externalId: '12345', provider: 'mangaupdates', mediaKind: 'MANGA', preSerialization: false,
+      titles, titleVariants: titles.map((title) => ({ title })),
+      categories: Array.from({ length: 32 }, (_, index) => `Category ${index}`),
+      genres: Array.from({ length: 32 }, (_, index) => `Genre ${index}`),
+    });
+    const search = vi.fn(unusedSearch.search);
+    const hydrate = vi.fn(unusedHydration.hydrate);
+    const resolveOrRequest = vi.fn(async () => ({ state: 'VERIFIED' as const, verifiedAt: now, profile: {
+      candidate: discovered, references: [{ provider: discovered.provider, externalId: discovered.externalId }], workId: 'work_public_metadata',
+    } }));
+    const requestRecovery = vi.fn(async () => { throw new Error('Recovery must not be admitted.'); });
+    const result = await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts({ search }), hydration: hydrationPorts({ hydrate }),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'public-metadata', publicDiscovery: { resolveOrRequest, requestRecovery },
+    });
+    expect(result).toMatchObject({ completed: 1, retried: 0, blocked: 0 });
+    expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'COMMITTED', attempt: 1 });
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RESOLVED' });
+    const work = await storage.getWork(workId('work_public_metadata'));
+    expect(work?.hydration?.candidate).toEqual(discovered);
+    expect(work?.hydration?.providerTitleKeys).toHaveLength(32);
+    expect(resolveOrRequest).toHaveBeenCalledTimes(1);
+    expect(search).not.toHaveBeenCalled();
+    expect(hydrate).not.toHaveBeenCalled();
+    expect(requestRecovery).not.toHaveBeenCalled();
+  });
+
+  it.each(['categories', 'genres'] as const)('preserves blocked taxonomy beyond the sixteenth public %s', async (field) => {
+    const { storage, outbox } = await fixture();
+    const discovered = publicDiscoveryCandidateSchema.parse({ ...candidate, [field]: [...Array.from({ length: 31 }, (_, index) => `Label ${index}`), 'Hentai'] });
+    const result = await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'taxonomy-tail',
+      publicDiscovery: { resolveOrRequest: async () => ({ state: 'VERIFIED', verifiedAt: now, profile: {
+        candidate: discovered, references: [{ provider: discovered.provider, externalId: discovered.externalId }], workId: 'work_blocked_tail',
+      } }) },
+    });
+    expect(result).toMatchObject({ completed: 1, retried: 0, blocked: 0 });
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' });
+    expect(await storage.listWorks({ limit: 10 })).toEqual([]);
+  });
+
+  it.each([
+    { extra: { categories: Array.from({ length: 33 }, (_, index) => `Category ${index}`) }, code: 'DISCOVERY_CANDIDATE_SCHEMA_INVALID' },
+    { extra: { cover: { attribution: 'AniList', url: 'https://untrusted.invalid/private-cover.jpg' } }, code: 'DISCOVERY_CANDIDATE_DOMAIN_INVALID' },
+  ])('records a bounded provider-result diagnostic for $code', async ({ extra, code }) => {
+    const { storage, outbox } = await fixture();
+    const trace: unknown[] = [];
+    await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'invalid-metadata', trace: (event) => { trace.push(event); },
+      publicDiscovery: { resolveOrRequest: async () => ({ state: 'VERIFIED', verifiedAt: now, profile: {
+        candidate: { ...candidate, ...extra }, references: [{ provider: candidate.provider, externalId: candidate.externalId }], workId: 'work_invalid_metadata',
+      } }) },
+    });
+    expect(trace).toContainEqual({ operation: 'provider-result', outcome: 'failed', code });
+    expect((await storage.listFavoriteSources({ limit: 1 }))[0]?.resolution).toEqual({ kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' });
+    expect(await storage.listWorks({ limit: 10 })).toEqual([]);
+    expect(JSON.stringify(trace)).not.toMatch(/Frieren|untrusted|private-cover|Category/iu);
+  });
+
+  it('never exposes an unknown uppercase private error message in diagnostics', async () => {
+    const { storage, outbox } = await fixture();
+    vi.spyOn(storage, 'getFavoriteParseArtifact').mockRejectedValueOnce(new Error('PRIVATE_BOOKMARK_TITLE'));
+    const trace: unknown[] = [];
+    await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'private-error', trace: (event) => { trace.push(event); },
+    });
+    expect(trace).toContainEqual({ operation: 'resolution-commit', outcome: 'failed', code: 'INTERNAL_FAILURE' });
+    expect(JSON.stringify(trace)).not.toContain('PRIVATE_BOOKMARK_TITLE');
+  });
+
   it('commits remote ambiguity as comparable references without inventing provider profiles', async () => {
     const { storage, outbox, task } = await fixture();
     const references = [{ provider: 'anilist' as const, externalId: '154587' }, { provider: 'anilist' as const, externalId: '154588' }];

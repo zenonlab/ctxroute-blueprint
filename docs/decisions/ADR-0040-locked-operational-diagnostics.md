@@ -51,6 +51,15 @@ y compris les erreurs de provider, de parsing, de claim et de commit. Le
 runner traite au plus quatre claims indépendants en parallèle par tranche;
 les claims restent atomiques et chaque lane fournisseur conserve ses limites.
 
+Le rejet d'un candidat Public Discovery indique l'opération `provider-result`
+et distingue `DISCOVERY_CANDIDATE_SCHEMA_INVALID` de
+`DISCOVERY_CANDIDATE_DOMAIN_INVALID`. Les autres exceptions de schéma, domaine
+et type ont une catégorie fermée; les messages d'erreur inconnus, même en
+majuscules, ne deviennent jamais des codes de diagnostic. Aucun message brut,
+chemin de champ dynamique ou stack n'est persisté. Le harness installé résume
+les échecs des cent derniers événements avec une seconde liste fermée : ce
+compte est un échantillon, jamais une preuve d'absence d'erreurs sur tout le run.
+
 Les logs de requête natifs de Cloudflare suivent la configuration de la
 plateforme; le verrou Worker gouverne les événements applicatifs Tobirink.
 Lorsqu'une admission `worker-direct` programme une continuation, son UUID

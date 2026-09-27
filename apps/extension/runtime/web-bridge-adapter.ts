@@ -61,7 +61,7 @@ async function mapLibraryItem(storage: StoragePort, item: LibraryCatalogueItem):
   if (coverUrl !== undefined) base.coverUrl = coverUrl;
   if (candidate.cover !== undefined) base.coverAttribution = projectedText(candidate.cover.attribution, 120);
   if (candidate.format !== undefined) base.format = projectedText(candidate.format, 120);
-  if (candidate.genres !== undefined) base.genres = candidate.genres.map((genre) => projectedText(genre, 120));
+  if (candidate.genres !== undefined) base.genres = candidate.genres.slice(0, 16).map((genre) => projectedText(genre, 120));
   if (candidate.editorialStatus !== undefined) base.editorialStatus = candidate.editorialStatus;
   if (candidate.startYear !== undefined) base.startYear = candidate.startYear;
   if (candidate.endYear !== undefined) base.endYear = candidate.endYear;
@@ -70,7 +70,7 @@ async function mapLibraryItem(storage: StoragePort, item: LibraryCatalogueItem):
   if (candidate.volumeCount !== undefined) base.volumeCount = candidate.volumeCount;
   if (candidate.popularity !== undefined) base.popularity = candidate.popularity;
   base.provider = projectedText(candidate.provider, 120);
-  if (candidate.titleVariants !== undefined) base.titleVariants = candidate.titleVariants.map((variant) => variant.language === undefined
+  if (candidate.titleVariants !== undefined) base.titleVariants = candidate.titleVariants.slice(0, 16).map((variant) => variant.language === undefined
     ? { title: projectedText(variant.title, 240) }
     : { language: projectedText(variant.language, 120), title: projectedText(variant.title, 240) });
   return base;

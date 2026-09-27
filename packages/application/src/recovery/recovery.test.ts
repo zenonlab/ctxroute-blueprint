@@ -6,6 +6,23 @@ import { createPrivateExport, importPrivateExport, validatePrivateExport } from 
 const empty = { agenda: [], favoriteSources: [], libraries: [], progress: [], reminders: [], reviews: [], works: [] };
 
 describe('private recovery', () => {
+  it('round-trips all 32 provider metadata values and title indexes', async () => {
+    const titles = Array.from({ length: 32 }, (_, index) => `Title ${index}`);
+    const candidate = {
+      externalId: '12345', provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const, preSerialization: false,
+      titles, titleVariants: titles.map((title) => ({ title })), categories: titles, genres: titles,
+    };
+    const work = createWork({
+      externalReferences: [{ provider: candidate.provider, externalId: candidate.externalId }], id: workId('work_metadata_recovery'), mediaKind: 'manga', preferredTitle: 'Synthetic manga',
+      hydration: { candidate, favoriteAliasKeys: [], hydratedAt: '2026-09-01T00:00:00.000Z', matcherVersion: 'favorite-matcher-v4', providerTitleKeys: titles },
+    });
+    const value = await createPrivateExport(new MemoryRecoveryStore({ ...empty, works: [work] }), '2026-09-04T10:00:00.000Z');
+    const restored = new MemoryRecoveryStore(empty);
+    await importPrivateExport(JSON.stringify(value), restored, 'replace-private-state');
+    expect((await restored.readSnapshot()).works).toEqual([work]);
+    expect(() => validatePrivateExport(JSON.stringify({ ...value, works: [{ ...work, hydration: { ...work.hydration, providerTitleKeys: [...titles, 'Extra title'] } }] }))).toThrow();
+  });
+
   it('preserves a deferred actionable Review through export and import', async () => {
     const review = createReview({ availableAt: '2026-09-09T10:00:00.000Z', id: reviewId('review_deferred'), reason: 'NOT_FOUND', sourceLabel: 'Synthetic source', status: 'pending', title: 'Synthetic voyager' });
     const value = await createPrivateExport(new MemoryRecoveryStore({ ...empty, reviews: [review] }), '2026-09-08T10:00:00.000Z');

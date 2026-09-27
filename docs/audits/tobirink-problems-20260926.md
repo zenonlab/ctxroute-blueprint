@@ -724,6 +724,96 @@ la base. La télémétrie retenue depuis ce déploiement contient zéro 429, err
 metadata, `exceededCpu` ou exception. Cette preuve est bornée à la fenêtre et
 aux événements conservés par Cloudflare.
 
+### Rejet local des résultats vérifiés — 27 septembre 2026
+
+Le run headless `s0TJEZ` importe les 1 522 entrées HTTP(S) de l'export exact
+fourni dans Downloads avec l'archive publique Chrome 1.0.45. À 595 secondes,
+il compte 905 résolus, 44 Review, 46 non pris en charge et 527 retryable,
+dont 60 `INTERNAL_FAILURE`, 465 `PROVIDER_UNAVAILABLE` et deux erreurs réseau.
+Ses 1 374 lectures sont transmises; ses dix admissions sont bloquées par le
+budget nul. Ce résultat est `incomplete`, pas une certification fournisseur.
+
+Une sonde ciblée relit hors ligne les artefacts des soixante erreurs du profil
+temporaire, puis effectue exactement soixante GET Discovery, sans admission.
+Les soixante réponses sont `VERIFIED` et valides selon le contrat public;
+aucune ne passe le validateur candidat de l'extension. Toutes contiennent plus
+de seize catégories; quatre ont aussi plus de seize titres, une plus de seize
+variantes. Le serveur accepte trente-deux éléments mais le domaine local et
+son schéma applicatif en refusent plus de seize. La panne est donc située
+après la résolution fournisseur, avant la projection Work, et ne justifie
+aucun réarmement D1. Seuls les compteurs et champs fermés sont enregistrés;
+les titres, URL et réponses restent en mémoire.
+
+Le correctif local aligne la cardinalité fournisseur à trente-deux, sans
+changer les seize alias privés ni tronquer les catégories avant leur contrôle.
+Les index Work et l'import privé suivent cette borne; WebBridge conserve sa
+projection bornée à seize. Des tests rouges puis verts couvrent le trajet,
+les trente-trois éléments refusés et la catégorie bloquante en fin de liste.
+Les codes d'erreur distinguent désormais le schéma du candidat et ses
+invariants de domaine sans exposer le message brut.
+
+Le rejeu `AM3olC` utilise la candidate locale décompressée, pas une nouvelle
+archive publique. Le manifeste porte encore 1.0.45; le SHA-256 de son
+`background.js` corrigé est
+`f257f2d95a5e7333265d084867d9394e9311db31676b5d708cfbbe3c5aac93e1`.
+Il correspond au build courant. Les archives publiées restent inchangées.
+Après 595 secondes, les 1 522 sources sont conservées : 966 résolues,
+44 Review, 52 non prises en charge et 460 retryable. Ces dernières sont
+458 `PROVIDER_UNAVAILABLE`, un `PUBLIC_DISCOVERY_PENDING` et un `NETWORK`.
+Il ne reste aucun `INTERNAL_FAILURE`, traitement actif ou Work résolu absent
+de la projection. La bibliothèque contient 1 309 entrées dont 805 Work hydratés.
+Les arrêts du service worker et du navigateur sont observés et la conservation
+est vérifiée. Les 1 297 lectures transmises, douze admissions tentées mais
+bloquées, zéro refresh transmis et zéro requête en vol confirment le budget
+sans mutation. Aucun appel fournisseur n'est exercé par ce test.
+
+Une comparaison locale hors ligne confirme le même corpus exact et retrouve
+chacun des soixante anciens échecs : 54 sont `RESOLVED`, avec leur Work dans
+Library, et six sont `BLOCKED_CONTENT_TAXONOMY`. Leur contenu n'est pas exposé.
+Cette comparaison explique la réparation des soixante sources; la différence
+globale de 61 résolutions entre les deux runs n'est pas présentée comme une
+preuve isolée de causalité. Les rapports agrégés restent privés en `0600` et
+les profils temporaires sont mis en pause après inspection.
+
+Validation du diff : toutes les suites workspace et tous les typechecks
+passent, dont domaine 43, application 461, extension 226, Worker 197 et
+contrats 15. Les tests infra 120, migrations IndexedDB Chromium, sécurité,
+couverture de gouvernance, intégration, décisions, documentation et Archify
+architecture passent. Playwright termine avec onze succès et un scénario
+réseau opt-in ignoré. Le lint ciblé et Oxlint passent; le lint global conserve
+six erreurs préexistantes dans deux scripts d'audit ignorés. La commande
+performance globale découvre aussi quatre anciens worktrees sans leur
+tsconfig WXT généré; le périmètre source excluant `build/**` passe avec
+45 tests et trois cas optionnels ignorés. Aucun fichier utilisateur, hook,
+permission, migration ou paramètre de reprise D1 n'est modifié.
+
+La préparation de livraison reproduit ensuite l'ordre de la CI dans un clone
+indépendant propre : installation verrouillée, builds Web et extension, puis
+`npm run verify` intégralement vert. Les archives candidates Chrome/Firefox
+sont reproductibles en builds isolés; elles ne sont pas publiées. Le harnais
+installé passe ses 36 tests, Playwright ses onze scénarios avec un scénario
+réseau opt-in ignoré, et `npm run archify:validate -- architecture` passe.
+Le `background.js` reconstruit possède exactement le SHA-256 du rejeu réel
+ci-dessus. Les audits et anciens worktrees locaux sont conservés, sans
+contournement des hooks ni exclusion ajoutée au dépôt pour masquer leur lint.
+
+Le verdict global demeure `incomplete` : cette étape répare et prouve les
+erreurs locales, pas les demandes fournisseur épuisées. La livraison doit
+passer par la PR et la CI, avec une nouvelle version avant toute publication
+d'archive. Une reprise des `FAILED/ATTEMPT_LIMIT` reste une opération bornée
+distincte, à confirmer immédiatement avant exécution. Le profil personnel
+et l'export complet de sa base privée ne sont pas certifiés par ce run.
+
+L'audit relève séparément des divergences textuelles non modifiées ici :
+l'attribution publique autorise 200 caractères contre 120 localement et les
+facettes publiques sont bornées en caractères, le domaine en octets UTF-8.
+Ces cas sont reproductibles sur fixtures, mais ne sont pas la cause des
+soixante rejets réels constatés. Une correction distincte doit préserver les
+bornes filaires et de confidentialité au lieu de les élargir implicitement.
+Le schéma d'import privé strict omet aussi le champ existant
+`hydration.publicDiscovery`; le test d'export ajouté ici prouve seulement les
+cardinalités des métadonnées et index, pas la restauration d'un profil D1 réel.
+
 ## Preuves encore nécessaires
 
 - La même preuve corrélée pour la recherche par titre et la reprise Queue :

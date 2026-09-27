@@ -292,6 +292,13 @@ types média et statistiques Library. Aucun titre, URL, identifiant d'œuvre,
 empreinte d'intégrité ou chemin de l'export ne rejoint stdout ou le rapport.
 Le statut est sondé toutes les cinq secondes sans boucle de réconciliation;
 les alarmes natives doivent assurer la poursuite.
+Chaque observation contient aussi `diagnosticFailureSample`, limité aux cent
+derniers événements locaux et réduit à opération, code fermé et compteur.
+Un échantillon vide ne certifie pas l'absence d'erreur; les compteurs persistés
+et le verdict de convergence restent déterminants. Une régression de contrat
+traverse le candidat public à trente-deux éléments, le runner, Work et Library,
+l'export privé et la projection WebBridge à seize éléments. Elle vérifie aussi
+qu'une catégorie bloquante en fin de liste n'est pas perdue.
 
 Le scénario arrête le service worker, redémarre Chromium avec le même profil
 temporaire et vérifie l'identité de l'extension. Une ancienne archive facultative

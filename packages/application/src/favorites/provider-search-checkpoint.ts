@@ -1,4 +1,4 @@
-import { createProviderCandidate, createProviderCandidateEnvelope } from '@tobirink/domain';
+import { createProviderCandidate, createProviderCandidateEnvelope, providerMetadataCollectionLimit } from '@tobirink/domain';
 import type { ProviderCandidate, ProviderCandidateEnvelope } from '@tobirink/domain';
 import { z } from 'zod';
 import type { StoragePort } from '../ports/storage-port';
@@ -21,18 +21,18 @@ type MutableProviderSearchQuery = { -readonly [Key in keyof FavoriteProviderSear
 export const providerCandidateSchema = z.strictObject({
   contentClassification: z.enum(['adult', 'non-adult', 'unknown']).optional(),
   linkedReferences: z.array(z.strictObject({ provider: z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']), externalId: text })).max(5).optional(),
-  canonicalUrl: z.url().max(8192).optional(), categories: z.array(text).max(16).optional(), externalId: text,
+  canonicalUrl: z.url().max(8192).optional(), categories: z.array(text).max(providerMetadataCollectionLimit).optional(), externalId: text,
   cover: z.strictObject({ attribution: z.string().trim().min(1).max(120), url: z.url().max(32 * 1024) }).optional(),
   displayTitle: text.optional(),
-  format: text.optional(), genres: z.array(text).max(16).optional(), mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
+  format: text.optional(), genres: z.array(text).max(providerMetadataCollectionLimit).optional(), mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
   editorialStatus: z.enum(['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN']).optional(),
   startYear: z.number().int().min(1800).max(3000).optional(), endYear: z.number().int().min(1800).max(3000).optional(),
   episodeCount: count.optional(), chapterCount: count.optional(), volumeCount: count.optional(),
   popularity: z.strictObject({ kind: z.enum(['MEMBERS', 'RANK']), value: count }).optional(), metadataVersion: z.union([z.literal(1), z.literal(2)]).optional(),
   preSerialization: z.boolean(), provider: z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']),
   season: z.number().int().positive().optional(),
-  titleVariants: z.array(z.strictObject({ language: z.string().trim().min(1).max(120).optional(), title: text })).max(16).optional(),
-  titles: z.array(text).min(1).max(16),
+  titleVariants: z.array(z.strictObject({ language: z.string().trim().min(1).max(120).optional(), title: text })).max(providerMetadataCollectionLimit).optional(),
+  titles: z.array(text).min(1).max(providerMetadataCollectionLimit),
 }).transform(({ contentClassification, linkedReferences, canonicalUrl, categories, cover, displayTitle, format, genres, season, titleVariants, editorialStatus, startYear, endYear, episodeCount, chapterCount, volumeCount, popularity, metadataVersion, ...candidate }) => {
   const value: MutableProviderCandidate = candidate;
   if (contentClassification !== undefined) value.contentClassification = contentClassification;

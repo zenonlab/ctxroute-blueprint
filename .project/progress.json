@@ -5943,6 +5943,160 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-diagnose-real-list-failures-20260927",
+      "title": "Expliquer et corriger les erreurs internes de la liste réelle",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "diagnose",
+          "title": "Reproduire les erreurs sans mutation distante",
+          "status": "DONE",
+          "acceptance": [
+            "Diagnostics bornés sans titre, URL, payload ni message libre.",
+            "Une erreur observée sur la liste réelle est reproduite; aucun POST de production ni réarmement."
+          ],
+          "files": [
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "apps/extension/runtime/extension-diagnostics.ts",
+            "apps/extension/scripts/installed-review.mjs",
+            "docs/architecture/src/favorite-convergence.architecture.json",
+            "docs/decisions/ADR-0040-locked-operational-diagnostics.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application -- favorite-resolution-runner",
+            "npm test --workspace @tobirink/extension -- installed-review",
+            "npm run archify:validate -- architecture"
+          ],
+          "evidence": [
+            "Profil réel s0TJEZ, 60 GET bornés et zéro mutation: 60/60 résultats VERIFIED publics, tous rejetés localement; catégories>16 pour60, titres>16 pour4, variantes>16 pour1.",
+            "Cause reproduite rouge localement: six tests domaine, quatre application et un projection UI; diagnostics harness36/36 verts."
+          ]
+        },
+        {
+          "id": "repair",
+          "title": "Corriger la cause avec une régression",
+          "status": "DONE",
+          "acceptance": [
+            "Correction minimale au point de défaillance prouvé.",
+            "Régression rouge puis verte, tentatives et états métier conservés."
+          ],
+          "files": [
+            "packages/application/src/favorites/provider-search-checkpoint.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/work.ts",
+            "docs/decisions/ADR-0040-locked-operational-diagnostics.md",
+            "docs/architecture/src/favorite-convergence.architecture.json"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/extension",
+            "npm run typecheck"
+          ],
+          "evidence": [
+            "Régressions rouges puis vertes:32 valeurs préservées,33 refusées,taxonomie en queue,alias privés16,export32 et WebBridge16.",
+            "Domaine43/application461/extension226/contrats15 passent; tous les typechecks workspace passent; revue indépendante sans régression introduite.",
+            "Diagnostic candidat schéma/domaine et agrégat privé36/36; Oxlint global,ADR65,documentation et Archify architecture showcase passent. Lint global:6 erreurs préexistantes dans2 audits ignorés."
+          ]
+        },
+        {
+          "id": "verify",
+          "title": "Rejouer la liste et documenter les limites",
+          "status": "DONE",
+          "acceptance": [
+            "Les 1522 favoris exacts restent conservés après redémarrages.",
+            "Bilan explicite des erreurs corrigées et des attentes fournisseur; aucune fausse certification complète.",
+            "Aucune archive publiée ni reprise FAILED sans confirmation immédiate distincte."
+          ],
+          "files": [
+            "apps/extension/scripts/installed-review.mjs",
+            "apps/extension/scripts/installed-review.test.mjs",
+            "docs/02-quality-strategy.md",
+            "docs/audits/tobirink-problems-20260926.md"
+          ],
+          "commands": [
+            "npm run build:extension",
+            "node apps/extension/scripts/installed-review.mjs <candidate-local>",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Rejeu exact1522 AM3olC:966 résolus,44 Review,52 exclus,460 retryable,0 erreur interne,0 processing. Redémarrages SW/navigateur et projection conservés.",
+            "Comparaison hors ligne des60 anciens échecs:54 RESOLVED+Work/Library,6 taxonomie;1522 sources identiques.1297 lectures,12 admissions bloquées,0 mutation/refresh/appel fournisseur.",
+            "Toutes suites workspace/types,IndexedDB,sécurité,infra120,E2E11/1skip,couverture,intégration,ADR/docs,Archify showcase9/9 et diff-check passent. Lint global6 erreurs historiques; perf source45/3skip après exclusion des worktrees générés.",
+            "Candidate locale non publiée; preuve et limites dans audit27septembre. Verdict global incomplete:458 fournisseurs indisponibles,1 pending,1 réseau. Aucun FAILED réarmé, aucune archive publiée."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "deliver-real-list-metadata-fix-20260927",
+      "title": "Livrer le correctif des candidats Discovery prouvé sur la liste réelle",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "verify-commit",
+          "title": "Auditer et versionner le correctif borné",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Diff limité aux métadonnées fournisseur32, diagnostics expurgés, régressions et preuves documentaires déjà approuvées; archives, règles FAILED, hooks, permissions et migrations inchangés.",
+            "Validation complète depuis clone indépendant propre sans suppression des audits utilisateur ni contournement des hooks.",
+            "Commit fonctionnel fix(discovery): accept bounded provider metadata collections et branche fix/public-discovery-candidate-metadata32."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/scripts/installed-review.mjs",
+            "docs/audits/tobirink-problems-20260926.md",
+            "docs/architecture/src/favorite-convergence.architecture.json"
+          ],
+          "commands": [
+            "git diff --check",
+            "npm run verify",
+            "npm run archify:validate -- architecture",
+            "git commit"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "pr-ci",
+          "title": "Pousser la PR et vérifier la CI",
+          "status": "TODO",
+          "acceptance": [
+            "PR vers main avec preuves réelles agrégées, limites explicites et validations; workflow existant inchangé.",
+            "Prévol CI vert sur le SHA exact avant fusion, apply désactivé hors main; déploiement normal main et sondes vérifiés après fusion.",
+            "Aucune archive publiée, aucun nouveau canari et aucun FAILED réarmé; reprise historique exige toujours une confirmation immédiate distincte."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            ".github/workflows/deploy-production.yml"
+          ],
+          "commands": [
+            "git push",
+            "gh pr create",
+            "gh workflow run deploy-production.yml --ref fix/public-discovery-candidate-metadata32 -f run_manga_canary=false -f publish_extension=false",
+            "gh run view",
+            "gh pr merge"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createFavoriteObservation,
   createFavoriteParseArtifact,
+  createProviderCandidate,
   createProviderCandidateEnvelope,
   createResolutionDecision,
   createSourceEvidence,
@@ -23,6 +24,20 @@ const observation = () => createFavoriteObservation({
 });
 
 describe('favorite pipeline contracts', () => {
+  it.each(['titles', 'titleVariants', 'categories', 'genres'] as const)('preserves 32 provider %s and rejects 33', (field) => {
+    const values = Array.from({ length: 32 }, (_, index) => field === 'titleVariants' ? { title: `Alias ${index}` } : `Value ${index}`);
+    const candidate = { externalId: '12345', mediaKind: 'MANGA' as const, preSerialization: false, provider: 'mangaupdates' as const, titles: ['Synthetic manga'], [field]: values };
+    expect(createProviderCandidate(candidate, 'mangaupdates')[field]).toEqual(values);
+    expect(() => createProviderCandidate({ ...candidate, [field]: [...values, values[0]] }, 'mangaupdates')).toThrow(/32 entries/u);
+  });
+
+  it('keeps private source aliases bounded to 16 independently of provider metadata', () => {
+    const aliases = Array.from({ length: 16 }, (_, index) => ({ provenance: 'stable-url-slug' as const, value: `Alias ${index}` }));
+    const evidence = { aliases, diagnostics: [], key: 'bookmark-aliases', mediaKind: 'MANGA' as const, proofs: [], sourceAdapter: 'generic-url', strategy: 'generic' as const };
+    expect(createSourceEvidence(evidence).aliases).toHaveLength(16);
+    expect(() => createSourceEvidence({ ...evidence, aliases: [...aliases, { provenance: 'stable-url-slug', value: 'Extra alias' }] })).toThrow(/16 entries/u);
+  });
+
   it('X-02 strips provider progress fields from canonical candidates', () => {
     const input = { candidates: [{ externalId: 'manga', lastChapter: 42, lastVolume: 7, mediaKind: 'MANGA' as const, preSerialization: false, provider: 'mangaupdates' as const, titles: ['Fixture'] }], complete: true, digest: 'x-02', provider: 'mangaupdates' as const, truncated: false };
     const [candidate] = createProviderCandidateEnvelope(input).candidates;
@@ -73,7 +88,7 @@ describe('favorite pipeline contracts', () => {
     expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, canonicalUrl: 'ftp://example.invalid/work' }], complete: true, digest: 'digest-url', provider: 'anilist', truncated: false })).toThrow(/HTTP\(S\)/u);
     expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, cover: { attribution: 'AniList', url: 'http://s4.anilist.co/file.jpg' } }], complete: true, digest: 'digest-cover-http', provider: 'anilist', truncated: false })).toThrow(/HTTPS/u);
     expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, cover: { attribution: 'AniList', url: 'https://images.invalid/file.jpg' } }], complete: true, digest: 'digest-cover-origin', provider: 'anilist', truncated: false })).toThrow(/not allowed/u);
-    expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, titleVariants: Array.from({ length: 17 }, () => ({ title: 'Alias' })) }], complete: true, digest: 'digest-title-variants', provider: 'anilist', truncated: false })).toThrow(/16 entries/u);
+    expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, titleVariants: Array.from({ length: 33 }, () => ({ title: 'Alias' })) }], complete: true, digest: 'digest-title-variants', provider: 'anilist', truncated: false })).toThrow(/32 entries/u);
     expect(() => createProviderCandidateEnvelope({ candidates: [{ ...candidate, season: 0 }], complete: true, digest: 'digest-season', provider: 'anilist', truncated: false })).toThrow(/positive safe integer/u);
   });
 
