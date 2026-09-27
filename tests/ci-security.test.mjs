@@ -114,7 +114,10 @@ test('extension publication is an optional two-object phase after successful can
   assert.match(publication, /verifyExtensionPublication/u);
   assert.doesNotMatch(publication, /worker-deploy|d1-migrate|queue-|published-extension\.json|continue-on-error|always\(\)/u);
   const workerPlan = workflow.split('- name: Create expiring Cloudflare plan')[1]?.split('- name:')[0];
-  assert.match(workerPlan, /plan\.actions\.length !== 1/u);
+  assert.match(workerPlan, /--operation d1-migrate:PUBLIC_DB/u);
+  assert.match(workerPlan, /--operation worker-deploy/u);
+  assert.match(workerPlan, /d1-migrate:d1:tobirink-public/u);
+  assert.match(workerPlan, /worker-deploy:worker:tobirink-public-api/u);
   assert.doesNotMatch(workerPlan, /r2-publish/u);
   assert.doesNotMatch(workflow, /contents: write/u);
 });
