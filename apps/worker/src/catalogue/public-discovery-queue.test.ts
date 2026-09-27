@@ -376,6 +376,46 @@ describe('public discovery queue trigger', () => {
     await adapter.publishBatch({ claimToken: resumed.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440001', results: [{ key: request.key, requestDigest: request.requestDigest, resolution: { reason: 'synthetic-no-match', state: 'NOT_FOUND' } }], schemaVersion: 3, verifiedAt: '2026-09-20T12:00:09.000Z' }, 'd'.repeat(64), 'e'.repeat(64), '2026-09-20T12:00:09.000Z');
   });
 
+  it('keeps a global wake for another expired lease when provider cadence defers the claimed request', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-20T12:00:00.000Z'));
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const deferred = { ...submission('b', 'Deferred request'), key: { ...key('b'), fingerprint: 'b0'.padEnd(64, '0') }, requestDigest: 'b'.repeat(64) };
+    const expired = { ...submission('c', 'Expired request'), key: { ...key('c'), fingerprint: 'c0'.padEnd(64, '0') }, requestDigest: 'c'.repeat(64) };
+    const now = new Date().toISOString();
+    const runtimes = await env.PUBLIC_DB.prepare("SELECT provider, next_allowed_at AS nextAllowed FROM public_discovery_provider_runtime WHERE provider IN ('anilist', 'kitsu-anime')")
+      .all<{ nextAllowed: number; provider: string }>();
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = {
+      metrics: async () => metrics,
+      send: vi.fn(async () => ({ metadata: { metrics } })),
+      sendBatch: vi.fn(async () => ({ metadata: { metrics } })),
+    };
+    const provider = vi.spyOn(globalThis, 'fetch');
+    try {
+      await adapter.request(deferred, now);
+      await adapter.request(expired, now);
+      await adapter.claimBatch({ claimToken: 'e'.repeat(43), key: expired.key, leaseUntil: now, limit: 1, now, tokenDigest: await tokenDigest('e'.repeat(43)) });
+      await env.PUBLIC_DB.prepare("UPDATE public_discovery_provider_runtime SET next_allowed_at = ?1 WHERE provider IN ('anilist', 'kitsu-anime')")
+        .bind(Date.now() + 60_000).run();
+
+      await expect(processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: queue })).resolves.toMatchObject({ claimed: 1, deferred: 1, continuationScheduled: true });
+
+      expect(provider).not.toHaveBeenCalled();
+      expect(queue.send).toHaveBeenCalledTimes(2);
+      expect(queue.send.mock.calls).toEqual(expect.arrayContaining([
+        [{ type: 'public-discovery-ready', version: 1 }, expect.objectContaining({ delaySeconds: 1 })],
+        [expect.objectContaining({ continuationToken: expect.any(String), type: 'public-discovery-ready', version: 1 }), expect.objectContaining({ delaySeconds: 60 })],
+      ]));
+    } finally {
+      provider.mockRestore(); vi.useRealTimers();
+      await env.PUBLIC_DB.batch(runtimes.results.map((runtime) => env.PUBLIC_DB.prepare('UPDATE public_discovery_provider_runtime SET next_allowed_at = ?1 WHERE provider = ?2')
+        .bind(runtime.nextAllowed, runtime.provider)));
+      await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint IN (?1, ?2)')
+        .bind(deferred.key.fingerprint, expired.key.fingerprint).run();
+    }
+  });
+
   it('persists a bounded provider cursor and refunds the claim before the next Queue wake', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const request = { ...submission('d', 'Cursor checkpoint work'), requestDigest: 'e'.repeat(64) };

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "goalId": "discovery-recovery-continuation-20260927",
+  "title": "Préserver la continuation globale après un différé fournisseur",
+  "approved": true,
+  "executionMode": "autonomous",
+  "modeOffered": false,
+  "validationEvidence": [
+    "L'observation D1 du 2026-09-27 montre qu'un cron reprend un lease expiré, puis que le différé fournisseur conserve deux leases expirés pour le prochain cron.",
+    "La confirmation autonome couvre ce correctif local, ses tests, sa documentation et sa livraison protégée; aucune mutation D1 directe ni reprise historique n'est incluse."
+  ],
+  "steps": [
+    {
+      "id": "continue-global-recovery",
+      "title": "Réveiller le backlog global après un différé spécifique",
+      "status": "IN_PROGRESS",
+      "acceptance": [
+        "Un différé fournisseur conserve sa continuation corrélée sans empêcher un signal global de réclamer les autres leases expirés.",
+        "Chaque invocation reste limitée à claim(1), respecte les délais fournisseur et ne réarme aucun FAILED.",
+        "Les tests couvrent un différé corrélé avec un second lease expiré et les signaux Queue attendus.",
+        "Le dataflow et ADR-0061 décrivent la double continuation bornée; aucune donnée de production n'est modifiée."
+      ],
+      "files": [
+        "apps/worker/src/native-collectors.ts",
+        "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+        "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+        "docs/architecture/src/adaptive-public-refresh.architecture.json",
+        "docs/plans/fix-discovery-recovery-continuation-20260927.json"
+      ],
+      "commands": [
+        "npm run test --workspace @tobirink/worker -- --run src/catalogue/public-discovery-queue.test.ts",
+        "npm run typecheck --workspace @tobirink/worker",
+        "npm run archify:validate -- architecture",
+        "git diff --check"
+      ],
+      "evidence": []
+    }
+  ]
+}
