@@ -17,7 +17,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-19
-- Revised: 2026-09-23
+- Revised: 2026-09-27
 
 ## Contexte
 
@@ -36,9 +36,18 @@ dynamique et `src/index.ts` comme entrypoint.
 Un workflow GitHub déclenché par `main` ou manuellement s'exécute uniquement sur
 le runner auto-hébergé enregistré avec les labels `self-hosted`, `macOS`,
 `ARM64`, `cloudflare-ci`. Il exécute `npm run verify`, génère un plan Cloudflare
-expirant, vérifie son digest et applique uniquement
-`worker:tobirink-public-api`. Les pull requests n’ont aucun job de déploiement
-et le job ne possède que `contents: read`.
+expirant, vérifie son digest et applique exactement la migration D1 déclarée
+`d1:tobirink-public`, puis `worker:tobirink-public-api`. L'allowlist de l'apply
+contient ces deux cibles seulement. Les pull requests n’ont aucun job de
+déploiement et le job ne possède que `contents: read`.
+
+La migration D1 est exécutée avant le Worker afin que chaque colonne ou table
+requise par le bundle existe au premier appel public. Le plan scellé inclut les
+deux actions et refuse un ajout, un retrait ou une substitution de cible. Une
+migration additive déjà appliquée est sans effet ; une migration qui échoue
+empêche le déploiement du Worker. Cette règle évite de livrer un runtime qui
+référence un schéma absent tout en conservant les migrations comme opérations
+explicites, traçables et bornées.
 
 Le plan de production encode aussi l’option `preserveRoutes: true`. Wrangler
 reçoit une configuration temporaire sans déclaration `routes`, ce qui publie la
@@ -56,7 +65,9 @@ donc détectée, tandis qu’un rebuild équivalent ne déclenche pas à tort
 Les secrets `CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID` sont des secrets
 d’environnement GitHub. `PROVIDER_GATEWAY_HMAC_KEY` reste un secret runtime
 séparé du dépôt, présent côté Worker et gateway; aucune valeur secrète n’est
-versionnée. D1 et les secrets fournisseur ne sont pas mutés par ce workflow.
+versionnée. D1 n'est muté par ce workflow qu'au travers de la migration
+versionnée incluse dans le plan scellé ; les secrets fournisseur ne sont pas
+mutés.
 R2 n'est publié que par l'option manuelle `publish_extension` de l'ADR-0039,
 désactivée par défaut, sur `main` avec canaris obligatoires. Son plan distinct
 autorise uniquement les deux nouvelles archives, après canaris réussis; les
@@ -112,6 +123,7 @@ journal Deno absent et n’ajoute aucun mécanisme concurrent.
 
 Le contrôle post-déploiement conserve les statuts HTTP et les identifiants
 de corrélation; l'option archives ajoute les tailles et SHA-256 publics.
-D1, les créations/suppressions Queue et la rotation des secrets restent des
-opérations séparées. La publication optionnelle R2 possède son propre plan
+D1 est limité à la migration explicitement scellée avec le Worker ; les
+créations/suppressions Queue et la rotation des secrets restent des opérations
+séparées. La publication optionnelle R2 possède son propre plan
 borné; le redéploiement des consommateurs est inclus au Worker.
