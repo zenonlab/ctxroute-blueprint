@@ -6042,7 +6042,7 @@
       "schemaVersion": 1,
       "id": "deliver-real-list-metadata-fix-20260927",
       "title": "Livrer le correctif des candidats Discovery prouvé sur la liste réelle",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -6080,7 +6080,7 @@
         {
           "id": "pr-ci",
           "title": "Pousser la PR et vérifier la CI",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "PR vers main avec preuves réelles agrégées, limites explicites et validations; workflow existant inchangé.",
             "Prévol CI vert sur le SHA exact avant fusion, apply désactivé hors main; déploiement normal main et sondes vérifiés après fusion.",
@@ -6099,8 +6099,9 @@
             "gh pr merge"
           ],
           "evidence": [
-            "Branche fix/public-discovery-candidate-metadata32; runner macOS ARM64 online/idle; PR prévue sans archive ni reprise historique.",
-            "Trois commits documentaires antérieurs inclus explicitement: preuve canaris, confirmation historique distincte, certification ancienne1.0.45."
+            "PR144 fusionnée en f36af83 après prévol36348495846 vert sur27dc900; prévol apply/canaris/publication skipped. Hooks et clone propre verts.",
+            "CI main36349017892 réussie: verify,E2E,plan/apply et quatre probes200; Worker e708b40b. Aucune migration à appliquer, canaris/publication skipped.",
+            "Hashes publics Chrome c044bf1b et Firefox1de68453 inchangés avant/après; aucun FAILED réarmé. Correctif fusionné, pas encore publié en archive;460retryable réels demeurent."
           ]
         }
       ]
