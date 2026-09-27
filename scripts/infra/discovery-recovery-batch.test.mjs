@@ -54,11 +54,23 @@ test('redacts unexpected failures', () => {
 test('resume selects only sealed unattempted rows and refuses an unfinished POST', () => {
   const rows = Array.from({ length: 10 }, (_value, index) => row(index));
   const candidates = rows.map(validateCandidateRow);
-  const identitySeals = candidates.map(candidate => candidate.identitySeal);
-  const journal = { attempts: identitySeals.slice(0, 4).map((_seal, index) => ({ index: index + 1,
+  const journal = { attempts: candidates.slice(0, 4).map((candidate, index) => ({ index: index + 1,
     media: candidates[index].mediaKind, state: 'TERMINAL', terminal: 'VERIFIED' })),
-  batchSeal: '511b6d16818fcff7a7c06c0ee22564e956181038a5fac73dfc9e36a7e1c5eca1', identitySeals, schemaVersion: 1 };
-  assert.deepEqual(selectRemainingCandidates(rows.slice(4), journal).map(candidate => candidate.identitySeal), identitySeals.slice(4));
+  batchId: 'recovery-test-01', batchSeal: digest(candidates.map(candidate => candidate.identitySeal).join('\n')),
+  candidates: candidates.map(candidate => ({ fingerprint: candidate.fingerprint, identitySeal: candidate.identitySeal,
+    mediaKind: candidate.mediaKind })), schemaVersion: 2 };
+  assert.deepEqual(selectRemainingCandidates(rows.slice(4), journal).map(candidate => candidate.identitySeal), candidates.slice(4).map(candidate => candidate.identitySeal));
   journal.attempts[3] = { index: 4, media: candidates[3].mediaKind, state: 'POST_STARTED' };
   assert.throws(() => selectRemainingCandidates(rows.slice(4), journal), /receipt-incomplete/u);
+});
+
+test('prepared receipt rejects a changed candidate identity', () => {
+  const rows = Array.from({ length: 10 }, (_value, index) => row(index));
+  const candidates = rows.map(validateCandidateRow);
+  const journal = { attempts: [], batchId: 'recovery-test-02', batchSeal: digest(candidates.map(candidate => candidate.identitySeal).join('\n')),
+    candidates: candidates.map(candidate => ({ fingerprint: candidate.fingerprint, identitySeal: candidate.identitySeal,
+      mediaKind: candidate.mediaKind })), schemaVersion: 2 };
+  const changed = [...rows];
+  changed[0] = { ...changed[0], requestDigest: digest('changed') };
+  assert.throws(() => selectRemainingCandidates(changed, journal), /identity-mismatch/u);
 });
