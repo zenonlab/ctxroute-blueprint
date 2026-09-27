@@ -5860,7 +5860,7 @@
       "schemaVersion": 1,
       "id": "repair-manga-continuation-20260927",
       "title": "Réparer la continuation manga et certifier la reprise",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -5900,7 +5900,7 @@
         {
           "id": "delivery",
           "title": "Livrer par PR et CI protégée",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Commit validé puis PR et CI protégée verts sans archive extension."
           ],
@@ -5913,13 +5913,14 @@
             "gh pr checks"
           ],
           "evidence": [
-            "Diff relu; message prévu fix(discovery): qualify correlated pre-provider continuations; livraison protégée sans extension."
+            "Commit c92678c, PR143 fusionnée en 565d1b3; hooks pré-push complets verts depuis clone propre.",
+            "CI protégée 36338487755 réussie, verify complet et E2E inclus; plan/apply et probes verts; aucun canari ni publication archive dans ce run."
           ]
         },
         {
           "id": "certify",
           "title": "Certifier une paire neuve et mesurer",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Une seule paire neuve après CI verte, appels corrélés et agrégats D1/Queue/Worker.",
             "Préparer lot scellé uniquement si certificat complet; aucune reprise FAILED sans confirmation immédiate."
@@ -5931,7 +5932,12 @@
           "commands": [
             "node scripts/infra/manga-canary.mjs --observe"
           ],
-          "evidence": []
+          "evidence": [
+            "Run unique 36338898685 vert sur 565d1b3, Worker37d84956 : anime/manga VERIFIED, un appel corrélé chacun, 93/105 lectures D1,34 écritures, zéro retry/429/erreur; archive skipped. Différé couvert localement; aucun différé sur cette paire distante.",
+            "Lecture post-canari : D1 VERIFIED958 FAILED502 PENDING1 PROCESSING3; Queue9/DLQ2 (approx.). Fenêtre Worker15 invocations/0 erreur/18 sous-requêtes; ces agrégats ne certifient pas le backlog.",
+            "Lot manga-certified-20260927 scellé :10 MANGA,1863 lectures/0 écriture, reçu0600 ignoré Git et0 tentative. Aucun POST historique; confirmation immédiate distincte et nouveau prévol requis.",
+            "Runbook et Progress relus; ADR/docs et diff-check passent; hooks/consignes inchangés. Preuves versionnées sur branche sans relancer le déploiement certifié."
+          ]
         }
       ]
     }

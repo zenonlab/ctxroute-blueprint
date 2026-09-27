@@ -391,8 +391,8 @@
 
 - [x] **Exclure la version Worker volatile du sceau** — DONE _(evidence: CI 36336224384 a confirmé le seul oubli d’attente; aucune étape Cloudflare n’a commencé., Suite infra complète 117/117 passe après mise à jour de cloudflare-queue-driver., Les contrôles initiaux restent verts : décisions, documentation, Archify architecture et git diff --check.)_
 
-## Réparer la continuation manga et certifier la reprise — ACTIVE
+## Réparer la continuation manga et certifier la reprise — DONE
 
 - [x] **Reproduire et corriger la continuation corrélée** — DONE _(evidence: Régression rouge puis verte : manga exact, différé 120s, réveil anticipé sans essai, continuation corrélée, un appel MangaUpdates et VERIFIED; claim(1) par invocation., Worker 197/197, infra 120/120, tous types, ADR65, docs, Archify architecture sans diagnostic et diff-check passent; ESLint canari et Oxlint ciblé passent., Audit : aucune migration, règle FAILED, Queue1/1, archive, hook ou consigne modifiés. verify/lint global bloqué par six erreurs préexistantes de deux audits ignorés build/audits; validation propre prévue pour livraison.)_
-- [ ] **Livrer par PR et CI protégée** — IN_PROGRESS _(evidence: Diff relu; message prévu fix(discovery): qualify correlated pre-provider continuations; livraison protégée sans extension.)_
-- [ ] **Certifier une paire neuve et mesurer** — PENDING
+- [x] **Livrer par PR et CI protégée** — DONE _(evidence: Commit c92678c, PR143 fusionnée en 565d1b3; hooks pré-push complets verts depuis clone propre., CI protégée 36338487755 réussie, verify complet et E2E inclus; plan/apply et probes verts; aucun canari ni publication archive dans ce run.)_
+- [x] **Certifier une paire neuve et mesurer** — DONE _(evidence: Run unique 36338898685 vert sur 565d1b3, Worker37d84956 : anime/manga VERIFIED, un appel corrélé chacun, 93/105 lectures D1,34 écritures, zéro retry/429/erreur; archive skipped. Différé couvert localement; aucun différé sur cette paire distante., Lecture post-canari : D1 VERIFIED958 FAILED502 PENDING1 PROCESSING3; Queue9/DLQ2 (approx.). Fenêtre Worker15 invocations/0 erreur/18 sous-requêtes; ces agrégats ne certifient pas le backlog., Lot manga-certified-20260927 scellé :10 MANGA,1863 lectures/0 écriture, reçu0600 ignoré Git et0 tentative. Aucun POST historique; confirmation immédiate distincte et nouveau prévol requis.)_
