@@ -13,6 +13,7 @@ scope:
   - packages/application/src/use-cases/import-favorite-sources.ts
   - packages/application/src/public-discovery/public-discovery-contract.ts
   - packages/adapters-browser/src/catalogue/http-public-discovery-adapter.ts
+  - scripts/infra/discovery-recovery-batch.mjs
   - docs/architecture/src/real-favorite-resolution.dataflow.json
 review: on-change
 revised: true
@@ -58,6 +59,50 @@ ce build utilise des imports ESM sans extension qui ne sont pas exécutables par
 Node directement. La CI propre exécute donc le même runner que l’opérationnel,
 sans dépendre d’un artefact généré ou d’un cache de runner.
 
+Le runner opérateur exige `--scope` pour le prévol, la préparation et
+l’exécution. Ce fichier privé provient de la liste réellement importée : son
+schéma de version 1 contient `corpusDigest`, `sourceCount` et exactement dix
+`entries` uniques `MANGA` ou `MANHWA`, chacune avec la clé v3 complète et son
+`requestDigest`. Sa lecture exige un fichier régulier de 16 Kio au plus et
+des permissions privées. L’empreinte seule ne prouve pas cette identité.
+La sélection D1 est ciblée : une CTE de dix entrées pilote dix recherches
+sur l’index de clé primaire complète, jamais les dix plus anciens échecs
+globaux. Le constructeur sépare SQL et paramètres ; le transport Wrangler
+CLI encode ensuite uniquement les valeurs validées par une allowlist stricte,
+sans revendiquer des bindings API distants. Chaque ligne doit encore être
+`FAILED/ATTEMPT_LIMIT` avec huit essais
+et conserver le payload et le digest attestés par le scope.
+
+Le journal de version 3 lie le lot à son `scopeSeal`. Un scope absent,
+divergent ou incomplet, un reçu legacy de version 2 ou une ligne modifiée
+interdit l’exécution avant tout POST. Il n’existe aucune conversion implicite
+des anciens reçus : ils restent intacts comme preuves historiques. Le scope
+et les sceaux sont privés, ignorés par Git et absents des sorties publiques ;
+les rapports ne conservent que les comptes, médias et codes fermés.
+
+Avant `POST_STARTED` dans le journal, une réservation permanente par clé v3
+complète est créée exclusivement (`wx`, mode `0600`), écrite puis
+synchronisée avec `sync`. Un `requestDigest` différent ne contourne pas
+cette réservation de la clé ; le digest reste vérifié contre le scope.
+Elle interdit un second POST depuis
+un autre processus ou lot utilisant le même répertoire de reçus. Une
+interruption, même avant l’envoi HTTP, conserve cette réservation et bloque
+le rejeu ; aucune suppression automatique ne la libère. Cette garantie
+locale n’est pas une coordination multi-machine : un seul opérateur doit
+utiliser le répertoire de reçus canonique, sans le dupliquer pour reprendre.
+
+L’observation attend d’abord le résultat terminal, puis accorde jusqu’à
+soixante secondes au coût fournisseur corrélé, avec une dernière lecture à
+la borne incluse. Un différé de cadence ne consomme donc pas prématurément
+cette fenêtre. La deadline totale de douze minutes par candidat reste
+prioritaire : terminal sans coût final, absence d’appel fournisseur, 429,
+erreur Queue ou dépassement des 300 lectures D1 cumulées interdisent le
+certificat et l’admission suivante. Avant de persister `TERMINAL`, le runner
+ferme et draine l’observateur, vérifie encore son état et relit le coût final.
+Une erreur tardive ou un coût final invalide empêche donc le reçu terminal.
+Cette évolution ne change ni `claim(1)`, ni Queue 1/1, ni les règles de
+réarmement ou d’arrêt.
+
 ## Conséquences
 
 Un réveil ciblé anticipé qui ne peut pas encore réclamer sa ligne conserve
@@ -81,4 +126,6 @@ La récupération est observable et réversible au niveau applicatif : désactiv
 - tests des clés et payloads communs, des indices synchronisés et de la prélecture groupée ;
 - tests reprise avec vrai adaptateur HTTP et stockage de contrat : dix demandes, quinze secondes, redémarrage, pause, `Retry-After`, erreur permanente, lecture après interruption, fin de lot et `UNAVAILABLE` sans boucle ;
 - test du rendu UI ;
+- tests du runner opérateur : scope obligatoire et privé borné à 16 Kio, identité complète et digest, refus du journal legacy ou divergent, SQL ciblé par dix clés primaires, réservation exclusive conservée entre processus et lots ;
+- tests d’observation : différés de 120 et 600 secondes, fenêtre de coût après le terminal, lecture à soixante secondes, deadline totale, drain final et refus des erreurs tardives sans reçu terminal ;
 - aucune récupération distante exécutée pendant cette modification.
