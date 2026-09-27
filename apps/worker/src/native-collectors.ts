@@ -336,10 +336,12 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   });
   const specificToken = claimedCount > 0 ? activeToken : continuationToken;
   const specificTokenDigest = claimedCount > 0 ? activeTokenDigest : continuationTokenDigest;
-  const specificPendingAt = specificTokenDigest === undefined ? undefined : await port.nextPendingAt(specificTokenDigest);
-  const nextPendingAt = claimedCount > 0
-    ? specificPendingAt ?? await port.nextPendingAt()
-    : specificPendingAt ?? (continueGlobalWhenEmpty ? await port.nextPendingAt() : undefined);
+  const needsSpecificContinuation = specificTokenDigest !== undefined
+    && (claimedCount === 0 || report.failed > 0 || (report.deferred ?? 0) > 0);
+  const specificPendingAt = needsSpecificContinuation ? await port.nextPendingAt(specificTokenDigest) : undefined;
+  const genericLane = key === undefined && continuationToken === undefined;
+  const nextPendingAt = specificPendingAt
+    ?? (genericLane && (claimedCount > 0 || continueGlobalWhenEmpty) ? await port.nextPendingAt() : undefined);
   let continuationScheduled = false;
   if (scheduleContinuation && nextPendingAt !== undefined) {
     const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(nextPendingAt) - Date.now()) / 1_000)));

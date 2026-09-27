@@ -2,6 +2,7 @@ import { applyD1Migrations, env } from 'cloudflare:test';
 import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import { favoriteTitlePreparationVersion } from '@tobirink/application';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { processPublicDiscoveryQueue } from '../native-collectors';
 import { instrumentD1 } from '../operational-metrics';
 
 const now = '2026-09-23T12:00:00.000Z';
@@ -62,6 +63,38 @@ describe('public discovery indexed query cost', () => {
     console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'empty-wake', terminalRows: 1024, ...cost }));
     expect(cost.rowsWritten).toBe(0);
     expect(cost.rowsRead).toBeLessThan(32);
+  });
+
+  it('does not scan global pending work after an exact terminal publication', async () => {
+    const key = { fingerprint: 'e'.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    await adapter.request({
+      key,
+      query: {
+        discoveryTitles: ['Bounded terminal publication'],
+        explicitProviderReference: { externalId: '900001', provider: 'anilist' },
+        mediaKind: 'ANIME',
+        sourceTitles: ['Bounded terminal publication'],
+      },
+      requestDigest: 'f'.repeat(64),
+      schemaVersion: 3,
+    }, now);
+    const provider = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ data: { Media: {
+      coverImage: { extraLarge: null, large: null, medium: null }, format: 'TV', genres: [], id: 900001,
+      siteUrl: 'https://anilist.co/anime/900001', synonyms: [], title: { english: null, native: null, romaji: 'Bounded terminal publication' }, type: 'ANIME',
+    } } }));
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = {
+      metrics: async () => metrics,
+      send: vi.fn(async () => ({ metadata: { metrics } })),
+      sendBatch: vi.fn(async () => ({ metadata: { metrics } })),
+    };
+    try {
+      const report = await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: queue }, key);
+      expect(report).toMatchObject({ claimed: 1, continuationScheduled: false, failed: 0, published: 1 });
+      expect(report.metrics?.rowsRead).toBeLessThanOrEqual(300);
+      expect(queue.send).not.toHaveBeenCalled();
+    } finally { provider.mockRestore(); }
   });
 
   it('uses the named four-key identity index for grouped lookups', async () => {

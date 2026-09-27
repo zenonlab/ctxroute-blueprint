@@ -21,7 +21,7 @@
     ]
   },
   "components": [
-    { "id": "extension", "type": "frontend", "label": "MV3 extension", "sublabel": "cursor · alarm · 1.1 s admission", "tag": "1.0.44", "pos": [40, 270], "size": [150, 76] },
+    { "id": "extension", "type": "frontend", "label": "MV3 extension", "sublabel": "cursor · alarm · 1.1 s admission", "tag": "1.0.45", "pos": [40, 270], "size": [150, 76] },
     { "id": "indexeddb", "type": "database", "label": "Private IndexedDB", "sublabel": "sources · works · Library", "tag": "restart-safe", "pos": [40, 470], "size": [150, 76] },
     { "id": "worker", "type": "cloud", "label": "Discovery Worker", "sublabel": "lookup · admission · lease", "tag": "D1-first · 60/600 rpm", "pos": [270, 270], "size": [150, 76] },
     { "id": "d1", "type": "database", "label": "Cloudflare D1", "sublabel": "grouped lookup ≤50", "tag": "four-key identity", "pos": [500, 150], "size": [150, 76] },
