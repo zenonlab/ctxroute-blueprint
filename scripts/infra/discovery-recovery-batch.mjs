@@ -9,10 +9,10 @@ import { z } from 'zod';
 import { startCostObserver } from './manga-canary.mjs';
 
 const batchLimit = 10;
-const expectedBatchSeal = '511b6d16818fcff7a7c06c0ee22564e956181038a5fac73dfc9e36a7e1c5eca1';
-const receiptPath = new URL('../../build/recovery/discovery-recovery-batch-511b6d16.json', import.meta.url);
+const receiptDirectory = new URL('../../build/recovery/', import.meta.url);
 const requestIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const sha256Pattern = /^[a-f0-9]{64}$/u;
+const batchIdPattern = /^[a-z][a-z0-9-]{2,47}$/u;
 const maxResponseBytes = 1024 * 1024;
 const readinessAttempts = 4;
 const readinessDelayMs = 2_500;
@@ -108,12 +108,15 @@ const rowSchema = z.strictObject({
   siteRulesVersion: z.string().min(1).max(128),
   state: z.literal('FAILED'),
 });
+const journalAttemptSchema = z.strictObject({ index: z.number().int().min(1).max(batchLimit), media: z.enum(['MANGA', 'MANHWA']),
+  state: z.enum(['POST_STARTED', 'TERMINAL']), terminal: z.enum(['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS']).optional() });
 const journalSchema = z.strictObject({
-  attempts: z.array(z.strictObject({ index: z.number().int().min(1).max(batchLimit), media: z.enum(['MANGA', 'MANHWA']),
-    state: z.enum(['POST_STARTED', 'TERMINAL']), terminal: z.enum(['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS']).optional() })).max(batchLimit),
-  batchSeal: z.literal(expectedBatchSeal),
-  identitySeals: z.array(z.string().regex(sha256Pattern)).length(batchLimit),
-  schemaVersion: z.literal(1),
+  attempts: z.array(journalAttemptSchema).max(batchLimit),
+  batchId: z.string().regex(batchIdPattern),
+  batchSeal: z.string().regex(sha256Pattern),
+  candidates: z.array(z.strictObject({ fingerprint: fingerprintSchema, identitySeal: fingerprintSchema,
+    mediaKind: z.enum(['MANGA', 'MANHWA']) })).length(batchLimit),
+  schemaVersion: z.literal(2),
 });
 
 const query = `SELECT
@@ -135,27 +138,6 @@ WHERE state = 'FAILED'
   AND media_kind IN ('MANGA', 'MANHWA')
 ORDER BY failed_at ASC, fingerprint ASC
 LIMIT 10`;
-const resumeQuery = `SELECT
-  fingerprint,
-  media_kind AS mediaKind,
-  parser_version AS parserVersion,
-  rules_version AS siteRulesVersion,
-  request_digest AS requestDigest,
-  request_json AS requestJson,
-  state,
-  failure_reason AS failureReason,
-  failed_at AS failedAt,
-  attempt_count AS attemptCount,
-  queue_signal_state AS queueSignalState
-FROM public_discovery_requests_v3
-WHERE state = 'FAILED'
-  AND failure_reason = 'ATTEMPT_LIMIT'
-  AND attempt_count = 8
-  AND media_kind IN ('MANGA', 'MANHWA')
-  AND failed_at >= '2026-09-15T21:15:02.979Z'
-  AND failed_at <= '2026-09-18T23:09:57.072Z'
-ORDER BY failed_at ASC, fingerprint ASC`;
-
 function recoveryError(code) {
   return new Error(`discovery-recovery-${code}`);
 }
@@ -188,17 +170,22 @@ export function validateCandidateRow(input) {
   const requestJsonSha256 = digest(row.requestJson);
   const identitySeal = digest(JSON.stringify({ fingerprint: row.fingerprint, mediaKind: row.mediaKind,
     parserVersion: row.parserVersion, siteRulesVersion: row.siteRulesVersion, requestDigest, requestJsonSha256 }));
-  return Object.freeze({ failedAt: row.failedAt, identitySeal, mediaKind: row.mediaKind, submission });
+  return Object.freeze({ failedAt: row.failedAt, fingerprint: row.fingerprint, identitySeal, mediaKind: row.mediaKind, submission });
 }
 
-export function validateBatch(rows, expectedSeal = expectedBatchSeal) {
+export function validateBatch(rows, expectedSeal) {
   if (!Array.isArray(rows) || rows.length !== batchLimit) throw recoveryError('batch-size');
   const candidates = rows.map(validateCandidateRow);
   const keys = candidates.map(candidate => JSON.stringify(candidate.submission.key));
   if (new Set(keys).size !== batchLimit) throw recoveryError('duplicate-key');
   const batchSeal = digest(candidates.map(candidate => candidate.identitySeal).join('\n'));
-  if (batchSeal !== expectedSeal) throw recoveryError('batch-seal');
+  if (expectedSeal !== undefined && batchSeal !== expectedSeal) throw recoveryError('batch-seal');
   return Object.freeze({ batchSeal, candidates });
+}
+
+function receiptPath(batchId) {
+  if (!batchIdPattern.test(batchId)) throw recoveryError('batch-id');
+  return new URL(`discovery-recovery-batch-${batchId}.json`, receiptDirectory);
 }
 
 function sanitizedEnvironment() {
@@ -210,41 +197,39 @@ function sanitizedEnvironment() {
   return environment;
 }
 
+function queryRows(command) {
+  const child = spawnSync('npm', ['exec', '--no', '--', 'wrangler', 'd1', 'execute', 'PUBLIC_DB', '--remote',
+    '--config', 'apps/worker/wrangler.jsonc', '--json', '--command', command], {
+    cwd: new URL('../../', import.meta.url), encoding: 'utf8', env: sanitizedEnvironment(), maxBuffer: maxResponseBytes,
+    timeout: 45_000,
+  });
+  if (child.error || child.status !== 0 || child.signal != null) throw recoveryError('d1-query-failed');
+  let output;
+  try { output = JSON.parse(child.stdout); } catch { throw recoveryError('d1-query-invalid'); }
+  const result = output?.[0];
+  if (!Array.isArray(output) || output.length !== 1 || result?.success !== true || result.meta?.changes !== 0
+    || result.meta?.rows_written !== 0 || result.meta?.changed_db === true || !Number.isSafeInteger(result.meta?.rows_read)
+    || !Array.isArray(result.results)) throw recoveryError('d1-proof-failed');
+  return { rows: result.results, rowsRead: result.meta.rows_read, rowsWritten: 0 };
+}
+
 function queryCandidates() {
-  const child = spawnSync('npm', ['exec', '--no', '--', 'wrangler', 'd1', 'execute', 'PUBLIC_DB', '--remote',
-    '--config', 'apps/worker/wrangler.jsonc', '--json', '--command', query], {
-    cwd: new URL('../../', import.meta.url), encoding: 'utf8', env: sanitizedEnvironment(), maxBuffer: maxResponseBytes,
-    timeout: 45_000,
-  });
-  if (child.error || child.status !== 0 || child.signal != null) throw recoveryError('d1-query-failed');
-  let output;
-  try { output = JSON.parse(child.stdout); } catch { throw recoveryError('d1-query-invalid'); }
-  const result = output?.[0];
-  if (!Array.isArray(output) || output.length !== 1 || result?.success !== true || result.meta?.changes !== 0
-    || result.meta?.rows_written !== 0 || result.meta?.changed_db === true || !Number.isSafeInteger(result.meta?.rows_read)
-    || !Array.isArray(result.results)) throw recoveryError('d1-proof-failed');
-  return { ...validateBatch(result.results), rowsRead: result.meta.rows_read, rowsWritten: 0 };
+  const proof = queryRows(query);
+  return { ...validateBatch(proof.rows), rowsRead: proof.rowsRead, rowsWritten: proof.rowsWritten };
 }
 
-function queryRemainingRows() {
-  const child = spawnSync('npm', ['exec', '--no', '--', 'wrangler', 'd1', 'execute', 'PUBLIC_DB', '--remote',
-    '--config', 'apps/worker/wrangler.jsonc', '--json', '--command', resumeQuery], {
-    cwd: new URL('../../', import.meta.url), encoding: 'utf8', env: sanitizedEnvironment(), maxBuffer: maxResponseBytes,
-    timeout: 45_000,
-  });
-  if (child.error || child.status !== 0 || child.signal != null) throw recoveryError('d1-query-failed');
-  let output;
-  try { output = JSON.parse(child.stdout); } catch { throw recoveryError('d1-query-invalid'); }
-  const result = output?.[0];
-  if (!Array.isArray(output) || output.length !== 1 || result?.success !== true || result.meta?.changes !== 0
-    || result.meta?.rows_written !== 0 || result.meta?.changed_db === true || !Number.isSafeInteger(result.meta?.rows_read)
-    || !Array.isArray(result.results)) throw recoveryError('d1-proof-failed');
-  return result.results;
+function queryPreparedRows(fingerprints) {
+  if (!Array.isArray(fingerprints) || fingerprints.length < 1 || fingerprints.length > batchLimit || new Set(fingerprints).size !== fingerprints.length
+    || fingerprints.some(fingerprint => !fingerprintSchema.safeParse(fingerprint).success)) throw recoveryError('journal-invalid');
+  const quotedFingerprints = fingerprints.map(fingerprint => `'${fingerprint}'`).join(', ');
+  const exactQuery = query.replace(/\nORDER BY failed_at ASC, fingerprint ASC\nLIMIT 10$/u,
+    `\n  AND fingerprint IN (${quotedFingerprints})\nORDER BY failed_at ASC, fingerprint ASC`);
+  return queryRows(exactQuery).rows;
 }
 
-async function loadJournal() {
+async function loadJournal(batchId) {
   let serialized;
-  try { serialized = await readFile(receiptPath, 'utf8'); } catch { throw recoveryError('receipt-missing'); }
+  try { serialized = await readFile(receiptPath(batchId), 'utf8'); } catch { throw recoveryError('receipt-missing'); }
   if (Buffer.byteLength(serialized) > 8192) throw recoveryError('journal-invalid');
   let value;
   try { value = JSON.parse(serialized); } catch { throw recoveryError('journal-invalid'); }
@@ -260,15 +245,20 @@ export function selectRemainingCandidates(rows, journalInput) {
   if (journal.attempts.some((attempt, index) => attempt.index !== index + 1 || attempt.state !== 'TERMINAL')) {
     throw recoveryError('receipt-incomplete');
   }
-  const candidatesBySeal = new Map(rows.map(row => {
+  const remainingEntries = journal.candidates.slice(journal.attempts.length);
+  const candidatesByFingerprint = new Map(rows.map(row => {
     const candidate = validateCandidateRow(row);
-    return [candidate.identitySeal, candidate];
+    return [candidate.fingerprint, candidate];
   }));
-  const remaining = journal.identitySeals.slice(journal.attempts.length).map(identitySeal => candidatesBySeal.get(identitySeal));
-  if (remaining.some(candidate => candidate === undefined) || new Set(remaining).size !== remaining.length) {
+  const preparedCandidates = remainingEntries.map(entry => {
+    const candidate = candidatesByFingerprint.get(entry.fingerprint);
+    return candidate?.identitySeal === entry.identitySeal && candidate.mediaKind === entry.mediaKind ? candidate : undefined;
+  });
+  if (preparedCandidates.length !== rows.length || preparedCandidates.some(candidate => candidate === undefined)
+    || new Set(preparedCandidates).size !== preparedCandidates.length) {
     throw recoveryError('remaining-candidates-changed');
   }
-  return remaining;
+  return preparedCandidates;
 }
 
 function postInit(body, signal, timeoutMs) {
@@ -347,11 +337,12 @@ async function awaitCost(observer, requestId, signal) {
   throw recoveryError('cost-missing');
 }
 
-async function createJournal(batch) {
-  await mkdir(dirname(receiptPath.pathname), { mode: 0o700, recursive: true });
-  const handle = await open(receiptPath, 'wx', 0o600).catch(() => { throw recoveryError('receipt-exists'); });
-  const journal = { attempts: [], batchSeal: batch.batchSeal,
-    identitySeals: batch.candidates.map(candidate => candidate.identitySeal), schemaVersion: 1 };
+async function createJournal(batchId, batch) {
+  const path = receiptPath(batchId);
+  await mkdir(dirname(path.pathname), { mode: 0o700, recursive: true });
+  const handle = await open(path, 'wx', 0o600).catch(() => { throw recoveryError('receipt-exists'); });
+  const journal = { attempts: [], batchId, batchSeal: batch.batchSeal, candidates: batch.candidates.map(candidate => ({
+    fingerprint: candidate.fingerprint, identitySeal: candidate.identitySeal, mediaKind: candidate.mediaKind })), schemaVersion: 2 };
   try { await handle.writeFile(`${JSON.stringify(journal)}\n`); } finally { await handle.close(); }
   return journal;
 }
@@ -359,9 +350,10 @@ async function createJournal(batch) {
 async function persistJournal(journal) {
   const parsed = journalSchema.safeParse(journal);
   if (!parsed.success) throw recoveryError('journal-invalid');
-  const temporary = new URL(`${receiptPath.href}.tmp`);
+  const path = receiptPath(parsed.data.batchId);
+  const temporary = new URL(`${path.href}.tmp`);
   await writeFile(temporary, `${JSON.stringify(parsed.data)}\n`, { mode: 0o600 });
-  await rename(temporary, receiptPath);
+  await rename(temporary, path);
 }
 
 async function executeCandidate(candidate, index, journal) {
@@ -404,23 +396,20 @@ async function executeCandidate(candidate, index, journal) {
   throw failure;
 }
 
-async function executeBatch() {
+async function prepareBatch(batchId) {
   const batch = queryCandidates();
-  const journal = await createJournal(batch);
-  const results = [];
-  for (const [offset, candidate] of batch.candidates.entries()) {
-    const result = await executeCandidate(candidate, offset + 1, journal);
-    results.push(result);
-    process.stdout.write(`${JSON.stringify({ schemaVersion: 1, type: 'discovery-recovery.progress', ...result })}\n`);
-  }
-  return { batchSeal: batch.batchSeal, completed: results.length, schemaVersion: 1,
-    terminals: Object.fromEntries(['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS'].map(state => [state, results.filter(result => result.state === state).length])),
-    type: 'discovery-recovery.complete' };
+  const journal = await createJournal(batchId, batch);
+  return { batchId: journal.batchId, batchSeal: journal.batchSeal, candidates: journal.candidates.length,
+    media: journal.candidates.reduce((counts, candidate) => {
+      counts[candidate.mediaKind] = (counts[candidate.mediaKind] ?? 0) + 1;
+      return counts;
+    }, {}), rowsRead: batch.rowsRead, rowsWritten: batch.rowsWritten, schemaVersion: 1, type: 'discovery-recovery.prepared' };
 }
 
-async function resumeBatch() {
-  const journal = await loadJournal();
-  const candidates = selectRemainingCandidates(queryRemainingRows(), journal);
+async function executeBatch(batchId) {
+  const journal = await loadJournal(batchId);
+  const remainingFingerprints = journal.candidates.slice(journal.attempts.length).map(candidate => candidate.fingerprint);
+  const candidates = selectRemainingCandidates(queryPreparedRows(remainingFingerprints), journal);
   const results = [];
   for (const candidate of candidates) {
     const result = await executeCandidate(candidate, journal.attempts.length + 1, journal);
@@ -428,9 +417,9 @@ async function resumeBatch() {
     process.stdout.write(`${JSON.stringify({ schemaVersion: 1, type: 'discovery-recovery.progress', ...result })}\n`);
   }
   const terminals = journal.attempts.filter(attempt => attempt.state === 'TERMINAL');
-  return { batchSeal: journal.batchSeal, completed: terminals.length, schemaVersion: 1,
-    terminals: Object.fromEntries(['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS'].map(state => [state,
-      terminals.filter(attempt => attempt.terminal === state).length])), type: 'discovery-recovery.complete' };
+  return { batchId, batchSeal: journal.batchSeal, completed: terminals.length, schemaVersion: 1,
+    terminals: Object.fromEntries(['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS'].map(state => [state, terminals.filter(attempt => attempt.terminal === state).length])),
+    type: 'discovery-recovery.complete' };
 }
 
 export function safeFailureCode(error) {
@@ -440,8 +429,9 @@ export function safeFailureCode(error) {
 }
 
 async function main() {
-  const [mode] = process.argv.slice(2);
-  if (process.argv.length !== 3 || !['--execute', '--preflight', '--resume'].includes(mode)) throw recoveryError('invalid-arguments');
+  const [mode, batchId] = process.argv.slice(2);
+  if (!['--execute', '--preflight', '--prepare'].includes(mode) || (mode === '--preflight' ? process.argv.length !== 3
+    : process.argv.length !== 4) || (mode !== '--preflight' && !batchIdPattern.test(batchId ?? ''))) throw recoveryError('invalid-arguments');
   if (mode === '--preflight') {
     const proof = queryCandidates();
     return { batchSeal: proof.batchSeal, candidates: proof.candidates.length, media: proof.candidates.reduce((counts, candidate) => {
@@ -449,7 +439,7 @@ async function main() {
       return counts;
     }, {}), rowsRead: proof.rowsRead, rowsWritten: proof.rowsWritten, schemaVersion: 1, type: 'discovery-recovery.preflight' };
   }
-  return mode === '--execute' ? executeBatch() : resumeBatch();
+  return mode === '--prepare' ? prepareBatch(batchId) : executeBatch(batchId);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
