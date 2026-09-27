@@ -5739,6 +5739,46 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "discovery-recovery",
+      "title": "Rendre la reprise Discovery expirée bornée et réactive",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "bounded-recovery-wake",
+          "title": "Cadencer la reprise des baux Discovery expirés",
+          "status": "DONE",
+          "acceptance": [
+            "Un bail Discovery expiré est repris en dix minutes au plus sans SQL manuel.",
+            "Chaque réveil ne réclame qu’une demande et conserve la cadence fournisseur existante.",
+            "Les FAILED historiques ne sont ni lus comme candidats ni réarmés.",
+            "Les tests Worker et l’architecture décrivent la reprise bornée."
+          ],
+          "files": [
+            "apps/worker/wrangler.jsonc",
+            "apps/worker/src/index.ts",
+            "apps/worker/src/operational-metrics.test.ts",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/architecture/src/adaptive-public-refresh.architecture.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/worker -- --run src/operational-metrics.test.ts",
+            "npm run typecheck --workspace @tobirink/worker",
+            "npm run archify:validate -- architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Worker ciblé 11/11 puis suite complète 195/195 passent.",
+            "Typecheck Worker, validation des décisions et documentation passent.",
+            "Archify architecture passe toutes les vues showcase sans erreur ni avertissement.",
+            "Le cron Discovery est */10 avec claim(1); Agenda hebdomadaire et états FAILED restent hors reprise."
+          ]
+        }
+      ]
     }
   ]
 }
