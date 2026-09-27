@@ -6,13 +6,6 @@ import { dirname } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
-import {
-  publicDiscoveryKeyV3Schema,
-  publicDiscoveryRequestSchema,
-  publicDiscoverySubmissionSchema,
-  publicDiscoveryVerifiedProfileSchema,
-  publicDiscoveryReferenceV3Schema,
-} from '../../packages/public-discovery/dist/index.js';
 import { startCostObserver } from './manga-canary.mjs';
 
 const batchLimit = 10;
@@ -29,6 +22,65 @@ const terminalObservations = 40;
 const terminalDelayMs = 15_000;
 const candidateBudgetMs = 12 * 60_000;
 
+const fingerprintSchema = z.string().regex(/^[a-f0-9]{64}$/u);
+const identifierSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/u);
+const titleSchema = z.string().trim().min(1).max(200);
+const publicDiscoveryProviderSchema = z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']);
+const publicDiscoveryKeyV3Schema = z.strictObject({
+  fingerprint: fingerprintSchema,
+  mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA', 'UNKNOWN']),
+  parserVersion: identifierSchema,
+  siteRulesVersion: identifierSchema,
+});
+const publicDiscoveryReferenceV3Schema = z.strictObject({ externalId: identifierSchema, provider: publicDiscoveryProviderSchema });
+const publicDiscoveryQuerySchema = z.strictObject({
+  discoveryTitles: z.array(titleSchema).min(1).max(4),
+  explicitProviderReference: publicDiscoveryReferenceV3Schema.optional(),
+  mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA', 'UNKNOWN']),
+  preSerialization: z.boolean().optional(),
+  season: z.number().int().positive().max(1000).optional(),
+  sourceFormat: z.string().trim().min(1).max(64).optional(),
+  sourceTitles: z.array(titleSchema).max(4),
+});
+const publicDiscoveryRequestSchema = z.strictObject({
+  key: publicDiscoveryKeyV3Schema,
+  query: publicDiscoveryQuerySchema,
+  requestDigest: fingerprintSchema,
+  schemaVersion: z.literal(3),
+});
+const publicDiscoverySubmissionSchema = publicDiscoveryRequestSchema.omit({ requestDigest: true });
+const coverSchema = z.strictObject({ attribution: z.string().trim().min(1).max(200), url: z.string().url().max(2048) });
+const titleVariantSchema = z.strictObject({ language: z.string().trim().min(1).max(32).optional(), title: titleSchema });
+const publicDiscoveryCandidateSchema = z.strictObject({
+  canonicalUrl: z.string().url().max(2048).optional(),
+  categories: z.array(z.string().trim().min(1).max(100)).max(32).optional(),
+  chapterCount: z.number().int().nonnegative().optional(),
+  contentClassification: z.enum(['adult', 'non-adult', 'unknown']).optional(),
+  cover: coverSchema.optional(),
+  displayTitle: titleSchema.optional(),
+  editorialStatus: z.enum(['UPCOMING', 'ONGOING', 'HIATUS', 'COMPLETED', 'CANCELLED', 'UNKNOWN']).optional(),
+  endYear: z.number().int().min(1800).max(3000).optional(),
+  episodeCount: z.number().int().nonnegative().optional(),
+  externalId: identifierSchema,
+  format: z.string().trim().min(1).max(100).optional(),
+  genres: z.array(z.string().trim().min(1).max(100)).max(32).optional(),
+  linkedReferences: z.array(publicDiscoveryReferenceV3Schema).max(5).optional(),
+  mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']),
+  metadataVersion: z.union([z.literal(1), z.literal(2)]).optional(),
+  popularity: z.strictObject({ kind: z.enum(['MEMBERS', 'RANK']), value: z.number().int().nonnegative() }).optional(),
+  preSerialization: z.boolean(),
+  provider: publicDiscoveryProviderSchema,
+  season: z.number().int().positive().max(1000).optional(),
+  startYear: z.number().int().min(1800).max(3000).optional(),
+  titles: z.array(titleSchema).min(1).max(32),
+  titleVariants: z.array(titleVariantSchema).max(32).optional(),
+  volumeCount: z.number().int().nonnegative().optional(),
+});
+const publicDiscoveryVerifiedProfileSchema = z.strictObject({
+  candidate: publicDiscoveryCandidateSchema,
+  references: z.array(publicDiscoveryReferenceV3Schema).min(1).max(5),
+  workId: identifierSchema,
+});
 const pendingStateSchema = z.strictObject({ retryAt: z.string().datetime({ offset: false }), state: z.literal('PENDING') });
 const publicStateSchema = z.discriminatedUnion('state', [
   z.strictObject({ state: z.literal('MISS') }),
