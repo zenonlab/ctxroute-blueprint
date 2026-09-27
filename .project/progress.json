@@ -5030,7 +5030,7 @@
       "schemaVersion": 1,
       "id": "goal-align-1042-discovery-production-20260920",
       "title": "Aligner main sur la release immutable 1.0.42, déployer Discovery et vérifier l’extension réelle",
-      "status": "ACTIVE",
+      "status": "BLOCKED",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -5125,7 +5125,7 @@
         {
           "id": "discovery-recovery",
           "title": "Prouver les canaris puis préparer et appliquer la reprise D1 bornée",
-          "status": "IN_PROGRESS",
+          "status": "BLOCKED",
           "acceptance": [
             "Canaris anime et manga prouvent des profils VERIFIED et des appels fournisseur réels après déploiement",
             "Backup D1 frais et plan conditionnel de rearm des seuls FAILED/ATTEMPT_LIMIT",
@@ -5144,9 +5144,10 @@
             "post-recovery D1 counts and extension Library inspection"
           ],
           "evidence": [
-            "Durable extension recovery added: batches of 20, local cursor, 30s alarm continuation, per-item error isolation; extension 33 files/154 tests pass and typecheck passes.",
-            "Queue target remains local-only: 5 claims, 10s batch timeout, 2 consumers; Worker Queue/routes 34/34 and provider fallback 57/57 pass.",
-            "Docs validation, Archify dataflow showcase and git diff check pass; production still has the previous Queue configuration and D1 recovery remains unexecuted."
+            "Canaris certifiés le 27 septembre : run 36338898685 après CI 36338487755, anime et manga VERIFIED, un appel corrélé chacun, 198 lectures D1 / 34 écritures et zéro erreur. Correctif livré par PR #143.",
+            "Production : claim(1), Queue 1/1, réveil dix minutes. Vue discovery-recovery-deployment.architecture.json actualisée ; Archify architecture, documentation et diff-check revalidés.",
+            "Lot manga-certified-20260927 scellé : 10 MANGA, reçu privé 0600, zéro tentative. Queue 9 / DLQ 2 : backlog non certifié ; aucune archive publiée, aucun FAILED réarmé.",
+            "external: confirmation immédiate distincte du lot FAILED/ATTEMPT_LIMIT manquante ; le rappel automatique ne vaut pas approbation. Sauvegarde fraîche, nouveau prévol et vérification bibliothèque après reprise restent requis."
           ]
         }
       ]
