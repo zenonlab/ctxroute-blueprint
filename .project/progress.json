@@ -5779,6 +5779,45 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "discovery-recovery-continuation-20260927",
+      "title": "Préserver la continuation globale après un différé fournisseur",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "continue-global-recovery",
+          "title": "Réveiller le backlog global après un différé spécifique",
+          "status": "DONE",
+          "acceptance": [
+            "Un différé fournisseur conserve sa continuation corrélée sans empêcher un signal global de réclamer les autres leases expirés.",
+            "Chaque invocation reste limitée à claim(1), respecte les délais fournisseur et ne réarme aucun FAILED.",
+            "Les tests couvrent un différé corrélé avec un second lease expiré et les signaux Queue attendus.",
+            "Le dataflow et ADR-0061 décrivent la double continuation bornée; aucune donnée de production n'est modifiée."
+          ],
+          "files": [
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/architecture/src/adaptive-public-refresh.architecture.json",
+            "docs/plans/fix-discovery-recovery-continuation-20260927.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/worker -- --run src/catalogue/public-discovery-queue.test.ts",
+            "npm run typecheck --workspace @tobirink/worker",
+            "npm run archify:validate -- architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Régression Queue 35/35 : un différé corrélé conserve son échéance et émet aussi le réveil global pour un lease expiré, sans appel fournisseur.",
+            "Suite Worker complète 196/196 et typecheck Worker passent.",
+            "Archify architecture, validation ADR/documentation et git diff --check passent sans erreur."
+          ]
+        }
+      ]
     }
   ]
 }

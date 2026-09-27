@@ -138,7 +138,7 @@
     { "id": "cache-first", "from": "publicApi", "to": "catalogueD1", "label": "alias → même fiche canonique", "variant": "emphasis", "route": "straight", "labelAt": [590, 125] },
     { "id": "admit-created", "from": "publicApi", "to": "publicQueue", "label": "created uniquement", "fromSide": "bottom", "toSide": "left", "via": [[355, 230], [230, 230], [230, 533]], "labelAt": [215, 420] },
     { "id": "weekly-agenda", "from": "weeklyCron", "to": "collectors", "label": "Agenda hebdomadaire", "variant": "emphasis", "fromSide": "right", "toSide": "top", "via": [[480, 333], [480, 380], [670, 380]], "labelAt": [545, 365] },
-    { "id": "expired-discovery-recovery", "from": "discoveryRecoveryCron", "to": "collectors", "label": "bail expiré", "variant": "security", "fromSide": "right", "toSide": "left", "labelAt": [610, 500] },
+    { "id": "expired-discovery-recovery", "from": "discoveryRecoveryCron", "to": "collectors", "label": "bail expiré · claim(1)", "variant": "security", "fromSide": "right", "toSide": "left", "labelAt": [585, 500] },
     { "id": "queued-work", "from": "publicQueue", "to": "collectors", "label": "Discovery · réhydratation", "fromSide": "right", "toSide": "left", "via": [[500, 533], [500, 440]], "labelAt": [495, 490] },
     { "id": "operational-state", "from": "collectors", "to": "operationsR2", "label": "baux · pages · observations", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [690, 510] },
     { "id": "validated-publish", "from": "collectors", "to": "catalogueD1", "label": "métadonnées + modèle changés", "variant": "emphasis", "fromSide": "top", "toSide": "bottom", "via": [[670, 250], [830, 250]], "labelAt": [750, 235] },
@@ -151,7 +151,7 @@
       "title": "Indépendance",
       "items": [
         "Une panne Agenda ne bloque ni Discovery ni la réhydratation",
-        "Un bail Discovery expiré est réparé par un cron à claim unique",
+        "Un bail Discovery expiré est réparé par claim(1) puis un réveil global si un différé corrélé laisserait du travail antérieur",
         "La dernière donnée vérifiée reste servie pendant tout traitement"
       ]
     },

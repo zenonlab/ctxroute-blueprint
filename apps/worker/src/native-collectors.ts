@@ -340,18 +340,27 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     && (claimedCount === 0 || report.failed > 0 || (report.deferred ?? 0) > 0);
   const specificPendingAt = needsSpecificContinuation ? await port.nextPendingAt(specificTokenDigest) : undefined;
   const genericLane = key === undefined && continuationToken === undefined;
-  const nextPendingAt = specificPendingAt
-    ?? (genericLane && (claimedCount > 0 || continueGlobalWhenEmpty) ? await port.nextPendingAt() : undefined);
+  const genericPendingAt = genericLane && (claimedCount > 0 || continueGlobalWhenEmpty)
+    ? await port.nextPendingAt()
+    : undefined;
+  const globalContinuationRequired = genericPendingAt !== undefined
+    && (specificPendingAt === undefined || Date.parse(genericPendingAt) < Date.parse(specificPendingAt));
   let continuationScheduled = false;
-  if (scheduleContinuation && nextPendingAt !== undefined) {
-    const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(nextPendingAt) - Date.now()) / 1_000)));
-    const signal: NativeCollectorSignal = specificPendingAt === undefined || specificToken === undefined
-      ? { type: 'public-discovery-ready', version: 1 }
-      : correlationId === undefined
+  const continuations: { dueAt: string; signal: NativeCollectorSignal }[] = [];
+  if (specificPendingAt !== undefined && specificToken !== undefined) {
+    continuations.push({
+      dueAt: specificPendingAt,
+      signal: correlationId === undefined
         ? { continuationToken: specificToken, type: 'public-discovery-ready', version: 1 }
-        : { continuationToken: specificToken, correlationId, type: 'public-discovery-ready', version: 1 };
+        : { continuationToken: specificToken, correlationId, type: 'public-discovery-ready', version: 1 },
+    });
+  }
+  if (globalContinuationRequired) continuations.push({ dueAt: genericPendingAt!, signal: { type: 'public-discovery-ready', version: 1 } });
+  for (const continuation of continuations) {
+    if (!scheduleContinuation) break;
+    const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(continuation.dueAt) - Date.now()) / 1_000)));
     try {
-      await queue.send(signal, { contentType: 'json', delaySeconds });
+      await queue.send(continuation.signal, { contentType: 'json', delaySeconds });
       continuationScheduled = true;
     } catch {
       console.warn('public-discovery-continuation-unsent');

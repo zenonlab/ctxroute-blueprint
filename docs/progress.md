@@ -382,3 +382,7 @@
 ## Rendre la reprise Discovery expirée bornée et réactive — DONE
 
 - [x] **Cadencer la reprise des baux Discovery expirés** — DONE _(evidence: Worker ciblé 11/11 puis suite complète 195/195 passent., Typecheck Worker, validation des décisions et documentation passent., Archify architecture passe toutes les vues showcase sans erreur ni avertissement.)_
+
+## Préserver la continuation globale après un différé fournisseur — DONE
+
+- [x] **Réveiller le backlog global après un différé spécifique** — DONE _(evidence: Régression Queue 35/35 : un différé corrélé conserve son échéance et émet aussi le réveil global pour un lease expiré, sans appel fournisseur., Suite Worker complète 196/196 et typecheck Worker passent., Archify architecture, validation ADR/documentation et git diff --check passent sans erreur.)_

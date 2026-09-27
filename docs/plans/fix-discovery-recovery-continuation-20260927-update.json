@@ -1,0 +1,10 @@
+{
+  "goalId": "discovery-recovery-continuation-20260927",
+  "stepId": "continue-global-recovery",
+  "status": "DONE",
+  "evidence": [
+    "Régression Queue 35/35 : un différé corrélé conserve son échéance et émet aussi le réveil global pour un lease expiré, sans appel fournisseur.",
+    "Suite Worker complète 196/196 et typecheck Worker passent.",
+    "Archify architecture, validation ADR/documentation et git diff --check passent sans erreur."
+  ]
+}
