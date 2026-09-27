@@ -284,6 +284,26 @@ test('durable Queue continuation completes the same private-free cost certificat
   assert.doesNotMatch(JSON.stringify(proof), /correlation|requestId|00000000/iu);
 });
 
+test('pre-provider cadence backoff waits for the correlated provider continuation', () => {
+  const requestId = identity(1);
+  const observation = createCostObservation();
+  observation.track(requestId, expectation);
+  observation.push(frame(envelope(requestId, [
+    cost({ acceptedResults: 0, correlationId: requestId, d1RowsRead: 40, d1RowsWritten: 6,
+      provider: 'none', providerRequests: 0, providerTransportDurationMs: 0, queueSends: 1, result: 'backoff' }),
+    admissionCost({ d1RowsRead: 15, d1RowsWritten: 7 }),
+  ])));
+  assert.equal(observation.read(requestId), undefined);
+  observation.push(frame(queueEnvelope(requestId, [
+    cost({ correlationId: requestId, d1RowsRead: 80, d1RowsWritten: 10 }),
+  ])));
+  const proof = observation.read(requestId);
+  assert.equal(proof.providerRequests, 1);
+  assert.equal(proof.acceptedResults, 1);
+  assert.equal(proof.queueSends, 1);
+  assert.equal(proof.d1RowsRead, 135);
+});
+
 test('Queue continuation cannot certify another or missing admission', () => {
   const requestId = identity(1);
   const observation = createCostObservation();
