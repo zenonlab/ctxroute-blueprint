@@ -8,13 +8,15 @@ import {
   type PublicDiscoveryReceipt,
   type PublicDiscoveryResult,
   type PublicDiscoveryResultBatch,
+  type PublicDiscoverySearchProgress,
   type PublicDiscoveryTerminalResolution,
 } from './contracts';
 import { FavoriteProviderRetryError } from './provider-kit';
+import { PublicDiscoverySearchContinuationError } from './resolver';
 
 export interface PublicDiscoveryGatewayPort {
   claim(limit: number): Promise<PublicDiscoveryClaimBatch>;
-  defer(request: PublicDiscoveryClaimedRequest, retryAt: string, now: string): Promise<void>;
+  defer(request: PublicDiscoveryClaimedRequest, retryAt: string, now: string, searchProgress?: PublicDiscoverySearchProgress): Promise<void>;
   publish(batch: PublicDiscoveryResultBatch): Promise<PublicDiscoveryReceipt>;
 }
 export interface PublicDiscoveryResolverPort {
@@ -46,7 +48,8 @@ export async function runPublicDiscoveryBatch(input: PublicDiscoveryBatchInput):
       if (error instanceof FavoriteProviderRetryError && Number.isFinite(error.retryAt)) {
         const now = input.now();
         const retryAt = new Date(Math.max(error.retryAt, Date.parse(now) + 1_000)).toISOString();
-        await input.gateway.defer(request, retryAt, now);
+        if (error instanceof PublicDiscoverySearchContinuationError) await input.gateway.defer(request, retryAt, now, error.searchProgress);
+        else await input.gateway.defer(request, retryAt, now);
         deferred += 1;
       } else failed += 1;
       continue;

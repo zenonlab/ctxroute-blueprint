@@ -11,6 +11,7 @@ scope:
   - apps/extension/wxt-entrypoints/background.ts
   - apps/extension/wxt.config.ts
   - docs/architecture/src/public-discovery.dataflow.json
+  - docs/architecture/src/discovery-recovery.dataflow.json
 review: on-change
 revised: true
 ---
@@ -19,7 +20,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-14
-- Revised: 2026-09-26
+- Revised: 2026-09-27
 
 ## Contexte
 
@@ -49,7 +50,7 @@ MangaDex, Kitsu Anime et Kitsu Manga. Leur composition appartient au consumer
 Worker natif; les anciens clients HTTP/OIDC et CLI de collecte sont retirés.
 
 Le résolveur suit les curseurs de recherche réels : quatre alias distincts au
-maximum, quatre pages par alias, vingt candidats par enveloppe et vingt-cinq
+maximum, quatre pages par tranche, vingt candidats par enveloppe et vingt-cinq
 candidats comparables conservés par fournisseur. Les candidats sans preuve
 de similarité ne remplissent pas ce dernier budget; chaque nouvelle page est
 inspectée avant conservation, pour ne pas masquer une identité exacte après
@@ -57,17 +58,23 @@ les vingt-cinq premiers résultats bruts. Une preuve exacte permet toujours
 une sortie anticipée. Le matching approximatif et `NOT_FOUND` exigent des
 enveloppes complètes, non tronquées et sans curseur restant.
 
-Le budget de recherche de vingt secondes est partagé par les fournisseurs,
-alias et fallbacks d'une résolution. Un curseur absent ou répété, une réponse
-incomplète ou une borne atteinte produit `incomplete-provider-search`, jamais
-un cache négatif. Cette erreur consomme un essai du bail existant; elle ne
-devient pas un report de cadence sans essai. Après huit échecs, le contrat D1
-expose toujours `UNAVAILABLE/ATTEMPT_LIMIT`, récupérable explicitement. Une
-véritable cadence ou réponse `429`, sans autre échec consommant retenu,
-conserve son échéance et son report sans consommation d'essai. Le timeout
-HTTP reste indépendant et l'appel déjà en
-vol n'est pas annulé par le budget du résolveur; aucune nouvelle page n'est
-démarrée après son expiration.
+Le budget de recherche est partagé par les fournisseurs, alias et fallbacks
+d'une résolution. Après quatre pages avec un curseur valide restant, le
+résolveur persiste un checkpoint v1 borné : fournisseur, page suivante, index
+d'alias et candidats comparables déjà inspectés. Le claim suivant reprend
+exactement cette page, rembourse l'essai temporaire et conserve le même
+digest; il ne rejoue ni les pages déjà parcourues ni le POST d'admission. Le
+checkpoint est supprimé lors de toute publication terminale et de toute
+nouvelle admission explicite. Un curseur absent ou répété, une réponse
+incomplète sans page suivante, une réponse invalide ou une borne de candidats
+produit toujours `incomplete-provider-search`, jamais un cache négatif. Ces
+erreurs restent consommantes : seul le checkpoint de pagination saine est un
+report durable. Après huit échecs réels, le contrat D1 expose toujours
+`UNAVAILABLE/ATTEMPT_LIMIT`, récupérable explicitement. Une véritable cadence
+ou réponse `429`, sans autre échec consommant retenu, conserve son échéance et
+son report sans consommation d'essai. Le timeout HTTP reste indépendant et
+l'appel déjà en vol n'est pas annulé par le budget du résolveur; aucune
+nouvelle page n'est démarrée après son expiration.
 
 Dans les recherches sans référence exacte des lanes `MANGA`, `MANHWA` et
 `MANHUA`, l'ordre est `MangaDex`, `Kitsu Manga`, puis `MangaUpdates`. Les deux
@@ -137,20 +144,12 @@ d'hydratation. Un fallback réussi conserve son résultat. Le collecteur
 existant compte l'erreur non remboursable sans modifier les tables, les
 contrats publics ou les profils déjà vérifiés.
 
-Cette règle borne les erreurs remontées par le résolveur portable ; elle ne
-modifie pas le timeout de composition Worker de trente secondes, qui reste
-un report typé. Elle ne constitue pas un budget universel pour toute
-interruption, ni un checkpoint durable de pagination. Les huit essais
-consommés reprennent au bail existant, pouvant durer quinze minutes chacun.
-
-Les curseurs restent locaux à une exécution : aucun checkpoint de pagination
-n'est ajouté à D1 dans ce correctif. Le gate attend déjà les créneaux de huit
-secondes ou moins, ce qui permet la page suivante sans refaire la page une
-en cadence normale. Un vrai report sous contention peut néanmoins recommencer
-la recherche au réveil. Une reprise durable inter-baux demanderait une
-évolution séparée du contrat et des mesures de contention; elle n'est pas
-déclarée acquise. Les limites structurelles, elles, épuisent les essais au
-lieu de recommencer indéfiniment sans les compter.
+Le checkpoint est une reprise inter-baux uniquement pour une pagination saine
+et validée. Il est stocké dans une colonne D1 distincte des payloads et
+résultats publics, borné par le schéma portable et effacé dès qu'une demande
+termine. Il ne remplace pas les garde-fous d'erreur : les limites structurelles
+et les réponses inconsistantes continuent à épuiser les essais au lieu de
+créer une boucle sans borne.
 
 Le package expose un export public stable, un test avec ports mémoire et un
 contrôle d’isolation qui échoue sur tout import `@tobirink/*` ou identifiant

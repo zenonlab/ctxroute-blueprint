@@ -20,9 +20,9 @@
     { "id": "canaries", "type": "backend", "label": "Canaris neufs", "sublabel": "anime · manga · HTTP + Queue", "stage": 1, "row": 0, "width": 150, "tag": "VERIFIED requis" },
     { "id": "approval", "type": "security", "label": "Confirmation ciblée", "sublabel": "lot · seuils · arrêt", "stage": 1, "row": 2, "tag": "avant écriture" },
     { "id": "rearm", "type": "backend", "label": "Lot scellé v3", "sublabel": "10 FAILED · v3 local", "stage": 2, "row": 2, "tag": "un POST par clé" },
-    { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "PENDING · PROCESSING", "stage": 2, "row": 0, "tag": "cache public" },
+    { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "cache public" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "claim(1) · expiration ciblée" },
-    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "manga · fenêtre 90 s", "stage": 3, "row": 2, "tag": "preuve exacte · échec fermé" },
+    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "manga · fenêtre 90 s", "stage": 3, "row": 2, "tag": "curseur repris · échec fermé" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · candidat lié", "stage": 4, "row": 1, "width": 150, "tag": "pas de preuve Library" }
   ],
   "flows": [
@@ -33,10 +33,10 @@
     { "from": "rearm", "to": "d1", "label": "reçu avant admission", "classification": "digest identique · arrêt 429/Queue/sans fournisseur/D1 > 300", "variant": "emphasis", "labelDy": -23 },
     { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "terminal ou continuation confirmée", "variant": "emphasis", "labelDy": -53 },
     { "from": "queue", "to": "collector", "label": "claim exact borné", "classification": "clé ciblée · aucun scan global", "variant": "emphasis", "labelDy": 24 },
-    { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "terminal ou continuation durable confirmée", "variant": "emphasis", "labelDx": 100 }
+    { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "terminal ou checkpoint durable remboursé", "variant": "emphasis", "labelDx": 100 }
   ],
   "cards": [
-    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Un reçu POST_STARTED interdit tout doublon", "Le budget Worker 100 s couvre la recherche 90 s", "UNKNOWN doit être reparsé avant toute admission", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
+    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Un reçu POST_STARTED interdit tout doublon", "Le curseur reprend après quatre pages sans rejouer la tranche", "UNKNOWN doit être reparsé avant toute admission", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
     { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Continuations fournisseur corrélées au même POST", "Zéro 429/Queue et coût D1 cumulé ≤ 300"] }
   ]
 }

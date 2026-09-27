@@ -226,13 +226,29 @@ describe('standalone provider resolver', () => {
     await expect(createPublicDiscoveryResolver(ports).resolve(request('ANIME'))).rejects.toBe(unavailable);
   });
 
-  it('stops at four pages when no exact identity proves the remaining search unnecessary', async () => {
+  it('checkpoints after four pages when no exact identity proves the remaining search unnecessary', async () => {
     const ports = providers();
     ports.anilist.search.mockImplementation(async ({ cursor }) => ({
       candidates: [], complete: false, digest: `page-${cursor}`, nextCursor: String(Number(cursor) + 1), provider: 'anilist', truncated: true,
     }));
-    await expect(createPublicDiscoveryResolver(ports).resolve(request('ANIME'))).rejects.toThrow('incomplete-provider-search:page-limit');
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('ANIME'))).rejects.toMatchObject({
+      message: 'public-discovery-search-continuation',
+      searchProgress: { candidates: [], cursor: '5', provider: 'anilist', titleIndex: 0, version: 1 },
+    });
     expect(ports.anilist.search.mock.calls.map(([query]) => query.cursor)).toEqual(['1', '2', '3', '4']);
+  });
+
+  it('resumes directly at the persisted page and verifies an exact later result', async () => {
+    const target = candidate('anilist', 'ANIME', '42', 'Target');
+    const ports = providers({ anilist: target });
+    ports.anilist.search.mockImplementation(async ({ cursor }) => ({
+      candidates: cursor === '5' ? [target] : [], complete: cursor === '5', digest: `page-${cursor}`,
+      nextCursor: cursor === '5' ? undefined : String(Number(cursor) + 1), provider: 'anilist', truncated: cursor !== '5',
+    }));
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...request('ANIME'), searchProgress: {
+      candidates: [], cursor: '5', provider: 'anilist', titleIndex: 0, version: 1,
+    } })).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: target } });
+    expect(ports.anilist.search.mock.calls.map(([query]) => query.cursor)).toEqual(['5']);
   });
 
   it('stops repeated cursors rather than claiming the provider was exhausted', async () => {
