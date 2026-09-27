@@ -18,9 +18,10 @@
   public catalogue and connected local projections, and an optional edge API.
   The site is not a general-purpose web application and has no account,
   authentication, private storage access, Review route, or radio surface.
-- Local release candidate: `1.0.45`; the extension package sets WXT manifests
-  and local ZIP names. The independently controlled public download pointer
-  remains `1.0.44` until the candidate's immutable archives are published and verified.
+- Published extension: `1.0.45`; the extension package sets WXT manifests and
+  immutable ZIP names. The independently controlled public download pointer
+  advances only after both archives, fresh canaries, and upgrade preservation
+  have been verified.
 
 ## Discovery context
 

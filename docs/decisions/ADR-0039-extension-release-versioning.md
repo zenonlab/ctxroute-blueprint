@@ -139,11 +139,13 @@ version was `2905a076-d107-4a29-8408-f24f86c97555`.
 
 ## Consequences
 
-La candidate `1.0.45` porte les corrections de résolution, de projection
-Library et de navigation Review livrées après la publication immuable de
-`1.0.44`. Elle doit être certifiée comme upgrade depuis `1.0.44`; aucune
-archive `1.0.44` n'est remplacée et le pointeur Web reste inchangé tant que le
-profil réel n'a pas satisfait les critères de livraison.
+La version `1.0.45` porte les corrections de résolution, de projection Library
+et de navigation Review livrées après la publication immuable de `1.0.44`.
+Elle est certifiée comme upgrade depuis `1.0.44`; aucune archive `1.0.44` n'est
+remplacée. Le pointeur Web avance seulement après vérification des archives,
+des canaris frais et de la conservation du profil réel. Les états encore en
+Review, retryables ou unsupported restent documentés et ne sont pas présentés
+comme résolus.
 
 La version `1.0.44` corrige le receiver et les clés de reprise, les
 continuations MV3 et les scans de projection. Ses ZIP reproductibles sont

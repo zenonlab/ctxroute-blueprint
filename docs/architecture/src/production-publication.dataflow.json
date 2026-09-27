@@ -16,7 +16,7 @@
         "id": "verification",
         "label": "Preuve en production",
         "focus": ["publicWorker", "memberPages", "publicDownloads", "productionEvidence"],
-        "note": "Deux téléchargements publics bornés doivent égaler les SHA-256 locaux; le pointeur Web avance seulement après cette preuve."
+        "note": "Les deux archives 1.0.45 doivent égaler les SHA-256 certifiés; le pointeur Web avance seulement après cette preuve."
       }
     ]
   },
@@ -34,7 +34,7 @@
     { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 1, "tag": "fail closed" },
     { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP vérifiés avant envoi", "stage": 2, "row": 2, "tag": "GET authentifié + SHA-256" },
     { "id": "publicWorker", "type": "backend", "label": "Worker public", "sublabel": "assets + téléchargements", "stage": 2, "row": 0, "tag": "100 %" },
-    { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "après hashes publics", "stage": 3, "row": 0, "tag": "pointeur publié" },
+    { "id": "memberPages", "type": "frontend", "label": "Page téléchargement", "sublabel": "après hashes publics", "stage": 3, "row": 0, "tag": "pointeur 1.0.45" },
     { "id": "publicDownloads", "type": "external", "label": "Téléchargements", "sublabel": "ZIP Chrome + Firefox", "stage": 3, "row": 2, "tag": "HTTP 200" },
     { "id": "productionEvidence", "type": "security", "label": "Preuve production", "sublabel": "statuts + hashes", "stage": 4, "row": 1, "tag": "concordants" }
   ],

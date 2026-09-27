@@ -4,6 +4,22 @@ Tobirink does not expose Wrangler as a release command. Every provider change
 starts from the repository-owned gate, while the extension and Worker runtime
 remain independent of this operational path.
 
+## Publication 1.0.45 — certifiée
+
+Le run protégé `36295558091` a validé le SHA main
+`07723a1a0025f1bf63066330bbf4188fd2c45f5c`, le Worker unique, les routes et
+les probes avant de publier les deux archives. Les canaris frais anime et manga
+ont chacun produit un appel fournisseur accepté : 183 et 195 lectures D1,
+378 lectures et 34 écritures au total, sans 429, erreur réseau, retry ni échec
+Queue. Aucune ligne `FAILED` historique n'a été réarmée.
+
+Les objets ont été relus en HTTP 200 avant l'avancement séparé du pointeur Web :
+Chrome 318507 octets, SHA-256
+`c044bf1bfbb5af3c9ef79e7d8c41c2320f212fa75f37b925d17434ca7f29df1c`;
+Firefox 318548 octets, SHA-256
+`1de6845307a73a08c3f1d670364619f3a2787076c3831504f18d430e216cc949`.
+Les objets 1.0.44 restent immuables et disponibles pour rollback.
+
 ## Incident Queue Discovery — contournement borné
 
 Tant que le runtime Cloudflare Queue renvoie une erreur d'envoi non qualifiée,
