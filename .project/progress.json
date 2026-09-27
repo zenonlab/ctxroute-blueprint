@@ -5855,6 +5855,85 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "repair-manga-continuation-20260927",
+      "title": "Réparer la continuation manga et certifier la reprise",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "repair",
+          "title": "Reproduire et corriger la continuation corrélée",
+          "status": "DONE",
+          "acceptance": [
+            "Régression manga exacte différée puis VERIFIED, un claim par invocation, aucun essai avant fournisseur.",
+            "Canari refuse coût sans continuation corrélée et certificat sans appel final.",
+            "Worker, infra, types, ADR/docs et Archify passent; diff audité; aucun FAILED réarmé."
+          ],
+          "files": [
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "scripts/infra/manga-canary.mjs",
+            "scripts/infra/manga-canary.test.mjs",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/operations/cloudflare.md",
+            "docs/architecture/src/discovery-recovery-deployment.architecture.json"
+          ],
+          "commands": [
+            "npm run test:worker",
+            "npm run test:infra",
+            "npm run typecheck",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Régression rouge puis verte : manga exact, différé 120s, réveil anticipé sans essai, continuation corrélée, un appel MangaUpdates et VERIFIED; claim(1) par invocation.",
+            "Worker 197/197, infra 120/120, tous types, ADR65, docs, Archify architecture sans diagnostic et diff-check passent; ESLint canari et Oxlint ciblé passent.",
+            "Audit : aucune migration, règle FAILED, Queue1/1, archive, hook ou consigne modifiés. verify/lint global bloqué par six erreurs préexistantes de deux audits ignorés build/audits; validation propre prévue pour livraison."
+          ]
+        },
+        {
+          "id": "delivery",
+          "title": "Livrer par PR et CI protégée",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Commit validé puis PR et CI protégée verts sans archive extension."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "git diff --check",
+            "gh pr checks"
+          ],
+          "evidence": [
+            "Diff relu; message prévu fix(discovery): qualify correlated pre-provider continuations; livraison protégée sans extension."
+          ]
+        },
+        {
+          "id": "certify",
+          "title": "Certifier une paire neuve et mesurer",
+          "status": "TODO",
+          "acceptance": [
+            "Une seule paire neuve après CI verte, appels corrélés et agrégats D1/Queue/Worker.",
+            "Préparer lot scellé uniquement si certificat complet; aucune reprise FAILED sans confirmation immédiate."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "node scripts/infra/manga-canary.mjs --observe"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

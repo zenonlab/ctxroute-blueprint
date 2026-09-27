@@ -1389,6 +1389,23 @@ Un premier coût `backoff` sans fournisseur est accepté seulement s’il annonc
 une continuation Queue unique portant le même UUID. L’observateur attend alors
 le coût terminal corrélé; le total final doit toujours contenir l’appel réel
 au fournisseur attendu, faute de quoi le certificat reste `INCOMPLETE`.
+Un réveil ciblé trop tôt est également `backoff` : il conserve ce même jeton
+opaque et cet UUID, sans claim ni tentative supplémentaire, et reporte le
+signal de 1 à 900 secondes. Le budget de 300 lectures D1 cumule l’admission,
+les différés et le terminal ; il est contrôlé avant même le premier appel.
+Un coût `provider:none` sans UUID corrélé ou sans cet envoi unique est refusé.
+Les erreurs Queue et 429 arrêtent toujours le canari, sans second POST.
+
+La régression locale du 27 septembre reproduit l’admission exacte Spirit
+Circle, un différé de 120 secondes, un réveil une seconde trop tôt puis un
+unique appel MangaUpdates et `VERIFIED`. Le défaut reproduit qualifiait le
+réveil anticipé `unchanged` malgré sa continuation, provoquant le rejet du
+certificat. Cette preuve locale ne certifie pas la production : la paire du
+run `36336847567` reste un échec, sans réadmission. Après PR et CI protégée
+vertes, une seule paire neuve est autorisée via `run_manga_canary=true` et
+`publish_extension=false`. Lire ensuite les agrégats D1/Queue/Worker ; ne
+préparer le lot historique scellé qu’après deux preuves complètes et demander
+une confirmation immédiate distincte avant tout réarmement `FAILED`.
 
 Le tail observe les invocations sans filtre textuel qui masquerait un échec
 CPU avant émission de coût. Un outcome anormal, une exception, un 429 ou un

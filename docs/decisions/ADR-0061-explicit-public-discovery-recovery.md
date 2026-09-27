@@ -60,6 +60,18 @@ sans dépendre d’un artefact généré ou d’un cache de runner.
 
 ## Conséquences
 
+Un réveil ciblé anticipé qui ne peut pas encore réclamer sa ligne conserve
+le jeton opaque et l’UUID de corrélation, puis reprogramme au plus un signal
+ciblé avec un délai de 1 à 900 secondes. Son coût est `backoff`, même si
+aucune nouvelle demande n’a été réclamée ; ce n’est pas un résultat
+`unchanged` sans fournisseur. Le différé initial restitue la tentative et le
+réveil anticipé n’en consomme aucune. Un signal générique vide reste inchangé.
+Le canari n’accepte ce coût `provider:none` qu’avec le même UUID et un seul
+envoi Queue réussi. Il applique le budget D1 cumulé dès les différés et
+exige toujours un coût fournisseur terminal corrélé à la borne d’observation.
+Sans cette preuve, même une lecture `VERIFIED` laisse le certificat incomplet.
+Le rollback de cette qualification ne réarme ni ne supprime aucune ligne.
+
 La récupération est observable et réversible au niveau applicatif : désactiver le contrôle empêche toute nouvelle action, sans supprimer ni réécrire les données existantes. Une reprise de centaines d’entrées prend volontairement du temps afin de respecter la cadence publique ; les réponses `PENDING` restent dans la file et sont réconciliées ultérieurement.
 
 ## Validation

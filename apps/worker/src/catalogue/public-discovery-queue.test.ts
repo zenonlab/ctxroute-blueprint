@@ -74,6 +74,68 @@ async function preserveProviderRuntime() {
 }
 
 describe('public discovery queue trigger', () => {
+  it('continues an exact manga admission through cadence and an early wake without spending an attempt', async () => {
+    const restoreRuntime = await preserveProviderRuntime();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-03T00:00:00.000Z'));
+    const discoveryKey = { ...key('d'), mediaKind: 'MANGA' as const };
+    const query = { discoveryTitles: ['Spirit Circle'], sourceTitles: ['Spirit Circle'], mediaKind: 'MANGA' as const,
+      explicitProviderReference: { provider: 'mangaupdates' as const, externalId: '13893304082' } };
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = { metrics: async () => metrics, send: vi.fn(async (_body: NativeCollectorSignal, _options?: { contentType?: 'json'; delaySeconds?: number }) => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    const bindings = { ...env, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: queue };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const claim = vi.spyOn(D1PublicDiscoveryV3Adapter.prototype, 'claimBatch');
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      expect(String(input)).toBe('https://api.mangaupdates.com/v1/series/13893304082');
+      return Response.json({ series_id: 13893304082, title: 'Spirit Circle', type: 'Manga' });
+    });
+    const queueFallback = vi.fn((selectedKey: Parameters<typeof processPublicDiscoveryQueue>[1], correlationId: string) => processPublicDiscoveryQueue(bindings, selectedKey, true, correlationId));
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue, deliveryMode: 'worker-direct', queueFallback });
+    const state = () => env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+      .bind(discoveryKey.fingerprint).first();
+    try {
+      await env.PUBLIC_DB.prepare('UPDATE public_discovery_provider_runtime SET next_allowed_at = ?1 WHERE provider = ?2')
+        .bind(Date.now() + 120_000, 'mangaupdates').run();
+      const response = await app.request('/v3/catalogue/discoveries/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schemaVersion: 3, key: discoveryKey, query }) });
+      expect(response.status).toBe(202);
+      expect(await response.json()).toMatchObject({ state: 'PENDING' });
+      expect(await queueFallback.mock.results[0]!.value).toMatchObject({ claimed: 1, deferred: 1, continuationScheduled: true,
+        metrics: { provider: 'none', providerRequests: 0, result: 'backoff', queueSends: 1 } });
+      expect(claim).toHaveBeenCalledTimes(1);
+      expect(await state()).toEqual({ state: 'PENDING', attempts: 0 });
+      const signal = queue.send.mock.calls[0]![0];
+      if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
+      expect(signal.correlationId).toBe(queueFallback.mock.calls[0]![1]);
+      expect(signal.continuationToken).toHaveLength(43);
+      expect(queue.send.mock.calls[0]![1]).toMatchObject({ delaySeconds: 120 });
+      vi.setSystemTime(Date.now() + 119_000);
+      expect(await processPublicDiscoveryQueue(bindings, undefined, true, signal.correlationId, signal.continuationToken))
+        .toMatchObject({ claimed: 0, continuationScheduled: true, metrics: { provider: 'none', providerRequests: 0, result: 'backoff', queueSends: 1 } });
+      expect(queue.send.mock.calls[1]![0]).toEqual(signal);
+      expect(await state()).toEqual({ state: 'PENDING', attempts: 0 });
+      expect(provider).not.toHaveBeenCalled();
+      vi.setSystemTime(Date.now() + 1_000);
+      const discovery = vi.fn((correlationId?: string, continuationToken?: string) => processPublicDiscoveryQueue(bindings, undefined, true, correlationId, continuationToken));
+      const message = { body: signal, attempts: 1, ack: vi.fn(), retry: vi.fn() };
+      await handleNativeCollectorQueue([message], { agenda: vi.fn(), discovery });
+      expect(discovery).toHaveBeenCalledExactlyOnceWith(signal.correlationId, signal.continuationToken);
+      expect(await discovery.mock.results[0]!.value)
+        .toMatchObject({ claimed: 1, published: 1, metrics: { provider: 'mangaupdates', providerRequests: 1, acceptedResults: 1 } });
+      expect(message.ack).toHaveBeenCalledOnce();
+      expect(message.retry).not.toHaveBeenCalled();
+      expect(await state()).toEqual({ state: 'VERIFIED', attempts: 1 });
+      expect(provider).toHaveBeenCalledTimes(1);
+      expect(claim).toHaveBeenCalledTimes(3);
+      expect(claim.mock.calls.every(([input]) => input.limit === 1)).toBe(true);
+      expect(queue.send).toHaveBeenCalledTimes(2);
+      expect(queueFallback).toHaveBeenCalledTimes(1);
+    } finally {
+      provider.mockRestore(); claim.mockRestore(); vi.useRealTimers();
+      await restoreRuntime();
+    }
+  });
   it('spends eight unavailable-provider attempts across fresh consumers, then stops without rearming FAILED', async () => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });

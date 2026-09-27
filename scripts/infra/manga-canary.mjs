@@ -160,7 +160,8 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
     for (const collector of selected) {
       if (counts.some(key => collector[key] === undefined)) fail('invalid-cost');
       const preProviderBackoff = collector.provider === 'none' && collector.providerRequests === 0
-        && collector.acceptedResults === 0 && collector.result === 'backoff' && collector.queueSends === 1;
+        && collector.acceptedResults === 0 && collector.result === 'backoff' && collector.queueSends === 1
+        && collector.correlationId === requestId;
       const providerContinuation = allowProviderContinuation && collector.provider !== 'none' && collector.providerRequests > 0
         && collector.acceptedResults === 0 && collector.result === 'unchanged' && collector.queueSends === 1;
       if (collector.provider === 'none' && !preProviderBackoff) fail('provider-mismatch');
@@ -173,13 +174,13 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
     }
     const terminals = selected.filter(collector => collector.acceptedResults === 1 && collector.result === 'changed');
     if (terminals.length > 1) fail('ambiguous-cost');
+    const summary = Object.fromEntries(counts.map(key => [key, [admission, ...selected].reduce((total, cost) => total + (cost[key] ?? 0), 0)]));
+    if (Object.values(summary).some(value => !Number.isSafeInteger(value))) fail('count-limit');
+    if (summary.d1RowsRead > 300) fail('d1-budget');
     if (terminals.length === 0) return;
     const terminal = terminals[0];
     if (terminal.provider === 'none'
       || (expectation.provider !== 'any' && terminal.provider !== expectation.provider)) fail('provider-mismatch');
-    const summary = Object.fromEntries(counts.map(key => [key, [admission, ...selected].reduce((total, cost) => total + (cost[key] ?? 0), 0)]));
-    if (Object.values(summary).some(value => !Number.isSafeInteger(value))) fail('count-limit');
-    if (summary.d1RowsRead > 300) fail('d1-budget');
     summary.durationMs = admission.durationMs;
     matched.set(requestId, { ...summary, provider: terminal.provider, result: terminal.result,
       collectorD1RowsRead: selected.reduce((total, cost) => total + cost.d1RowsRead, 0), admissionD1RowsRead: admission.d1RowsRead });
