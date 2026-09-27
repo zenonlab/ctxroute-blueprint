@@ -74,6 +74,10 @@ jeton et se reprogramme uniquement pour la même demande. Un signal générique
 qui ne réclame aucune ligne est acquitté sans produire un nouveau signal
 générique. Seul le réveil quotidien peut programmer la prochaine échéance
 globale après un claim vide; il reste la réparation bornée d'un signal perdu.
+Une publication terminale issue d'une admission ciblée est acquittée sans
+lecture de la prochaine échéance globale et sans signal supplémentaire; son
+coût ne croît donc pas avec les demandes historiques restantes. Le signal
+générique conserve son drainage global borné.
 Cette règle empêche un lot de doublons, impossible à coalescer avec
 `batch_size=1`, de maintenir artificiellement un backlog constant.
 
