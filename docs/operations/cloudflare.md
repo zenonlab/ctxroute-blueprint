@@ -1424,12 +1424,13 @@ fenêtre canari 18:03:55–18:04:48 UTC, les métriques Worker globales indiquen
 15 invocations, zéro erreur et 18 sous-requêtes ; elles ne remplacent pas
 les deux preuves corrélées et ne certifient pas la santé du backlog.
 
-Le lot local privé `manga-certified-20260927` scelle dix mangas avec le digest
-`381cf9e2d63ebf31a59d1389f72e703109d18937cd3aa48781c0882552a19dd0`.
-Sa préparation lit 1 863 lignes et n’en écrit aucune ; les trois runtimes
-sont présents, MangaUpdates est différé. Aucun POST de reprise n’est émis.
-Le reçu ignoré par Git reste sous `build/recovery/`, permissions `0600`.
-Ne pas l’exécuter sans confirmation immédiate distincte et nouveau prévol.
+Le lot local privé historique `manga-certified-20260927` contient dix mangas
+issus d’une sélection D1 globale, sans preuve d’appartenance à la liste réelle.
+Sa préparation avait lu 1 863 lignes et n’en avait écrit aucune ; aucun POST
+de reprise n’avait été émis. Le prévol ultérieur retrouve zéro de ces dix
+identités parmi celles en panne dans la liste réelle. Ce reçu reste intact,
+ignoré par Git et privé en `0600`, mais n’est pas admissible à l’exécution du
+runner désormais lié au scope. Son sceau n’est pas une certification du lot.
 
 Le tail observe les invocations sans filtre textuel qui masquerait un échec
 CPU avant émission de coût. Un outcome anormal, une exception, un 429 ou un
@@ -1452,6 +1453,106 @@ Le rollback du seul script revient à un observateur moins strict et ne doit
 donc jamais être utilisé pour autoriser une reprise sur un ancien certificat
 agrégé. Aucun changement Worker, protocole public ou archive d'extension
 n'est nécessaire à cette corrélation déjà exposée par le runtime.
+
+### Reprise liée à la liste réelle — prévol du 27 septembre 2026
+
+Le profil temporaire conserve les 1 522 sources de l’export exact. Ses 458
+sources `PROVIDER_UNAVAILABLE` correspondent à 398 identités Discovery
+uniques. L’ancien lot global n’en couvre aucune (`0/10`). Le nouveau prévol
+vérifie dix clés complètes et leurs payloads/digests contre la liste privée :
+six `MANGA` et quatre `MANHWA`, toutes encore `FAILED/ATTEMPT_LIMIT` avec huit
+essais. La lecture finale ciblée coûte dix lignes lues et zéro écriture.
+Aucun POST d’admission n’est émis. Ces dix lectures ne représentent pas le
+coût global des sondes précédentes ni celui des contrôles de runtimes.
+Ce prévol ne certifie ni la reprise fournisseur ni la projection Library.
+
+Après correction, le vrai CLI `--preflight --scope` confirme les dix
+candidats issus du même export : six `MANGA`, quatre `MANHWA`, seize lectures
+D1 (dix clés et six lectures de runtimes), zéro écriture et zéro admission.
+Les trois runtimes sont `READY`. Un premier contrôle s’était arrêté sur
+`scope-read-budget` ; le tri SQL inutile a été retiré, sans relever la limite
+de dix lectures ciblées, et l’ordre du scope est rétabli en mémoire.
+Un diagnostic SELECT séparé rapporte dix lectures sans écriture ; le coût
+exact du premier refus n’a pas été conservé. Seize n’est donc pas le total
+de toutes les sondes. Les deux reçus historiques restent byte-identiques ;
+aucun `--prepare` ni `--execute` n’a été lancé pendant cette vérification.
+
+Le runner `scripts/infra/discovery-recovery-batch.mjs` impose un fichier
+`--scope` privé pour ses trois modes. Le schéma de scope version 1 contient
+`corpusDigest`, `sourceCount` et exactement dix `entries` uniques, chacune
+constituée de `key` (`fingerprint`, `mediaKind`, `parserVersion`,
+`siteRulesVersion`) et `requestDigest`. Les seuls médias admis sont `MANGA`
+et `MANHWA`. Construire ce scope à partir des artefacts du profil réel,
+jamais d’une sélection globale des plus anciens échecs D1. Le scope ne doit
+contenir ni titre, ni URL, ni payload fournisseur. Conserver ce fichier et
+le reçu local sous `build/recovery/`, ignorés par Git, en permissions `0600`.
+Ne pas imprimer leurs digests ou leur contenu dans les logs, PR ou rapports.
+Le chargement refuse un scope qui n’est pas un fichier régulier, dépasse
+16 Kio ou expose des permissions groupe/autres sur un système POSIX.
+Les sorties CLI ne contiennent aucun `batchSeal`, `scopeSeal` ou digest privé.
+
+Le prévol et la préparation utilisent une requête SQL ciblée dont la CTE
+de dix entrées pilote les recherches par index de clé primaire complète.
+Le constructeur sépare SQL et paramètres ; la CLI Wrangler reçoit ensuite
+les valeurs encodées après une allowlist stricte, pas des bindings API.
+Ces contrôles exigent un payload v3 et un digest identiques au scope, ainsi
+que les états et compteurs attendus. Les trois runtimes manga doivent être
+présents ; un différé de cadence reste autorisé sans contourner le bail
+Worker. Le journal version 3 porte `scopeSeal` et lie l’ordre des candidats
+au scope exact. Un journal version 2, une clé partielle, un digest modifié
+ou un scope différent sont refusés sans mutation ; aucun ancien reçu n’est
+converti, supprimé ou réutilisé automatiquement.
+
+Depuis la racine du dépôt, après création et vérification privée du scope :
+
+```sh
+node scripts/infra/discovery-recovery-batch.mjs --preflight --scope "$SCOPE_FILE"
+node scripts/infra/discovery-recovery-batch.mjs --prepare "$BATCH_ID" --scope "$SCOPE_FILE"
+```
+
+`SCOPE_FILE` désigne le fichier privé attesté et `BATCH_ID` un nouveau nom de
+lot ; un reçu existant ne doit pas être écrasé. Ces commandes ne réarment
+aucune ligne. Après PR et CI vertes, un nouveau prévol et une confirmation
+immédiate distincte du lot exact restent obligatoires avant la seule commande
+mutante, non exécutée dans cette étape :
+
+```sh
+node scripts/infra/discovery-recovery-batch.mjs --execute "$BATCH_ID" --scope "$SCOPE_FILE"
+```
+
+Avant `POST_STARTED`, le runner réserve chaque clé v3 complète dans
+un fichier permanent créé exclusivement avec `wx`,
+en mode `0600`, puis écrit et synchronisé avec `sync`. La réservation
+précède l’entrée `POST_STARTED` et tout POST d’admission. Deux processus ou deux lots
+partageant le même répertoire ne peuvent pas réadmettre cette clé, même avec
+un `requestDigest` différent ; le scope contrôle toujours ce digest. Une
+interruption conserve la réservation même si le POST n’a pas encore été
+envoyé ; ne pas la supprimer pour contourner le refus. Aucun nettoyage
+automatique n’est prévu. Cette exclusion est locale, pas multi-machine :
+garder un seul opérateur et le répertoire de reçus canonique, sans copie
+ou autre clone pour relancer le lot.
+
+Le runner persiste ensuite `POST_STARTED` et ne réessaie jamais ce POST.
+Il attend le terminal avant d’ouvrir la fenêtre de soixante secondes pour
+le coût final corrélé, y compris une lecture à la
+borne. Un différé de 120 ou 600 secondes ne déclenche donc plus un faux
+`cost-missing` après les seules soixante premières secondes. La deadline
+totale reste de douze minutes par candidat ; elle n’est pas prolongée par
+cette fenêtre. Un terminal sans appel fournisseur et coût corrélés reste
+non certifié. Le budget de 300 lectures D1 cumulées, l’arrêt sur 429 ou erreur
+Queue, `claim(1)`, Queue 1/1 et l’interdiction d’admettre la clé suivante sans
+preuve complète sont inchangés. Un journal interrompu interdit le rejeu
+automatique ; conserver le reçu et diagnostiquer en lecture seule.
+Avant d’écrire `TERMINAL`, l’observateur est fermé et drainé, son état est
+revérifié et le coût corrélé final est relu puis contrôlé. Une erreur tardive
+de fermeture, de Queue ou de coût refuse donc le certificat et laisse la
+tentative non terminale, sans libérer la réservation.
+
+Le statut de ce lot reste **non certifié et non exécuté**. Cette correction
+du ciblage et de l’observateur n’autorise aucun réarmement historique, aucun
+nouveau canari et aucune publication d’archive. Le rollback se limite au
+revert du correctif ; il n’autorise pas l’utilisation des anciens reçus et ne
+supprime aucune donnée privée ou distante.
 
 ### Premier lot de reprise historique — 26 septembre 2026
 

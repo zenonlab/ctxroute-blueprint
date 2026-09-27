@@ -115,34 +115,26 @@ const rowSchema = z.strictObject({
 });
 const journalAttemptSchema = z.strictObject({ index: z.number().int().min(1).max(batchLimit), media: z.enum(['MANGA', 'MANHWA']),
   state: z.enum(['POST_STARTED', 'TERMINAL']), terminal: z.enum(['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS']).optional() });
+const sourceScopeEntrySchema = z.strictObject({
+  key: publicDiscoveryKeyV3Schema.extend({ mediaKind: z.enum(['MANGA', 'MANHWA']) }),
+  requestDigest: fingerprintSchema,
+});
+const sourceScopeSchema = z.strictObject({
+  corpusDigest: fingerprintSchema,
+  entries: z.array(sourceScopeEntrySchema).length(batchLimit),
+  schemaVersion: z.literal(1),
+  sourceCount: z.number().int().min(batchLimit).max(100_000),
+});
 const journalSchema = z.strictObject({
   attempts: z.array(journalAttemptSchema).max(batchLimit),
   batchId: z.string().regex(batchIdPattern),
   batchSeal: z.string().regex(sha256Pattern),
   candidates: z.array(z.strictObject({ fingerprint: fingerprintSchema, identitySeal: fingerprintSchema,
     mediaKind: z.enum(['MANGA', 'MANHWA']) })).length(batchLimit),
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
+  scopeSeal: fingerprintSchema,
 });
 
-const query = `SELECT
-  fingerprint,
-  media_kind AS mediaKind,
-  parser_version AS parserVersion,
-  rules_version AS siteRulesVersion,
-  request_digest AS requestDigest,
-  request_json AS requestJson,
-  state,
-  failure_reason AS failureReason,
-  failed_at AS failedAt,
-  attempt_count AS attemptCount,
-  queue_signal_state AS queueSignalState
-FROM public_discovery_requests_v3
-WHERE state = 'FAILED'
-  AND failure_reason = 'ATTEMPT_LIMIT'
-  AND attempt_count = 8
-  AND media_kind IN ('MANGA', 'MANHWA')
-ORDER BY failed_at ASC, fingerprint ASC
-LIMIT 10`;
 const mangaProviderReadinessQuery = `SELECT
   provider,
   CASE
@@ -165,6 +157,51 @@ function sameKey(left, right) {
     && left.parserVersion === right.parserVersion && left.siteRulesVersion === right.siteRulesVersion;
 }
 
+export function validateSourceScope(input) {
+  const parsed = sourceScopeSchema.safeParse(input);
+  if (!parsed.success) throw recoveryError('scope-invalid');
+  if (new Set(parsed.data.entries.map(entry => entry.key.fingerprint)).size !== batchLimit) {
+    throw recoveryError('scope-duplicate');
+  }
+  return { scope: parsed.data, scopeSeal: digest(JSON.stringify(parsed.data)) };
+}
+
+const scopedQuery = `WITH requested(position, fingerprint, media_kind, parser_version, rules_version, request_digest) AS (VALUES
+  (0, ?, ?, ?, ?, ?), (1, ?, ?, ?, ?, ?), (2, ?, ?, ?, ?, ?), (3, ?, ?, ?, ?, ?), (4, ?, ?, ?, ?, ?),
+  (5, ?, ?, ?, ?, ?), (6, ?, ?, ?, ?, ?), (7, ?, ?, ?, ?, ?), (8, ?, ?, ?, ?, ?), (9, ?, ?, ?, ?, ?)
+)
+SELECT
+  request.fingerprint,
+  request.media_kind AS mediaKind,
+  request.parser_version AS parserVersion,
+  request.rules_version AS siteRulesVersion,
+  request.request_digest AS requestDigest,
+  request.request_json AS requestJson,
+  request.state,
+  request.failure_reason AS failureReason,
+  request.failed_at AS failedAt,
+  request.attempt_count AS attemptCount,
+  request.queue_signal_state AS queueSignalState
+FROM requested CROSS JOIN public_discovery_requests_v3 AS request INDEXED BY sqlite_autoindex_public_discovery_requests_v3_1
+WHERE requested.position >= CAST(? AS INTEGER)
+  AND request.fingerprint = requested.fingerprint
+  AND request.media_kind = requested.media_kind
+  AND request.parser_version = requested.parser_version
+  AND request.rules_version = requested.rules_version
+  AND request.request_digest = requested.request_digest
+  AND request.state = 'FAILED'
+  AND request.failure_reason = 'ATTEMPT_LIMIT'
+  AND request.attempt_count = 8
+LIMIT 10`;
+
+export function buildScopedQuery(scopeInput, completedCount = 0) {
+  const { scope } = validateSourceScope(scopeInput);
+  if (!Number.isInteger(completedCount) || completedCount < 0 || completedCount >= batchLimit) throw recoveryError('scope-offset');
+  const parameters = scope.entries.flatMap(({ key, requestDigest }) =>
+    [key.fingerprint, key.mediaKind, key.parserVersion, key.siteRulesVersion, requestDigest]);
+  return { parameters: [...parameters, completedCount], plan: 'EXPLAIN QUERY PLAN ' + scopedQuery, sql: scopedQuery };
+}
+
 export function validateCandidateRow(input) {
   const parsedRow = rowSchema.safeParse(input);
   if (!parsedRow.success) throw recoveryError('candidate-invalid');
@@ -184,7 +221,7 @@ export function validateCandidateRow(input) {
   const requestJsonSha256 = digest(row.requestJson);
   const identitySeal = digest(JSON.stringify({ fingerprint: row.fingerprint, mediaKind: row.mediaKind,
     parserVersion: row.parserVersion, siteRulesVersion: row.siteRulesVersion, requestDigest, requestJsonSha256 }));
-  return Object.freeze({ failedAt: row.failedAt, fingerprint: row.fingerprint, identitySeal, mediaKind: row.mediaKind, submission });
+  return Object.freeze({ failedAt: row.failedAt, fingerprint: row.fingerprint, identitySeal, mediaKind: row.mediaKind, requestDigest, submission });
 }
 
 export function validateBatch(rows, expectedSeal) {
@@ -195,6 +232,15 @@ export function validateBatch(rows, expectedSeal) {
   const batchSeal = digest(candidates.map(candidate => candidate.identitySeal).join('\n'));
   if (expectedSeal !== undefined && batchSeal !== expectedSeal) throw recoveryError('batch-seal');
   return Object.freeze({ batchSeal, candidates });
+}
+
+export function validateScopedBatch(rows, scopeInput) {
+  const { scope, scopeSeal } = validateSourceScope(scopeInput);
+  const batch = validateBatch(rows);
+  const ordered = scope.entries.map(entry => batch.candidates.find(candidate =>
+    sameKey(candidate.submission.key, entry.key) && candidate.requestDigest === entry.requestDigest));
+  if (ordered.some(candidate => candidate === undefined)) throw recoveryError('scope-mismatch');
+  return { batchSeal: digest(ordered.map(candidate => candidate.identitySeal).join('\n')), candidates: ordered, scopeSeal };
 }
 
 export function assertMangaProvidersRegistered(rows) {
@@ -240,9 +286,22 @@ function queryRows(command) {
   return { rows: result.results, rowsRead: result.meta.rows_read, rowsWritten: 0 };
 }
 
-function queryCandidates() {
-  const proof = queryRows(query);
-  const batch = validateBatch(proof.rows);
+function queryScopedRows(scope, completedCount = 0) {
+  const query = buildScopedQuery(scope, completedCount);
+  const values = query.parameters.map(value => {
+    const parsed = z.union([identifierSchema, z.number().int().min(0).max(batchLimit - 1)]).safeParse(value);
+    if (!parsed.success) throw recoveryError('scope-invalid');
+    return `'${parsed.data}'`;
+  });
+  let position = 0;
+  const proof = queryRows(query.sql.replace(/\?/gu, () => values[position++]));
+  if (proof.rowsRead < 0 || proof.rowsRead > batchLimit - completedCount) throw recoveryError('scope-read-budget');
+  return proof;
+}
+
+function queryCandidates(scope) {
+  const proof = queryScopedRows(scope);
+  const batch = validateScopedBatch(proof.rows, scope);
   const providerProof = queryRows(mangaProviderReadinessQuery);
   const providers = assertMangaProvidersRegistered(providerProof.rows);
   return { ...batch, providers, rowsRead: proof.rowsRead + providerProof.rowsRead, rowsWritten: proof.rowsWritten + providerProof.rowsWritten };
@@ -252,13 +311,17 @@ function queryMangaProvidersRegistered() {
   return assertMangaProvidersRegistered(queryRows(mangaProviderReadinessQuery).rows);
 }
 
-function queryPreparedRows(fingerprints) {
-  if (!Array.isArray(fingerprints) || fingerprints.length < 1 || fingerprints.length > batchLimit || new Set(fingerprints).size !== fingerprints.length
-    || fingerprints.some(fingerprint => !fingerprintSchema.safeParse(fingerprint).success)) throw recoveryError('journal-invalid');
-  const quotedFingerprints = fingerprints.map(fingerprint => `'${fingerprint}'`).join(', ');
-  const exactQuery = query.replace(/\nORDER BY failed_at ASC, fingerprint ASC\nLIMIT 10$/u,
-    `\n  AND fingerprint IN (${quotedFingerprints})\nORDER BY failed_at ASC, fingerprint ASC`);
-  return queryRows(exactQuery).rows;
+async function loadSourceScope(path) {
+  const handle = await open(path, 'r').catch(() => { throw recoveryError('scope-missing'); });
+  try {
+    const metadata = await handle.stat();
+    if (!metadata.isFile() || metadata.size > 16_384 || (process.platform !== 'win32' && (metadata.mode & 0o077) !== 0)) {
+      throw recoveryError('scope-invalid');
+    }
+    let value;
+    try { value = JSON.parse(await handle.readFile('utf8')); } catch { throw recoveryError('scope-invalid'); }
+    return validateSourceScope(value).scope;
+  } finally { await handle.close(); }
 }
 
 async function loadJournal(batchId) {
@@ -268,25 +331,38 @@ async function loadJournal(batchId) {
   let value;
   try { value = JSON.parse(serialized); } catch { throw recoveryError('journal-invalid'); }
   const parsed = journalSchema.safeParse(value);
-  if (!parsed.success) throw recoveryError('journal-invalid');
+  if (!parsed.success || parsed.data.batchId !== batchId) throw recoveryError('journal-invalid');
   return parsed.data;
 }
 
-export function selectRemainingCandidates(rows, journalInput) {
+function validateJournalScope(journalInput, scopeInput) {
   const parsed = journalSchema.safeParse(journalInput);
   if (!parsed.success) throw recoveryError('journal-invalid');
   const journal = parsed.data;
-  if (journal.attempts.some((attempt, index) => attempt.index !== index + 1 || attempt.state !== 'TERMINAL')) {
+  const { scope, scopeSeal } = validateSourceScope(scopeInput);
+  if (journal.scopeSeal !== scopeSeal || journal.candidates.some((entry, index) => entry.fingerprint !== scope.entries[index].key.fingerprint
+    || entry.mediaKind !== scope.entries[index].key.mediaKind)
+    || journal.batchSeal !== digest(journal.candidates.map(entry => entry.identitySeal).join('\n'))) throw recoveryError('scope-mismatch');
+  if (journal.attempts.some((attempt, index) => attempt.index !== index + 1 || attempt.state !== 'TERMINAL'
+    || attempt.terminal === undefined || attempt.media !== journal.candidates[index].mediaKind)) {
     throw recoveryError('receipt-incomplete');
   }
+  return journal;
+}
+
+export function selectRemainingCandidates(rows, journalInput, scopeInput) {
+  const journal = validateJournalScope(journalInput, scopeInput);
+  const { scope } = validateSourceScope(scopeInput);
   const remainingEntries = journal.candidates.slice(journal.attempts.length);
   const candidatesByFingerprint = new Map(rows.map(row => {
     const candidate = validateCandidateRow(row);
     return [candidate.fingerprint, candidate];
   }));
-  const preparedCandidates = remainingEntries.map(entry => {
+  const preparedCandidates = remainingEntries.map((entry, index) => {
     const candidate = candidatesByFingerprint.get(entry.fingerprint);
-    return candidate?.identitySeal === entry.identitySeal && candidate.mediaKind === entry.mediaKind ? candidate : undefined;
+    const source = scope.entries[journal.attempts.length + index];
+    return candidate?.identitySeal === entry.identitySeal && candidate.mediaKind === entry.mediaKind
+      && sameKey(candidate.submission.key, source.key) && candidate.requestDigest === source.requestDigest ? candidate : undefined;
   });
   if (preparedCandidates.length !== rows.length || preparedCandidates.some(candidate => candidate === undefined)
     || new Set(preparedCandidates).size !== preparedCandidates.length) {
@@ -350,25 +426,45 @@ async function awaitObserverReady(observer, signal) {
   throw recoveryError('observer-not-ready');
 }
 
-async function awaitTerminal(observer, key, signal) {
+async function awaitTerminal(observer, key, signal, wait, readState) {
   for (let observation = 1; observation <= terminalObservations; observation += 1) {
-    await sleep(terminalDelayMs, undefined, { signal });
+    await wait(terminalDelayMs, undefined, { signal });
+    signal?.throwIfAborted();
     observer.check();
-    const response = await lookup(key, signal);
+    const response = await readState(key, signal);
     if (['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS'].includes(response.state.state)) return { observation, state: response.state.state };
     if (response.state.state !== 'PENDING') throw recoveryError(`terminal-${response.state.state.toLowerCase()}`);
   }
   throw recoveryError('terminal-timeout');
 }
 
-async function awaitCost(observer, requestId, signal) {
+async function awaitCost(observer, requestId, signal, wait) {
   for (let attempt = 1; attempt <= costObservations; attempt += 1) {
+    signal?.throwIfAborted();
+    observer.check();
     const cost = observer.read(requestId);
     if (cost !== undefined) return cost;
-    await sleep(costDelayMs, undefined, { signal });
-    observer.check();
+    await wait(costDelayMs, undefined, { signal });
   }
+  signal?.throwIfAborted();
+  observer.check();
+  const cost = observer.read(requestId);
+  if (cost !== undefined) return cost;
   throw recoveryError('cost-missing');
+}
+
+export async function awaitRecoveryCompletion({ observer, key, admission, signal, wait = sleep, readState = lookup }) {
+  signal?.throwIfAborted();
+  observer.check();
+  const terminal = admission.payload.state === 'VERIFIED' ? { observation: 0, state: 'VERIFIED' }
+    : await awaitTerminal(observer, key, signal, wait, readState);
+  await awaitCost(observer, admission.requestId, signal, wait);
+  await observer.close();
+  signal?.throwIfAborted();
+  observer.check();
+  const cost = observer.read(admission.requestId);
+  if (cost === undefined) throw recoveryError('cost-missing');
+  return { terminal, cost };
 }
 
 async function createJournal(batchId, batch) {
@@ -376,7 +472,8 @@ async function createJournal(batchId, batch) {
   await mkdir(dirname(path.pathname), { mode: 0o700, recursive: true });
   const handle = await open(path, 'wx', 0o600).catch(() => { throw recoveryError('receipt-exists'); });
   const journal = { attempts: [], batchId, batchSeal: batch.batchSeal, candidates: batch.candidates.map(candidate => ({
-    fingerprint: candidate.fingerprint, identitySeal: candidate.identitySeal, mediaKind: candidate.mediaKind })), schemaVersion: 2 };
+    fingerprint: candidate.fingerprint, identitySeal: candidate.identitySeal, mediaKind: candidate.mediaKind })), schemaVersion: 3,
+    scopeSeal: batch.scopeSeal };
   try { await handle.writeFile(`${JSON.stringify(journal)}\n`); } finally { await handle.close(); }
   return journal;
 }
@@ -390,11 +487,23 @@ async function persistJournal(journal) {
   await rename(temporary, path);
 }
 
+export async function reserveRecoveryPost(entryInput, directory = receiptDirectory) {
+  const parsed = sourceScopeEntrySchema.safeParse(entryInput);
+  if (!parsed.success) throw recoveryError('scope-invalid');
+  const path = new URL(`discovery-recovery-post-${digest(JSON.stringify(parsed.data.key))}.json`, directory);
+  const handle = await open(path, 'wx', 0o600).catch(() => { throw recoveryError('post-reservation-failed'); });
+  try {
+    await handle.writeFile('{"schemaVersion":1,"state":"POST_RESERVED"}\n');
+    await handle.sync();
+  } finally { await handle.close(); }
+}
+
 async function executeCandidate(candidate, index, journal) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(recoveryError('budget')), candidateBudgetMs);
   let observer;
   let failure;
+  let result;
   try {
     observer = startCostObserver({ allowProviderContinuation: true });
     const work = async () => {
@@ -402,6 +511,7 @@ async function executeCandidate(candidate, index, journal) {
       const initial = await lookup(candidate.submission.key, controller.signal);
       if (initial.state.state !== 'UNAVAILABLE') throw recoveryError(`candidate-${initial.state.state.toLowerCase()}`);
       queryMangaProvidersRegistered();
+      await reserveRecoveryPost({ key: candidate.submission.key, requestDigest: candidate.requestDigest });
       journal.attempts.push({ index, media: candidate.mediaKind, state: 'POST_STARTED' });
       await persistJournal(journal);
       const admission = await postRequest(candidate.submission, controller.signal);
@@ -409,11 +519,8 @@ async function executeCandidate(candidate, index, journal) {
       if (admission.status !== 202 || !requestIdPattern.test(admission.requestId ?? '')) throw recoveryError(`admission-http-${admission.status}`);
       if (!['PENDING', 'VERIFIED'].includes(admission.payload?.state)) throw recoveryError('admission-invalid');
       observer.track(admission.requestId, { provider: 'any', status: 202, task: 'discovery' });
-      const [terminal, cost] = await Promise.all([
-        admission.payload.state === 'VERIFIED' ? { observation: 0, state: 'VERIFIED' }
-          : awaitTerminal(observer, candidate.submission.key, controller.signal),
-        awaitCost(observer, admission.requestId, controller.signal),
-      ]);
+      const { terminal, cost } = await awaitRecoveryCompletion({ observer, key: candidate.submission.key,
+        admission, signal: controller.signal });
       if (cost.providerRequests < 1 || cost.acceptedResults < 1 || cost.provider429s > 0 || cost.providerHttpErrors > 0
         || cost.providerNetworkErrors > 0 || cost.queueFailures > 0 || cost.d1RowsRead > 300) throw recoveryError('cost-policy');
       journal.attempts[index - 1] = { index, media: candidate.mediaKind, state: 'TERMINAL', terminal: terminal.state };
@@ -421,30 +528,31 @@ async function executeCandidate(candidate, index, journal) {
       return { d1RowsRead: cost.d1RowsRead, index, media: candidate.mediaKind, observations: terminal.observation,
         provider: cost.provider, providerRequests: cost.providerRequests, state: terminal.state };
     };
-    return await Promise.race([work(), observer.failed]);
+    result = await Promise.race([work(), observer.failed]);
   } catch (error) { failure = error; }
   finally {
     controller.abort();
     clearTimeout(timer);
     try { await observer?.close(); } catch (error) { failure ??= error; }
   }
-  throw failure;
+  if (failure) throw failure;
+  return result;
 }
 
-async function prepareBatch(batchId) {
-  const batch = queryCandidates();
+async function prepareBatch(batchId, scope) {
+  const batch = queryCandidates(scope);
   const journal = await createJournal(batchId, batch);
-  return { batchId: journal.batchId, batchSeal: journal.batchSeal, candidates: journal.candidates.length,
+  return { batchId: journal.batchId, candidates: journal.candidates.length,
     media: journal.candidates.reduce((counts, candidate) => {
       counts[candidate.mediaKind] = (counts[candidate.mediaKind] ?? 0) + 1;
       return counts;
     }, {}), providers: batch.providers, rowsRead: batch.rowsRead, rowsWritten: batch.rowsWritten, schemaVersion: 1, type: 'discovery-recovery.prepared' };
 }
 
-async function executeBatch(batchId) {
-  const journal = await loadJournal(batchId);
-  const remainingFingerprints = journal.candidates.slice(journal.attempts.length).map(candidate => candidate.fingerprint);
-  const candidates = selectRemainingCandidates(queryPreparedRows(remainingFingerprints), journal);
+async function executeBatch(batchId, scope) {
+  const journal = validateJournalScope(await loadJournal(batchId), scope);
+  const rows = journal.attempts.length === batchLimit ? [] : queryScopedRows(scope, journal.attempts.length).rows;
+  const candidates = selectRemainingCandidates(rows, journal, scope);
   const results = [];
   for (const candidate of candidates) {
     const result = await executeCandidate(candidate, journal.attempts.length + 1, journal);
@@ -452,7 +560,7 @@ async function executeBatch(batchId) {
     process.stdout.write(`${JSON.stringify({ schemaVersion: 1, type: 'discovery-recovery.progress', ...result })}\n`);
   }
   const terminals = journal.attempts.filter(attempt => attempt.state === 'TERMINAL');
-  return { batchId, batchSeal: journal.batchSeal, completed: terminals.length, schemaVersion: 1,
+  return { batchId, completed: terminals.length, schemaVersion: 1,
     terminals: Object.fromEntries(['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS'].map(state => [state, terminals.filter(attempt => attempt.terminal === state).length])),
     type: 'discovery-recovery.complete' };
 }
@@ -463,18 +571,29 @@ export function safeFailureCode(error) {
     ? parsed.data : 'discovery-recovery-failed';
 }
 
+export function parseRecoveryArguments(args) {
+  const scopePathSchema = z.string().trim().min(1).refine(path => !path.startsWith('--'));
+  const parsed = z.union([
+    z.tuple([z.literal('--preflight'), z.literal('--scope'), scopePathSchema]),
+    z.tuple([z.enum(['--prepare', '--execute']), z.string().regex(batchIdPattern), z.literal('--scope'), scopePathSchema]),
+  ]).safeParse(args);
+  if (!parsed.success) throw recoveryError('invalid-arguments');
+  const [mode] = parsed.data;
+  const offset = mode === '--preflight' ? 1 : 2;
+  return { batchId: offset === 2 ? parsed.data[1] : undefined, mode, scopePath: parsed.data[offset + 1] };
+}
+
 async function main() {
-  const [mode, batchId] = process.argv.slice(2);
-  if (!['--execute', '--preflight', '--prepare'].includes(mode) || (mode === '--preflight' ? process.argv.length !== 3
-    : process.argv.length !== 4) || (mode !== '--preflight' && !batchIdPattern.test(batchId ?? ''))) throw recoveryError('invalid-arguments');
+  const { mode, batchId, scopePath } = parseRecoveryArguments(process.argv.slice(2));
+  const scope = await loadSourceScope(scopePath);
   if (mode === '--preflight') {
-    const proof = queryCandidates();
-    return { batchSeal: proof.batchSeal, candidates: proof.candidates.length, media: proof.candidates.reduce((counts, candidate) => {
+    const proof = queryCandidates(scope);
+    return { candidates: proof.candidates.length, media: proof.candidates.reduce((counts, candidate) => {
       counts[candidate.mediaKind] = (counts[candidate.mediaKind] ?? 0) + 1;
       return counts;
     }, {}), providers: proof.providers, rowsRead: proof.rowsRead, rowsWritten: proof.rowsWritten, schemaVersion: 1, type: 'discovery-recovery.preflight' };
   }
-  return mode === '--prepare' ? prepareBatch(batchId) : executeBatch(batchId);
+  return mode === '--prepare' ? prepareBatch(batchId, scope) : executeBatch(batchId, scope);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

@@ -6105,6 +6105,139 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "preflight-real-list-recovery-20260927",
+      "title": "Préparer une reprise bornée prouvée sur la liste réelle sans mutation distante",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "membership",
+          "title": "Prouver l’appartenance du lot réel",
+          "status": "DONE",
+          "acceptance": [
+            "Comparer en mémoire les identités du reçu aux artefacts du profil exact1522, sans exposer titres, URL, empreintes individuelles ou payloads.",
+            "Profil temporaire consulté hors réseau, profil personnel et ancien reçu préservés; rapport local agrégé0600 seulement."
+          ],
+          "files": [
+            "build/recovery/discovery-recovery-batch-manga-certified-20260927.json",
+            "build/installed-review/tobirink-installed-review-AM3olC.json",
+            "build/audits/real-list-recovery-preflight.mjs",
+            "build/audits/real-list-recovery-preflight.report.json"
+          ],
+          "commands": [
+            "node build/audits/real-list-recovery-preflight.mjs",
+            "node --test scripts/infra/discovery-recovery-batch.test.mjs"
+          ],
+          "evidence": [
+            "ProfilAM3olC hors réseau: corpus exact1522 conservé,458sources PROVIDER_UNAVAILABLE et398identités uniques. Ancienlot:0/10empreintes parmi ces identités, reçu inchangé et0tentative.",
+            "Nouveaureçu privé real-list-20260927-01:10FAILED,10clés complètes et10payloads/digests identiques à la liste; requête indexée10lectures/0écriture,0admission.",
+            "Sonde initiale1518lectures; unprévol cible échoue sans mesure persistée, le suivant1518>400est refusé. La lecture ciblée finale respecte la borne; aucun budgetglobal ne peut être certifié sur ces sondes."
+          ]
+        },
+        {
+          "id": "safety",
+          "title": "Vérifier les préconditions de production",
+          "status": "DONE",
+          "acceptance": [
+            "Établir état Worker/Queue/D1 par lectures seules, métriques rowsWritten0; aucun POST admission, canari, déploiement ou publication.",
+            "Présenter un lot pertinent et les gardes ou défauts reproduits; aucune certification ou exécution si une garde nécessaire manque.",
+            "Confirmation immédiate distincte requise avant toute reprise FAILED/ATTEMPT_LIMIT; aucune modification des règles de reprise, aucun réarmement automatique."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "scripts/infra/discovery-recovery-batch.mjs",
+            "docs/operations/cloudflare.md",
+            "docs/architecture/src/discovery-recovery-deployment.architecture.json"
+          ],
+          "commands": [
+            "Lectures agrégées Cloudflare D1 Queue Worker",
+            "Reproduction locale de la fenêtre observateur",
+            "npm run archify:validate -- architecture"
+          ],
+          "evidence": [
+            "Worker02c0e1ed actif100%; Queue0/DLQ2 approximatifs, batch1/concurrence1, nonpausée; trois runtimes manga READY.",
+            "D1agrégé:958VERIFIED,502FAILED,3PENDING,1PROCESSING,31NOT_FOUND,23AMBIGUOUS;3036lectures/0écriture. Runtimes6lectures/0écriture.",
+            "Défaut awaitCost reproduit7/7 sansréseau:coût60/120s refusé après60s;canari attendleterminal puis60s. Suitesreprise7/7,Archifyarchitectureetdiff-checkverts. PasdePOST; correctiongardes proposée séparément, exécutioninterdite avantpreuve etconfirmationimmédiate."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "fix-scoped-recovery-observation-20260927",
+      "title": "Corriger le ciblage réel et l’observation de la reprise sans réarmer D1",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "repair",
+          "title": "Borner le ciblage et la preuve",
+          "status": "DONE",
+          "acceptance": [
+            "Préflight/prepare/execute requièrent un scope privé issu de la liste; clés complètes et digests contrôlés, reçu lié au scope, vieux reçus refusés sans mutation.",
+            "Sélection D1 indexée bornée, aucun lot global implicite; exactement10candidats,unPOSTparclé,aucun réarmementautomatique.",
+            "Attendre le terminal avant la fenêtre de coût60s avec lecturefinale, en conservant deadline12min, erreurQueue/429,budget300 et absencepreuve=échec.",
+            "Régressions rouges/vertes pour scopeabsent/mismatch/legacy/SQLindex, différés120/600s,deadline,coûtabsent eterreurs; docs/diagramme àjour."
+          ],
+          "files": [
+            "scripts/infra/discovery-recovery-batch.mjs",
+            "scripts/infra/discovery-recovery-batch.test.mjs",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/operations/cloudflare.md",
+            "docs/architecture/src/discovery-recovery-deployment.architecture.json",
+            ".project/progress.json",
+            "docs/progress.md"
+          ],
+          "commands": [
+            "node --test scripts/infra/discovery-recovery-batch.test.mjs scripts/infra/manga-canary.test.mjs",
+            "npm run test:infra",
+            "npm run archify:validate -- architecture",
+            "npm run validate:docs -- --all",
+            "npm run validate:decisions",
+            "git diff --check"
+          ],
+          "evidence": [
+            "67/67 tests recovery/canari : source exacte obligatoire, journal v3 lié au scope, refus legacy/CLI invalide, SQL PK sans tri, réservation POST exclusive persistante par clé, terminal 120/600 s puis coût 60 s inclus, drain final et deadline 12 min.",
+            "Prévol réel sur les 1522 sources : 10 clés/payloads exacts (6 MANGA/4 MANHWA), 16 lectures D1 dont 10 clés et 6 runtimes, zéro écriture/admission ; deux anciens reçus intacts. Premier refus de budget conservé comme échec, pas inclus dans les 16 lectures.",
+            "ADR/docs/diff et Archify architecture verts ; showcase 9/9, zéro diagnostic, confinement 1440/1600/1920/2048 en clair/sombre et captures inspectées. IR 61107fc4, HTML ba4eeeb7 ; interface fixe Archify en anglais.",
+            "Audit indépendant corrigé : drain avant TERMINAL, sceaux retirés de stdout, mauvais batchId refusé, permissions privées et fichier 16 Kio. Hooks, Worker, Queue, migrations et favoris inchangés."
+          ]
+        },
+        {
+          "id": "delivery",
+          "title": "Livrer par PR et CI",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Diffaudité,hooksactifs,validationcomplèteincluantCIexactSHAavantfusion;CI mainetprobesvertes.",
+            "Aucunexecutehistorique,aucuncanarifrais,aucune publicationarchive; les reçus existants et les favoris restent intacts.",
+            "Commitfonctionnel fix(discovery): scope recovery to private source proofs; branchefix/scoped-recovery-observation et retourarrièreparrevertPR."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "docs/operations/cloudflare.md"
+          ],
+          "commands": [
+            "npm run verify",
+            "git commit",
+            "git push",
+            "gh pr create",
+            "gh workflow run deploy-production.yml",
+            "gh pr merge",
+            "gh run view"
+          ],
+          "evidence": [
+            "Livraison PR/CI autorisée explicitement ; clone propre avec hooks actifs, sans nouveaux canaris ni publication ni execute historique.",
+            "Le verify du workspace principal échoue sur six erreurs préexistantes dans deux audits ignorés ; artefacts préservés. Validation complète dans clone propre, sans contourner les hooks."
+          ]
+        }
+      ]
     }
   ]
 }

@@ -12,7 +12,7 @@
     "origin": [55, 70],
     "cols": 4,
     "gapX": 80,
-    "gapY": 52,
+    "gapY": 112,
     "cellW": 170,
     "cellH": 68
   },
@@ -97,12 +97,12 @@
     {
       "dot": "emerald",
       "title": "Garanties actives",
-      "items": ["Deux cibles exactes : D1 puis Worker", "Queue batch 1 et concurrence 1", "Le reçu privé interdit le doublon POST"]
+      "items": ["Reprise : 10 clés et digests du profil privé", "Scope scellé · lecture D1 indexée · un POST par clé", "Queue batch 1 et concurrence 1"]
     },
     {
       "dot": "amber",
       "title": "Certification restante",
-      "items": ["Différé sans essai ; appel final corrélé requis", "Arrêt sur 429, Queue, absence fournisseur ou budget D1", "Aucun FAILED réarmé sans confirmation"]
+      "items": ["Terminal puis preuve corrélée sous 60 s (borne 12 min)", "Arrêt sur 429, Queue, absence fournisseur ou budget D1", "Aucun FAILED réarmé sans confirmation"]
     }
   ]
 }
