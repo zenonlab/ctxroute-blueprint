@@ -1554,6 +1554,24 @@ nouveau canari et aucune publication d’archive. Le rollback se limite au
 revert du correctif ; il n’autorise pas l’utilisation des anciens reçus et ne
 supprime aucune donnée privée ou distante.
 
+Livraison du correctif : PR #146, commit `2e91f32`, fusion `61b1abc`.
+Le prévol CI `36352574525` est vert sur le SHA exact avant fusion ; la CI
+`main` `36353030211` réussit ensuite vérification, E2E, plan, apply et sondes.
+Aucune migration n’est à appliquer ; le Worker est publié en version
+`442986f6-a4dd-4067-92b5-555474010a58`. Les quatre sondes `/`, `/library`,
+`/download` et Deno `/healthz` répondent HTTP 200. Les étapes canaris et
+publication d’archives sont ignorées. Ces sondes ne certifient pas les
+favoris encore en pause et n’autorisent pas leur réarmement.
+
+La validation complète locale passe dans le clone propre avec hooks actifs :
+133 tests infra, dont 67 reprise/canari, 197 Worker, tous les typechecks et
+`npm run verify`. Le workspace principal garde six erreurs de lint
+préexistantes dans deux audits ignorés, sans suppression ni contournement.
+Archify `architecture` passe en showcase 9/9, sans erreur ni avertissement ;
+le HTML de reprise a été contrôlé sur quatre tailles desktop, en clair et
+sombre, sans débordement, avec inspection des captures. L’interface fixe du
+viewer reste en anglais ; le contenu du diagramme est en français.
+
 ### Premier lot de reprise historique — 26 septembre 2026
 
 Après les deux canaris corrélés, une seule demande historique
