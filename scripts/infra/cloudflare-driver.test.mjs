@@ -5,7 +5,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertExtensionPublicationContext, assertExtensionPublicationPlan, createCloudflareDriver, fingerprintWorkerInputs, loadCloudflareConfig, readExtensionPublicationCandidate, validateCloudflareConfig, verifyExtensionPublication } from './cloudflare-driver.mjs';
+import { assertExtensionPublicationContext, assertExtensionPublicationPlan, createCloudflareDriver, fingerprintWorkerInputs, inspectFirefoxPublicationArchive, loadCloudflareConfig, readExtensionPublicationCandidate, validateCloudflareConfig, verifyExtensionPublication } from './cloudflare-driver.mjs';
+import { createDeterministicZip } from '../release/deterministic-zip.mjs';
 import { createOperationPlan } from './provider-gate-core.mjs';
 
 const { Response } = globalThis;
@@ -30,14 +31,68 @@ test('extension publication is disabled for pushes and requires manual main plus
 });
 
 function extensionCandidateFixture(edit = () => undefined, bytes = Buffer.from('zip')) {
-  const manifest = { schemaVersion: 1, version: releaseVersion, siteOrigin: 'https://tobirink.com', artifacts: ['chrome', 'firefox'].map(browser => ({
+  const build = { schemaVersion: 1, version: releaseVersion, siteOrigin: 'https://tobirink.com', artifacts: ['chrome', 'firefox'].map(browser => ({
     artifact: `tobirink-${browser}-mv3-${releaseVersion}.zip`, target: `${browser}-mv3`, version: releaseVersion,
     manifest: { version: releaseVersion }, size: 3, sha256: '4a70fe9aa6436e02c2dea340fbd1e352e4ef2d8ce6ca52ad25d4b95471fc8bf2',
   })) };
+  const manifest = { ...build, commit: 'a'.repeat(40), artifacts: build.artifacts.map(record => ({ ...record,
+    artifact: record.artifact.replace(/firefox(.*)\.zip$/u, 'firefox$1.xpi'),
+    format: record.target === 'chrome-mv3' ? 'zip' : 'xpi',
+    contentType: record.target === 'chrome-mv3' ? 'application/zip' : 'application/x-xpinstall',
+  })) };
   edit(manifest);
-  return { read: async path => path.endsWith('/package.json') ? JSON.stringify({ version: releaseVersion })
-    : path.endsWith('/release-manifest.json') ? JSON.stringify(manifest) : bytes };
+  return { expectedCommit: 'a'.repeat(40), inspectFirefox: async () => undefined,
+    read: async path => path.endsWith('/package.json') ? JSON.stringify({ version: releaseVersion })
+      : path.endsWith('/release-manifest.json') ? JSON.stringify(build)
+        : path.endsWith('/publication-manifest.json') ? JSON.stringify(manifest) : bytes };
 }
+
+const readCandidate = () => readExtensionPublicationCandidate(extensionCandidateFixture());
+
+test('final manifest and signed archive are mandatory independently of ordinary Worker operations', async () => {
+  const fixture = extensionCandidateFixture();
+  for (const missing of ['publication-manifest.json', '.xpi']) {
+    await assert.rejects(() => readExtensionPublicationCandidate({ ...fixture, read: async path => {
+      if (path.endsWith(missing)) throw new Error('missing-final-artifact');
+      return fixture.read(path);
+    } }), /missing-final-artifact/u);
+  }
+  const driver = createCloudflareDriver({ config: { ...config, r2: [{ binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] },
+    workerDirectory: '/worker', readCandidate: async () => { throw new Error('missing-final-artifact'); },
+    run: async () => { throw new Error('unexpected-network'); } });
+  assert.ok(driver.resolveOperations(['worker-deploy']).length === 1);
+  await assert.rejects(() => driver.preview(driver.resolveOperations([`r2-publish:tobirink-chrome-mv3-${releaseVersion}.zip`])), /missing-final-artifact/u);
+});
+
+test('Firefox final bytes retain the complete unsigned payload, version, Gecko identity and signature entries', async () => {
+  const root = await mkdtemp(resolve(tmpdir(), 'tobirink-xpi-contract-'));
+  const source = resolve(root, 'signed.xpi');
+  const unsignedSource = resolve(root, 'unsigned.zip');
+  const entries = [
+    { name: 'manifest.json', content: Buffer.from(JSON.stringify({ version: releaseVersion, browser_specific_settings: { gecko: { id: 'tobirink@tobirink.local' } } })) },
+    { name: 'background.js', content: Buffer.from('payload') },
+  ];
+  const signatureEntries = ['manifest.mf', 'mozilla.sf', 'mozilla.rsa'].map(name => ({ name: `META-INF/${name}`, content: Buffer.from('structural-fixture-not-a-signature') }));
+  await writeFile(unsignedSource, createDeterministicZip(entries));
+  const check = async signed => {
+    await writeFile(source, createDeterministicZip(signed));
+    return inspectFirefoxPublicationArchive({ source, unsignedSource, version: releaseVersion });
+  };
+  await check([...entries, ...signatureEntries]);
+  for (const invalid of [entries, [...entries, ...signatureEntries.slice(1)],
+    [...entries, ...signatureEntries, { name: 'extra.js', content: Buffer.from('extra') }],
+    [entries[0], { ...entries[1], content: Buffer.from('changed') }, ...signatureEntries],
+    [entries[0], ...signatureEntries],
+  ]) await assert.rejects(() => check(invalid), /extension-publication-xpi-/u);
+  for (const manifest of [
+    { version: '0.0.0', browser_specific_settings: { gecko: { id: 'tobirink@tobirink.local' } } },
+    { version: releaseVersion, browser_specific_settings: { gecko: { id: 'other@identity' } } },
+  ]) {
+    const wrong = [{ ...entries[0], content: Buffer.from(JSON.stringify(manifest)) }, entries[1]];
+    await writeFile(unsignedSource, createDeterministicZip(wrong));
+    await assert.rejects(() => check([...wrong, ...signatureEntries]), /extension-publication-xpi-identity/u);
+  }
+});
 
 test('extension candidate checks both exact filenames, versions, sizes and local hashes', async () => {
   const candidate = await readExtensionPublicationCandidate(extensionCandidateFixture());
@@ -46,7 +101,11 @@ test('extension candidate checks both exact filenames, versions, sizes and local
   for (const edit of [
     manifest => { manifest.version = '0.0.0'; },
     manifest => { manifest.artifacts[1] = manifest.artifacts[0]; },
-    manifest => { manifest.artifacts[0].manifest.version = '0.0.0'; },
+    manifest => { manifest.artifacts[0].version = '0.0.0'; },
+    manifest => { manifest.commit = 'b'.repeat(40); },
+    manifest => { manifest.artifacts[1].format = 'zip'; },
+    manifest => { manifest.artifacts[1].contentType = 'application/zip'; },
+    manifest => { manifest.artifacts.push(manifest.artifacts[0]); },
     manifest => { manifest.artifacts[0].size = 5 * 1024 * 1024 + 1; },
     manifest => { manifest.artifacts[0].sha256 = '0'.repeat(64); },
     manifest => { manifest.artifacts[0].artifact = '../other.zip'; },
@@ -74,11 +133,14 @@ const publicArchiveResponse = (body = 'zip', options = {}) => new Response(body,
 test('both public archives must match hashes, sizes and HTTP metadata without credentials or redirects', async () => {
   const candidate = await readExtensionPublicationCandidate(extensionCandidateFixture());
   const calls = [];
-  const proof = await verifyExtensionPublication(candidate, { fetcher: async (url, options) => { calls.push({ url, options }); return publicArchiveResponse(); } });
+  const proof = await verifyExtensionPublication(candidate, { fetcher: async (url, options) => { calls.push({ url, options }); return publicArchiveResponse('zip', {
+    headers: { 'Content-Type': url.endsWith('.xpi') ? 'application/x-xpinstall' : 'application/zip', 'Cache-Control': 'immutable' },
+  }); } });
   assert.equal(proof.artifacts.length, 2);
   assert.ok(proof.artifacts.every(artifact => artifact.size === 3 && artifact.status === 200));
   assert.deepEqual(calls.map(({ url }) => url), candidate.artifacts.map(({ artifact }) => `https://tobirink.com/downloads/${artifact}`));
   assert.ok(calls.every(({ options }) => options.redirect === 'error' && options.headers === undefined));
+  await assert.rejects(() => verifyExtensionPublication(candidate, { fetcher: async () => publicArchiveResponse() }), /http-contract/u);
   for (const response of [
     () => publicArchiveResponse('zip', { status: 404 }),
     () => publicArchiveResponse('zip', { status: 302 }),
@@ -100,7 +162,9 @@ test('public verification has one total deadline including stalled bodies and re
   } }), /extension-publication-timeout/u);
   assert.equal(signal.aborted, true);
   let count = 0;
-  await assert.rejects(() => verifyExtensionPublication(candidate, { fetcher: async () => publicArchiveResponse(++count === 1 ? 'zip' : 'zap') }), /public-bytes/u);
+  await assert.rejects(() => verifyExtensionPublication(candidate, { fetcher: async url => publicArchiveResponse(++count === 1 ? 'zip' : 'zap', {
+    headers: { 'Content-Type': url.endsWith('.xpi') ? 'application/x-xpinstall' : 'application/zip', 'Cache-Control': 'immutable' },
+  }) }), /public-bytes/u);
   assert.equal(count, 2);
   await assert.rejects(() => verifyExtensionPublication(candidate, { timeoutMs: 30_001 }), /invalid-deadline/u);
 });
@@ -120,7 +184,7 @@ function test_derive_operation_targets() {
   });
   assert.deepEqual(releaseDriver.listOperations().filter(operation => operation.kind === 'r2-publish').map(operation => operation.target), [
     `r2:public-releases/downloads/tobirink-chrome-mv3-${releaseVersion}.zip`,
-    `r2:public-releases/downloads/tobirink-firefox-mv3-${releaseVersion}.zip`,
+    `r2:public-releases/downloads/tobirink-firefox-mv3-${releaseVersion}.xpi`,
   ]);
 }
 
@@ -322,7 +386,7 @@ async function test_worker_build_failure_prevents_wrangler() {
 async function test_release_publish_is_hashed_and_translated() {
   const calls = [];
   const releaseConfig = { ...config, r2: [...config.r2, { binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] };
-  const driver = createCloudflareDriver({ config: releaseConfig, workerDirectory: '/worker', apiToken: 'fixture-token', r2Fetch: async () => new Response(null, { status: 404 }), read: async () => Buffer.from('zip'), run: async args => { calls.push(args); return '{}'; } });
+  const driver = createCloudflareDriver({ config: releaseConfig, workerDirectory: '/worker', readCandidate, apiToken: 'fixture-token', r2Fetch: async () => new Response(null, { status: 404 }), read: async () => Buffer.from('zip'), run: async args => { calls.push(args); return '{}'; } });
   const actions = driver.resolveOperations([`r2-publish:tobirink-chrome-mv3-${releaseVersion}.zip`]);
   const preview = await driver.preview(actions);
   assert.deepEqual(preview.artifacts, [{
@@ -342,12 +406,29 @@ async function test_release_publish_is_hashed_and_translated() {
   ]]);
 }
 
+test('Firefox upload uses the sealed XPI unchanged with its installation MIME type', async () => {
+  const calls = [];
+  const driver = createCloudflareDriver({
+    config: { ...config, r2: [{ binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] },
+    workerDirectory: '/worker', readCandidate, read: async () => Buffer.from('zip'), apiToken: 'fixture-token',
+    r2Fetch: async () => new Response(null, { status: 404 }),
+    run: async args => { calls.push(args); return '{}'; },
+  });
+  const actions = driver.resolveOperations([`r2-publish:tobirink-firefox-mv3-${releaseVersion}.xpi`]);
+  await driver.preview(actions);
+  await driver.inspect('account-1', actions);
+  await driver.apply(actions);
+  const upload = calls.find(args => args.includes('put'));
+  assert.equal(upload[upload.indexOf('--content-type') + 1], 'application/x-xpinstall');
+  assert.ok(upload[upload.indexOf('--file') + 1].endsWith(`tobirink-firefox-mv3-${releaseVersion}.xpi`));
+});
+
 function archiveInspectionFixture(response) {
   const writes = [];
   const reads = [];
   const driver = createCloudflareDriver({
     config: { ...config, r2: [{ binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] },
-    workerDirectory: '/worker', apiToken: 'fixture-token', read: async () => Buffer.from('zip'),
+    workerDirectory: '/worker', apiToken: 'fixture-token', readCandidate, read: async () => Buffer.from('zip'),
     run: async args => { if (args.includes('put')) writes.push(args); return '{}'; },
     r2Fetch: async (url, init) => { reads.push({ url, init }); return response(); },
   });
@@ -374,7 +455,7 @@ test('a partial two-archive publication fails and resumes without rewriting the 
   let failFirefox = true;
   const driver = createCloudflareDriver({
     config: { ...config, r2: [{ binding: 'RELEASE_SNAPSHOTS', name: 'public-releases' }] },
-    workerDirectory: '/worker', apiToken: 'fixture-token', read: async () => Buffer.from('zip'),
+    workerDirectory: '/worker', apiToken: 'fixture-token', readCandidate, read: async () => Buffer.from('zip'),
     r2Fetch: async url => published.has(url.split('/').at(-1)) ? new Response('zip') : new Response(null, { status: 404 }),
     run: async args => {
       if (args.includes('put')) {
@@ -386,7 +467,7 @@ test('a partial two-archive publication fails and resumes without rewriting the 
       return '{}';
     },
   });
-  const artifacts = ['chrome', 'firefox'].map(browser => `tobirink-${browser}-mv3-${releaseVersion}.zip`);
+  const artifacts = ['chrome', 'firefox'].map(browser => `tobirink-${browser}-mv3-${releaseVersion}.${browser === 'chrome' ? 'zip' : 'xpi'}`);
   const actions = driver.resolveOperations(artifacts.map(artifact => `r2-publish:${artifact}`));
   await driver.inspect('account-1', actions);
   await assert.rejects(() => driver.apply(actions), /fixture-upload-failed/u);

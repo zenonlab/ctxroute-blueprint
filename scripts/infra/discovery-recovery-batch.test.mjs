@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
-import { assertMangaProvidersRegistered, awaitRecoveryCompletion, buildScopedQuery, parseRecoveryArguments, reserveRecoveryPost,
+import { assertMangaProvidersRegistered, assertRecoveryProvidersRegistered, awaitRecoveryCompletion, buildScopedQuery, parseRecoveryArguments, reserveRecoveryPost,
   safeFailureCode, selectRemainingCandidates, validateBatch, validateCandidateRow, validateScopedBatch, validateSourceScope } from './discovery-recovery-batch.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -210,21 +210,44 @@ test('every recovery mode requires an explicit private source scope before netwo
   }
 });
 
-test('scope validates exactly ten unique known-media keys and sealed request digests', () => {
+test('scope validates one to ten unique known-media keys and sealed request digests', () => {
   const rows = Array.from({ length: 10 }, (_value, index) => row(index));
   const scope = scopeFor(rows);
   assert.equal(validateSourceScope(scope).scope.entries.length, 10);
   assert.throws(() => validateSourceScope(undefined), /scope-invalid/u);
-  assert.throws(() => validateSourceScope({ ...scope, entries: scope.entries.slice(1) }), /scope-invalid/u);
+  assert.equal(validateSourceScope({ ...scope, entries: scope.entries.slice(1) }).scope.entries.length, 9);
+  assert.throws(() => validateSourceScope({ ...scope, entries: [] }), /scope-invalid/u);
+  assert.throws(() => validateSourceScope({ ...scope, entries: [...scope.entries, scope.entries[0]] }), /scope-invalid/u);
   assert.throws(() => validateSourceScope({ ...scope, title: 'private' }), /scope-invalid/u);
   const duplicate = structuredClone(scope);
   duplicate.entries[9] = duplicate.entries[0];
   assert.throws(() => validateSourceScope(duplicate), /scope-duplicate/u);
-  for (const key of [{ mediaKind: 'ANIME' }, { parserVersion: "bad' OR 1=1" }, { siteRulesVersion: ' ' }]) {
+  for (const key of [{ mediaKind: 'UNKNOWN' }, { parserVersion: "bad' OR 1=1" }, { siteRulesVersion: ' ' }]) {
     const invalid = structuredClone(scope);
     Object.assign(invalid.entries[0].key, key);
     assert.throws(() => buildScopedQuery(invalid), /scope-invalid/u);
   }
+});
+
+test('partial final batches preserve media, offset, sealing and completed journal semantics', () => {
+  for (const count of [1, 3, 9, 10]) {
+    const rows = Array.from({ length: count }, (_value, index) => row(index, ['ANIME', 'MANHUA', 'MANGA', 'MANHWA'][index % 4]));
+    const scope = scopeFor(rows);
+    const batch = validateScopedBatch(rows, scope);
+    const query = buildScopedQuery(scope, count - 1);
+    assert.equal(query.parameters.length, count * 5 + 1);
+    assert.throws(() => buildScopedQuery(scope, count), /scope-offset/u);
+    const journal = { attempts: [], batchId: 'recovery-partial', batchSeal: batch.batchSeal,
+      candidates: batch.candidates.map(({ fingerprint, identitySeal, mediaKind }) => ({ fingerprint, identitySeal, mediaKind })),
+      schemaVersion: 3, scopeSeal: batch.scopeSeal };
+    assert.equal(selectRemainingCandidates(rows, journal, scope).length, count);
+    journal.attempts = batch.candidates.map((candidate, index) => ({ index: index + 1, media: candidate.mediaKind, state: 'TERMINAL', terminal: 'VERIFIED' }));
+    assert.deepEqual(selectRemainingCandidates([], journal, scope), []);
+    assert.throws(() => selectRemainingCandidates([], { ...journal, candidates: [] }, scope), /journal-invalid/u);
+  }
+  const anime = ['anilist', 'kitsu-anime'].map(provider => ({ availability: 'DEFERRED', provider }));
+  assert.deepEqual(assertRecoveryProvidersRegistered(anime, ['ANIME']), anime);
+  assert.throws(() => assertRecoveryProvidersRegistered(anime, ['MANGA']), /provider-readiness-invalid/u);
 });
 
 test('scoped selection requires the complete source key and digest, not global oldest failures', () => {
@@ -290,7 +313,7 @@ test('scoped SQL executes primary-key probes only and excludes unrelated or chan
     assert.throws(() => buildScopedQuery(scope, 10), /scope-offset/u);
     database.prepare('UPDATE public_discovery_requests_v3 SET request_digest = ? WHERE fingerprint = ?').run(digest('changed'), rows[0].fingerprint);
     assert.equal(database.prepare(query.sql).all(...query.parameters).length, 9);
-    assert.throws(() => validateScopedBatch(database.prepare(query.sql).all(...query.parameters), scope), /batch-size/u);
+    assert.throws(() => validateScopedBatch(database.prepare(query.sql).all(...query.parameters), scope), /scope-mismatch/u);
   } finally { database.close(); }
 });
 

@@ -6240,6 +6240,136 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-finish-tobirink-certified-delivery",
+      "title": "Terminer Tobirink par preuve réelle et livraison durable",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "diagnostic",
+          "title": "Comptabiliser les sources et blocages privés",
+          "status": "DONE",
+          "acceptance": [
+            "1522 sources comptabilisées sans extrapolation; preuves conservées"
+          ],
+          "files": [
+            "build/audits/**/*",
+            "build/installed-review/**/*"
+          ],
+          "commands": [
+            "node --test apps/extension/scripts/installed-review.test.mjs"
+          ],
+          "evidence": [
+            "Registre privé 0600 build/audits/certification-inventory-1790548610301/registry.json: 1522 sources conservées, 1346 identités, 137 sources dupliquées; copie de profil isolée.",
+            "27 lectures D1 indexées bornées: 1305 lignes lues, zéro écriture/admission; chaque source porte état local, preuve D1 disponible et prochaine action."
+          ]
+        },
+        {
+          "id": "candidate",
+          "title": "Réparer et vérifier la candidate complète",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "Aller-retour publicDiscovery et anciens formats vérifiés",
+            "Admissions scellées disjointes, réservation commune et lots partiels testés",
+            "Candidate privée; pointeur public inchangé"
+          ],
+          "files": [
+            "packages/application/src/recovery/**/*",
+            "packages/contracts/src/export/**/*",
+            "apps/extension/scripts/**/*",
+            "scripts/infra/**/*",
+            "scripts/release/**/*",
+            "apps/worker/**/*",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/operations/cloudflare.md",
+            "docs/architecture/src/**/*"
+          ],
+          "commands": [
+            "npm run verify",
+            "npm run archify:validate -- architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Candidate1.0.46 : export publicDiscovery v1-v5, lots1-10, réservation commune pilote/CLI, observation corrélée et POST45s ; route XPI et gate finale version/commit/MIME/SHA/payload Firefox sans modifier permissions ou comptes.",
+            "npm run verify intégral réussi sur clone propre du diff :137 tests infra, tous workspaces, couverture, typechecks, performance, CRG, intégration, audit0 vulnérabilité et vues showcase9/9. Six erreurs ESLint des anciens scripts privés restent intactes dans l'espace historique.",
+            "E2E Web11 succès/1 ignoré ; banc42 tests ; aller-retour exact1522 sources/805 œuvres publicDiscovery ; archives Chrome et Firefox reproduites par deux builds isolés.",
+            "Gate fermée avant canaris sans publication-manifest.json et XPI ; signature structurelle seule ne certifie pas Firefox. Transport des fichiers certifiés vers CI non configuré ; aucun secret ni droit ajouté.",
+            "Firefox156.0.1 installé et web-ext10.7.0 disponible ; aucun navigateur connecté à Codex ni accès Mozilla configuré. Pilote nécessite confirmation immédiate du lot exact ; aucun réarmement/admission ni publication effectué.",
+            "Préparation du commit fonctionnel et de la CI sur branche : aucun apply Worker, canari ou objet public sur cette branche. Import neuf hors ligne prolongé dans un profil séparé, résultats encore en cours."
+          ]
+        },
+        {
+          "id": "pilot",
+          "title": "Prouver dix reprises depuis le bouton",
+          "status": "TODO",
+          "acceptance": [
+            "Confirmation immédiate du lot exact avant reprise",
+            "Chaîne bouton à Library corrélée et coût certifié"
+          ],
+          "files": [
+            "build/installed-review/**/*",
+            "build/recovery/**/*"
+          ],
+          "commands": [
+            "node apps/extension/scripts/installed-review.mjs"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "converge",
+          "title": "Faire converger toutes les sources",
+          "status": "TODO",
+          "acceptance": [
+            "1522 sources expliquées, aucun blocage technique",
+            "Confirmation distincte des reprises épuisées"
+          ],
+          "files": [
+            "build/recovery/**/*",
+            "build/audits/**/*"
+          ],
+          "commands": [
+            "node scripts/infra/discovery-recovery-batch.mjs preflight"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "certify",
+          "title": "Certifier Chrome et Firefox durablement",
+          "status": "TODO",
+          "acceptance": [
+            "ZIP exact et XPI signé testés, conservation après mise à jour et deux redémarrages"
+          ],
+          "files": [
+            "build/releases/**/*",
+            "docs/browser-support.md",
+            "docs/release.md"
+          ],
+          "commands": [
+            "npm run package:extension"
+          ],
+          "evidence": []
+        },
+        {
+          "id": "publish",
+          "title": "Publier uniquement les artefacts certifiés",
+          "status": "TODO",
+          "acceptance": [
+            "CI protégée verte, fichiers publics identiques aux preuves, installation téléchargée vérifiée"
+          ],
+          "files": [
+            "docs/release.md",
+            "build/releases/**/*"
+          ],
+          "commands": [
+            "git diff --check"
+          ],
+          "evidence": []
+        }
+      ]
     }
   ]
 }

@@ -90,6 +90,10 @@ jobs:
       - name: Verify repository
         run: npm run verify
 
+      - name: Require sealed publication artifacts before production effects
+        if: ${{ inputs.publish_extension == true }}
+        run: node --input-type=module -e "import { readExtensionPublicationCandidate } from './scripts/infra/cloudflare-driver.mjs'; await readExtensionPublicationCandidate();"
+
       - name: Collect aggregate Discovery diagnostics
         timeout-minutes: 2
         env:
@@ -169,7 +173,7 @@ jobs:
             --provider cloudflare \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
             --operation r2-publish:tobirink-chrome-mv3-"$EXTENSION_VERSION".zip \
-            --operation r2-publish:tobirink-firefox-mv3-"$EXTENSION_VERSION".zip > .ctxroute-extension-publication-plan.json
+            --operation r2-publish:tobirink-firefox-mv3-"$EXTENSION_VERSION".xpi > .ctxroute-extension-publication-plan.json
           EXTENSION_PLAN_DIGEST="$(node --input-type=module -e "import { readFile } from 'node:fs/promises'; import { assertExtensionPublicationPlan, readExtensionPublicationCandidate } from './scripts/infra/cloudflare-driver.mjs'; const plan = JSON.parse(await readFile('.ctxroute-extension-publication-plan.json', 'utf8')); assertExtensionPublicationPlan(plan, await readExtensionPublicationCandidate(), process.env.CLOUDFLARE_ACCOUNT_ID); process.stdout.write(plan.digest);")"
           npm run --silent infra:apply -- \
             --provider cloudflare \
@@ -177,7 +181,7 @@ jobs:
             --approve "$EXTENSION_PLAN_DIGEST" \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
             --allow r2:tobirink-public-releases/downloads/tobirink-chrome-mv3-"$EXTENSION_VERSION".zip \
-            --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-"$EXTENSION_VERSION".zip
+            --allow r2:tobirink-public-releases/downloads/tobirink-firefox-mv3-"$EXTENSION_VERSION".xpi
           node --input-type=module -e "import { readExtensionPublicationCandidate, verifyExtensionPublication } from './scripts/infra/cloudflare-driver.mjs'; console.log(JSON.stringify(await verifyExtensionPublication(await readExtensionPublicationCandidate())));"
 
       - name: Remove temporary deployment plan

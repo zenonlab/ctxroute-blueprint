@@ -38,6 +38,31 @@ async function recoveryFixture(count: number, fetcher: (input: string, init: Req
 
 describe('finite provider recovery with the real HTTP adapter', () => {
   afterEach(() => vi.useRealTimers());
+  it('lets an admitted POST finish after twenty seconds without starting another item past the wake budget', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-28T00:00:00.000Z');
+    const fetcher = vi.fn(async () => {
+      await new Promise(resolve => setTimeout(resolve, 20_000));
+      return Response.json({ state: 'PENDING', retryAt: '2026-09-28T00:01:00.000Z' });
+    });
+    const fixture = await recoveryFixture(2, fetcher);
+    const running = fixture.restart().run(true);
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await running).toBe(1);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect((await readFavoriteProviderRecoveryCursor(fixture.checkpointStorage))?.pendingSourceId).toBeUndefined();
+  });
+  it('still times out an admission at forty-five seconds and retains its interrupted cursor', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-28T00:00:00.000Z');
+    const fetcher = vi.fn(async () => new Promise<Response>(() => {}));
+    const fixture = await recoveryFixture(2, fetcher);
+    const running = fixture.restart().run(true);
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+    await vi.advanceTimersByTimeAsync(45_000);
+    expect(await running).toBe(0);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect((await readFavoriteProviderRecoveryCursor(fixture.checkpointStorage))?.pendingSourceId).toBeDefined();
+  });
   it('bounds a wake to ten submissions, coalesces callers and resumes after restart without repeats', async () => {
     vi.useFakeTimers(); vi.setSystemTime('2026-09-23T12:00:00.000Z');
     const fetcher = vi.fn(async () => { vi.setSystemTime(Date.now() + 1_100); return Response.json({ state: 'PENDING', retryAt: new Date(Date.now() + 60_000).toISOString() }); });

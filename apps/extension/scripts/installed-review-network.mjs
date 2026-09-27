@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
+import { awaitObserverReady, awaitRecoveryCompletion, reserveRecoveryPost, validateSourceScope } from '../../../scripts/infra/discovery-recovery-batch.mjs';
+import { startCostObserver } from '../../../scripts/infra/manga-canary.mjs';
 
 const publicOrigin = 'https://tobirink.com';
 const providerOrigins = new Set([
@@ -43,7 +46,7 @@ const receiptSchema = z.strictObject({
   keyDigest: z.string().regex(/^[a-f0-9]{64}$/u),
   kind: z.enum(['request', 'refresh']),
   schemaVersion: z.literal(1),
-  sequence: z.number().int().positive().max(2),
+  sequence: z.number().int().positive().max(10),
 });
 const capturedSubmissionSchema = requestSchema;
 const readSlotSchema = z.strictObject({ schemaVersion: z.literal(1), sequence: z.number().int().positive().max(5000) });
@@ -51,7 +54,7 @@ const failureCodeSchema = z.enum([
   'agenda-read-rejected', 'discovery-read-rejected', 'duplicate-mutation-key',
   'failure-seal-failed', 'foreign-origin-rejected', 'handler-failed',
   'invalid-network-url', 'mutation-budget-exceeded', 'mutation-network-failed',
-  'mutation-payload-rejected', 'mutation-receipt-failed', 'mutation-status-rejected',
+  'mutation-payload-rejected', 'mutation-receipt-failed', 'mutation-status-rejected', 'mutation-scope-rejected', 'correlation-failed',
   'provider-origin-rejected', 'provider-websocket-rejected', 'read-budget-exceeded',
   'read-network-failed', 'read-receipt-failed', 'read-status-rejected',
   'refresh-budget-exceeded', 'unexpected-tobirink-route', 'websocket-rejected',
@@ -326,6 +329,12 @@ class InstalledReviewNetworkGuard {
       return;
     }
     const digest = digestKey(submission.key);
+    const scopedEntry = this.options.sourceScope?.entries.find(entry => digestKey(entry.key) === digest);
+    if (this.options.sourceScope !== undefined && (kind !== 'request' || scopedEntry === undefined
+      || scopedEntry.requestDigest !== createHash('sha256').update(JSON.stringify(submission)).digest('hex'))) {
+      await this.abort(route, 'mutation-scope-rejected');
+      return;
+    }
     const reservation = await this.exclusively(async () => {
       if (this.failure !== undefined) return 'guard-failed';
       const currentMutations = this.counts.forwardedRequests + this.counts.forwardedRefreshes;
@@ -336,7 +345,10 @@ class InstalledReviewNetworkGuard {
       const sequence = this.previousReceipts.length + currentMutations + 1;
       const receipt = { keyDigest: digest, kind, schemaVersion: 1, sequence };
       const path = join(this.options.receiptRoot, `${this.options.token}.network-${String(sequence).padStart(3, '0')}.json`);
-      try { await writeFile(path, JSON.stringify(receipt) + '\n', { flag: 'wx', mode: 0o600 }); }
+      try {
+        if (scopedEntry !== undefined) await reserveRecoveryPost(scopedEntry, this.options.recoveryReceiptDirectory);
+        await writeFile(path, JSON.stringify(receipt) + '\n', { flag: 'wx', mode: 0o600 });
+      }
       catch { return 'mutation-receipt-failed'; }
       this.seen.add(digest);
       this.counts.receipts += 1;
@@ -353,7 +365,8 @@ class InstalledReviewNetworkGuard {
       return;
     }
     try {
-      const response = await route.fetch({ maxRedirects: 0, maxRetries: 0, timeout: 15_000 });
+      const response = await route.fetch({ maxRedirects: 0, maxRetries: 0, timeout: 45_000 });
+      if (scopedEntry !== undefined && okMutation.has(response.status())) await this.options.onAdmission?.(submission, response);
       await this.acceptResponse(route, response, okMutation, 'mutation-status-rejected');
     } catch { await this.abort(route, 'mutation-network-failed'); }
   }
@@ -459,6 +472,10 @@ class InstalledReviewNetworkGuard {
 }
 
 export async function createInstalledReviewNetworkGuard(options) {
+  const sourceScope = options.sourceScope === undefined ? undefined : validateSourceScope(options.sourceScope).scope;
+  assert.ok(Number.isInteger(options.mutationBudget) && options.mutationBudget >= 0
+    && options.mutationBudget <= (sourceScope === undefined ? 2 : sourceScope.entries.length), 'Mutation budget requires a matching source scope above two requests.');
+  assert.ok(sourceScope === undefined || options.online && options.refreshBudget === 0, 'Scoped recovery forbids refreshes and requires online mode.');
   const [receipts, slots, capturedSubmissions, sealedFailure] = await Promise.all([
     readReceipts(options.receiptRoot, options.token),
     readSlots(options.receiptRoot, options.token),
@@ -468,10 +485,62 @@ export async function createInstalledReviewNetworkGuard(options) {
   assert.ok(receipts.length <= options.mutationBudget, 'Existing mutation receipts exceed the configured budget.');
   assert.ok(receipts.filter(({ kind }) => kind === 'refresh').length <= options.refreshBudget, 'Existing refresh receipts exceed the configured budget.');
   assert.ok(slots.length <= options.readBudget, 'Existing read slots exceed the configured budget.');
-  return new InstalledReviewNetworkGuard(options, receipts, slots, capturedSubmissions, sealedFailure);
+  return new InstalledReviewNetworkGuard({ ...options, sourceScope }, receipts, slots, capturedSubmissions, sealedFailure);
 }
 
 export async function installInstalledReviewNetworkRoutes(context, guard) {
   await context.route('**/*', guard.handle);
   await context.routeWebSocket('**/*', guard.handleWebSocket);
+}
+
+export async function createInstalledRecoveryObservation({ onFailure, recordAdmission, start = startCostObserver, ready = awaitObserverReady, complete = awaitRecoveryCompletion }) {
+  const observer = start({ allowProviderContinuation: true });
+  const controller = new AbortController();
+  const tasks = [];
+  const admissions = [];
+  let failure;
+  const fail = error => {
+    failure ??= error;
+    controller.abort();
+    void onFailure();
+  };
+  void observer.failed.catch(fail);
+  const readinessTimer = setTimeout(() => controller.abort(), 30_000);
+  try { await ready(observer, controller.signal); }
+  catch (error) { await observer.close(); throw error; }
+  finally { clearTimeout(readinessTimer); }
+  return {
+    async onAdmission(submission, response) {
+      assert.equal(failure, undefined, 'Recovery observer failed.');
+      const requestId = response.headers()['x-tobirink-request-id'];
+      assert.match(requestId ?? '', /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+      assert.ok(!admissions.includes(requestId), 'Admission correlation must be unique.');
+      const body = await response.text();
+      assert.ok(Buffer.byteLength(body) <= 1024 * 1024, 'Admission response exceeds its byte limit.');
+      const payload = JSON.parse(body);
+      assert.ok(['PENDING', 'VERIFIED'].includes(payload.state), 'Invalid recovery admission state.');
+      await recordAdmission?.({ key: submission.key, requestId,
+        requestDigest: createHash('sha256').update(JSON.stringify(submission)).digest('hex') });
+      observer.track(requestId, { provider: 'any', status: 202, task: 'discovery' });
+      admissions.push(requestId);
+      const signal = globalThis.AbortSignal.any([controller.signal, globalThis.AbortSignal.timeout(12 * 60_000)]);
+      const sharedObserver = { check: () => observer.check(), read: id => observer.read(id), close: async () => undefined };
+      tasks.push(complete({ observer: sharedObserver, key: submission.key, admission: { payload, requestId }, signal }).catch(fail));
+    },
+    async finish(expected) {
+      await Promise.all(tasks);
+      await observer.close();
+      observer.check();
+      assert.equal(failure, undefined, 'Recovery correlation failed.');
+      assert.equal(admissions.length, expected, 'Every scoped admission requires correlated evidence.');
+      return admissions.map(requestId => {
+        const cost = observer.read(requestId);
+        assert.ok(cost && cost.providerRequests >= 1 && cost.acceptedResults >= 1 && cost.provider429s === 0
+          && cost.providerHttpErrors === 0 && cost.providerNetworkErrors === 0 && cost.queueFailures === 0
+          && cost.d1RowsRead <= 300, 'Recovery correlated cost policy failed.');
+        return { providerRequests: cost.providerRequests, d1RowsRead: cost.d1RowsRead, d1RowsWritten: cost.d1RowsWritten };
+      });
+    },
+    async close() { controller.abort(); await observer.close(); await Promise.all(tasks); },
+  };
 }

@@ -6,6 +6,44 @@ import { createPrivateExport, importPrivateExport, validatePrivateExport } from 
 const empty = { agenda: [], favoriteSources: [], libraries: [], progress: [], reminders: [], reviews: [], works: [] };
 
 describe('private recovery', () => {
+  it.each([1, 2, 3, 4, 5])('preserves public discovery identity and dates in export version %s', async (version) => {
+    const publicDiscovery = {
+      fingerprint: 'a'.repeat(64), mediaKind: 'ANIME' as const,
+      parserVersion: 'parser-v1', siteRulesVersion: 'rules-v1',
+      verifiedAt: '2026-09-01T00:00:00.000Z', nextRefreshAt: '2026-09-08T00:00:00.000Z',
+    };
+    const work = createWork({
+      id: workId('work_public_export'), mediaKind: 'anime', preferredTitle: 'Synthetic title',
+      externalReferences: [{ provider: 'anilist', externalId: '1' }],
+      hydration: {
+        candidate: { provider: 'anilist', externalId: '1', mediaKind: 'ANIME', preSerialization: false, titles: ['Synthetic title'] },
+        favoriteAliasKeys: [], providerTitleKeys: ['synthetic title'], matcherVersion: 'matcher-v1',
+        hydratedAt: '2026-09-01T00:00:00.000Z', publicDiscovery,
+      },
+    });
+    const snapshot = { ...empty, works: [work] };
+    const exported = await createPrivateExport(new MemoryRecoveryStore(snapshot), '2026-09-04T10:00:00.000Z');
+    const { favoriteSources, ...legacy } = exported;
+    const payload = version === 1 ? { ...legacy, version } : { ...legacy, favoriteSources, version };
+    const restored = new MemoryRecoveryStore(empty);
+    await importPrivateExport(JSON.stringify(payload), restored, 'replace-private-state');
+    expect(await restored.readSnapshot()).toEqual(snapshot);
+    expect(await createPrivateExport(restored, exported.exportedAt)).toEqual(exported);
+    for (const invalid of [
+      { ...publicDiscovery, fingerprint: 'invalid' },
+      { ...publicDiscovery, mediaKind: 'INVALID' },
+      { ...publicDiscovery, parserVersion: '' },
+      { ...publicDiscovery, verifiedAt: 'invalid' },
+      { ...publicDiscovery, nextRefreshAt: publicDiscovery.verifiedAt },
+      { ...publicDiscovery, unexpected: true },
+    ]) {
+      const corrupted = { ...payload, works: [{ ...work, hydration: { ...work.hydration, publicDiscovery: invalid } }] };
+      await expect(importPrivateExport(JSON.stringify(corrupted), restored, 'replace-private-state')).rejects.toThrow();
+      expect(restored.replaceCount).toBe(1);
+      expect(await restored.readSnapshot()).toEqual(snapshot);
+    }
+  });
+
   it('round-trips all 32 provider metadata values and title indexes', async () => {
     const titles = Array.from({ length: 32 }, (_, index) => `Title ${index}`);
     const candidate = {

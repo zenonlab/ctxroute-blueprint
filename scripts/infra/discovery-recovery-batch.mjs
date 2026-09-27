@@ -27,9 +27,10 @@ const identifierSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/u)
 const titleSchema = z.string().trim().min(1).max(200);
 const publicDiscoveryProviderSchema = z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']);
 const mangaRecoveryProviders = Object.freeze(['kitsu-manga', 'mangadex', 'mangaupdates']);
+const knownMediaSchema = z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA']);
 const providerReadinessSchema = z.strictObject({
   availability: z.enum(['DEFERRED', 'READY']),
-  provider: z.enum(['kitsu-manga', 'mangadex', 'mangaupdates']),
+  provider: publicDiscoveryProviderSchema,
 });
 const publicDiscoveryKeyV3Schema = z.strictObject({
   fingerprint: fingerprintSchema,
@@ -105,7 +106,7 @@ const rowSchema = z.strictObject({
   failedAt: z.string().datetime({ offset: false }),
   failureReason: z.literal('ATTEMPT_LIMIT'),
   fingerprint: z.string().regex(sha256Pattern),
-  mediaKind: z.enum(['MANGA', 'MANHWA']),
+  mediaKind: knownMediaSchema,
   parserVersion: z.string().min(1).max(128),
   queueSignalState: z.string().min(1).max(32),
   requestDigest: z.string().regex(sha256Pattern),
@@ -113,24 +114,24 @@ const rowSchema = z.strictObject({
   siteRulesVersion: z.string().min(1).max(128),
   state: z.literal('FAILED'),
 });
-const journalAttemptSchema = z.strictObject({ index: z.number().int().min(1).max(batchLimit), media: z.enum(['MANGA', 'MANHWA']),
+const journalAttemptSchema = z.strictObject({ index: z.number().int().min(1).max(batchLimit), media: knownMediaSchema,
   state: z.enum(['POST_STARTED', 'TERMINAL']), terminal: z.enum(['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS']).optional() });
 const sourceScopeEntrySchema = z.strictObject({
-  key: publicDiscoveryKeyV3Schema.extend({ mediaKind: z.enum(['MANGA', 'MANHWA']) }),
+  key: publicDiscoveryKeyV3Schema.extend({ mediaKind: knownMediaSchema }),
   requestDigest: fingerprintSchema,
 });
 const sourceScopeSchema = z.strictObject({
   corpusDigest: fingerprintSchema,
-  entries: z.array(sourceScopeEntrySchema).length(batchLimit),
+  entries: z.array(sourceScopeEntrySchema).min(1).max(batchLimit),
   schemaVersion: z.literal(1),
-  sourceCount: z.number().int().min(batchLimit).max(100_000),
-});
+  sourceCount: z.number().int().min(1).max(100_000),
+}).refine(scope => scope.sourceCount >= scope.entries.length);
 const journalSchema = z.strictObject({
   attempts: z.array(journalAttemptSchema).max(batchLimit),
   batchId: z.string().regex(batchIdPattern),
   batchSeal: z.string().regex(sha256Pattern),
   candidates: z.array(z.strictObject({ fingerprint: fingerprintSchema, identitySeal: fingerprintSchema,
-    mediaKind: z.enum(['MANGA', 'MANHWA']) })).length(batchLimit),
+    mediaKind: knownMediaSchema })).min(1).max(batchLimit),
   schemaVersion: z.literal(3),
   scopeSeal: fingerprintSchema,
 });
@@ -160,17 +161,13 @@ function sameKey(left, right) {
 export function validateSourceScope(input) {
   const parsed = sourceScopeSchema.safeParse(input);
   if (!parsed.success) throw recoveryError('scope-invalid');
-  if (new Set(parsed.data.entries.map(entry => entry.key.fingerprint)).size !== batchLimit) {
+  if (new Set(parsed.data.entries.map(entry => JSON.stringify(entry.key))).size !== parsed.data.entries.length) {
     throw recoveryError('scope-duplicate');
   }
   return { scope: parsed.data, scopeSeal: digest(JSON.stringify(parsed.data)) };
 }
 
-const scopedQuery = `WITH requested(position, fingerprint, media_kind, parser_version, rules_version, request_digest) AS (VALUES
-  (0, ?, ?, ?, ?, ?), (1, ?, ?, ?, ?, ?), (2, ?, ?, ?, ?, ?), (3, ?, ?, ?, ?, ?), (4, ?, ?, ?, ?, ?),
-  (5, ?, ?, ?, ?, ?), (6, ?, ?, ?, ?, ?), (7, ?, ?, ?, ?, ?), (8, ?, ?, ?, ?, ?), (9, ?, ?, ?, ?, ?)
-)
-SELECT
+const scopedSelection = `SELECT
   request.fingerprint,
   request.media_kind AS mediaKind,
   request.parser_version AS parserVersion,
@@ -196,7 +193,9 @@ LIMIT 10`;
 
 export function buildScopedQuery(scopeInput, completedCount = 0) {
   const { scope } = validateSourceScope(scopeInput);
-  if (!Number.isInteger(completedCount) || completedCount < 0 || completedCount >= batchLimit) throw recoveryError('scope-offset');
+  if (!Number.isInteger(completedCount) || completedCount < 0 || completedCount >= scope.entries.length) throw recoveryError('scope-offset');
+  const values = scope.entries.map((_entry, index) => `(${index}, ?, ?, ?, ?, ?)`);
+  const scopedQuery = `WITH requested(position, fingerprint, media_kind, parser_version, rules_version, request_digest) AS (VALUES ${values.join(',')})\n${scopedSelection}`;
   const parameters = scope.entries.flatMap(({ key, requestDigest }) =>
     [key.fingerprint, key.mediaKind, key.parserVersion, key.siteRulesVersion, requestDigest]);
   return { parameters: [...parameters, completedCount], plan: 'EXPLAIN QUERY PLAN ' + scopedQuery, sql: scopedQuery };
@@ -225,10 +224,10 @@ export function validateCandidateRow(input) {
 }
 
 export function validateBatch(rows, expectedSeal) {
-  if (!Array.isArray(rows) || rows.length !== batchLimit) throw recoveryError('batch-size');
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > batchLimit) throw recoveryError('batch-size');
   const candidates = rows.map(validateCandidateRow);
   const keys = candidates.map(candidate => JSON.stringify(candidate.submission.key));
-  if (new Set(keys).size !== batchLimit) throw recoveryError('duplicate-key');
+  if (new Set(keys).size !== candidates.length) throw recoveryError('duplicate-key');
   const batchSeal = digest(candidates.map(candidate => candidate.identitySeal).join('\n'));
   if (expectedSeal !== undefined && batchSeal !== expectedSeal) throw recoveryError('batch-seal');
   return Object.freeze({ batchSeal, candidates });
@@ -236,6 +235,7 @@ export function validateBatch(rows, expectedSeal) {
 
 export function validateScopedBatch(rows, scopeInput) {
   const { scope, scopeSeal } = validateSourceScope(scopeInput);
+  if (rows.length !== scope.entries.length) throw recoveryError('scope-mismatch');
   const batch = validateBatch(rows);
   const ordered = scope.entries.map(entry => batch.candidates.find(candidate =>
     sameKey(candidate.submission.key, entry.key) && candidate.requestDigest === entry.requestDigest));
@@ -244,13 +244,23 @@ export function validateScopedBatch(rows, scopeInput) {
 }
 
 export function assertMangaProvidersRegistered(rows) {
-  if (!Array.isArray(rows) || rows.length !== mangaRecoveryProviders.length) throw recoveryError('provider-readiness-invalid');
+  return assertRecoveryProvidersRegistered(rows, ['MANGA']);
+}
+
+function recoveryProviders(mediaKinds) {
+  const known = z.array(knownMediaSchema).min(1).max(batchLimit).parse(mediaKinds);
+  return [...new Set(known.flatMap(media => media === 'ANIME' ? ['anilist', 'kitsu-anime'] : mangaRecoveryProviders))].sort();
+}
+
+export function assertRecoveryProvidersRegistered(rows, mediaKinds) {
+  const required = recoveryProviders(mediaKinds);
+  if (!Array.isArray(rows) || rows.length !== required.length) throw recoveryError('provider-readiness-invalid');
   const providers = rows.map(row => {
     const parsed = providerReadinessSchema.safeParse(row);
     if (!parsed.success) throw recoveryError('provider-readiness-invalid');
     return parsed.data;
   });
-  if (providers.map(provider => provider.provider).join('\n') !== mangaRecoveryProviders.join('\n')) {
+  if (providers.map(provider => provider.provider).join('\n') !== required.join('\n')) {
     throw recoveryError('provider-readiness-invalid');
   }
   return Object.freeze(providers);
@@ -295,23 +305,25 @@ function queryScopedRows(scope, completedCount = 0) {
   });
   let position = 0;
   const proof = queryRows(query.sql.replace(/\?/gu, () => values[position++]));
-  if (proof.rowsRead < 0 || proof.rowsRead > batchLimit - completedCount) throw recoveryError('scope-read-budget');
+  if (proof.rowsRead < 0 || proof.rowsRead > scope.entries.length - completedCount) throw recoveryError('scope-read-budget');
   return proof;
 }
 
 function queryCandidates(scope) {
   const proof = queryScopedRows(scope);
   const batch = validateScopedBatch(proof.rows, scope);
-  const providerProof = queryRows(mangaProviderReadinessQuery);
-  const providers = assertMangaProvidersRegistered(providerProof.rows);
+  const mediaKinds = batch.candidates.map(candidate => candidate.mediaKind);
+  const providerProof = queryRows(providerReadinessQuery(mediaKinds));
+  const providers = assertRecoveryProvidersRegistered(providerProof.rows, mediaKinds);
   return { ...batch, providers, rowsRead: proof.rowsRead + providerProof.rowsRead, rowsWritten: proof.rowsWritten + providerProof.rowsWritten };
 }
 
-function queryMangaProvidersRegistered() {
-  return assertMangaProvidersRegistered(queryRows(mangaProviderReadinessQuery).rows);
+function providerReadinessQuery(mediaKinds) {
+  return mangaProviderReadinessQuery.replace("'kitsu-manga', 'mangadex', 'mangaupdates'",
+    recoveryProviders(mediaKinds).map(provider => `'${provider}'`).join(', '));
 }
 
-async function loadSourceScope(path) {
+export async function loadSourceScope(path) {
   const handle = await open(path, 'r').catch(() => { throw recoveryError('scope-missing'); });
   try {
     const metadata = await handle.stat();
@@ -340,7 +352,8 @@ function validateJournalScope(journalInput, scopeInput) {
   if (!parsed.success) throw recoveryError('journal-invalid');
   const journal = parsed.data;
   const { scope, scopeSeal } = validateSourceScope(scopeInput);
-  if (journal.scopeSeal !== scopeSeal || journal.candidates.some((entry, index) => entry.fingerprint !== scope.entries[index].key.fingerprint
+  if (journal.candidates.length !== scope.entries.length || journal.attempts.length > journal.candidates.length
+    || journal.scopeSeal !== scopeSeal || journal.candidates.some((entry, index) => entry.fingerprint !== scope.entries[index].key.fingerprint
     || entry.mediaKind !== scope.entries[index].key.mediaKind)
     || journal.batchSeal !== digest(journal.candidates.map(entry => entry.identitySeal).join('\n'))) throw recoveryError('scope-mismatch');
   if (journal.attempts.some((attempt, index) => attempt.index !== index + 1 || attempt.state !== 'TERMINAL'
@@ -354,13 +367,13 @@ export function selectRemainingCandidates(rows, journalInput, scopeInput) {
   const journal = validateJournalScope(journalInput, scopeInput);
   const { scope } = validateSourceScope(scopeInput);
   const remainingEntries = journal.candidates.slice(journal.attempts.length);
-  const candidatesByFingerprint = new Map(rows.map(row => {
+  const candidatesByKey = new Map(rows.map(row => {
     const candidate = validateCandidateRow(row);
-    return [candidate.fingerprint, candidate];
+    return [JSON.stringify(candidate.submission.key), candidate];
   }));
   const preparedCandidates = remainingEntries.map((entry, index) => {
-    const candidate = candidatesByFingerprint.get(entry.fingerprint);
     const source = scope.entries[journal.attempts.length + index];
+    const candidate = candidatesByKey.get(JSON.stringify(source.key));
     return candidate?.identitySeal === entry.identitySeal && candidate.mediaKind === entry.mediaKind
       && sameKey(candidate.submission.key, source.key) && candidate.requestDigest === source.requestDigest ? candidate : undefined;
   });
@@ -410,7 +423,7 @@ async function lookup(key, signal) {
   return { requestId: response.requestId, state: parseLookup(response.payload, key) };
 }
 
-async function awaitObserverReady(observer, signal) {
+export async function awaitObserverReady(observer, signal) {
   const key = { fingerprint: digest(`discovery-recovery-observer:${randomUUID()}`), mediaKind: 'MANGA',
     parserVersion: 'discovery-recovery-observer-v1', siteRulesVersion: 'recovery-v1' };
   const requestIds = [];
@@ -490,6 +503,7 @@ async function persistJournal(journal) {
 export async function reserveRecoveryPost(entryInput, directory = receiptDirectory) {
   const parsed = sourceScopeEntrySchema.safeParse(entryInput);
   if (!parsed.success) throw recoveryError('scope-invalid');
+  await mkdir(directory, { recursive: true, mode: 0o700 });
   const path = new URL(`discovery-recovery-post-${digest(JSON.stringify(parsed.data.key))}.json`, directory);
   const handle = await open(path, 'wx', 0o600).catch(() => { throw recoveryError('post-reservation-failed'); });
   try {
@@ -510,7 +524,7 @@ async function executeCandidate(candidate, index, journal) {
       await awaitObserverReady(observer, controller.signal);
       const initial = await lookup(candidate.submission.key, controller.signal);
       if (initial.state.state !== 'UNAVAILABLE') throw recoveryError(`candidate-${initial.state.state.toLowerCase()}`);
-      queryMangaProvidersRegistered();
+      assertRecoveryProvidersRegistered(queryRows(providerReadinessQuery([candidate.mediaKind])).rows, [candidate.mediaKind]);
       await reserveRecoveryPost({ key: candidate.submission.key, requestDigest: candidate.requestDigest });
       journal.attempts.push({ index, media: candidate.mediaKind, state: 'POST_STARTED' });
       await persistJournal(journal);
@@ -551,7 +565,7 @@ async function prepareBatch(batchId, scope) {
 
 async function executeBatch(batchId, scope) {
   const journal = validateJournalScope(await loadJournal(batchId), scope);
-  const rows = journal.attempts.length === batchLimit ? [] : queryScopedRows(scope, journal.attempts.length).rows;
+  const rows = journal.attempts.length === journal.candidates.length ? [] : queryScopedRows(scope, journal.attempts.length).rows;
   const candidates = selectRemainingCandidates(rows, journal, scope);
   const results = [];
   for (const candidate of candidates) {

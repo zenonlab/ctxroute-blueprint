@@ -167,16 +167,20 @@ export function createPublicReleaseApp(injected?: ReleaseServices): Hono<WorkerR
 
   app.get('/downloads/:artifact', async (context) => {
     const artifact = context.req.param('artifact');
-    if (!/^tobirink-(?:chrome|firefox)-mv3-\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?\.zip$/u.test(artifact)) {
+    const zip = /^tobirink-(?:chrome|firefox)-mv3-\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?\.zip$/u.test(artifact);
+    const xpi = /^tobirink-firefox-mv3-\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?\.xpi$/u.test(artifact);
+    if (!zip && !xpi) {
       return noStoreJson(context, 'invalid-release-artifact', 400);
     }
     const object = await routeServices(context, injected).releases.readArtifact(`downloads/${artifact}`);
     if (!object) return noStoreJson(context, 'release-artifact-unavailable', 503);
+    const contentType = xpi ? 'application/x-xpinstall' : 'application/zip';
+    if (object.contentType !== contentType) return noStoreJson(context, 'release-artifact-invalid', 503);
     return new Response(object.body, {
       headers: {
         'Cache-Control': 'public, max-age=31536000, immutable',
         'Content-Disposition': `attachment; filename="${artifact}"`,
-        'Content-Type': object.contentType,
+        'Content-Type': contentType,
         ETag: object.etag,
         'X-Content-Type-Options': 'nosniff',
       },

@@ -16,7 +16,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-02
-- Revised: 2026-09-08
+- Revised: 2026-09-28
 
 ## Contexte
 
@@ -58,6 +58,11 @@ v10 ajoute deux index multi-entry privés aux fiches Work hydratées : aliases
 validés par type/saison et titres fournisseurs. L'export v4 conserve cette
 hydratation, son âge et ses aliases privés. Une lecture du cache ne repousse
 pas son expiration. Les lignes historiques et leurs liens Review sont conservés.
+L'export courant v5 conserve aussi `hydration.publicDiscovery` : clé publique
+complète, date de vérification et échéance de rafraîchissement, sans remise à
+zéro de leur âge. Le champ reste optionnel pour les exports v1 à v5. Sa
+validation stricte et les invariants du domaine précèdent tout remplacement
+atomique; une identité ou une échéance invalide conserve tout l'état privé.
 IndexedDB v11 ajoute un singleton de scan/restauration des IDs. Ce checkpoint
 disparaît avec un reset explicite de la base, tandis que la publication sync
 en attente et sa cadence survivent dans local. Aucun favori ni élément de
