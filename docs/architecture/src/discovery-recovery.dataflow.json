@@ -21,7 +21,7 @@
     { "id": "approval", "type": "security", "label": "Confirmation ciblée", "sublabel": "lot · seuils · arrêt", "stage": 1, "row": 2, "tag": "avant écriture" },
     { "id": "rearm", "type": "backend", "label": "Runner serveur v3", "sublabel": "dry-run · payload v3", "stage": 2, "row": 2, "tag": "un POST · arrêt 429/503" },
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "PENDING · PROCESSING", "stage": 2, "row": 0, "tag": "cache public" },
-    { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "Queue 1/1 · claim(1)" },
+    { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "claim(1) · vide acquitté" },
     { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "recherche manga rapide", "stage": 3, "row": 2, "tag": "preuve exacte · échec fermé" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · candidat lié", "stage": 4, "row": 1, "width": 150, "tag": "pas de preuve Library" }
   ],
@@ -36,7 +36,7 @@
     { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "terminal ou continuation durable confirmée", "variant": "emphasis", "labelDx": 100 }
   ],
   "cards": [
-    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Huit échecs consommés : FAILED après expiration du bail", "Cadence ou 429 seuls : report sans essai", "Famille manga commune, saison et format vérifiés", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
+    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Huit échecs consommés : FAILED après expiration du bail", "Cadence ou 429 seuls : report sans essai", "Continuation spécifique conservée; signal générique vide acquitté", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
     { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST puis VERIFIED terminal", "Chaque appel fournisseur corrélé, zéro 429/Queue", "Coût D1 cumulé direct + continuations ≤ 300"] }
   ]
 }

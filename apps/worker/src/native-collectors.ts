@@ -286,7 +286,7 @@ export function agendaCollectionFailureCode(failures: readonly string[]): string
   return 'agenda-provider-unavailable';
 }
 
-export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings, key?: PublicDiscoveryKeyV3, scheduleContinuation = true, correlationId?: string, continuationToken?: string): Promise<DiscoveryProcessingReport> {
+export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings, key?: PublicDiscoveryKeyV3, scheduleContinuation = true, correlationId?: string, continuationToken?: string, continueGlobalWhenEmpty = false): Promise<DiscoveryProcessingReport> {
   const d1 = instrumentD1(bindings.PUBLIC_DB);
   const queue = instrumentQueueSend(bindings.PUBLIC_DISCOVERY_QUEUE);
   const providers = instrumentProviderFetch(providerFetch(bindings));
@@ -296,6 +296,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   let activeToken = '';
   let activeTokenDigest = '';
   let claimedCount = 0;
+  const continuationTokenDigest = continuationToken === undefined ? undefined : await digest(continuationToken);
   const resolver = createBudgetedDiscoveryResolver(createPublicDiscoveryProviders(
     providers.fetch,
     new D1ProviderRuntimeControl(d1.database),
@@ -307,7 +308,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
         activeTokenDigest = await digest(activeToken);
         const now = new Date();
         const claimInput: Parameters<typeof port.claimBatch>[0] = { claimToken: activeToken, leaseUntil: new Date(now.valueOf() + 15 * 60_000).toISOString(), limit, now: now.toISOString(), tokenDigest: activeTokenDigest };
-        if (continuationToken !== undefined) claimInput.continuationTokenDigest = await digest(continuationToken);
+        if (continuationTokenDigest !== undefined) claimInput.continuationTokenDigest = continuationTokenDigest;
         if (key) claimInput.key = key;
         const claimed = await port.claimBatch(claimInput);
         claimedCount = claimed.requests.length;
@@ -333,16 +334,20 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       },
     },
   });
-  const specificPendingAt = claimedCount > 0 ? await port.nextPendingAt(activeTokenDigest) : undefined;
-  const nextPendingAt = specificPendingAt ?? await port.nextPendingAt();
+  const specificToken = claimedCount > 0 ? activeToken : continuationToken;
+  const specificTokenDigest = claimedCount > 0 ? activeTokenDigest : continuationTokenDigest;
+  const specificPendingAt = specificTokenDigest === undefined ? undefined : await port.nextPendingAt(specificTokenDigest);
+  const nextPendingAt = claimedCount > 0
+    ? specificPendingAt ?? await port.nextPendingAt()
+    : specificPendingAt ?? (continueGlobalWhenEmpty ? await port.nextPendingAt() : undefined);
   let continuationScheduled = false;
   if (scheduleContinuation && nextPendingAt !== undefined) {
     const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(nextPendingAt) - Date.now()) / 1_000)));
-    const signal: NativeCollectorSignal = specificPendingAt === undefined
+    const signal: NativeCollectorSignal = specificPendingAt === undefined || specificToken === undefined
       ? { type: 'public-discovery-ready', version: 1 }
       : correlationId === undefined
-        ? { continuationToken: activeToken, type: 'public-discovery-ready', version: 1 }
-        : { continuationToken: activeToken, correlationId, type: 'public-discovery-ready', version: 1 };
+        ? { continuationToken: specificToken, type: 'public-discovery-ready', version: 1 }
+        : { continuationToken: specificToken, correlationId, type: 'public-discovery-ready', version: 1 };
     try {
       await queue.send(signal, { contentType: 'json', delaySeconds });
       continuationScheduled = true;

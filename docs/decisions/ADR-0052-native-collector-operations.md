@@ -69,6 +69,14 @@ dans une même invocation. La borne de 50 appels du traitement Discovery
 inclut ses publications, reports et continuation; elle ne certifie pas à elle
 seule le coût interne d'un traitement Agenda.
 
+Une continuation Discovery spécifique livrée avant son échéance conserve son
+jeton et se reprogramme uniquement pour la même demande. Un signal générique
+qui ne réclame aucune ligne est acquitté sans produire un nouveau signal
+générique. Seul le réveil quotidien peut programmer la prochaine échéance
+globale après un claim vide; il reste la réparation bornée d'un signal perdu.
+Cette règle empêche un lot de doublons, impossible à coalescer avec
+`batch_size=1`, de maintenir artificiellement un backlog constant.
+
 ## Conséquences
 
 Une panne AniList ou MangaUpdates devient identifiable sans exposer de donnée

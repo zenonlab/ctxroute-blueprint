@@ -505,7 +505,7 @@ describe('public discovery queue trigger', () => {
       expect(queue.send).toHaveBeenCalledOnce();
     } finally { provider.mockRestore(); }
   }, 15_000);
-  it('acks an empty claimed batch when continuation delivery fails', async () => {
+  it('reschedules an early specific continuation and drains an empty generic signal', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const now = new Date().toISOString();
     await adapter.request({ ...submission('3', 'Synthetic leased work'), requestDigest: 'a'.repeat(64) }, now);
@@ -516,12 +516,14 @@ describe('public discovery queue trigger', () => {
     const bindings = { ...env, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_GATEWAY_HMAC_KEY: 'x'.repeat(32) };
     expect(await processPublicDiscoveryQueue(bindings, undefined, true, undefined, continuationToken)).toMatchObject({ claimed: 0, continuationScheduled: true });
     expect(queue.send).toHaveBeenCalledOnce();
+    expect(queue.send.mock.calls[0]?.[0]).toMatchObject({ continuationToken });
     expect(queue.send.mock.calls[0]?.[1]?.delaySeconds).toBeGreaterThan(0);
     expect(queue.send.mock.calls[0]?.[1]?.delaySeconds).toBeLessThanOrEqual(900);
-    queue.send.mockRejectedValueOnce(new Error('local-queue-failure'));
+    queue.send.mockClear();
     const item = { body: { type: 'public-discovery-ready', version: 1 }, attempts: 1, ack: vi.fn(), retry: vi.fn() };
     await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery: () => processPublicDiscoveryQueue(bindings) });
     expect(item.ack).toHaveBeenCalledOnce(); expect(item.retry).not.toHaveBeenCalled();
+    expect(queue.send).not.toHaveBeenCalled();
   });
   it('measures warm local admission and D1 read separately', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
