@@ -26,6 +26,11 @@ const fingerprintSchema = z.string().regex(/^[a-f0-9]{64}$/u);
 const identifierSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/u);
 const titleSchema = z.string().trim().min(1).max(200);
 const publicDiscoveryProviderSchema = z.enum(['anilist', 'mangaupdates', 'mangadex', 'kitsu-anime', 'kitsu-manga']);
+const mangaRecoveryProviders = Object.freeze(['kitsu-manga', 'mangadex', 'mangaupdates']);
+const providerReadinessSchema = z.strictObject({
+  availability: z.enum(['DEFERRED', 'READY']),
+  provider: z.enum(['kitsu-manga', 'mangadex', 'mangaupdates']),
+});
 const publicDiscoveryKeyV3Schema = z.strictObject({
   fingerprint: fingerprintSchema,
   mediaKind: z.enum(['ANIME', 'MANGA', 'MANHWA', 'MANHUA', 'UNKNOWN']),
@@ -138,6 +143,15 @@ WHERE state = 'FAILED'
   AND media_kind IN ('MANGA', 'MANHWA')
 ORDER BY failed_at ASC, fingerprint ASC
 LIMIT 10`;
+const mangaProviderReadinessQuery = `SELECT
+  provider,
+  CASE
+    WHEN MAX(next_allowed_at, active_until, circuit_open_until) > (unixepoch() * 1000) THEN 'DEFERRED'
+    ELSE 'READY'
+  END AS availability
+FROM public_discovery_provider_runtime
+WHERE provider IN ('kitsu-manga', 'mangadex', 'mangaupdates')
+ORDER BY provider ASC`;
 function recoveryError(code) {
   return new Error(`discovery-recovery-${code}`);
 }
@@ -183,6 +197,20 @@ export function validateBatch(rows, expectedSeal) {
   return Object.freeze({ batchSeal, candidates });
 }
 
+export function assertMangaProvidersReady(rows) {
+  if (!Array.isArray(rows) || rows.length !== mangaRecoveryProviders.length) throw recoveryError('provider-readiness-invalid');
+  const providers = rows.map(row => {
+    const parsed = providerReadinessSchema.safeParse(row);
+    if (!parsed.success) throw recoveryError('provider-readiness-invalid');
+    return parsed.data;
+  });
+  if (providers.map(provider => provider.provider).join('\n') !== mangaRecoveryProviders.join('\n')) {
+    throw recoveryError('provider-readiness-invalid');
+  }
+  if (providers.some(provider => provider.availability !== 'READY')) throw recoveryError('provider-deferred');
+  return Object.freeze(providers);
+}
+
 function receiptPath(batchId) {
   if (!batchIdPattern.test(batchId)) throw recoveryError('batch-id');
   return new URL(`discovery-recovery-batch-${batchId}.json`, receiptDirectory);
@@ -215,7 +243,14 @@ function queryRows(command) {
 
 function queryCandidates() {
   const proof = queryRows(query);
-  return { ...validateBatch(proof.rows), rowsRead: proof.rowsRead, rowsWritten: proof.rowsWritten };
+  const batch = validateBatch(proof.rows);
+  const providerProof = queryRows(mangaProviderReadinessQuery);
+  const providers = assertMangaProvidersReady(providerProof.rows);
+  return { ...batch, providers, rowsRead: proof.rowsRead + providerProof.rowsRead, rowsWritten: proof.rowsWritten + providerProof.rowsWritten };
+}
+
+function queryMangaProvidersReady() {
+  return assertMangaProvidersReady(queryRows(mangaProviderReadinessQuery).rows);
 }
 
 function queryPreparedRows(fingerprints) {
@@ -367,6 +402,7 @@ async function executeCandidate(candidate, index, journal) {
       await awaitObserverReady(observer, controller.signal);
       const initial = await lookup(candidate.submission.key, controller.signal);
       if (initial.state.state !== 'UNAVAILABLE') throw recoveryError(`candidate-${initial.state.state.toLowerCase()}`);
+      queryMangaProvidersReady();
       journal.attempts.push({ index, media: candidate.mediaKind, state: 'POST_STARTED' });
       await persistJournal(journal);
       const admission = await postRequest(candidate.submission, controller.signal);
@@ -403,7 +439,7 @@ async function prepareBatch(batchId) {
     media: journal.candidates.reduce((counts, candidate) => {
       counts[candidate.mediaKind] = (counts[candidate.mediaKind] ?? 0) + 1;
       return counts;
-    }, {}), rowsRead: batch.rowsRead, rowsWritten: batch.rowsWritten, schemaVersion: 1, type: 'discovery-recovery.prepared' };
+    }, {}), providers: batch.providers, rowsRead: batch.rowsRead, rowsWritten: batch.rowsWritten, schemaVersion: 1, type: 'discovery-recovery.prepared' };
 }
 
 async function executeBatch(batchId) {
@@ -437,7 +473,7 @@ async function main() {
     return { batchSeal: proof.batchSeal, candidates: proof.candidates.length, media: proof.candidates.reduce((counts, candidate) => {
       counts[candidate.mediaKind] = (counts[candidate.mediaKind] ?? 0) + 1;
       return counts;
-    }, {}), rowsRead: proof.rowsRead, rowsWritten: proof.rowsWritten, schemaVersion: 1, type: 'discovery-recovery.preflight' };
+    }, {}), providers: proof.providers, rowsRead: proof.rowsRead, rowsWritten: proof.rowsWritten, schemaVersion: 1, type: 'discovery-recovery.preflight' };
   }
   return mode === '--prepare' ? prepareBatch(batchId) : executeBatch(batchId);
 }
