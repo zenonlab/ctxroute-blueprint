@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { safeFailureCode, validateBatch, validateCandidateRow } from './discovery-recovery-batch.mjs';
+import { safeFailureCode, selectRemainingCandidates, validateBatch, validateCandidateRow } from './discovery-recovery-batch.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
 
@@ -49,4 +49,16 @@ test('rejects unknown media, digest drift, duplicate keys and changed seals', ()
 test('redacts unexpected failures', () => {
   assert.equal(safeFailureCode(new Error('secret title and URL')), 'discovery-recovery-failed');
   assert.equal(safeFailureCode(new Error('discovery-recovery-http-429')), 'discovery-recovery-http-429');
+});
+
+test('resume selects only sealed unattempted rows and refuses an unfinished POST', () => {
+  const rows = Array.from({ length: 10 }, (_value, index) => row(index));
+  const candidates = rows.map(validateCandidateRow);
+  const identitySeals = candidates.map(candidate => candidate.identitySeal);
+  const journal = { attempts: identitySeals.slice(0, 4).map((_seal, index) => ({ index: index + 1,
+    media: candidates[index].mediaKind, state: 'TERMINAL', terminal: 'VERIFIED' })),
+  batchSeal: '511b6d16818fcff7a7c06c0ee22564e956181038a5fac73dfc9e36a7e1c5eca1', identitySeals, schemaVersion: 1 };
+  assert.deepEqual(selectRemainingCandidates(rows.slice(4), journal).map(candidate => candidate.identitySeal), identitySeals.slice(4));
+  journal.attempts[3] = { index: 4, media: candidates[3].mediaKind, state: 'POST_STARTED' };
+  assert.throws(() => selectRemainingCandidates(rows.slice(4), journal), /receipt-incomplete/u);
 });

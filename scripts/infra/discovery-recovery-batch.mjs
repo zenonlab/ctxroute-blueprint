@@ -1,7 +1,7 @@
 /* global AbortSignal, fetch */
 import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { mkdir, open, rename, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
@@ -83,6 +83,26 @@ WHERE state = 'FAILED'
   AND media_kind IN ('MANGA', 'MANHWA')
 ORDER BY failed_at ASC, fingerprint ASC
 LIMIT 10`;
+const resumeQuery = `SELECT
+  fingerprint,
+  media_kind AS mediaKind,
+  parser_version AS parserVersion,
+  rules_version AS siteRulesVersion,
+  request_digest AS requestDigest,
+  request_json AS requestJson,
+  state,
+  failure_reason AS failureReason,
+  failed_at AS failedAt,
+  attempt_count AS attemptCount,
+  queue_signal_state AS queueSignalState
+FROM public_discovery_requests_v3
+WHERE state = 'FAILED'
+  AND failure_reason = 'ATTEMPT_LIMIT'
+  AND attempt_count = 8
+  AND media_kind IN ('MANGA', 'MANHWA')
+  AND failed_at >= '2026-09-15T21:15:02.979Z'
+  AND failed_at <= '2026-09-18T23:09:57.072Z'
+ORDER BY failed_at ASC, fingerprint ASC`;
 
 function recoveryError(code) {
   return new Error(`discovery-recovery-${code}`);
@@ -152,6 +172,51 @@ function queryCandidates() {
     || result.meta?.rows_written !== 0 || result.meta?.changed_db === true || !Number.isSafeInteger(result.meta?.rows_read)
     || !Array.isArray(result.results)) throw recoveryError('d1-proof-failed');
   return { ...validateBatch(result.results), rowsRead: result.meta.rows_read, rowsWritten: 0 };
+}
+
+function queryRemainingRows() {
+  const child = spawnSync('npm', ['exec', '--no', '--', 'wrangler', 'd1', 'execute', 'PUBLIC_DB', '--remote',
+    '--config', 'apps/worker/wrangler.jsonc', '--json', '--command', resumeQuery], {
+    cwd: new URL('../../', import.meta.url), encoding: 'utf8', env: sanitizedEnvironment(), maxBuffer: maxResponseBytes,
+    timeout: 45_000,
+  });
+  if (child.error || child.status !== 0 || child.signal != null) throw recoveryError('d1-query-failed');
+  let output;
+  try { output = JSON.parse(child.stdout); } catch { throw recoveryError('d1-query-invalid'); }
+  const result = output?.[0];
+  if (!Array.isArray(output) || output.length !== 1 || result?.success !== true || result.meta?.changes !== 0
+    || result.meta?.rows_written !== 0 || result.meta?.changed_db === true || !Number.isSafeInteger(result.meta?.rows_read)
+    || !Array.isArray(result.results)) throw recoveryError('d1-proof-failed');
+  return result.results;
+}
+
+async function loadJournal() {
+  let serialized;
+  try { serialized = await readFile(receiptPath, 'utf8'); } catch { throw recoveryError('receipt-missing'); }
+  if (Buffer.byteLength(serialized) > 8192) throw recoveryError('journal-invalid');
+  let value;
+  try { value = JSON.parse(serialized); } catch { throw recoveryError('journal-invalid'); }
+  const parsed = journalSchema.safeParse(value);
+  if (!parsed.success) throw recoveryError('journal-invalid');
+  return parsed.data;
+}
+
+export function selectRemainingCandidates(rows, journalInput) {
+  const parsed = journalSchema.safeParse(journalInput);
+  if (!parsed.success) throw recoveryError('journal-invalid');
+  const journal = parsed.data;
+  if (journal.attempts.some((attempt, index) => attempt.index !== index + 1 || attempt.state !== 'TERMINAL')) {
+    throw recoveryError('receipt-incomplete');
+  }
+  const candidatesBySeal = new Map(rows.map(row => {
+    const candidate = validateCandidateRow(row);
+    return [candidate.identitySeal, candidate];
+  }));
+  const remaining = journal.identitySeals.slice(journal.attempts.length).map(identitySeal => candidatesBySeal.get(identitySeal));
+  if (remaining.some(candidate => candidate === undefined) || new Set(remaining).size !== remaining.length) {
+    throw recoveryError('remaining-candidates-changed');
+  }
+  return remaining;
 }
 
 function postInit(body, signal, timeoutMs) {
@@ -301,6 +366,21 @@ async function executeBatch() {
     type: 'discovery-recovery.complete' };
 }
 
+async function resumeBatch() {
+  const journal = await loadJournal();
+  const candidates = selectRemainingCandidates(queryRemainingRows(), journal);
+  const results = [];
+  for (const candidate of candidates) {
+    const result = await executeCandidate(candidate, journal.attempts.length + 1, journal);
+    results.push(result);
+    process.stdout.write(`${JSON.stringify({ schemaVersion: 1, type: 'discovery-recovery.progress', ...result })}\n`);
+  }
+  const terminals = journal.attempts.filter(attempt => attempt.state === 'TERMINAL');
+  return { batchSeal: journal.batchSeal, completed: terminals.length, schemaVersion: 1,
+    terminals: Object.fromEntries(['VERIFIED', 'NOT_FOUND', 'AMBIGUOUS'].map(state => [state,
+      terminals.filter(attempt => attempt.terminal === state).length])), type: 'discovery-recovery.complete' };
+}
+
 export function safeFailureCode(error) {
   const parsed = z.string().safeParse(error?.message);
   return parsed.success && /^(?:discovery-recovery|discovery-canary-observer)-[a-z0-9-]+$/u.test(parsed.data)
@@ -309,7 +389,7 @@ export function safeFailureCode(error) {
 
 async function main() {
   const [mode] = process.argv.slice(2);
-  if (process.argv.length !== 3 || !['--execute', '--preflight'].includes(mode)) throw recoveryError('invalid-arguments');
+  if (process.argv.length !== 3 || !['--execute', '--preflight', '--resume'].includes(mode)) throw recoveryError('invalid-arguments');
   if (mode === '--preflight') {
     const proof = queryCandidates();
     return { batchSeal: proof.batchSeal, candidates: proof.candidates.length, media: proof.candidates.reduce((counts, candidate) => {
@@ -317,7 +397,7 @@ async function main() {
       return counts;
     }, {}), rowsRead: proof.rowsRead, rowsWritten: proof.rowsWritten, schemaVersion: 1, type: 'discovery-recovery.preflight' };
   }
-  return executeBatch();
+  return mode === '--execute' ? executeBatch() : resumeBatch();
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
