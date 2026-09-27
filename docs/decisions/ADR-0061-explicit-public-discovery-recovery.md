@@ -50,7 +50,7 @@ La lecture de statut et les reprises automatiques ne réarment jamais `FAILED` :
 
 Un réveil Worker séparé, borné à cinq claims et déclenché quotidiennement à 03:37 UTC, traite les demandes D1 échues lorsqu’un signal Queue a été perdu ; le cron Agenda hebdomadaire est inchangé. Aucun SQL manuel ni endpoint caché n’est ajouté. Le run canari et la reprise historique restent soumis au flux de production protégé et à une confirmation immédiate avant mutation distante.
 
-En mode `worker-direct`, le client accorde jusqu’à 45 secondes au POST d’admission, comme le canari protégé. Le Worker réserve 42 secondes à une résolution et le resolver 38 secondes à ses recherches, ce qui couvre quatre titres manga cadencés sur les trois lanes sans dépasser le délai HTTP. Les lectures conservent leur délai de 15 secondes. Une interruption ne déclenche jamais un second POST automatique : la reprise lit d’abord l’état D1 exact.
+En mode `worker-direct`, le client accorde jusqu’à 45 secondes au POST d’admission, comme le canari protégé. Le Worker réserve 100 secondes à une résolution Queue et le resolver 90 secondes à ses recherches. Cette borne couvre quatre titres manga cadencés sur les trois lanes, y compris les intervalles réels des fournisseurs, tout en restant finie. Les lectures conservent leur délai de 15 secondes. Une interruption ne déclenche jamais un second POST automatique : la reprise lit d’abord l’état D1 exact.
 
 Le runner de reprise porte une projection stricte des champs v3 qu’il accepte
 à sa frontière HTTP et dans le reçu D1. Il ne charge pas le `dist` TypeScript :

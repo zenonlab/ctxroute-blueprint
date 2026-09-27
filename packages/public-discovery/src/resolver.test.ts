@@ -307,29 +307,29 @@ describe('standalone provider resolver', () => {
     });
   });
 
-  it('does not issue later pages or fallback calls after the shared thirty-eight-second search budget', async () => {
+  it('does not issue later pages or fallback calls after the shared ninety-second search budget', async () => {
     vi.useFakeTimers();
     try {
       const ports = providers();
       ports.anilist.search.mockImplementation(async () => {
-        await new Promise((resolve) => { setTimeout(resolve, 25_000); });
+        await new Promise((resolve) => { setTimeout(resolve, 95_000); });
         return { candidates: [], complete: false, digest: 'late', nextCursor: '2', provider: 'anilist', truncated: true };
       });
       const outcome = expect(createPublicDiscoveryResolver(ports).resolve(request('ANIME'))).rejects.toThrow('incomplete-provider-search:deadline');
-      await vi.advanceTimersByTimeAsync(38_000);
+      await vi.advanceTimersByTimeAsync(90_000);
       await outcome;
       expect(ports['kitsu-anime'].search).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(5_000);
-      expect(ports.anilist.search).toHaveBeenCalledTimes(2);
+      expect(ports.anilist.search).toHaveBeenCalledOnce();
     } finally { vi.useRealTimers(); }
   });
 
-  it('allows four paced manga titles across all three lanes before the search deadline', async () => {
+  it('allows four slowly paced manga titles across all three lanes before the search deadline', async () => {
     vi.useFakeTimers();
     try {
       const ports = providers();
       const pacedSearch = async (provider: 'mangadex' | 'mangaupdates' | 'kitsu-manga') => {
-        await new Promise((resolve) => { setTimeout(resolve, 3_000); });
+        await new Promise((resolve) => { setTimeout(resolve, 7_000); });
         return { candidates: [], complete: true, digest: `paced-${provider}`, provider, truncated: false };
       };
       ports.mangadex.search.mockImplementation(() => pacedSearch('mangadex'));
@@ -338,7 +338,7 @@ describe('standalone provider resolver', () => {
       const outcome = expect(createPublicDiscoveryResolver(ports).resolve({ ...request('MANGA'), query: {
         discoveryTitles: ['One', 'Two', 'Three', 'Four'], mediaKind: 'MANGA', sourceTitles: ['One', 'Two', 'Three', 'Four'],
       } })).resolves.toEqual({ reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' });
-      await vi.advanceTimersByTimeAsync(37_000);
+      await vi.advanceTimersByTimeAsync(89_000);
       await outcome;
       expect(ports.mangadex.search).toHaveBeenCalledTimes(4);
       expect(ports['kitsu-manga'].search).toHaveBeenCalledTimes(4);

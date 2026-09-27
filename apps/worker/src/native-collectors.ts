@@ -103,7 +103,7 @@ class PublicDiscoveryProcessingError extends Error {
 
 type NativeCollectorDisposition = 'ack-invalid' | 'ack-success' | 'ack-forwarded' | 'retry' | 'retry-to-dlq';
 const nativeCollectorMaxRetryRequests = 8;
-const publicDiscoveryResolutionTimeoutMilliseconds = 42_000;
+const publicDiscoveryResolutionTimeoutMilliseconds = 100_000;
 
 class PublicDiscoveryInvocationBudgetError extends Error {
   constructor() { super('public-discovery-invocation-budget'); this.name = 'PublicDiscoveryInvocationBudgetError'; }
