@@ -1,5 +1,30 @@
 # Extension packaging and rollback
 
+## Publication 1.0.45 — canaris et profil réel — 27 septembre 2026
+
+Le run protégé `36295558091`, sur le SHA main
+`07723a1a0025f1bf63066330bbf4188fd2c45f5c`, a validé Playwright, la suite
+complète, le plan mono-Worker et les probes publiques. Les canaris frais anime
+et manga terminent chacun avec un appel fournisseur et un résultat accepté,
+sans 429, erreur réseau, échec Queue ni retry. Ils consomment respectivement
+183 et 195 lectures D1, soit 378 lectures et 34 écritures pour la paire.
+
+Les archives immuables ont été publiées puis relues en HTTP 200. Chrome contient
+20 fichiers, pèse 318507 octets et possède le SHA-256
+`c044bf1bfbb5af3c9ef79e7d8c41c2320f212fa75f37b925d17434ca7f29df1c`.
+Firefox contient 20 fichiers, pèse 318548 octets et possède le SHA-256
+`1de6845307a73a08c3f1d670364619f3a2787076c3831504f18d430e216cc949`.
+Les archives 1.0.44 restent inchangées pour le rollback.
+
+Un profil Chromium temporaire copié depuis l'export réel de 1 522 favoris a
+été mis à niveau de 1.0.44 vers 1.0.45. L'identité de l'extension, les données
+privées et les 1 522 sources restent présentes après redémarrage du service
+worker puis du navigateur. Le dernier état mesuré comprend 940 résolus,
+45 Review, 491 retryables et 46 unsupported, avec zéro traitement actif. La
+Library projette 1 290 entrées, dont 754 œuvres avec métadonnées connues, sans
+œuvre projetée manquante. Cette preuve valide la conservation et la reprise;
+elle ne prétend pas que les 1 522 favoris sont tous résolus.
+
 ## Publication 1.0.44 — garde du profil installé — 26 septembre 2026
 
 Les archives 1.0.44 produites et reproduites isolément par la CI protégée
