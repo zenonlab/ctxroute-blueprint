@@ -106,6 +106,12 @@ test('extension publication is an optional two-object phase after successful can
   const sealedStep = workflow.slice(sealed).split('\n      - name:')[0];
   assert.match(sealedStep, /inputs\.publish_extension == true/u);
   assert.match(sealedStep, /await readExtensionPublicationCandidate\(\)/u);
+  assert.match(sealedStep, /GH_TOKEN: \$\{\{ github\.token \}\}/u);
+  assert.match(sealedStep, /gh release download "\$TOBIRINK_CERTIFIED_RELEASE_TAG" --repo "\$GITHUB_REPOSITORY"/u);
+  assert.match(sealedStep, /--pattern 'publication-manifest\.json'/u);
+  assert.match(sealedStep, /--pattern "tobirink-firefox-mv3-\$EXTENSION_VERSION\.xpi"/u);
+  assert.match(sealedStep, /--json isDraft/u);
+  assert.doesNotMatch(sealedStep, /--clobber|gh release create|gh release upload|web-ext sign/u);
   const publication = workflow.split('- name: Publish and verify immutable extension archives')[1]?.split('- name:')[0];
   assert.ok(publication);
   assert.ok(workflow.indexOf('- name: Run fresh bounded anime and manga canaries') < workflow.indexOf('- name: Publish and verify immutable extension archives'));

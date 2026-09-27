@@ -47,12 +47,27 @@ obligatoire avant toute certification et création du manifeste final.
 Le driver ne charge ces fichiers qu'en prévisualisation/application d'une
 publication, jamais pour un déploiement Worker ordinaire. Le workflow de
 publication vérifie leur présence avant tout effet de production et utilise
-le XPI sans recompression. Le transfert des fichiers certifiés vers ce workflow
-reste à configurer; aucun compte, secret ni permission Actions n'est ajouté
-implicitement. En leur absence, la publication échoue fermée, sans canari.
+le XPI sans recompression. Le paramètre `certified_release_tag` désigne une
+release GitHub encore brouillon du même dépôt, préparée après certification.
+Le workflow y lit uniquement le XPI nommé pour cette version et
+`publication-manifest.json`, avec son jeton existant `contents: read`, sans
+écrasement. La création du brouillon et l'envoi des fichiers ne sont pas
+automatisés implicitement. Le SHA du Chrome reconstruit doit égaler celui du
+fichier certifié; le payload Firefox doit égaler son build reproductible.
+Aucun compte, secret ni permission Actions n'est ajouté. Sans ces fichiers,
+la publication échoue fermée, sans canari.
+Le transport restera à prouver avec le véritable brouillon signé; les tests
+locaux n'attestent pas l'accès distant à des assets qui n'existent pas encore.
 La signature Mozilla, les reprises confirmées, les parcours durables
 Chrome/Firefox et leur publication restent à accomplir.
 Les preuves historiques et anciennes archives ne sont pas remplacées.
+
+Le premier prévol CI de la PR candidate échoue sur l'attente initiale des
+Options : la capture montre encore « Lecture de l'état local… » après cinq
+secondes. Le test attend désormais la même borne de soixante secondes que
+l'inventaire, sans accepter un état incomplet ni ajouter de retry au produit.
+Le run d'échec `36358211431` reste conservé; seul un nouveau run vert pourra
+certifier la candidate.
 
 Vérifications locales de la candidate : suites des workspaces, 137 tests infra,
 42 tests du banc installé, migrations navigateur et aller-retour privé de

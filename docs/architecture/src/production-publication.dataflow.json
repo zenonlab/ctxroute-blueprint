@@ -10,7 +10,7 @@
         "id": "publication",
         "label": "Publication bornée",
         "focus": ["staticExport", "releasePackages", "githubDelivery", "approvalGate", "releaseBucket", "publicWorker"],
-        "note": "Worker indépendant de Mozilla; publication fermée sans manifeste final, ZIP Chrome et XPI Firefox scellés."
+        "note": "Brouillon GitHub lu sans nouveau droit : XPI et manifeste scellés. Worker indépendant de Mozilla; absence = refus avant canaris."
       },
       {
         "id": "verification",
@@ -29,7 +29,7 @@
   ],
   "nodes": [
     { "id": "staticExport", "type": "frontend", "label": "Export Workbench", "sublabel": "version publiée explicite", "stage": 0, "row": 0, "tag": "Next statique" },
-    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "Chrome + Firefox", "stage": 0, "row": 2, "tag": "SHA-256 vérifiés" },
+    { "id": "releasePackages", "type": "backend", "label": "Archives extension", "sublabel": "build + signature", "stage": 0, "row": 2, "tag": "SHA-256 vérifiés" },
     { "id": "githubDelivery", "type": "security", "label": "Livraison GitHub", "sublabel": "main · canaris avant ZIP", "stage": 1, "row": 0, "tag": "plans distincts" },
     { "id": "approvalGate", "type": "security", "label": "Autorisation exacte", "sublabel": "digest + cibles", "stage": 1, "row": 1, "tag": "fail closed" },
     { "id": "releaseBucket", "type": "database", "label": "Releases publiques", "sublabel": "ZIP + XPI scellés", "stage": 2, "row": 2, "tag": "GET authentifié + SHA-256" },

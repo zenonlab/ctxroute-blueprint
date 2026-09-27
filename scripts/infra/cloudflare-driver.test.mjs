@@ -23,9 +23,10 @@ const releaseVersion = JSON.parse(readFileSync(resolve(extensionRoot, 'package.j
 test('extension publication is disabled for pushes and requires manual main plus canaries', () => {
   assert.equal(assertExtensionPublicationContext({ GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/heads/main' }), false);
   assert.equal(assertExtensionPublicationContext({ TOBIRINK_PUBLISH_EXTENSION: 'false' }), false);
-  const enabled = { TOBIRINK_PUBLISH_EXTENSION: 'true', TOBIRINK_RUN_MANGA_CANARY: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main' };
+  const enabled = { TOBIRINK_PUBLISH_EXTENSION: 'true', TOBIRINK_RUN_MANGA_CANARY: 'true', TOBIRINK_CERTIFIED_RELEASE_TAG: 'certified-1.0.46', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main' };
   assert.equal(assertExtensionPublicationContext(enabled), true);
-  for (const patch of [{ GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/other' }, { TOBIRINK_RUN_MANGA_CANARY: 'false' }, { TOBIRINK_RUN_MANGA_CANARY: undefined }]) {
+  for (const patch of [{ GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/other' }, { TOBIRINK_RUN_MANGA_CANARY: 'false' }, { TOBIRINK_RUN_MANGA_CANARY: undefined },
+    { TOBIRINK_CERTIFIED_RELEASE_TAG: '' }, { TOBIRINK_CERTIFIED_RELEASE_TAG: undefined }, { TOBIRINK_CERTIFIED_RELEASE_TAG: '--other-option' }, { TOBIRINK_CERTIFIED_RELEASE_TAG: 'unsafe/tag' }]) {
     assert.throws(() => assertExtensionPublicationContext({ ...enabled, ...patch }), /extension-publication-preconditions/u);
   }
 });

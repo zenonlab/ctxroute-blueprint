@@ -18,6 +18,7 @@ export function assertExtensionPublicationContext(environment = process.env) {
   if (environment.TOBIRINK_PUBLISH_EXTENSION !== 'true'
     || environment.GITHUB_EVENT_NAME !== 'workflow_dispatch'
     || environment.GITHUB_REF !== 'refs/heads/main'
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(environment.TOBIRINK_CERTIFIED_RELEASE_TAG ?? '')
     || environment.TOBIRINK_RUN_MANGA_CANARY !== 'true') throw new Error('extension-publication-preconditions');
   return true;
 }

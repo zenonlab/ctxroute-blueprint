@@ -112,7 +112,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
 
     const optionsPage = await context.newPage();
     await optionsPage.goto(`chrome-extension://${extensionId}/options.html`);
-    await expect(optionsPage.getByText('Favoris observés')).toBeVisible();
+    await expect(optionsPage.getByText('Favoris observés')).toBeVisible({ timeout: 60_000 });
     const reconcileAction = optionsPage.getByRole('button', { name: /^(Commencer l’analyse|Reprendre maintenant|Vérifier à nouveau)$/u });
     await reconcileAction.click();
     await expect(reconcileAction).toBeEnabled({ timeout: 60_000 });
