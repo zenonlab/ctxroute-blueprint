@@ -366,7 +366,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       console.warn('public-discovery-continuation-unsent');
     }
   }
-  const result = report.replayed > 0 && report.published === 0 ? 'deduplicated' : report.published > 0 ? 'changed' : (report.deferred ?? 0) > 0 ? 'backoff' : 'unchanged';
+  const result = report.replayed > 0 && report.published === 0 ? 'deduplicated' : report.published > 0 ? 'changed' : (report.deferred ?? 0) > 0 || specificPendingAt !== undefined ? 'backoff' : 'unchanged';
   return { ...report, continuationScheduled, metrics: { ...collectorCost(d1.snapshot(), providers.snapshot(), report.published, result), ...queue.snapshot() } };
   } catch (error) {
     throw new PublicDiscoveryProcessingError(error instanceof Error ? error : undefined, { ...collectorCost(d1.snapshot(), providers.snapshot(), acceptedResults, 'failed'), ...queue.snapshot() });

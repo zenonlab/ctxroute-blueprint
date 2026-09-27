@@ -390,3 +390,9 @@
 ## Stabiliser la garde de plan Cloudflare sans relâcher ses bornes — DONE
 
 - [x] **Exclure la version Worker volatile du sceau** — DONE _(evidence: CI 36336224384 a confirmé le seul oubli d’attente; aucune étape Cloudflare n’a commencé., Suite infra complète 117/117 passe après mise à jour de cloudflare-queue-driver., Les contrôles initiaux restent verts : décisions, documentation, Archify architecture et git diff --check.)_
+
+## Réparer la continuation manga et certifier la reprise — ACTIVE
+
+- [x] **Reproduire et corriger la continuation corrélée** — DONE _(evidence: Régression rouge puis verte : manga exact, différé 120s, réveil anticipé sans essai, continuation corrélée, un appel MangaUpdates et VERIFIED; claim(1) par invocation., Worker 197/197, infra 120/120, tous types, ADR65, docs, Archify architecture sans diagnostic et diff-check passent; ESLint canari et Oxlint ciblé passent., Audit : aucune migration, règle FAILED, Queue1/1, archive, hook ou consigne modifiés. verify/lint global bloqué par six erreurs préexistantes de deux audits ignorés build/audits; validation propre prévue pour livraison.)_
+- [ ] **Livrer par PR et CI protégée** — IN_PROGRESS _(evidence: Diff relu; message prévu fix(discovery): qualify correlated pre-provider continuations; livraison protégée sans extension.)_
+- [ ] **Certifier une paire neuve et mesurer** — PENDING

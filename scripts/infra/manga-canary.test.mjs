@@ -304,6 +304,31 @@ test('pre-provider cadence backoff waits for the correlated provider continuatio
   assert.equal(proof.d1RowsRead, 135);
 });
 
+test('pre-provider backoff requires its own correlation and exactly one continuation', () => {
+  for (const changes of [{ correlationId: undefined }, { queueSends: 0 }, { queueSends: 2 }, { result: 'unchanged' }]) {
+    const requestId = identity(1);
+    const observation = createCostObservation();
+    observation.track(requestId, expectation);
+    assert.throws(() => observation.push(frame(envelope(requestId, [
+      cost({ acceptedResults: 0, correlationId: requestId, provider: 'none', providerRequests: 0,
+        providerTransportDurationMs: 0, queueSends: 1, result: 'backoff', ...changes }), admissionCost(),
+    ]))), /provider-mismatch/u);
+  }
+});
+
+test('repeated correlated pre-provider wakes stay uncertified and enforce the cumulative D1 budget', () => {
+  const requestId = identity(1);
+  const observation = createCostObservation();
+  observation.track(requestId, expectation);
+  const backoff = cost({ acceptedResults: 0, correlationId: requestId, provider: 'none', providerRequests: 0,
+    providerTransportDurationMs: 0, queueSends: 1, result: 'backoff', d1RowsRead: 100 });
+  observation.push(frame(envelope(requestId, [backoff, admissionCost()])));
+  observation.push(frame(queueEnvelope(requestId, [backoff])));
+  assert.equal(observation.read(requestId), undefined);
+  assert.equal(observation.snapshot().observedEvents, 0);
+  assert.throws(() => observation.push(frame(queueEnvelope(requestId, [backoff]))), /d1-budget/u);
+});
+
 test('recovery mode waits through a provider continuation while release canaries stay strict', () => {
   const requestId = identity(1);
   const intermediate = envelope(requestId, [
@@ -570,6 +595,20 @@ test('delayed exact envelopes prove readiness and each fixture even after the re
   assert.equal(results.length, 2);
   assert.equal(context.admissions(), 2);
   assert.ok(waits >= 6);
+});
+
+test('VERIFIED without a final correlated provider cost fails after the bounded continuation wait', async () => {
+  let waits = 0;
+  const context = harness({ receive: ({ call, value, emit }) => {
+    if (!call.url.endsWith('/requests')) return emit(value);
+    emit(envelope(call.requestId, [cost({ correlationId: call.requestId, acceptedResults: 0, provider: 'none',
+      providerRequests: 0, providerTransportDurationMs: 0, queueSends: 1, result: 'backoff' }), admissionCost()]));
+  }, observationWait: () => { waits += 1; } });
+  await assert.rejects(runObservedDiscoveryCanaries(context.options), /missing-correlated-cost/u);
+  assert.equal(waits, 13);
+  assert.equal(context.admissions(), 1);
+  assert.equal(context.reports.at(-1).state, 'INCOMPLETE');
+  assert.equal(context.reports.at(-1).providerRequests, 0);
 });
 
 test('unrelated lookup cannot establish readiness or launch an admission', async () => {
