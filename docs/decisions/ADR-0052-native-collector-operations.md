@@ -77,7 +77,9 @@ globale après un claim vide; il reste la réparation bornée d'un signal perdu.
 Une publication terminale issue d'une admission ciblée est acquittée sans
 lecture de la prochaine échéance globale et sans signal supplémentaire; son
 coût ne croît donc pas avec les demandes historiques restantes. Le signal
-générique conserve son drainage global borné.
+générique conserve son drainage global borné. Avant un claim ciblé, les baux
+épuisés sont terminés uniquement pour la clé demandée, y compris son refresh;
+le balayage borné des expirations globales reste réservé au drainage générique.
 Cette règle empêche un lot de doublons, impossible à coalescer avec
 `batch_size=1`, de maintenir artificiellement un backlog constant.
 
