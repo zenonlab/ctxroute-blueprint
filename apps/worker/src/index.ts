@@ -9,9 +9,9 @@ import { enqueueAgendaRefresh, handleNativeCollectorQueue, processAgendaQueue, p
 
 const app = new Hono<WorkerRuntime>();
 const publicSiteRoutes = new Set(['/', '/library', '/agenda', '/privacy', '/download']);
-// Queue delivery performs normal continuation. This is only a bounded daily
-// repair for rows whose Queue signal was lost, so it must never become a poll.
-export const publicDiscoveryRecoveryCron = '37 3 * * *';
+// Queue delivery performs normal continuation. This is only a bounded repair
+// for rows whose Queue signal was lost: one claim at most every ten minutes.
+export const publicDiscoveryRecoveryCron = '*/10 * * * *';
 
 export function isPublicSiteRoute(pathname: string): boolean {
   return publicSiteRoutes.has(pathname) || (pathname.startsWith('/library/') && pathname.split('/').filter(Boolean).length === 2);

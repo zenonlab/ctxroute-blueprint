@@ -40,7 +40,7 @@ describe('operational metrics', () => {
     await expect(store.pendingSignal()).resolves.toBe('2026-09-20T03:23:00.000Z');
   });
 
-  it('uses the daily bounded Discovery wake without changing the weekly Agenda cron', async () => {
+  it('uses the ten-minute bounded Discovery wake without changing the weekly Agenda cron', async () => {
     vi.useFakeTimers();
     vi.setSystemTime('2026-09-22T12:00:00.000Z');
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
@@ -53,6 +53,9 @@ describe('operational metrics', () => {
     expect(send).toHaveBeenCalledOnce();
     expect(send).toHaveBeenCalledWith({ type: 'public-discovery-ready', version: 1 }, expect.objectContaining({ contentType: 'json' }));
     expect(send.mock.calls[0]?.[1]?.delaySeconds).toBeGreaterThan(0);
+    await worker.scheduled({ scheduledTime: Date.parse(now), cron: '23 3 * * SUN', noRetry: vi.fn() }, { ...env, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: Object.assign(Object.create(null), { send }) });
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[1]?.[0]).toMatchObject({ type: 'agenda-refresh', version: 1 });
   });
 
   it('retains R2 attempt metrics when collection fails before its first claim', async () => {
