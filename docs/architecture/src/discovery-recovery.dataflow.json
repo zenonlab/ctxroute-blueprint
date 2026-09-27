@@ -37,6 +37,6 @@
   ],
   "cards": [
     { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Huit échecs consommés : FAILED après expiration du bail", "Cadence ou 429 seuls : report sans essai", "UNKNOWN doit être reparsé avant toute admission", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
-    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Chaque appel fournisseur corrélé, zéro 429/Queue", "Coût D1 cumulé direct + continuations ≤ 300"] }
+    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Continuations fournisseur corrélées au même POST", "Zéro 429/Queue et coût D1 cumulé ≤ 300"] }
   ]
 }
