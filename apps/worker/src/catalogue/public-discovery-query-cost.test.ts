@@ -67,6 +67,12 @@ describe('public discovery indexed query cost', () => {
 
   it('does not scan global pending work after an exact terminal publication', async () => {
     const key = { fingerprint: 'e'.repeat(64), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
+    const unrelatedFingerprint = 'a'.repeat(64);
+    await env.PUBLIC_DB.prepare(`INSERT INTO public_discovery_requests_v3(
+      fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
+      state, claim_token_hash, lease_until, attempt_count, retry_at, created_at, updated_at)
+      VALUES (?1, 'ANIME', '5', '3', ?2, '{}', 'PROCESSING', ?3, ?4, 8, ?4, ?4, ?4)`)
+      .bind(unrelatedFingerprint, 'a'.repeat(64), 'b'.repeat(64), expired).run();
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     await adapter.request({
       key,
@@ -94,7 +100,12 @@ describe('public discovery indexed query cost', () => {
       expect(report).toMatchObject({ claimed: 1, continuationScheduled: false, failed: 0, published: 1 });
       expect(report.metrics?.rowsRead).toBeLessThanOrEqual(300);
       expect(queue.send).not.toHaveBeenCalled();
-    } finally { provider.mockRestore(); }
+      expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+        .bind(unrelatedFingerprint).first()).toEqual({ state: 'PROCESSING' });
+    } finally {
+      provider.mockRestore();
+      await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(unrelatedFingerprint).run();
+    }
   });
 
   it('uses the named four-key identity index for grouped lookups', async () => {

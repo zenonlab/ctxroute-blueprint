@@ -203,6 +203,16 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       RETURNING fingerprint`).bind(...keyValues(key), now, futureIso(now, failedRetentionMilliseconds)).first();
   }
 
+  private async failExhaustedRefreshKey(key: PublicDiscoveryKeyV3, now: string): Promise<void> {
+    await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+      refresh_state = 'IDLE', refresh_attempt_count = 0,
+      claim_token_hash = NULL, lease_until = NULL, updated_at = ?5
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+        AND state = 'VERIFIED' AND refresh_state = 'PROCESSING'
+        AND refresh_attempt_count >= 8 AND lease_until <= ?5
+      RETURNING fingerprint`).bind(...keyValues(key), now).first();
+  }
+
   private async failExhaustedBatch(now: string, limit: number): Promise<void> {
     await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = 'FAILED', failure_reason = 'ATTEMPT_LIMIT', failed_at = ?1,
@@ -351,7 +361,11 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   }
 
   async claimBatch(input: { claimToken: string; continuationTokenDigest?: string; key?: PublicDiscoveryKeyV3; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch> {
-    await this.failExhaustedBatch(input.now, input.limit);
+    if (input.key === undefined) await this.failExhaustedBatch(input.now, input.limit);
+    else {
+      await this.failExhaustedKey(input.key, input.now);
+      await this.failExhaustedRefreshKey(input.key, input.now);
+    }
     const rows = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = CASE WHEN state = 'VERIFIED' THEN state ELSE 'PROCESSING' END,
       refresh_state = CASE WHEN state = 'VERIFIED' THEN 'PROCESSING' ELSE refresh_state END,
