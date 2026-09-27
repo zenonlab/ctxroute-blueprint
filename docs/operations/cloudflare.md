@@ -566,6 +566,13 @@ file or mutate Cloudflare. The plan contains only hashes of inspection and
 preview output, its exact actions, its account, and a short expiry. Redirecting
 that output to a reviewed file is an explicit operator choice outside the gate.
 
+L’inspection scellée conserve l’identité Cloudflare, les migrations D1, les
+Queues actives et les objets R2 concernés. Elle exclut volontairement
+`wrangler deployments status` : le dry-run Worker peut lui-même faire évoluer
+cette métadonnée volatile entre plan et apply. Le fingerprint déterministe des
+sources/config/assets et l’aperçu sont toujours recalculés avant mutation ; un
+changement de code, de migration, de Queue, d’objet ou de compte reste bloquant.
+
 La livraison GitHub de production ajoute `--preserve-routes true` au plan.
 Cette option est incluse dans son digest et fait utiliser à Wrangler une copie
 éphémère de `wrangler.jsonc` sans `routes`; le Worker, ses bindings, ses

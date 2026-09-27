@@ -5818,6 +5818,43 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-fix-cloudflare-plan-stability-20260927",
+      "title": "Stabiliser la garde de plan Cloudflare sans relâcher ses bornes",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "stable-inspection",
+          "title": "Exclure la version Worker volatile du sceau",
+          "status": "DONE",
+          "acceptance": [
+            "Le plan conserve identité, migrations et Queue mais ne dépend plus de la version Worker volatile.",
+            "Le test prouve que la garde échoue encore sur une dérive stable.",
+            "La CI peut atteindre les canaris sans mutation D1 historique ni publication extension."
+          ],
+          "files": [
+            "scripts/infra/cloudflare-driver.mjs",
+            "scripts/infra/cloudflare-driver.test.mjs",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/architecture/src/adaptive-public-refresh.architecture.json"
+          ],
+          "commands": [
+            "npm test -- scripts/infra/cloudflare-driver.test.mjs",
+            "npm run archify:validate -- architecture",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all"
+          ],
+          "evidence": [
+            "Tests infra 286/287 (1 skip) passent, dont l’absence de deployments status dans le sceau Worker.",
+            "validate:decisions, validate:docs, Archify architecture et git diff --check passent.",
+            "CI 36335521076 avait bloqué avant toute application; le correctif conserve les inspections D1/Queue/identité et le preview scellé."
+          ]
+        }
+      ]
     }
   ]
 }

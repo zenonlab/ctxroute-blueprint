@@ -16,7 +16,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-02
-- Revised: 2026-09-05
+- Revised: 2026-09-27
 
 ## Context
 
@@ -50,8 +50,12 @@ operational driver.
 
 The driver permits D1 migration application, Worker deployment, and publication
 of the two version-derived Chrome/Firefox archives to the configured release
-bucket. It inspects authentication, current deployment, pending migrations, and
-every configured R2 bucket. Before approval, each release archive is read and
+bucket. It inspects authentication, pending migrations, active Queue inventory,
+and every configured R2 bucket. It deliberately excludes `deployments status`
+from the plan inspection: the Worker dry-run can refresh that deployment
+metadata itself, so sealing it would reject a plan without an external change.
+The deterministic Worker fingerprint and preview remain sealed and are repeated
+immediately before apply. Before approval, each release archive is read and
 its size and SHA-256 enter the preview digest; apply rejects changed bytes.
 D1 migrations run first, release objects second, and the Worker deployment
 last. No generic R2 key, bucket deletion, or arbitrary local path is accepted.
