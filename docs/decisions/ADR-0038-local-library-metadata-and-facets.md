@@ -15,6 +15,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-09
+- Revised: 2026-09-27
 
 ## Contexte
 
@@ -30,8 +31,14 @@ la bibliothèque : genres, format, statut éditorial canonique, années, totaux
 d'épisodes/chapitres/volumes et popularité accompagnée de sa nature. Le
 fournisseur de la fiche constitue la provenance. Une valeur absente reste
 inconnue; aucune donnée ne doit être inventée ou utilisée pour le matching.
-La même fiche peut conserver un titre d'affichage, au plus seize variantes de
-titre avec leur langue lorsqu'elle est fournie, et une jaquette HTTPS attribuée.
+La même fiche peut conserver un titre d'affichage, au plus trente-deux titres,
+variantes de titre, catégories et genres fournisseur, et une jaquette HTTPS
+attribuée. Cette borne fournisseur est distincte des seize alias extraits d'un
+favori privé. Le validateur applicatif, le domaine, les index de titres Work et
+l'import/export privé acceptent la même cardinalité. Aucun tag n'est tronqué
+avant le contrôle de taxonomie, y compris en position dix-sept ou suivante.
+Le WebBridge garde sa projection historique de seize genres et variantes
+visibles, sans modifier la fiche complète conservée dans IndexedDB.
 L'origine de la jaquette est fixée par fournisseur dans le contrat de domaine;
 une origine différente ou une valeur hors limite invalide la réponse complète.
 Cette référence HTTPS attribuée reste locale et est affichée directement. Elle

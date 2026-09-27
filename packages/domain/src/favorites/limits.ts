@@ -10,6 +10,7 @@ export const favoriteAliasLimit = 16;
 export const favoriteTransformationLimit = 64;
 export const favoriteDiagnosticLimit = 32;
 export const providerCandidateLimit = 20;
+export const providerMetadataCollectionLimit = 32;
 
 export function utf8ByteLength(value: string): number {
   let bytes = 0;

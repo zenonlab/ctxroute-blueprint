@@ -10,6 +10,12 @@ const base = {
 };
 
 describe('Work public discovery freshness', () => {
+  it('preserves 32 provider title index keys and rejects 33', () => {
+    const providerTitleKeys = Array.from({ length: 32 }, (_, index) => `title ${index}`);
+    expect(createWork({ ...base, hydration: { ...base.hydration, providerTitleKeys } }).hydration?.providerTitleKeys).toEqual(providerTitleKeys);
+    expect(() => createWork({ ...base, hydration: { ...base.hydration, providerTitleKeys: [...providerTitleKeys, 'extra title'] } })).toThrow('Work identity indexes must be bounded');
+  });
+
   it('preserves canonical verified and refresh timestamps', () => {
     const publicDiscovery = {
       fingerprint: 'a'.repeat(64), mediaKind: 'ANIME' as const, nextRefreshAt: '2026-09-23T00:00:00.000Z',

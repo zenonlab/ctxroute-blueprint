@@ -4,7 +4,7 @@
   "meta": {
     "title": "TobiRink favorite convergence boundaries",
     "quality_profile": "showcase",
-    "viewBox": [1120, 680],
+    "viewBox": [1120, 640],
     "views": [
       {
         "id": "recovery-path",
@@ -21,18 +21,18 @@
     ]
   },
   "components": [
-    { "id": "extension", "type": "frontend", "label": "MV3 extension", "sublabel": "cursor · alarm · 1.1 s admission", "tag": "1.0.45", "pos": [40, 270], "size": [150, 76] },
-    { "id": "indexeddb", "type": "database", "label": "Private IndexedDB", "sublabel": "sources · works · Library", "tag": "restart-safe", "pos": [40, 470], "size": [150, 76] },
-    { "id": "worker", "type": "cloud", "label": "Discovery Worker", "sublabel": "lookup · admission · lease", "tag": "D1-first · 60/600 rpm", "pos": [270, 270], "size": [150, 76] },
-    { "id": "d1", "type": "database", "label": "Cloudflare D1", "sublabel": "grouped lookup ≤50", "tag": "four-key identity", "pos": [500, 150], "size": [150, 76] },
-    { "id": "queue", "type": "messagebus", "label": "Discovery Queue", "sublabel": "signal · retry · DLQ", "tag": "one treatment / invocation", "pos": [500, 390], "size": [150, 76] },
-    { "id": "collector", "type": "backend", "label": "Bounded collector", "sublabel": "claim(5) · budget 50 RPC", "tag": "partial success measured", "pos": [730, 390], "size": [150, 76] },
-    { "id": "providers", "type": "external", "label": "Provider APIs", "sublabel": "cadences · gateway/direct", "tag": "no extension calls", "pos": [960, 390], "size": [150, 76] },
-    { "id": "library", "type": "frontend", "label": "Library projection", "sublabel": "resolved work or reason", "tag": "honest terminal state", "pos": [270, 470], "size": [150, 76] }
+    { "id": "extension", "type": "frontend", "label": "MV3 extension", "sublabel": "cursor · alarm · 1.1 s admission", "tag": "local candidate", "pos": [40, 230], "size": [150, 76] },
+    { "id": "indexeddb", "type": "database", "label": "Private IndexedDB", "sublabel": "sources · works · Library", "tag": "restart-safe", "pos": [40, 430], "size": [150, 76] },
+    { "id": "worker", "type": "cloud", "label": "Discovery Worker", "sublabel": "lookup · admission · lease", "tag": "D1-first · 60/600 rpm", "pos": [270, 230], "size": [150, 76] },
+    { "id": "d1", "type": "database", "label": "Cloudflare D1", "sublabel": "grouped lookup ≤50", "tag": "four-key identity", "pos": [500, 110], "size": [150, 76] },
+    { "id": "queue", "type": "messagebus", "label": "Discovery Queue", "sublabel": "signal · retry · DLQ", "tag": "one treatment / invocation", "pos": [500, 350], "size": [150, 76] },
+    { "id": "collector", "type": "backend", "label": "Bounded collector", "sublabel": "claim(1) · budget 50 RPC", "tag": "partial success measured", "pos": [730, 350], "size": [150, 76] },
+    { "id": "providers", "type": "external", "label": "Provider APIs", "sublabel": "cadences · gateway/direct", "tag": "no extension calls", "pos": [960, 350], "size": [150, 76] },
+    { "id": "library", "type": "frontend", "label": "Library projection", "sublabel": "resolved work or reason", "tag": "honest terminal state", "pos": [270, 430], "size": [150, 76] }
   ],
   "connections": [
     { "id": "extension-worker", "from": "extension", "to": "worker", "label": "lookup / submit", "variant": "emphasis" },
-    { "id": "extension-indexeddb", "from": "extension", "to": "indexeddb", "label": "cursor + status", "fromSide": "bottom", "toSide": "top", "labelAt": [210, 430] },
+    { "id": "extension-indexeddb", "from": "extension", "to": "indexeddb", "label": "cursor + status", "fromSide": "bottom", "toSide": "top", "labelAt": [210, 390] },
     { "id": "worker-d1", "from": "worker", "to": "d1", "label": "grouped read / atomic write", "variant": "emphasis" },
     { "id": "worker-queue", "from": "worker", "to": "queue", "label": "admit signal", "fromSide": "bottom", "toSide": "top" },
     { "id": "queue-collector", "from": "queue", "to": "collector", "label": "claim + lease", "variant": "emphasis" },
@@ -41,6 +41,6 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "What is bounded", "items": ["Public lookup accepts at most 50 keys and uses one grouped D1 read", "Collector invocations reserve D1 work before provider calls"] },
-    { "dot": "amber", "title": "What remains honest", "items": ["UNAVAILABLE and structural exclusions stay visible", "Private source identity never enters Worker diagnostics"] }
+    { "dot": "amber", "title": "Contract and diagnostics", "items": ["Public and private candidates retain up to 32 metadata entries", "Local failure codes exclude private values; UNAVAILABLE stays visible"] }
   ]
 }

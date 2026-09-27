@@ -5,7 +5,26 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
-import { restartInstalledReviewWorker } from './installed-review.mjs';
+import { restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
+
+describe('installed diagnostic failure sample', () => {
+  it('bounds the sample and emits only closed codes and operations', () => {
+    const failures = Array.from({ length: 110 }, () => ({ outcome: 'failed', operation: 'provider-result', code: 'DISCOVERY_CANDIDATE_SCHEMA_INVALID', title: 'PRIVATE_TITLE' }));
+    const result = summarizeInstalledDiagnosticFailures({ events: [...failures,
+      { outcome: 'failed', operation: 'PRIVATE_OPERATION', code: 'PRIVATE_CODE', url: 'https://private.invalid' },
+      { outcome: 'complete', operation: 'resolution-commit', code: 'VERIFIED' },
+    ] });
+    expect(result).toEqual({ windowLimit: 100, sampledEvents: 100, failures: [
+      { operation: 'provider-result', code: 'DISCOVERY_CANDIDATE_SCHEMA_INVALID', count: 98 },
+      { operation: 'other', code: 'OTHER_FAILURE', count: 1 },
+    ] });
+    expect(JSON.stringify(result)).not.toMatch(/PRIVATE|private\.invalid/u);
+  });
+
+  it('does not treat missing diagnostics as a zero-error certificate', () => {
+    expect(summarizeInstalledDiagnosticFailures(undefined)).toEqual({ windowLimit: 100, sampledEvents: 0, failures: [] });
+  });
+});
 
 const key = (index = 1) => ({
   fingerprint: index.toString(16).padStart(64, '0'),

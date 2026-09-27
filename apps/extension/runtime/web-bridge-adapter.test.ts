@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStoragePort } from '@tobirink/contracts';
-import { webReviewSnapshotSchema } from '@tobirink/contracts/web-bridge';
+import { webLibraryPageSchema, webReviewSnapshotSchema } from '@tobirink/contracts/web-bridge';
 import { importFavoriteSources } from '@tobirink/application';
 import type { FavoriteSourceAdapter } from '@tobirink/application';
 import { agendaEntryId, createAgendaEntry, createFavoriteSource, createLibrary, createProgress, createReview, createSourceEvidence, createWork, favoriteSourceId, libraryId, progressId, reviewId, workId } from '@tobirink/domain';
@@ -16,6 +16,27 @@ async function addResolvedWork(storage: MemoryStoragePort, input: { id: string; 
 }
 
 describe('WebBridge private projections', () => {
+  it('projects 16 display values without discarding the 32 stored provider values', async () => {
+    const storage = new MemoryStoragePort();
+    const titles = Array.from({ length: 32 }, (_, index) => `Title ${index}`);
+    const candidate = {
+      externalId: '12345', provider: 'mangaupdates' as const, mediaKind: 'MANGA' as const, preSerialization: false,
+      titles, genres: titles, titleVariants: titles.map((title) => ({ title })),
+    };
+    const id = workId('work_web_metadata');
+    await storage.putWork(createWork({
+      id, externalReferences: [{ provider: candidate.provider, externalId: candidate.externalId }], mediaKind: 'manga', preferredTitle: 'Synthetic manga',
+      hydration: { candidate, favoriteAliasKeys: [], hydratedAt: '2026-09-01T00:00:00.000Z', matcherVersion: 'favorite-matcher-v4', providerTitleKeys: titles },
+    }));
+    await storage.putLibrary(createLibrary(primaryLibraryId, [id]));
+    const snapshot = webLibraryPageSchema.parse(await createWebBridgeRequestHandler(storage)({
+      type: 'library.read', requestId: 'request_metadata', query: { facet: 'all', limit: 24, sort: 'ADDED_DESC' },
+    }));
+    expect(snapshot.items[0]?.genres).toEqual(titles.slice(0, 16));
+    expect(snapshot.items[0]?.titleVariants).toEqual(candidate.titleVariants.slice(0, 16));
+    expect((await storage.getWork(id))?.hydration?.candidate).toEqual(candidate);
+  });
+
   it('exposes reference-only Review only to opted-in reads and keeps legacy writes compatible', async () => {
     const storage = new MemoryStoragePort();
     await importFavoriteSources([{ bookmarkId: 'review-references', folderPath: [], order: 0, state: 'eligible', title: 'Synthetic river', url: 'https://reader.example/manhwa/synthetic-river' }], storage, '2026-09-08T00:00:00.000Z');

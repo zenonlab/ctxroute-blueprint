@@ -1407,6 +1407,30 @@ vertes, une seule paire neuve est autorisée via `run_manga_canary=true` et
 préparer le lot historique scellé qu’après deux preuves complètes et demander
 une confirmation immédiate distincte avant tout réarmement `FAILED`.
 
+Certification du 27 septembre, après PR #143 et CI `36338487755` verte :
+le run unique `36338898685` réussit sur `565d1b3`, Worker
+`37d84956-1042-489b-80d8-7ce059a719ad`. Anime et manga sont `VERIFIED`, avec
+un appel fournisseur corrélé chacun, respectivement 93 et 105 lectures D1,
+34 écritures cumulées, zéro retry, 429 ou erreur Queue/fournisseur. Ce run
+direct ne rencontre pas de différé (`queueSends=0`) ; la continuation différée
+est couverte par la régression locale, pas exercée par cette paire distante.
+La publication des archives est explicitement ignorée.
+
+Lecture agrégée à 18:06 UTC : D1 compte 958 `VERIFIED`, 502 `FAILED`,
+un `PENDING` et trois `PROCESSING` ; la requête diagnostique coûte 3 036
+lectures et zéro écriture, hors budget canari. Les métriques approximatives
+Queue indiquent neuf messages et deux en DLQ, sans âge disponible. Sur la
+fenêtre canari 18:03:55–18:04:48 UTC, les métriques Worker globales indiquent
+15 invocations, zéro erreur et 18 sous-requêtes ; elles ne remplacent pas
+les deux preuves corrélées et ne certifient pas la santé du backlog.
+
+Le lot local privé `manga-certified-20260927` scelle dix mangas avec le digest
+`381cf9e2d63ebf31a59d1389f72e703109d18937cd3aa48781c0882552a19dd0`.
+Sa préparation lit 1 863 lignes et n’en écrit aucune ; les trois runtimes
+sont présents, MangaUpdates est différé. Aucun POST de reprise n’est émis.
+Le reçu ignoré par Git reste sous `build/recovery/`, permissions `0600`.
+Ne pas l’exécuter sans confirmation immédiate distincte et nouveau prévol.
+
 Le tail observe les invocations sans filtre textuel qui masquerait un échec
 CPU avant émission de coût. Un outcome anormal, une exception, un 429 ou un
 échec Queue observé arrête le lot. Les autres erreurs fournisseur et résultats

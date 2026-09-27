@@ -5030,7 +5030,7 @@
       "schemaVersion": 1,
       "id": "goal-align-1042-discovery-production-20260920",
       "title": "Aligner main sur la release immutable 1.0.42, déployer Discovery et vérifier l’extension réelle",
-      "status": "ACTIVE",
+      "status": "BLOCKED",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -5125,7 +5125,7 @@
         {
           "id": "discovery-recovery",
           "title": "Prouver les canaris puis préparer et appliquer la reprise D1 bornée",
-          "status": "IN_PROGRESS",
+          "status": "BLOCKED",
           "acceptance": [
             "Canaris anime et manga prouvent des profils VERIFIED et des appels fournisseur réels après déploiement",
             "Backup D1 frais et plan conditionnel de rearm des seuls FAILED/ATTEMPT_LIMIT",
@@ -5144,9 +5144,10 @@
             "post-recovery D1 counts and extension Library inspection"
           ],
           "evidence": [
-            "Durable extension recovery added: batches of 20, local cursor, 30s alarm continuation, per-item error isolation; extension 33 files/154 tests pass and typecheck passes.",
-            "Queue target remains local-only: 5 claims, 10s batch timeout, 2 consumers; Worker Queue/routes 34/34 and provider fallback 57/57 pass.",
-            "Docs validation, Archify dataflow showcase and git diff check pass; production still has the previous Queue configuration and D1 recovery remains unexecuted."
+            "Canaris certifiés le 27 septembre : run 36338898685 après CI 36338487755, anime et manga VERIFIED, un appel corrélé chacun, 198 lectures D1 / 34 écritures et zéro erreur. Correctif livré par PR #143.",
+            "Production : claim(1), Queue 1/1, réveil dix minutes. Vue discovery-recovery-deployment.architecture.json actualisée ; Archify architecture, documentation et diff-check revalidés.",
+            "Lot manga-certified-20260927 scellé : 10 MANGA, reçu privé 0600, zéro tentative. Queue 9 / DLQ 2 : backlog non certifié ; aucune archive publiée, aucun FAILED réarmé.",
+            "external: confirmation immédiate distincte du lot FAILED/ATTEMPT_LIMIT manquante ; le rappel automatique ne vaut pas approbation. Sauvegarde fraîche, nouveau prévol et vérification bibliothèque après reprise restent requis."
           ]
         }
       ]
@@ -5360,7 +5361,7 @@
       "schemaVersion": 1,
       "id": "goal-finish-favorite-convergence-20260923",
       "title": "Fermer les défauts de convergence, certifier le parcours et livrer la nouvelle extension",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -5445,7 +5446,7 @@
         {
           "id": "release",
           "title": "Certifier les canaris et le profil temporaire puis publier et vérifier la nouvelle version",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Worker/Deno compatibles validés avant nouvelle extension; canaris anime+manga sur clés nouvelles avec preuve de traversée fournisseur.",
             "Petit lot puis copie privée des1522favoris testés; identité/données préservées lors upgrade et progression après arrêt MV3/navigateur.",
@@ -5474,9 +5475,11 @@
             "git diff --check"
           ],
           "evidence": [
-            "Worker canary run 35875863436 completed successfully: fresh anime and manga VERIFIED with 4 provider requests, 0 retries/429s and 4,501 D1 rows read.",
-            "The existing temporary online session tobirink-installed-review-oKOCZz is preserved, but its private bookmark export input is not present in the workspace; installed-review refuses online resume without that explicit export.",
-            "No synthetic export was substituted, no 1,522-favorite online convergence was claimed, no historical FAILED rows were rearmed, and extension archives remain unpublished."
+            "Run protégé 36295558091 sur main SHA 07723a1a0025f1bf63066330bbf4188fd2c45f5c: verify, plan Worker, probes, canaris et publication terminés avec succès.",
+            "Canaris frais anime+manga: appels fournisseur corrélés et résultats acceptés, aucune erreur/429/retry; profil Chromium temporaire issu des 1 522 sources conservé après redémarrages, aucun traitement actif.",
+            "Archives 1.0.45 servies en HTTP 200; SHA-256 live Chrome c044bf1bfbb5af3c9ef79e7d8c41c2320f212fa75f37b925d17434ca7f29df1c et Firefox 1de6845307a73a08c3f1d670364619f3a2787076c3831504f18d430e216cc949 concordent aux preuves publiées; pointeur /download affiche 1.0.45.",
+            "Vue produit existante production-publication.dataflow.json décrit publication/vérification et hashes; npm run archify:validate -- architecture réussit sans erreur ni avertissement.",
+            "Aucun FAILED historique réarmé; aucune affirmation de convergence totale des 1 522 favoris."
           ]
         }
       ]
@@ -5860,7 +5863,7 @@
       "schemaVersion": 1,
       "id": "repair-manga-continuation-20260927",
       "title": "Réparer la continuation manga et certifier la reprise",
-      "status": "ACTIVE",
+      "status": "DONE",
       "executionMode": "autonomous",
       "modeOffered": true,
       "steps": [
@@ -5900,7 +5903,7 @@
         {
           "id": "delivery",
           "title": "Livrer par PR et CI protégée",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Commit validé puis PR et CI protégée verts sans archive extension."
           ],
@@ -5913,13 +5916,14 @@
             "gh pr checks"
           ],
           "evidence": [
-            "Diff relu; message prévu fix(discovery): qualify correlated pre-provider continuations; livraison protégée sans extension."
+            "Commit c92678c, PR143 fusionnée en 565d1b3; hooks pré-push complets verts depuis clone propre.",
+            "CI protégée 36338487755 réussie, verify complet et E2E inclus; plan/apply et probes verts; aucun canari ni publication archive dans ce run."
           ]
         },
         {
           "id": "certify",
           "title": "Certifier une paire neuve et mesurer",
-          "status": "TODO",
+          "status": "DONE",
           "acceptance": [
             "Une seule paire neuve après CI verte, appels corrélés et agrégats D1/Queue/Worker.",
             "Préparer lot scellé uniquement si certificat complet; aucune reprise FAILED sans confirmation immédiate."
@@ -5931,7 +5935,173 @@
           "commands": [
             "node scripts/infra/manga-canary.mjs --observe"
           ],
-          "evidence": []
+          "evidence": [
+            "Run unique 36338898685 vert sur 565d1b3, Worker37d84956 : anime/manga VERIFIED, un appel corrélé chacun, 93/105 lectures D1,34 écritures, zéro retry/429/erreur; archive skipped. Différé couvert localement; aucun différé sur cette paire distante.",
+            "Lecture post-canari : D1 VERIFIED958 FAILED502 PENDING1 PROCESSING3; Queue9/DLQ2 (approx.). Fenêtre Worker15 invocations/0 erreur/18 sous-requêtes; ces agrégats ne certifient pas le backlog.",
+            "Lot manga-certified-20260927 scellé :10 MANGA,1863 lectures/0 écriture, reçu0600 ignoré Git et0 tentative. Aucun POST historique; confirmation immédiate distincte et nouveau prévol requis.",
+            "Runbook et Progress relus; ADR/docs et diff-check passent; hooks/consignes inchangés. Preuves versionnées sur branche sans relancer le déploiement certifié."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-diagnose-real-list-failures-20260927",
+      "title": "Expliquer et corriger les erreurs internes de la liste réelle",
+      "status": "DONE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "diagnose",
+          "title": "Reproduire les erreurs sans mutation distante",
+          "status": "DONE",
+          "acceptance": [
+            "Diagnostics bornés sans titre, URL, payload ni message libre.",
+            "Une erreur observée sur la liste réelle est reproduite; aucun POST de production ni réarmement."
+          ],
+          "files": [
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "apps/extension/runtime/extension-diagnostics.ts",
+            "apps/extension/scripts/installed-review.mjs",
+            "docs/architecture/src/favorite-convergence.architecture.json",
+            "docs/decisions/ADR-0040-locked-operational-diagnostics.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application -- favorite-resolution-runner",
+            "npm test --workspace @tobirink/extension -- installed-review",
+            "npm run archify:validate -- architecture"
+          ],
+          "evidence": [
+            "Profil réel s0TJEZ, 60 GET bornés et zéro mutation: 60/60 résultats VERIFIED publics, tous rejetés localement; catégories>16 pour60, titres>16 pour4, variantes>16 pour1.",
+            "Cause reproduite rouge localement: six tests domaine, quatre application et un projection UI; diagnostics harness36/36 verts."
+          ]
+        },
+        {
+          "id": "repair",
+          "title": "Corriger la cause avec une régression",
+          "status": "DONE",
+          "acceptance": [
+            "Correction minimale au point de défaillance prouvé.",
+            "Régression rouge puis verte, tentatives et états métier conservés."
+          ],
+          "files": [
+            "packages/application/src/favorites/provider-search-checkpoint.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.test.ts",
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/domain/src/work.ts",
+            "docs/decisions/ADR-0040-locked-operational-diagnostics.md",
+            "docs/architecture/src/favorite-convergence.architecture.json"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/application",
+            "npm test --workspace @tobirink/extension",
+            "npm run typecheck"
+          ],
+          "evidence": [
+            "Régressions rouges puis vertes:32 valeurs préservées,33 refusées,taxonomie en queue,alias privés16,export32 et WebBridge16.",
+            "Domaine43/application461/extension226/contrats15 passent; tous les typechecks workspace passent; revue indépendante sans régression introduite.",
+            "Diagnostic candidat schéma/domaine et agrégat privé36/36; Oxlint global,ADR65,documentation et Archify architecture showcase passent. Lint global:6 erreurs préexistantes dans2 audits ignorés."
+          ]
+        },
+        {
+          "id": "verify",
+          "title": "Rejouer la liste et documenter les limites",
+          "status": "DONE",
+          "acceptance": [
+            "Les 1522 favoris exacts restent conservés après redémarrages.",
+            "Bilan explicite des erreurs corrigées et des attentes fournisseur; aucune fausse certification complète.",
+            "Aucune archive publiée ni reprise FAILED sans confirmation immédiate distincte."
+          ],
+          "files": [
+            "apps/extension/scripts/installed-review.mjs",
+            "apps/extension/scripts/installed-review.test.mjs",
+            "docs/02-quality-strategy.md",
+            "docs/audits/tobirink-problems-20260926.md"
+          ],
+          "commands": [
+            "npm run build:extension",
+            "node apps/extension/scripts/installed-review.mjs <candidate-local>",
+            "npm run validate:decisions",
+            "npm run validate:docs -- --all",
+            "npm run archify:validate -- architecture",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Rejeu exact1522 AM3olC:966 résolus,44 Review,52 exclus,460 retryable,0 erreur interne,0 processing. Redémarrages SW/navigateur et projection conservés.",
+            "Comparaison hors ligne des60 anciens échecs:54 RESOLVED+Work/Library,6 taxonomie;1522 sources identiques.1297 lectures,12 admissions bloquées,0 mutation/refresh/appel fournisseur.",
+            "Toutes suites workspace/types,IndexedDB,sécurité,infra120,E2E11/1skip,couverture,intégration,ADR/docs,Archify showcase9/9 et diff-check passent. Lint global6 erreurs historiques; perf source45/3skip après exclusion des worktrees générés.",
+            "Candidate locale non publiée; preuve et limites dans audit27septembre. Verdict global incomplete:458 fournisseurs indisponibles,1 pending,1 réseau. Aucun FAILED réarmé, aucune archive publiée."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "deliver-real-list-metadata-fix-20260927",
+      "title": "Livrer le correctif des candidats Discovery prouvé sur la liste réelle",
+      "status": "ACTIVE",
+      "executionMode": "autonomous",
+      "modeOffered": true,
+      "steps": [
+        {
+          "id": "verify-commit",
+          "title": "Auditer et versionner le correctif borné",
+          "status": "DONE",
+          "acceptance": [
+            "Diff limité aux métadonnées fournisseur32, diagnostics expurgés, régressions et preuves documentaires déjà approuvées; archives, règles FAILED, hooks, permissions et migrations inchangés.",
+            "Validation complète depuis clone indépendant propre sans suppression des audits utilisateur ni contournement des hooks.",
+            "Commit fonctionnel fix(discovery): accept bounded provider metadata collections et branche fix/public-discovery-candidate-metadata32."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            "packages/domain/src/favorites/contracts.ts",
+            "packages/application/src/favorites/favorite-resolution-runner.ts",
+            "apps/extension/runtime/web-bridge-adapter.ts",
+            "apps/extension/scripts/installed-review.mjs",
+            "docs/audits/tobirink-problems-20260926.md",
+            "docs/architecture/src/favorite-convergence.architecture.json"
+          ],
+          "commands": [
+            "git diff --check",
+            "npm run verify",
+            "npm run archify:validate -- architecture",
+            "git commit"
+          ],
+          "evidence": [
+            "Commit61355b2 vérifié; git hooks pré-commit verts, aucune modification Worker/migration/permission/workflow/archive.",
+            "Clone indépendant: npm run verify intégral vert après préparation identique CI; packaging isolé reproductible, E2E11/1skip, harnais36/36 et Archify architecture verts.",
+            "SHA background corrigé f257f2d9 identique au rejeu1522; aucune donnée privée exportée. Audits/worktrees existants conservés."
+          ]
+        },
+        {
+          "id": "pr-ci",
+          "title": "Pousser la PR et vérifier la CI",
+          "status": "IN_PROGRESS",
+          "acceptance": [
+            "PR vers main avec preuves réelles agrégées, limites explicites et validations; workflow existant inchangé.",
+            "Prévol CI vert sur le SHA exact avant fusion, apply désactivé hors main; déploiement normal main et sondes vérifiés après fusion.",
+            "Aucune archive publiée, aucun nouveau canari et aucun FAILED réarmé; reprise historique exige toujours une confirmation immédiate distincte."
+          ],
+          "files": [
+            ".project/progress.json",
+            "docs/progress.md",
+            ".github/workflows/deploy-production.yml"
+          ],
+          "commands": [
+            "git push",
+            "gh pr create",
+            "gh workflow run deploy-production.yml --ref fix/public-discovery-candidate-metadata32 -f run_manga_canary=false -f publish_extension=false",
+            "gh run view",
+            "gh pr merge"
+          ],
+          "evidence": [
+            "Branche fix/public-discovery-candidate-metadata32; runner macOS ARM64 online/idle; PR prévue sans archive ni reprise historique.",
+            "Trois commits documentaires antérieurs inclus explicitement: preuve canaris, confirmation historique distincte, certification ancienne1.0.45."
+          ]
         }
       ]
     }

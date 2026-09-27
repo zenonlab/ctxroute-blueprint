@@ -1,6 +1,6 @@
 import type { WorkId } from './identity';
 import { canonicalDateTime, invariant, requiredText } from './invariant';
-import { createProviderCandidate, favoriteTitleByteLimit, utf8ByteLength } from './favorites/contracts';
+import { createProviderCandidate, favoriteTitleByteLimit, providerMetadataCollectionLimit, utf8ByteLength } from './favorites/contracts';
 import type { ProviderCandidate } from './favorites/contracts';
 
 export type MediaKind = 'anime' | 'manga';
@@ -55,7 +55,7 @@ export function createWork(input: Work): Work {
   };
   if (input.hydration !== undefined) {
     const hydration = input.hydration;
-    invariant(hydration.favoriteAliasKeys.length <= 64 && hydration.providerTitleKeys.length <= 16, 'invalid-favorite-resolution', 'Work identity indexes must be bounded.');
+    invariant(hydration.favoriteAliasKeys.length <= 64 && hydration.providerTitleKeys.length <= providerMetadataCollectionLimit, 'invalid-favorite-resolution', 'Work identity indexes must be bounded.');
     invariant(references.some((reference) => reference.provider === hydration.candidate.provider && reference.externalId === hydration.candidate.externalId), 'invalid-favorite-resolution', 'Hydrated identity must belong to the work.');
     const publicDiscovery = hydration.publicDiscovery === undefined ? undefined : Object.freeze({
       fingerprint: hydration.publicDiscovery.fingerprint,

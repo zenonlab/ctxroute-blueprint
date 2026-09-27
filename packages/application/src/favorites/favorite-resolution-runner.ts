@@ -1,5 +1,7 @@
-import { createFavoriteSource, createProviderCandidate, createWork, workId } from '@tobirink/domain';
+import { createFavoriteSource, createProviderCandidate, createWork, DomainInvariantError, workId } from '@tobirink/domain';
+import { ZodError } from 'zod';
 import type { FavoriteParseArtifact, FavoriteResolutionResult, LibraryId, ProviderCandidate, Work } from '@tobirink/domain';
+import type { PublicDiscoveryCandidate } from '@tobirink/public-discovery';
 import type { StoragePort } from '../ports/storage-port';
 import { favoriteIdentityKey, favoritePublicReferenceSchema, resolveSynchronizedFavoriteIdentity } from './favorite-identity-lookup';
 import type { FavoriteIdentityLookupPort } from './favorite-identity-lookup';
@@ -93,7 +95,17 @@ export type FavoriteResolutionTraceEvent = Readonly<{
 function failureCode(error: Error | undefined): string {
   if (error instanceof FavoriteProviderRetryError) return 'PROVIDER_UNAVAILABLE';
   if (error instanceof PublicDiscoveryError) return error.code;
-  if (error !== undefined && /^[A-Z][A-Z0-9_:-]{1,63}$/u.test(error.message)) return error.message;
+  if (error instanceof ZodError) return 'SCHEMA_VALIDATION_FAILED';
+  if (error instanceof DomainInvariantError) return 'DOMAIN_INVARIANT_FAILED';
+  if (error instanceof TypeError) return 'TYPE_ERROR';
+  const known = [
+    'STALE_PRIVATE_REFERENCE', 'STALE_WORK_IDENTITY', 'UNROUTABLE_PROVIDER_REFERENCE',
+    'HYDRATION_REFERENCE_MISMATCH', 'INCOMPLETE_HYDRATION_SEARCH', 'MATCHED_PROVIDER_CANDIDATE_MISSING',
+    'REVIEW_REFERENCE_LIMIT', 'RESOLVED_REQUIRES_CURRENT_CANDIDATE', 'AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES',
+    'STALE_SEARCH_CHECKPOINT', 'INVALID_PROVIDER_PAGE', 'PROVIDER_CURSOR_DID_NOT_ADVANCE',
+    'DISCOVERY_CANDIDATE_SCHEMA_INVALID', 'DISCOVERY_CANDIDATE_DOMAIN_INVALID',
+  ];
+  if (error !== undefined && known.includes(error.message)) return error.message;
   return 'INTERNAL_FAILURE';
 }
 
@@ -103,7 +115,17 @@ async function traceEvent(dependencies: FavoriteResolutionRunnerDependencies, ev
 }
 
 async function traceFailure(dependencies: FavoriteResolutionRunnerDependencies, code: string): Promise<void> {
-  await traceEvent(dependencies, { operation: 'resolution-commit', outcome: 'failed', code });
+  const operation = code === 'DISCOVERY_CANDIDATE_SCHEMA_INVALID' || code === 'DISCOVERY_CANDIDATE_DOMAIN_INVALID' ? 'provider-result' : 'resolution-commit';
+  await traceEvent(dependencies, { operation, outcome: 'failed', code });
+}
+
+function parseDiscoveredCandidate(candidate: PublicDiscoveryCandidate): ProviderCandidate {
+  try { return providerCandidateSchema.parse(candidate); }
+  catch (error) {
+    if (error instanceof ZodError) throw new Error('DISCOVERY_CANDIDATE_SCHEMA_INVALID');
+    if (error instanceof TypeError || error instanceof DomainInvariantError) throw new Error('DISCOVERY_CANDIDATE_DOMAIN_INVALID');
+    throw error;
+  }
 }
 
 export interface FavoriteResolutionSliceResult {
@@ -330,7 +352,7 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       });
       return 'completed';
     }
-    const discoveredCandidate = providerCandidateSchema.parse(discovery.profile.candidate);
+    const discoveredCandidate = parseDiscoveredCandidate(discovery.profile.candidate);
     if (reference !== undefined && (discoveredCandidate.provider !== reference.provider || discoveredCandidate.externalId !== reference.externalId)) throw new Error('HYDRATION_REFERENCE_MISMATCH');
     if (hasExactBlockedProviderTaxonomy(discoveredCandidate)) {
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');

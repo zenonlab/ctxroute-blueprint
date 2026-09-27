@@ -2,7 +2,6 @@ import { canonicalDateTime } from '../invariant';
 import { createSourceEvidence } from './source-evidence-contract';
 import type { FavoriteParseArtifact } from './parse-artifact-contract';
 import {
-  favoriteAliasLimit,
   favoriteDiagnosticLimit,
   favoriteFolderSegmentByteLimit,
   favoriteFolderSegmentLimit,
@@ -12,6 +11,7 @@ import {
   favoriteTransformationLimit,
   favoriteUrlByteLimit,
   providerCandidateLimit,
+  providerMetadataCollectionLimit,
   providerFacetValueByteLimit,
   utf8ByteLength,
 } from './limits';
@@ -195,7 +195,7 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
   if (input.contentClassification !== undefined) {
     contract(['adult', 'non-adult', 'unknown'].includes(input.contentClassification), 'contentClassification is invalid.');
   }
-  contract(input.titles.length <= favoriteAliasLimit, `titles exceeds ${favoriteAliasLimit} entries.`);
+  contract(input.titles.length <= providerMetadataCollectionLimit, `titles exceeds ${providerMetadataCollectionLimit} entries.`);
   if (input.season !== undefined) contract(Number.isSafeInteger(input.season) && input.season > 0, 'candidate season must be a positive safe integer.');
   for (const [field, value] of Object.entries({ startYear: input.startYear, endYear: input.endYear })) {
     if (value !== undefined) contract(Number.isSafeInteger(value) && value >= 1800 && value <= 3000, `${field} must be a plausible year.`);
@@ -236,7 +236,7 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
       ? { title }
       : { language: boundedText(variant.language, `titleVariants[${index}].language`, providerFacetValueByteLimit), title });
   }));
-  contract((titleVariants?.length ?? 0) <= favoriteAliasLimit, `titleVariants exceeds ${favoriteAliasLimit} entries.`);
+  contract((titleVariants?.length ?? 0) <= providerMetadataCollectionLimit, `titleVariants exceeds ${providerMetadataCollectionLimit} entries.`);
   const candidate = {
     externalId: boundedText(input.externalId, 'externalId', favoriteTitleByteLimit),
     mediaKind: input.mediaKind,
@@ -247,8 +247,8 @@ export function createProviderCandidate(input: ProviderCandidate, provider: Favo
   if (input.contentClassification !== undefined) Object.assign(candidate, { contentClassification: input.contentClassification });
   if (input.format !== undefined) Object.assign(candidate, { format: boundedText(input.format, 'format', providerFacetValueByteLimit) });
   if (input.season !== undefined) Object.assign(candidate, { season: input.season });
-  if (input.categories !== undefined) Object.assign(candidate, { categories: boundedTexts(input.categories, 'categories', favoriteAliasLimit, providerFacetValueByteLimit) });
-  if (input.genres !== undefined) Object.assign(candidate, { genres: boundedTexts(input.genres, 'genres', favoriteAliasLimit, providerFacetValueByteLimit) });
+  if (input.categories !== undefined) Object.assign(candidate, { categories: boundedTexts(input.categories, 'categories', providerMetadataCollectionLimit, providerFacetValueByteLimit) });
+  if (input.genres !== undefined) Object.assign(candidate, { genres: boundedTexts(input.genres, 'genres', providerMetadataCollectionLimit, providerFacetValueByteLimit) });
   if (input.editorialStatus !== undefined) Object.assign(candidate, { editorialStatus: input.editorialStatus });
   if (input.startYear !== undefined) Object.assign(candidate, { startYear: input.startYear });
   if (input.endYear !== undefined) Object.assign(candidate, { endYear: input.endYear });

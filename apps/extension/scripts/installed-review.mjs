@@ -95,8 +95,25 @@ function extractArchive(archive, destination) {
   assert.equal(result.status, 0, 'Temporary test archive extraction failed.');
 }
 
+export function summarizeInstalledDiagnosticFailures(diagnostics) {
+  const events = Array.isArray(diagnostics?.events) ? diagnostics.events.slice(-100) : [];
+  const knownCodes = new Set(['INTERNAL_FAILURE', 'DISCOVERY_CANDIDATE_SCHEMA_INVALID', 'DISCOVERY_CANDIDATE_DOMAIN_INVALID',
+    'SCHEMA_VALIDATION_FAILED', 'DOMAIN_INVARIANT_FAILED', 'TYPE_ERROR', 'STALE_PRIVATE_REFERENCE', 'STALE_WORK_IDENTITY',
+    'HYDRATION_REFERENCE_MISMATCH', 'AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES']);
+  const failures = [];
+  for (const event of events) {
+    if (event?.outcome !== 'failed') continue;
+    const operation = ['admission', 'provider-result', 'resolution-commit', 'projection', 'continuation'].includes(event.operation) ? event.operation : 'other';
+    const code = knownCodes.has(event.code) ? event.code : 'OTHER_FAILURE';
+    const previous = failures.find(failure => failure.operation === operation && failure.code === code);
+    if (previous === undefined) failures.push({ operation, code, count: 1 });
+    else previous.count += 1;
+  }
+  return { windowLimit: 100, sampledEvents: events.length, failures };
+}
+
 async function capture(page) {
-  return page.evaluate(async (fields) => {
+  const snapshot = await page.evaluate(async (fields) => {
     const status = await globalThis.chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 });
     if (!status.ok) throw new Error('status-unavailable');
     const library = await globalThis.chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, sort: 'TITLE_ASC' });
@@ -147,8 +164,9 @@ async function capture(page) {
     const counts = Object.fromEntries(fields.map((field) => [field, Number.isSafeInteger(status.counts[field]) ? status.counts[field] : 0]));
     const statistics = Object.fromEntries(['completed', 'inProgress', 'knownMetadata', 'notStarted', 'total'].map((field) => [field, library.snapshot.statistics[field]]));
     return { aggregate: { counts, inventory: status.inventory.status, reasons, media, unresolved, missingProjectedWorks,
-      library: statistics, works: works.length, reviews: reviews.length, humanReviews: integrity.humanReviews.length, progress: progress.length }, integrity };
+      library: statistics, works: works.length, reviews: reviews.length, humanReviews: integrity.humanReviews.length, progress: progress.length }, integrity, diagnostics: status.diagnostics };
   }, countNames);
+  return { aggregate: { ...snapshot.aggregate, diagnosticFailureSample: summarizeInstalledDiagnosticFailures(snapshot.diagnostics) }, integrity: snapshot.integrity };
 }
 
 export function assertPreserved(before, after, expected) {
