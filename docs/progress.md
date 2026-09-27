@@ -386,3 +386,7 @@
 ## Préserver la continuation globale après un différé fournisseur — DONE
 
 - [x] **Réveiller le backlog global après un différé spécifique** — DONE _(evidence: Régression Queue 35/35 : un différé corrélé conserve son échéance et émet aussi le réveil global pour un lease expiré, sans appel fournisseur., Suite Worker complète 196/196 et typecheck Worker passent., Archify architecture, validation ADR/documentation et git diff --check passent sans erreur.)_
+
+## Stabiliser la garde de plan Cloudflare sans relâcher ses bornes — DONE
+
+- [x] **Exclure la version Worker volatile du sceau** — DONE _(evidence: Tests infra 286/287 (1 skip) passent, dont l’absence de deployments status dans le sceau Worker., validate:decisions, validate:docs, Archify architecture et git diff --check passent., CI 36335521076 avait bloqué avant toute application; le correctif conserve les inspections D1/Queue/identité et le preview scellé.)_

@@ -129,7 +129,6 @@ async function test_inspect_read_only_resources() {
   const run = async args => {
     calls.push(args);
     if (args[0] === 'whoami') return '{"accounts":[{"id":"account-1"}]}';
-    if (args[0] === 'deployments') return '{"versions":[]}';
     if (args[0] === 'd1') return 'No migrations to apply';
     return '{"name":"public-covers"}';
   };
@@ -140,7 +139,6 @@ async function test_inspect_read_only_resources() {
   assert.deepEqual(state.queues, { configured: [], output: '' });
   assert.deepEqual(calls, [
     ['whoami', '--account', 'account-1', '--json'],
-    ['deployments', 'status', '--name', 'public-api', '--json'],
     ['d1', 'migrations', 'list', 'CATALOGUE_DB', '--remote'],
     ['r2', 'bucket', 'info', 'public-covers', '--json'],
   ]);
@@ -155,7 +153,7 @@ async function test_worker_inspection_does_not_require_unrelated_storage_permiss
     run: async args => {
       calls.push(args);
       if (args[0] === 'whoami') return '{"accounts":[{"id":"account-1"}]}';
-      return '{"versions":[]}';
+      return '{}';
     },
   });
   const actions = driver.resolveOperations(['worker-deploy']);
@@ -165,8 +163,25 @@ async function test_worker_inspection_does_not_require_unrelated_storage_permiss
   assert.deepEqual(state.queues, { configured: [], output: '' });
   assert.deepEqual(calls, [
     ['whoami', '--account', 'account-1', '--json'],
-    ['deployments', 'status', '--name', 'public-api', '--json'],
   ]);
+}
+
+async function test_worker_inspection_omits_volatile_deployment_status() {
+  const calls = [];
+  const driver = createCloudflareDriver({
+    config,
+    workerDirectory: '/worker',
+    run: async args => {
+      calls.push(args);
+      if (args[0] === 'whoami') return '{"accounts":[{"id":"account-1"}]}';
+      throw new Error(`unexpected-command:${args.join(' ')}`);
+    },
+  });
+  const actions = driver.resolveOperations(['worker-deploy']);
+  const first = await driver.inspect('account-1', actions);
+  const second = await driver.inspect('account-1', actions);
+  assert.deepEqual(second, first);
+  assert.equal(calls.some(args => args[0] === 'deployments'), false);
 }
 
 async function test_preview_and_apply_translations() {
@@ -507,6 +522,7 @@ function test_reject_invalid_r2_identifiers() {
 test('the driver derives operation targets from configuration', test_derive_operation_targets);
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('worker-only inspection excludes unrelated D1, R2 and Queue reads', test_worker_inspection_does_not_require_unrelated_storage_permissions);
+test('worker inspection omits volatile deployment status', test_worker_inspection_omits_volatile_deployment_status);
 test('preview is dry-run and apply owns the only mutating Wrangler translations', test_preview_and_apply_translations);
 test('worker preview ignores volatile Wrangler output but tracks sources', test_worker_preview_ignores_volatile_wrangler_output_but_tracks_sources);
 test('worker fingerprint normalizes Next build IDs only', test_worker_fingerprint_normalizes_next_build_ids_only);
