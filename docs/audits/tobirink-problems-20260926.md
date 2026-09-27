@@ -797,6 +797,17 @@ Le `background.js` reconstruit possède exactement le SHA-256 du rejeu réel
 ci-dessus. Les audits et anciens worktrees locaux sont conservés, sans
 contournement des hooks ni exclusion ajoutée au dépôt pour masquer leur lint.
 
+La PR #144 livre le correctif en `f36af83` après le prévol CI
+`36348495846`, réussi sur le SHA exact `27dc900`. Ce prévol n'applique aucun
+plan et n'exécute ni canari ni publication. Le run main `36349017892` réussit
+ensuite les E2E, `verify`, le plan et l'application Cloudflare, puis les quatre
+sondes HTTP 200. Le Worker actif annoncé est
+`e708b40b-095a-48fa-a94b-73318e1e15eb`; aucune migration n'était à appliquer.
+Les étapes canaris et publication restent ignorées. Les SHA-256 des deux
+archives publiques 1.0.45 sont identiques avant et après ce déploiement :
+la fusion du code n'est donc pas la livraison d'une extension corrigée aux
+utilisateurs. Aucun `FAILED` n'est réarmé par cette livraison.
+
 Le verdict global demeure `incomplete` : cette étape répare et prouve les
 erreurs locales, pas les demandes fournisseur épuisées. La livraison doit
 passer par la PR et la CI, avec une nouvelle version avant toute publication
