@@ -30,7 +30,7 @@
       "id": "worker",
       "type": "backend",
       "label": "Worker public",
-      "sublabel": "admission v3 · 42 s",
+      "sublabel": "admission v3 · 100 s",
       "tag": "version contrôlée",
       "row": 1,
       "col": 1
@@ -57,7 +57,7 @@
       "id": "resolver",
       "type": "backend",
       "label": "Resolver public",
-      "sublabel": "recherche bornée 38 s",
+      "sublabel": "recherche bornée 90 s",
       "tag": "résultat terminal",
       "row": 1,
       "col": 2
