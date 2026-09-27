@@ -304,6 +304,28 @@ test('pre-provider cadence backoff waits for the correlated provider continuatio
   assert.equal(proof.d1RowsRead, 135);
 });
 
+test('recovery mode waits through a provider continuation while release canaries stay strict', () => {
+  const requestId = identity(1);
+  const intermediate = envelope(requestId, [
+    cost({ acceptedResults: 0, correlationId: requestId, d1RowsRead: 73, d1RowsWritten: 18,
+      provider: 'mixed', providerRequests: 7, queueSends: 1, result: 'unchanged' }),
+    admissionCost({ d1RowsRead: 32, d1RowsWritten: 6 }),
+  ]);
+  const strict = createCostObservation();
+  strict.track(requestId, { ...expectation, provider: 'any' });
+  assert.throws(() => strict.push(frame(intermediate)), /accepted-results/u);
+
+  const recovery = createCostObservation({ allowProviderContinuation: true });
+  recovery.track(requestId, { ...expectation, provider: 'any' });
+  recovery.push(frame(intermediate));
+  assert.equal(recovery.read(requestId), undefined);
+  recovery.push(frame(queueEnvelope(requestId, [cost({ correlationId: requestId, d1RowsRead: 80, d1RowsWritten: 10 })])));
+  const proof = recovery.read(requestId);
+  assert.equal(proof.providerRequests, 8);
+  assert.equal(proof.acceptedResults, 1);
+  assert.equal(proof.d1RowsRead, 185);
+});
+
 test('Queue continuation cannot certify another or missing admission', () => {
   const requestId = identity(1);
   const observation = createCostObservation();

@@ -116,7 +116,7 @@ const expectationSchema = z.discriminatedUnion('task', [
   z.strictObject({ status: z.literal(200), task: z.literal('discovery-lookup') }),
 ]);
 
-export function createCostObservation() {
+export function createCostObservation({ allowProviderContinuation = false } = {}) {
   const records = new Map();
   const expected = new Map();
   const matched = new Map();
@@ -161,11 +161,13 @@ export function createCostObservation() {
       if (counts.some(key => collector[key] === undefined)) fail('invalid-cost');
       const preProviderBackoff = collector.provider === 'none' && collector.providerRequests === 0
         && collector.acceptedResults === 0 && collector.result === 'backoff' && collector.queueSends === 1;
+      const providerContinuation = allowProviderContinuation && collector.provider !== 'none' && collector.providerRequests > 0
+        && collector.acceptedResults === 0 && collector.result === 'unchanged' && collector.queueSends === 1;
       if (collector.provider === 'none' && !preProviderBackoff) fail('provider-mismatch');
       if (collector.providerRequests === 0 && !preProviderBackoff) fail('no-provider-calls');
       if (collector.queueFailures > 0) fail('queue-failure');
       if (collector.acceptedResults === 0 && ['failed', 'backoff'].includes(collector.result) && collector.queueSends !== 1) fail('failed-result');
-      if (collector.acceptedResults === 0 && !['failed', 'backoff'].includes(collector.result)) fail('accepted-results');
+      if (collector.acceptedResults === 0 && !['failed', 'backoff'].includes(collector.result) && !providerContinuation) fail('accepted-results');
       if (collector.acceptedResults === 1 && ['failed', 'backoff'].includes(collector.result)) fail('failed-result');
       if (collector.acceptedResults > 1 || collector.acceptedResults === 1 && collector.result !== 'changed') fail('accepted-results');
     }
@@ -309,7 +311,8 @@ export function createCostObservation() {
   };
 }
 
-export function startCostObserver({ spawnProcess = spawn, killProcess = process.kill.bind(process), platform = process.platform } = {}) {
+export function startCostObserver({ allowProviderContinuation = false, spawnProcess = spawn,
+  killProcess = process.kill.bind(process), platform = process.platform } = {}) {
   // The CI observer owns a POSIX process group so npm's Wrangler descendants cannot outlive it.
   if (platform === 'win32') throw observerError('unsupported-platform');
   const env = { ...process.env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_SANITIZE: 'true', WRANGLER_SEND_METRICS: 'false',
@@ -322,7 +325,7 @@ export function startCostObserver({ spawnProcess = spawn, killProcess = process.
       '--format', 'json'], { cwd: new URL('../../', import.meta.url), env, detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
   } catch { throw observerError('failed'); }
   const groupId = child.pid;
-  const observation = createCostObservation();
+  const observation = createCostObservation({ allowProviderContinuation });
   let stopping = false;
   let exited = false;
   let closePromise;

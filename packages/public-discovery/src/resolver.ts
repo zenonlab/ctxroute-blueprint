@@ -42,7 +42,7 @@ const animeProviders = ['anilist', 'kitsu-anime'] as const;
 const mangaProviders = ['mangaupdates', 'mangadex', 'kitsu-manga'] as const;
 const mangaSearchProviders = ['mangadex', 'kitsu-manga', 'mangaupdates'] as const;
 const searchPageLimit = 4;
-const searchDurationMilliseconds = 20_000;
+const searchDurationMilliseconds = 38_000;
 
 class IncompleteProviderSearchError extends Error {
   constructor(reason: string) { super(`incomplete-provider-search:${reason}`); }
