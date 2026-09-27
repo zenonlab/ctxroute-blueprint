@@ -71,6 +71,10 @@ résume que les tâches Discovery et borne le flux reçu à 1 Mio, la fenêtre �
 échec du tail, flux invalide ou incomplet, absence d’événement ou absence
 d’appel fournisseur interdit une certification verte. La fin du canari,
 son échec ou une interruption ferme uniquement le groupe npm/Wrangler créé.
+Un `backoff` de cadence antérieur au transport peut légitimement porter
+`provider=none` et zéro appel s’il programme exactement une continuation avec
+le même identifiant de corrélation. Il reste non terminal et ne certifie rien
+avant l’événement corrélé qui appelle le fournisseur attendu et publie le résultat.
 
 Le format JSON de Wrangler ne fournit pas de signal de connexion prêt : les
 trois secondes de stabilisation avant le canari ne prouvent pas sa connexion.

@@ -1362,6 +1362,10 @@ Les écritures sont mesurées mais ne sont pas confondues avec les lectures.
 Un trafic étranger, un coût incomplet, un doublon ou une trace absente ne peut
 remplacer cette preuve. Une lecture de readiness peut légitimement coûter
 zéro ligne ; sa corrélation, et non un appel fournisseur, établit la réception.
+Un premier coût `backoff` sans fournisseur est accepté seulement s’il annonce
+une continuation Queue unique portant le même UUID. L’observateur attend alors
+le coût terminal corrélé; le total final doit toujours contenir l’appel réel
+au fournisseur attendu, faute de quoi le certificat reste `INCOMPLETE`.
 
 Le tail observe les invocations sans filtre textuel qui masquerait un échec
 CPU avant émission de coût. Un outcome anormal, une exception, un 429 ou un

@@ -159,8 +159,10 @@ export function createCostObservation() {
       || admission.result !== 'changed') fail('invalid-cost');
     for (const collector of selected) {
       if (counts.some(key => collector[key] === undefined)) fail('invalid-cost');
-      if (collector.provider === 'none') fail('provider-mismatch');
-      if (collector.providerRequests === 0) fail('no-provider-calls');
+      const preProviderBackoff = collector.provider === 'none' && collector.providerRequests === 0
+        && collector.acceptedResults === 0 && collector.result === 'backoff' && collector.queueSends === 1;
+      if (collector.provider === 'none' && !preProviderBackoff) fail('provider-mismatch');
+      if (collector.providerRequests === 0 && !preProviderBackoff) fail('no-provider-calls');
       if (collector.queueFailures > 0) fail('queue-failure');
       if (collector.acceptedResults === 0 && ['failed', 'backoff'].includes(collector.result) && collector.queueSends !== 1) fail('failed-result');
       if (collector.acceptedResults === 0 && !['failed', 'backoff'].includes(collector.result)) fail('accepted-results');
