@@ -180,6 +180,7 @@ export default defineBackground({
       if (existing?.scheduledTime !== undefined && existing.scheduledTime > Date.now()
         && (checkpoint?.status !== 'active' || existing.scheduledTime <= immediateDeadline)) return;
       await restoreFavoriteResolutionContinuation(browser.alarms, privateStorage.storage, resolutionOutbox);
+      await reconcileFavorites();
     };
     const readFavoriteStatus = async () => {
       await restoreFavoriteWake();
