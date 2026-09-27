@@ -6049,7 +6049,7 @@
         {
           "id": "verify-commit",
           "title": "Auditer et versionner le correctif borné",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Diff limité aux métadonnées fournisseur32, diagnostics expurgés, régressions et preuves documentaires déjà approuvées; archives, règles FAILED, hooks, permissions et migrations inchangés.",
             "Validation complète depuis clone indépendant propre sans suppression des audits utilisateur ni contournement des hooks.",
@@ -6071,12 +6071,16 @@
             "npm run archify:validate -- architecture",
             "git commit"
           ],
-          "evidence": []
+          "evidence": [
+            "Commit61355b2 vérifié; git hooks pré-commit verts, aucune modification Worker/migration/permission/workflow/archive.",
+            "Clone indépendant: npm run verify intégral vert après préparation identique CI; packaging isolé reproductible, E2E11/1skip, harnais36/36 et Archify architecture verts.",
+            "SHA background corrigé f257f2d9 identique au rejeu1522; aucune donnée privée exportée. Audits/worktrees existants conservés."
+          ]
         },
         {
           "id": "pr-ci",
           "title": "Pousser la PR et vérifier la CI",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "PR vers main avec preuves réelles agrégées, limites explicites et validations; workflow existant inchangé.",
             "Prévol CI vert sur le SHA exact avant fusion, apply désactivé hors main; déploiement normal main et sondes vérifiés après fusion.",
@@ -6094,7 +6098,10 @@
             "gh run view",
             "gh pr merge"
           ],
-          "evidence": []
+          "evidence": [
+            "Branche fix/public-discovery-candidate-metadata32; runner macOS ARM64 online/idle; PR prévue sans archive ni reprise historique.",
+            "Trois commits documentaires antérieurs inclus explicitement: preuve canaris, confirmation historique distincte, certification ancienne1.0.45."
+          ]
         }
       ]
     }

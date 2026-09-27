@@ -405,5 +405,5 @@
 
 ## Livrer le correctif des candidats Discovery prouvé sur la liste réelle — ACTIVE
 
-- [ ] **Auditer et versionner le correctif borné** — IN_PROGRESS
-- [ ] **Pousser la PR et vérifier la CI** — PENDING
+- [x] **Auditer et versionner le correctif borné** — DONE _(evidence: Commit61355b2 vérifié; git hooks pré-commit verts, aucune modification Worker/migration/permission/workflow/archive., Clone indépendant: npm run verify intégral vert après préparation identique CI; packaging isolé reproductible, E2E11/1skip, harnais36/36 et Archify architecture verts., SHA background corrigé f257f2d9 identique au rejeu1522; aucune donnée privée exportée. Audits/worktrees existants conservés.)_
+- [ ] **Pousser la PR et vérifier la CI** — IN_PROGRESS _(evidence: Branche fix/public-discovery-candidate-metadata32; runner macOS ARM64 online/idle; PR prévue sans archive ni reprise historique., Trois commits documentaires antérieurs inclus explicitement: preuve canaris, confirmation historique distincte, certification ancienne1.0.45.)_
