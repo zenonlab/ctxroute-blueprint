@@ -389,4 +389,4 @@
 
 ## Stabiliser la garde de plan Cloudflare sans relâcher ses bornes — DONE
 
-- [x] **Exclure la version Worker volatile du sceau** — DONE _(evidence: Tests infra 286/287 (1 skip) passent, dont l’absence de deployments status dans le sceau Worker., validate:decisions, validate:docs, Archify architecture et git diff --check passent., CI 36335521076 avait bloqué avant toute application; le correctif conserve les inspections D1/Queue/identité et le preview scellé.)_
+- [x] **Exclure la version Worker volatile du sceau** — DONE _(evidence: CI 36336224384 a confirmé le seul oubli d’attente; aucune étape Cloudflare n’a commencé., Suite infra complète 117/117 passe après mise à jour de cloudflare-queue-driver., Les contrôles initiaux restent verts : décisions, documentation, Archify architecture et git diff --check.)_
