@@ -1897,3 +1897,14 @@ priorité globale des correspondances. Le plafond théorique passe de 400 à
 100 appels fournisseur pour ce titre ; cela ne promet pas une résolution en
 douze minutes avec Queue, cadence et autres travaux. Les dix réservations
 `batch-003` restent consommées, le pilote échoué et la correction non déployée.
+
+Le prévol suivant de `batch-004` trouve dix MANGA éligibles par 16 lectures D1
+indexées, zéro écriture ou réservation. Wrangler local charge un ancien jeton
+API depuis `.env` et reçoit `9109` depuis la nouvelle IP de box. Une nouvelle
+session OAuth Wrangler, limitée aux 29 permissions déjà présentes, réussit
+sans modifier `.env`; l'injection en mémoire de cet OAuth permet le prévol.
+Le tail ne produit pas de preuve dans les dix premières secondes de la sonde
+du banc, mais reçoit une lecture `MISS` synthétique corrélée après une fenêtre
+plus longue. Le banc autorise donc au plus 24 sondes espacées de 2,5 secondes
+avant le bouton (délai de garde 75 secondes), puis échoue fermé sans POST si
+le tail reste absent. Ces lectures de démarrage restent hors budget par clé.

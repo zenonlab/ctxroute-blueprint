@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
-import { assertMangaProvidersRegistered, assertRecoveryProvidersRegistered, awaitRecoveryCompletion, buildScopedQuery, parseRecoveryArguments, reserveRecoveryPost,
+import { assertMangaProvidersRegistered, assertRecoveryProvidersRegistered, awaitObserverReady, awaitRecoveryCompletion, buildScopedQuery, parseRecoveryArguments, reserveRecoveryPost,
   safeFailureCode, selectRemainingCandidates, validateBatch, validateCandidateRow, validateScopedBatch, validateSourceScope } from './discovery-recovery-batch.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -60,6 +60,37 @@ test('waits for the terminal before its correlated cost window at 120 and 600 se
     assert.equal(context.elapsed(), terminalAt);
     assert.deepEqual(context.reads, { state: terminalAt / 15_000, cost: 2, close: 1 });
   }
+});
+
+test('waits through delayed tail startup before permitting a recovery admission', async () => {
+  let probes = 0;
+  const tracked = [];
+  const observer = {
+    check() {},
+    track(requestId) { tracked.push(requestId); },
+    read() { return probes >= 13 ? { task: 'discovery-lookup' } : undefined; },
+  };
+  await awaitObserverReady(observer, undefined, {
+    readState: async () => {
+      probes += 1;
+      return { requestId: `00000000-0000-4000-8000-${String(probes).padStart(12, '0')}`,
+        state: { state: 'MISS' } };
+    },
+    wait: async () => undefined,
+  });
+  assert.equal(probes, 13);
+  assert.equal(tracked.length, 13);
+  probes = 0;
+  observer.read = () => undefined;
+  await assert.rejects(awaitObserverReady(observer, undefined, {
+    readState: async () => {
+      probes += 1;
+      return { requestId: `00000000-0000-4000-8000-${String(probes).padStart(12, '0')}`,
+        state: { state: 'MISS' } };
+    },
+    wait: async () => undefined,
+  }), /discovery-recovery-observer-not-ready/u);
+  assert.equal(probes, 24);
 });
 
 test('reads a correlated cost delivered exactly at the final sixty-second boundary', async () => {

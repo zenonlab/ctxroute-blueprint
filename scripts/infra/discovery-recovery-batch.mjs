@@ -14,7 +14,7 @@ const requestIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3
 const sha256Pattern = /^[a-f0-9]{64}$/u;
 const batchIdPattern = /^[a-z][a-z0-9-]{2,47}$/u;
 const maxResponseBytes = 1024 * 1024;
-const readinessAttempts = 4;
+const readinessAttempts = 24;
 const readinessDelayMs = 2_500;
 const costObservations = 12;
 const costDelayMs = 5_000;
@@ -423,16 +423,16 @@ async function lookup(key, signal) {
   return { requestId: response.requestId, state: parseLookup(response.payload, key) };
 }
 
-export async function awaitObserverReady(observer, signal) {
+export async function awaitObserverReady(observer, signal, { wait = sleep, readState = lookup } = {}) {
   const key = { fingerprint: digest(`discovery-recovery-observer:${randomUUID()}`), mediaKind: 'MANGA',
     parserVersion: 'discovery-recovery-observer-v1', siteRulesVersion: 'recovery-v1' };
   const requestIds = [];
   for (let attempt = 1; attempt <= readinessAttempts; attempt += 1) {
-    const response = await lookup(key, signal);
+    const response = await readState(key, signal);
     if (response.state.state !== 'MISS' || !requestIdPattern.test(response.requestId ?? '')) throw recoveryError('observer-readiness');
     observer.track(response.requestId, { status: 200, task: 'discovery-lookup' });
     requestIds.push(response.requestId);
-    await sleep(readinessDelayMs, undefined, { signal });
+    await wait(readinessDelayMs, undefined, { signal });
     observer.check();
     if (requestIds.some(requestId => observer.read(requestId) !== undefined)) return;
   }

@@ -9,7 +9,7 @@ const nodeGlobals = Object.fromEntries([
   'structuredClone',
 ].map(name => [name, 'readonly']));
 
-const generatedIgnores = ['.agents/**', '.claude/skills/**', '.code-review-graph/**', '.ctxroute/**', 'coverage/**', '**/dist/**', '**/.next/**', '**/out/**', '**/.output/**', '**/.wxt/**', '**/node_modules/**', 'packages/code-review-graph/.venv/**'];
+const generatedIgnores = ['.agents/**', '.claude/skills/**', '.code-review-graph/**', '.ctxroute/**', 'build/**', 'coverage/**', '**/dist/**', '**/.next/**', '**/out/**', '**/.output/**', '**/.wxt/**', '**/node_modules/**', 'packages/code-review-graph/.venv/**'];
 
 export default [{
   ignores: generatedIgnores,

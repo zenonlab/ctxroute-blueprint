@@ -527,7 +527,7 @@ export async function createInstalledRecoveryObservation({ onFailure, recordAdmi
     void onFailure();
   };
   void observer.failed.catch(fail);
-  const readinessTimer = setTimeout(() => controller.abort(), 30_000);
+  const readinessTimer = setTimeout(() => controller.abort(), 75_000);
   try { await ready(observer, controller.signal); }
   catch (error) { await observer.close(); throw error; }
   finally { clearTimeout(readinessTimer); }
