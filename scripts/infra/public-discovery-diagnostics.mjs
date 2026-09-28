@@ -6,6 +6,34 @@ import { pathToFileURL } from 'node:url';
 const wranglerCli = resolve(dirname(createRequire(import.meta.url).resolve('wrangler/package.json')), 'wrangler-dist/cli.js');
 const common = ['--no-warnings', wranglerCli, 'd1', 'execute', 'tobirink-public', '--remote', '--config', 'apps/worker/wrangler.jsonc', '--json', '--command'];
 const failureCodes = new Set(['account-missing', 'account-invalid', 'access-denied', 'token-location-denied', 'authentication-failed', 'timeout', 'output-limit', 'command-unavailable', 'transport-failed', 'query-failed', 'response-invalid']);
+const tokenVerifyUrl = 'https://api.cloudflare.com/client/v4/user/tokens/verify';
+
+export async function verifyDiagnosticToken({ environment = process.env, request = globalThis.fetch } = {}) {
+  if (!environment.CLOUDFLARE_API_TOKEN) return { ok: false, code: 'token-missing' };
+  let response;
+  let payload;
+  try {
+    response = await request(tokenVerifyUrl, {
+      headers: { Authorization: `Bearer ${environment.CLOUDFLARE_API_TOKEN}` },
+      signal: globalThis.AbortSignal.timeout(5_000),
+    });
+    if (Number(response.headers?.get('content-length')) > 16_384) return { ok: false, code: 'token-response-invalid' };
+    const body = await response.text();
+    if (body.length > 16_384) return { ok: false, code: 'token-response-invalid' };
+    payload = JSON.parse(body);
+  } catch { return { ok: false, code: 'token-transport-failed' }; }
+  const httpStatus = Number.isInteger(response.status) ? response.status : null;
+  const cloudflareCode = Array.isArray(payload?.errors) && Number.isInteger(payload.errors[0]?.code) ? payload.errors[0].code : null;
+  if (Array.isArray(payload?.errors) && payload.errors.some(error => /Cannot use the access token from location\b/iu.test(error?.message ?? ''))) {
+    return { ok: false, code: 'token-location-denied', httpStatus, cloudflareCode };
+  }
+  if (payload?.result?.status === 'expired' || payload?.result?.status === 'disabled') {
+    return { ok: false, code: `token-${payload.result.status}`, httpStatus, cloudflareCode };
+  }
+  if (!response.ok || payload?.success !== true) return { ok: false, code: 'token-verification-failed', httpStatus, cloudflareCode };
+  if (payload?.result?.status !== 'active') return { ok: false, code: 'token-response-invalid', httpStatus, cloudflareCode };
+  return { ok: true, status: 'active' };
+}
 export function discoveryDiagnosticQueries(now) {
   if (new Date(now).toISOString() !== now) throw new TypeError('invalid-diagnostic-clock');
   return {
@@ -90,7 +118,7 @@ export function collectDiscoveryDiagnostics({ now = new Date().toISOString(), qu
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const report = collectDiscoveryDiagnostics();
+  const report = process.argv[2] === '--verify-token' ? await verifyDiagnosticToken() : collectDiscoveryDiagnostics();
   process.stdout.write(`${JSON.stringify(report)}\n`);
   if (!report.ok) process.exitCode = 1;
 }

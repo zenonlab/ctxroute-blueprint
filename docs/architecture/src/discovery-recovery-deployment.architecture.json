@@ -21,7 +21,7 @@
       "id": "githubCi",
       "type": "cloud",
       "label": "CI protégée GitHub",
-      "sublabel": "D1→Worker",
+      "sublabel": "jeton · D1→Worker",
       "tag": "main uniquement",
       "row": 1,
       "col": 0
