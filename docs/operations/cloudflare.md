@@ -1676,6 +1676,16 @@ au plus une demande historique expressément autorisée.
 
 ## Arrêt du pilote installé du 28 septembre 2026
 
+Le second essai autorisé `tdqu7R` s'arrête après six admissions corrélées et
+un doublon bloqué avant transmission. Les six réservations sont consommées,
+les quatre autres clés intactes; aucun renvoi n'est permis. La lecture de
+contrôle retrouve trois résultats `VERIFIED` et trois `PENDING`, sans certifier
+le coût ou la projection locale. Le timeout `PENDING` du navigateur ne doit
+pas réadmettre une demande : la candidate 1.0.48 conserve une lecture seule
+et un prochain contrôle au moins une minute plus tard. La Queue et sa
+continuation restent responsables de l'exécution; aucune garde serveur
+ni limite d'admission n'est assouplie.
+
 Le pilote privé `jfltzN`, explicitement autorisé sur dix identités, s'arrête
 après une réservation POST : `read-network-failed` pendant
 le redémarrage du navigateur. Aucune corrélation d'admission n'a été reçue;

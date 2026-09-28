@@ -72,9 +72,10 @@ describe('HttpPublicDiscoveryAdapter', () => {
     await expect(new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher).resolveOrRequest(actualKey, query)).resolves.toMatchObject({ state: 'UNAVAILABLE' });
     expect(fetcher).toHaveBeenCalledOnce();
   });
-  it('resubmits an overdue PENDING after restart and shares admission cadence with refresh', async () => {
+  it.each([false, true])('only observes overdue PENDING after restart with a stored clock %s', async storedClock => {
     vi.useFakeTimers(); vi.setSystemTime('2026-09-18T12:00:00.000Z');
     const clocks: Record<string, number> = {};
+    if (storedClock) clocks[`public-discovery-pending-v1:${JSON.stringify(key)}`] = Date.now() + 60_000;
     const storage = { get: async () => clocks, set: async (values: Record<string, number>) => { Object.assign(clocks, values); } };
     const fetcher = vi.fn(async () => Response.json({ state: 'PENDING', retryAt: new Date(Date.now() + 60_000).toISOString() }));
     await new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage).resolveOrRequest(key, query);
@@ -82,9 +83,20 @@ describe('HttpPublicDiscoveryAdapter', () => {
     vi.setSystemTime(Date.now() + 60_001);
     const restarted = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage);
     await restarted.resolveOrRequest(key, query);
-    expect(fetcher.mock.calls).toHaveLength(3);
-    await expect(restarted.requestRefresh(key)).rejects.toMatchObject({ code: 'ADMISSION_WAIT' });
-    expect(fetcher.mock.calls).toHaveLength(3);
+    expect(fetcher.mock.calls).toHaveLength(2);
+  });
+  it('never re-admits an explicitly recovered request when its polling deadline expires', async () => {
+    vi.useFakeTimers(); vi.setSystemTime('2026-09-28T12:00:00.000Z');
+    const clocks: Record<string, number> = {};
+    const storage = { get: async () => clocks, set: async (values: Record<string, number>) => { Object.assign(clocks, values); } };
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => Response.json({
+      state: 'PENDING', retryAt: '2026-09-28T12:01:00.000Z',
+    }, { status: init.method === 'POST' ? 202 : 200 }));
+    await new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage).requestRecovery(key, query);
+    vi.setSystemTime(Date.now() + 90_000);
+    const restarted = new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher, storage);
+    await expect(restarted.resolveOrRequest(key, query)).resolves.toEqual({ state: 'PENDING', retryAt: '2026-09-28T12:02:30.000Z' });
+    expect(fetcher.mock.calls.map(([, init]) => init.method)).toEqual(['POST', 'GET']);
   });
   it.each([[429, 'RATE_LIMITED'], [503, 'SERVICE_UNAVAILABLE'], [409, 'CONTRACT_CONFLICT']] as const)('classifies HTTP %s without leaking response content', async (status, code) => {
     const fetcher = vi.fn(async () => new Response('private payload', { status, headers: { 'Retry-After': '120' } }));

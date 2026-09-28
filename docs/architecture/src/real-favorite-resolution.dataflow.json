@@ -23,7 +23,7 @@
         "id": "retry-and-review",
         "label": "Reprise et Review",
         "focus": ["privateStore", "publicWorker", "publicD1", "review", "diagnostics"],
-        "note": "PENDING, admission limitée et Review sont conservés localement plutôt que perdus dans la bibliothèque."
+        "note": "PENDING est relu sans réadmission, même après échéance ou redémarrage; seul MISS admet automatiquement."
       }
     ]
   },

@@ -33,6 +33,11 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ## Décision
 
+Après admission, `PENDING` est observé sans second POST, y compris après
+expiration de `retryAt` ou redémarrage. Une échéance passée est bornée à une
+minute pour éviter une boucle locale. `MISS` conserve l'admission normale;
+`UNAVAILABLE` conserve la confirmation explicite de reprise.
+
 Le banc installé ne redémarre ni le service worker ni le navigateur pendant
 les admissions du pilote scellé. Il attend la projection locale et la preuve
 corrélée, met l'analyse en pause par l'interface, puis draine les routes avant

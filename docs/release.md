@@ -1,5 +1,22 @@
 # Extension packaging and rollback
 
+## Candidate 1.0.48 — PENDING sans réadmission
+
+Le second pilote autorisé `tdqu7R` conserve six admissions corrélées avant
+l'arrêt `duplicate-mutation-key` : la septième tentative est un doublon
+bloqué avant transmission. Quatre clés du lot restent intactes. Une lecture
+de contrôle des six clés admises retourne trois `VERIFIED` et trois `PENDING`;
+elle ne remplace pas une preuve de coût ni de projection dans Library.
+
+La cause est reproduite par trois régressions : l'adaptateur réadmettait
+automatiquement `PENDING` à l'expiration de son horloge. La candidate 1.0.48
+relit désormais cet état sans POST, y compris après redémarrage, et borne
+une échéance passée à une minute pour éviter une boucle locale. L'admission
+normale de `MISS` et la reprise explicite de `UNAVAILABLE` restent distinctes.
+Les 24 tests ciblés passent. Aucun reçu n'est supprimé ou réarmé; les fichiers
+1.0.47 et les preuves d'échec restent conservés. Le téléchargement public reste
+1.0.45; aucune nouvelle certification distante n'est revendiquée.
+
 ## Pilote autorisé — échec conservé
 
 Le pilote `jfltzN` utilise le ZIP exact 1.0.47 et les dix identités autorisées.
