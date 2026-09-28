@@ -7,8 +7,44 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createInstalledRecoveryObservation, createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
-import { restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
+import { reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
 import { reserveRecoveryPost } from '../../../scripts/infra/discovery-recovery-batch.mjs';
+
+describe('installed upgrade reload', () => {
+  const extensionId = 'a'.repeat(32);
+  function fixture(enabled = 'true', health = true) {
+    const developer = { getAttribute: vi.fn(async () => enabled), click: vi.fn() };
+    const reload = { click: vi.fn(), waitFor: vi.fn() };
+    const page = { goto: vi.fn(), evaluate: vi.fn(async () => ({ ok: health })),
+      locator: vi.fn(selector => selector === '#devMode' ? developer : reload) };
+    return { page, developer, reload };
+  }
+  it.each(['true', 'false'])('reloads the exact extension with developer mode %s', async enabled => {
+    const { page, developer, reload } = fixture(enabled);
+    await reloadInstalledReviewExtension(page, extensionId);
+    expect(page.goto.mock.calls).toEqual([['chrome://extensions/'], [`chrome-extension://${extensionId}/options.html`]]);
+    expect(developer.click).toHaveBeenCalledTimes(enabled === 'true' ? 0 : 1);
+    expect(page.locator).toHaveBeenCalledWith(`extensions-item[id="${extensionId}"] #dev-reload-button`);
+    expect(reload.click).toHaveBeenCalledOnce();
+    expect(reload.waitFor).toHaveBeenCalledWith({ state: 'visible' });
+    expect(page.evaluate).toHaveBeenCalledOnce();
+  });
+  it('refuses a malformed identity before opening browser settings', async () => {
+    const { page } = fixture();
+    await expect(reloadInstalledReviewExtension(page, 'invalid')).rejects.toThrow('complete Chrome extension identity');
+    expect(page.goto).not.toHaveBeenCalled();
+  });
+  it('does not certify a reload when its UI action fails', async () => {
+    const { page, reload } = fixture();
+    reload.click.mockRejectedValue(new Error('reload-failed'));
+    await expect(reloadInstalledReviewExtension(page, extensionId)).rejects.toThrow('reload-failed');
+    expect(page.evaluate).not.toHaveBeenCalled();
+  });
+  it('requires a healthy runtime after reload', async () => {
+    const { page } = fixture('true', false);
+    await expect(reloadInstalledReviewExtension(page, extensionId)).rejects.toThrow('must answer its health check');
+  });
+});
 
 describe('installed diagnostic failure sample', () => {
   it('bounds the sample and emits only closed codes and operations', () => {

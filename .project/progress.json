@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,18 +6294,18 @@
             "git diff --check"
           ],
           "evidence": [
-            "Candidate1.0.46 : export publicDiscovery v1-v5, lots1-10, réservation commune pilote/CLI, observation corrélée et POST45s ; route XPI et gate finale version/commit/MIME/SHA/payload Firefox sans modifier permissions ou comptes.",
-            "npm run verify intégral réussi sur clone propre du diff :137 tests infra, tous workspaces, couverture, typechecks, performance, CRG, intégration, audit0 vulnérabilité et vues showcase9/9. Six erreurs ESLint des anciens scripts privés restent intactes dans l'espace historique.",
-            "E2E Web11 succès/1 ignoré ; banc42 tests ; aller-retour exact1522 sources/805 œuvres publicDiscovery ; archives Chrome et Firefox reproduites par deux builds isolés.",
-            "Gate fermée avant canaris sans publication-manifest.json et XPI ; signature structurelle seule ne certifie pas Firefox. Transport des fichiers certifiés vers CI non configuré ; aucun secret ni droit ajouté.",
-            "Firefox156.0.1 installé et web-ext10.7.0 disponible ; aucun navigateur connecté à Codex ni accès Mozilla configuré. Pilote nécessite confirmation immédiate du lot exact ; aucun réarmement/admission ni publication effectué.",
-            "Préparation du commit fonctionnel et de la CI sur branche : aucun apply Worker, canari ou objet public sur cette branche. Import neuf hors ligne prolongé dans un profil séparé, résultats encore en cours."
+            "PR148 fusionnée : commits fonctionnels a19c40a et af5248e ; merge c51a2c0915797ec009680a152111b7271e74c013. CI protégée36358734333 SUCCESS sur af5248e ; premier échec E2E36358211431 conservé, attente initiale de l'inventaire corrigée puis E2E11 succès/1 ignoré.",
+            "npm run verify intégral réussi en clone propre,137 tests infra, tous workspaces, couverture, typechecks, performance, CRG, intégration, audit0 vulnérabilité, Archify architecture et vues modifiées showcase9/9. Hooks commit et push actifs.",
+            "Candidate1.0.46 : publicDiscovery v1-v5, aller-retour privé1522 sources/805 œuvres, lots1-10 toutes identités média connues, réservation commune pilote/CLI, POST45s et observation corrélée. Archives reproduites indépendamment.",
+            "Publication séparée du build : manifeste final version/commit/format/MIME/taille/SHA, XPI à payload identique et signature structurelle ; lecture bornée des noms attendus depuis un brouillon GitHub avec droits existants. Signature réelle et transport distant encore à certifier.",
+            "Import neuf exact hors ligne lhJsdT :1522 sources,1483 retryables attendus et39 sans identité,0 traitement actif/erreur interne/œuvre projetée manquante à940s ; worker puis navigateur redémarrés ;0 sortie réseau/admission. Ne prouve pas convergence en ligne.",
+            "Le workflow main36359066098 est en cours, sans canari ni publication demandés ; le pointeur public reste1.0.45. Aucune reprise D1 effectuée ; Mozilla non configuré et Chrome toujours déconnecté."
           ]
         },
         {
           "id": "pilot",
           "title": "Prouver dix reprises depuis le bouton",
-          "status": "TODO",
+          "status": "BLOCKED",
           "acceptance": [
             "Confirmation immédiate du lot exact avant reprise",
             "Chaîne bouton à Library corrélée et coût certifié"
@@ -6317,7 +6317,12 @@
           "commands": [
             "node apps/extension/scripts/installed-review.mjs"
           ],
-          "evidence": []
+          "evidence": [
+            "CI main36359066098 SUCCESS sur c51a2c0915797ec009680a152111b7271e74c013 ; Worker déployé via gate, canaris/publication skipped ; pointeur public1.0.45 inchangé.",
+            "Prévol actualisé :10 candidats éligibles (6 MANGA/4 MANHWA),3 fournisseurs READY,16 lectures D1/0 écriture,0 réservation existante parmi ces clés.",
+            "Confirmation immédiate demandée pour le seul lot privé pilot-real-list-20260928.html / discovery-recovery-source-real-list-20260927.json, sceau8a1e172154b21058e1e3fd2f74095e04bf2c9b10563c63a451601db633846d30. Aucune réponse à cette autorisation précise pour l'instant ; aucun clic ni POST exécuté.",
+            "Ce blocage porte sur l'autorisation de réarmement D1, pas sur le développement. Aucun lot suivant ne peut être élargi sans la preuve du pilote."
+          ]
         },
         {
           "id": "converge",
@@ -6339,7 +6344,7 @@
         {
           "id": "certify",
           "title": "Certifier Chrome et Firefox durablement",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "ZIP exact et XPI signé testés, conservation après mise à jour et deux redémarrages"
           ],
@@ -6351,7 +6356,10 @@
           "commands": [
             "npm run package:extension"
           ],
-          "evidence": []
+          "evidence": [
+            "Preuve privée upgrade-preservation-trumND : copie réelle1.0.45 vers ZIP1.0.46 exact, bouton Chrome Recharger, export/restauration chiffrés réels, deux redémarrages ;1522 sources/805 œuvres/766 progressions/44 Review conservées, original inchangé, zéro réseau transmis.",
+            "Ancien background persistant reproduit malgré manifeste actualisé ; banc corrigé avec rechargement UI et santé,47 tests passent. Hors ligne en pause : caches invalidés, total Library1309→805 ; reconstruction des cartes en attente encore à vérifier. Firefox signé et convergence non certifiés."
+          ]
         },
         {
           "id": "publish",

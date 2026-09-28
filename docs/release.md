@@ -69,6 +69,12 @@ l'inventaire, sans accepter un état incomplet ni ajouter de retry au produit.
 Le run d'échec `36358211431` reste conservé; seul un nouveau run vert pourra
 certifier la candidate.
 
+La PR 148 est fusionnée au commit `c51a2c0915797ec009680a152111b7271e74c013`.
+Le prévol protégé `36358734333` passe sur `af5248e`, puis le workflow main
+`36359066098` passe et déploie le Worker par la gate habituelle. Les canaris et
+la publication d'archives sont ignorés; le pointeur public reste en 1.0.45.
+Ce résultat valide la candidate intégrée, pas les critères de livraison finale.
+
 Vérifications locales de la candidate : suites des workspaces, 137 tests infra,
 42 tests du banc installé, migrations navigateur et aller-retour privé de
 1 522 sources et 805 œuvres avec `publicDiscovery` réussis. Les E2E Web en
@@ -86,15 +92,40 @@ scripts privés dans `build/audits`, laissés intacts; la performance non filtr�
 découvre aussi d'anciens worktrees dont les configurations WXT sont absentes.
 Aucun artefact historique n'est supprimé ou exclu de la configuration pour
 verdir le bilan : la preuve complète vient du clone propre.
-Le nouvel import intégral hors ligne conserve les 1 522 sources après les
-redémarrages mais reste incomplet à 240 secondes; il ne certifie pas Library.
+Le premier import intégral hors ligne reste incomplet à 240 secondes et sa
+preuve est conservée. Un nouveau profil isolé termine à 940 secondes :
+1 522 sources, 1 483 retryables attendus hors ligne, 39 sans identité publique,
+zéro traitement actif, erreur interne ou œuvre projetée manquante. Le service
+worker puis le navigateur sont redémarrés. Aucun appel réseau n'est transmis;
+les échecs réseau attendus restent retryables, sans Review fabriquée. Cette
+preuve valide l'import et la conservation hors ligne, pas la résolution en ligne.
 
-Firefox stable 156.0.1 est installé localement et `web-ext` 10.7.0 est disponible
-via le cache npm. Aucun accès Mozilla n'est configuré. Le connecteur Chrome
+Firefox stable 156.0.1 et la commande globale `web-ext` 10.7.0 sont installés
+localement. Aucun accès Mozilla n'est configuré. Le connecteur Chrome
 installé ne dispose pas de son manifeste de messagerie native : sa réparation
 passe par la réinstallation du plugin dans l'interface Codex/ChatGPT, puis par
 la connexion humaine à Mozilla. Aucun compte, secret, droit ni réglage de
 signature n'a été créé implicitement.
+
+La mise à jour hors ligne du profil réel copié 1.0.45 vers le ZIP exact 1.0.46
+réussit avec le bouton **Recharger** de `chrome://extensions`, sans
+désinstallation. Remplacer les fichiers et relire le manifeste ne suffit pas :
+le banc a observé l'ancien background et un export refusé jusqu'au rechargement.
+Le banc impose maintenant ce bouton et une réponse de santé, avec cinq
+régressions supplémentaires. Pour une mise à jour manuelle, conserver le chemin
+d'extraction stable, remplacer le code, puis cliquer Recharger sur TobiRink.
+
+La preuve privée `upgrade-preservation-trumND` vérifie ensuite les vrais boutons
+d'export chiffré et de restauration, puis deux redémarrages navigateur :
+1 522 sources, 805 œuvres avec hydratation publique, 766 progressions et
+44 Review conservées sémantiquement, sans requête externe transmise. Le profil
+original reste byte-identique et son ancien code est restauré. Les différences
+d'ordre des propriétés JSON ne sont pas assimilées à une perte de données.
+Cette preuve reste partielle : le profil est en pause et les caches dérivés
+sont invalidés par la restauration. Le total Library passe de 1 309 à 805,
+les 805 œuvres hydratées restant présentes; la reconstruction des cartes en
+attente doit encore être vérifiée après reprise. Aucun succès de convergence
+ni de signature Firefox n'est déduit de ce contrôle de conservation.
 
 ## Publication 1.0.45 — canaris et profil réel — 27 septembre 2026
 

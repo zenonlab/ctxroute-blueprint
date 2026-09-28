@@ -16,7 +16,7 @@
         "id": "runtime-proof",
         "label": "Preuves navigateur",
         "focus": ["browserBuilds", "chromeRuntime", "firefoxRuntime", "releaseGate"],
-        "note": "Profil Chromium isolé : import, upgrade, arrêts MV3 et navigateur; conservation privée et compteurs à plusieurs échéances."
+        "note": "Profil isolé : import, upgrade avec Recharger, export/restauration et redémarrages; le manifeste seul ne prouve pas le runtime."
       },
       {
         "id": "release-artifacts",
