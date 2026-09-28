@@ -1,5 +1,17 @@
 # Extension packaging and rollback
 
+## Pilote autorisé — échec conservé
+
+Le pilote `jfltzN` utilise le ZIP exact 1.0.47 et les dix identités autorisées.
+Il s'arrête après un POST transmis et trois lectures, au redémarrage prématuré
+du navigateur (`read-network-failed`). Aucune corrélation d'admission reçue,
+donc aucune preuve fournisseur ou Library revendiquée. Une lecture de contrôle
+renvoie `UNAVAILABLE`; la réservation reste consommée sans répétition.
+Les neuf autres clés n'ont pas été soumises. Le banc est corrigé localement
+pour attendre corrélation, pause et drainage avant redémarrage; ses 49 tests
+passent après deux régressions rouges. Aucun nouveau pilote ni téléchargement
+public n'est lancé sur la base de ce seul correctif.
+
 ## Candidate 1.0.47 — restauration sans invalidation artificielle
 
 La candidate 1.0.46 et ses preuves restent conservées, sans promotion publique.

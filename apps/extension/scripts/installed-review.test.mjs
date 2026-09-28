@@ -7,8 +7,35 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createInstalledRecoveryObservation, createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
-import { reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
+import { prepareInstalledRecoveryRestart, reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
 import { reserveRecoveryPost } from '../../../scripts/infra/discovery-recovery-batch.mjs';
+
+describe('installed recovery restart preparation', () => {
+  it('waits for correlation before pausing and draining live routes', async () => {
+    const events = [];
+    let complete;
+    const completion = new Promise(resolve => { complete = resolve; });
+    const observer = { finish: vi.fn(async () => { await completion; events.push('correlated'); return ['cost']; }) };
+    const page = { getByRole: vi.fn(() => ({ click: async () => { events.push('paused'); } })) };
+    const guard = { drain: async () => { events.push('drained'); }, throwIfFailed: () => { events.push('checked'); } };
+    const pending = prepareInstalledRecoveryRestart(page, guard, observer, 10);
+    await Promise.resolve();
+    expect(events).toEqual([]);
+    complete();
+    await expect(pending).resolves.toEqual(['cost']);
+    expect(observer.finish).toHaveBeenCalledWith(10);
+    expect(events).toEqual(['correlated', 'paused', 'drained', 'checked']);
+    expect(page.getByRole).toHaveBeenCalledWith('button', { name: 'Mettre en pause', exact: true });
+  });
+
+  it('does not proceed to a restart after correlation failure', async () => {
+    const page = { getByRole: vi.fn() };
+    const guard = { drain: vi.fn() };
+    await expect(prepareInstalledRecoveryRestart(page, guard, { finish: async () => { throw new Error('late-failure'); } }, 10)).rejects.toThrow('late-failure');
+    expect(page.getByRole).not.toHaveBeenCalled();
+    expect(guard.drain).not.toHaveBeenCalled();
+  });
+});
 
 describe('installed upgrade reload', () => {
   const extensionId = 'a'.repeat(32);

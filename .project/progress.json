@@ -6302,7 +6302,7 @@
         {
           "id": "pilot",
           "title": "Prouver dix reprises depuis le bouton",
-          "status": "BLOCKED",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Confirmation immédiate du lot exact avant reprise",
             "Chaîne bouton à Library corrélée et coût certifié"
@@ -6315,8 +6315,8 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Après CI principale36363397552 SUCCESS, nouveau prévol du même scope :10 candidats éligibles,6 MANGA/4 MANHWA; Kitsu et MangaDex READY, MangaUpdates DEFERRED;16 lectures indexées,0 écriture.",
-            "Confirmation immédiate renouvelée pour le seul lot discovery-recovery-source-real-list-20260927.json, sceau8a1e172154b21058e1e3fd2f74095e04bf2c9b10563c63a451601db633846d30, sur candidate1.0.47. Aucun accord explicite reçu pour ce lot, aucun clic/POST/rearm exécuté; aucun élargissement permis avant sa preuve."
+            "Autorisation reçue pour10clés seulement. PilotejfltzN sur ZIP47 exact :1POST transmis/réservé,3lectures ; arrêt read-network-failed au browser-restart. Aucune corrélation reçue ; lookup ultérieur200/UNAVAILABLE ; réservation conservée,0renvoi,9clés non soumises.",
+            "Régression2rouges puis49tests verts : corrélation, pause et drainage avant redémarrages du pilote. Archify architecture/dataflow, ADR/docs,ESLint et diff-check passent. Correction locale en validation ; aucune convergence ni certification du lot revendiquée."
           ]
         },
         {

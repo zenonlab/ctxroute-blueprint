@@ -22,6 +22,14 @@ function integer(value, fallback, minimum, maximum) {
   return parsed;
 }
 
+export async function prepareInstalledRecoveryRestart(page, networkGuard, recoveryObservation, expected) {
+  const costs = await recoveryObservation.finish(expected);
+  await page.getByRole('button', { name: 'Mettre en pause', exact: true }).click();
+  await networkGuard.drain();
+  networkGuard.throwIfFailed();
+  return costs;
+}
+
 export function installedReviewConfig(env = process.env) {
   const online = env.TOBIRINK_REAL_RUN === '1';
   assert.ok(!online || env.TOBIRINK_FAVORITES_EXPORT, 'Online testing requires an explicit private bookmark export.');
@@ -429,17 +437,22 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       upgraded = true;
       log({ event: 'installed-upgrade', previousVersion: oldVersion, version: session.version, retained: true });
     }
-    stage = 'service-worker-restart';
-    const workerRestartObserved = await restartInstalledReviewWorker(context, page, session.extensionId, Math.min(deadline - 15_000, Date.now() + 15_000));
-    const afterWorker = await observe('after-service-worker-restart');
-    assertPreserved(before, afterWorker, session.expected);
-    stage = 'browser-restart';
-    await closeContext();
-    debugging = await launch();
-    page = await context.newPage();
-    await loadExtension();
-    const afterBrowser = await observe('after-browser-restart');
-    assertPreserved(afterWorker, afterBrowser, session.expected);
+    let workerRestartObserved;
+    const verifyRestarts = async baseline => {
+      stage = 'service-worker-restart';
+      workerRestartObserved = await restartInstalledReviewWorker(context, page, session.extensionId, Math.min(deadline - 15_000, Date.now() + 15_000));
+      const afterWorker = await observe('after-service-worker-restart');
+      assertPreserved(baseline, afterWorker, session.expected);
+      stage = 'browser-restart';
+      await closeContext();
+      debugging = await launch();
+      page = await context.newPage();
+      await loadExtension();
+      const afterBrowser = await observe('after-browser-restart');
+      assertPreserved(afterWorker, afterBrowser, session.expected);
+      return afterBrowser;
+    };
+    const afterBrowser = recoveryObservation === undefined ? await verifyRestarts(before) : before;
     stage = 'observe';
     let milestoneIndex = 0;
     let lastProgress = 0;
@@ -463,11 +476,17 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     }
     const final = await observe('final');
     assertPreserved(afterBrowser, final, session.expected);
+    let correlatedCosts;
+    if (recoveryObservation !== undefined) {
+      stage = 'recovery-correlation';
+      correlatedCosts = await prepareInstalledRecoveryRestart(page, networkGuard, recoveryObservation, sourceScope.entries.length);
+      await verifyRestarts(final);
+    }
     await closeContext();
     await networkGuard.drain();
     networkGuard.throwIfFailed();
     const networkEvidence = networkGuard.snapshot();
-    if (recoveryObservation !== undefined) networkEvidence.correlatedCosts = await recoveryObservation.finish(sourceScope.entries.length);
+    if (correlatedCosts !== undefined) networkEvidence.correlatedCosts = correlatedCosts;
     assert.equal(networkEvidence.inFlight, 0, 'Installed-review network handlers must drain before certification.');
     if (!config.online) {
       assert.ok(networkEvidence.attemptedMutations >= 1, 'Offline smoke must observe a blocked mutation attempt.');

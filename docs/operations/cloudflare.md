@@ -1673,3 +1673,17 @@ vérifie les redémarrages et termine `incomplete`. Les 640 `ADMISSION_WAIT`,
 de déclarer la convergence. Cette preuve ne justifie aucun réarmement massif :
 déployer d'abord le correctif, exiger un canari par titre corrélé, puis reprendre
 au plus une demande historique expressément autorisée.
+
+## Arrêt du pilote installé du 28 septembre 2026
+
+Le pilote privé `jfltzN`, explicitement autorisé sur dix identités, s'arrête
+après une réservation et un POST transmis : `read-network-failed` pendant
+le redémarrage du navigateur. Aucune corrélation d'admission n'a été reçue;
+le résultat distant du POST n'est donc pas certifié. La lecture de contrôle
+indexée d'une seule clé renvoie HTTP 200 / `UNAVAILABLE`. La réservation
+reste consommée; aucun renvoi, autre lot ou élargissement n'est exécuté.
+
+Le banc diffère désormais les redémarrages du pilote après la projection,
+la corrélation, la pause explicite et le drainage des routes. Les preuves de
+l'échec restent privées et intactes. Ce correctif local ne certifie pas les
+dix reprises et ne permet pas de rejouer la clé interrompue.
