@@ -6315,8 +6315,8 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Autorisation reçue pour10clés seulement. PilotejfltzN sur ZIP47 exact :1POST transmis/réservé,3lectures ; arrêt read-network-failed au browser-restart. Aucune corrélation reçue ; lookup ultérieur200/UNAVAILABLE ; réservation conservée,0renvoi,9clés non soumises.",
-            "Régression2rouges puis49tests verts : corrélation, pause et drainage avant redémarrages du pilote. Archify architecture/dataflow, ADR/docs,ESLint et diff-check passent. Correction locale en validation ; aucune convergence ni certification du lot revendiquée."
+            "Autorisation reçue pour10clés seulement. PilotejfltzN sur ZIP47 exact :1réservationPOST,3lectures ; arrêt read-network-failed au browser-restart. Aucune réception/admission distante confirmée ; lookup ultérieur200/UNAVAILABLE ; réservation conservée,0renvoi,9clés non soumises.",
+            "Correctif9b7e1f1 : corrélation, pause et drainage avant redémarrages du pilote ; régression2rouges puis49verts, extension241/241, opératoires68/68. npm run verify intégral passe en clone propre avec hooks actifs ; architecture et discovery-recovery.dataflow showcase sans diagnostic. Aucun nouveau POST ; lot non certifié."
           ]
         },
         {

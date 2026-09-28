@@ -3,9 +3,9 @@
 ## Pilote autorisé — échec conservé
 
 Le pilote `jfltzN` utilise le ZIP exact 1.0.47 et les dix identités autorisées.
-Il s'arrête après un POST transmis et trois lectures, au redémarrage prématuré
+Il s'arrête après une réservation POST et trois lectures, au redémarrage prématuré
 du navigateur (`read-network-failed`). Aucune corrélation d'admission reçue,
-donc aucune preuve fournisseur ou Library revendiquée. Une lecture de contrôle
+donc aucune réception distante, preuve fournisseur ou Library revendiquée. Une lecture de contrôle
 renvoie `UNAVAILABLE`; la réservation reste consommée sans répétition.
 Les neuf autres clés n'ont pas été soumises. Le banc est corrigé localement
 pour attendre corrélation, pause et drainage avant redémarrage; ses 49 tests

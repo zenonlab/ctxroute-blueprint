@@ -1677,9 +1677,9 @@ au plus une demande historique expressément autorisée.
 ## Arrêt du pilote installé du 28 septembre 2026
 
 Le pilote privé `jfltzN`, explicitement autorisé sur dix identités, s'arrête
-après une réservation et un POST transmis : `read-network-failed` pendant
+après une réservation POST : `read-network-failed` pendant
 le redémarrage du navigateur. Aucune corrélation d'admission n'a été reçue;
-le résultat distant du POST n'est donc pas certifié. La lecture de contrôle
+la réception et le résultat distants du POST ne sont donc pas certifiés. La lecture de contrôle
 indexée d'une seule clé renvoie HTTP 200 / `UNAVAILABLE`. La réservation
 reste consommée; aucun renvoi, autre lot ou élargissement n'est exécuté.
 
