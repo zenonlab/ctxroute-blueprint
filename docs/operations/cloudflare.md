@@ -1676,6 +1676,18 @@ au plus une demande historique expressément autorisée.
 
 ## Arrêt du pilote installé du 28 septembre 2026
 
+Le diagnostic ciblé du profil complet `JB9dN3` lit cinq clés sans écriture.
+Les quatre attentes manga n'ont aucun curseur persisté; la composition Worker
+omettait le quatrième argument `searchProgress` du port `defer`. Une régression
+intégrée reproduit cette perte après quatre pages, indépendamment de l'état
+des fournisseurs, puis sa perte lors d'un report de cadence ultérieur. Le
+correctif transmet le nouveau curseur ou conserve celui déjà réclamé sans modifier les claims,
+la Queue ou les règles de reprise. Les états distants doivent encore être
+observés après livraison; aucun `FAILED` n'est réarmé par ce correctif.
+La cinquième clé correspond à un résultat négatif expiré : une nouvelle
+admission normale reste distincte d'une reprise épuisée et n'est pas autorisée
+par le test en lecture seule.
+
 Le pilote `JH9olk`, autorisé après le correctif de coût, atteint dix sources
 expliquées à 138 secondes : neuf œuvres dans Library et une exclusion
 `BLOCKED_CONTENT_TAXONOMY` par la règle métier existante. Les snapshots après

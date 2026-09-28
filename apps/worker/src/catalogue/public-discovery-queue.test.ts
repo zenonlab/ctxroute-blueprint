@@ -74,6 +74,66 @@ async function preserveProviderRuntime() {
 }
 
 describe('public discovery queue trigger', () => {
+  it.each([false, true])('carries the fourth-page checkpoint through the Worker gateway with later cadence deferral %s', async (laterDeferral) => {
+    const restoreRuntime = await preserveProviderRuntime();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-04T00:00:00.000Z'));
+    const discoveryKey = { ...key('c'), fingerprint: (laterDeferral ? 'c06' : 'c05').padStart(64, '0') };
+    const title = 'Synthetic Checkpoint River';
+    const media = { id: 97531, type: 'ANIME', format: 'TV', genres: [], synonyms: [], siteUrl: null,
+      title: { romaji: title, english: null, native: null }, coverImage: { extraLarge: null, large: null, medium: null } };
+    const pages: number[] = [];
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      expect(String(input)).toBe('https://graphql.anilist.co');
+      const body: { variables: { page?: number; id?: number } } = JSON.parse(String(init?.body));
+      vi.setSystemTime(Date.now() + 10_000);
+      if (body.variables.id !== undefined) return Response.json({ data: { Media: media } });
+      const page = body.variables.page!;
+      pages.push(page);
+      return Response.json({ data: { Page: { media: page === 5 ? [media] : [], pageInfo: { hasNextPage: page < 5 } } } });
+    });
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = { metrics: async () => metrics, send: vi.fn(async (_signal: NativeCollectorSignal) => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    const bindings = { ...env, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: queue };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const correlationId = '00000000-0000-4000-8000-000000000015';
+    try {
+      await adapter.request({ ...submission('c', title), key: discoveryKey, requestDigest: 'f'.repeat(64) }, new Date().toISOString());
+      expect(await processPublicDiscoveryQueue(bindings, discoveryKey, true, correlationId))
+        .toMatchObject({ claimed: 1, deferred: 1, published: 0, continuationScheduled: true });
+      expect(pages).toEqual([1, 2, 3, 4]);
+      const checkpoint = await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+        .bind(discoveryKey.fingerprint).first<{ state: string; attempts: number; progress: string }>();
+      expect(checkpoint).toMatchObject({ state: 'PENDING', attempts: 0 });
+      expect(JSON.parse(checkpoint!.progress)).toEqual({ candidates: [], cursor: '5', provider: 'anilist', titleIndex: 0, version: 1 });
+      let signal = queue.send.mock.calls[0]![0];
+      if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
+      expect(signal.correlationId).toBe(correlationId);
+      expect(signal.continuationToken).toHaveLength(43);
+      vi.setSystemTime(Date.now() + 10_000);
+      if (laterDeferral) {
+        await env.PUBLIC_DB.prepare("UPDATE public_discovery_provider_runtime SET next_allowed_at = ?1 WHERE provider IN ('anilist', 'kitsu-anime')")
+          .bind(Date.now() + 120_000).run();
+        expect(await processPublicDiscoveryQueue(bindings, undefined, true, signal.correlationId, signal.continuationToken))
+          .toMatchObject({ claimed: 1, deferred: 1, published: 0, metrics: { providerRequests: 0 } });
+        expect(await env.PUBLIC_DB.prepare('SELECT search_progress_json AS progress, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+          .bind(discoveryKey.fingerprint).first()).toEqual({ progress: checkpoint!.progress, attempts: 0 });
+        signal = queue.send.mock.calls.at(-1)![0];
+        if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
+        expect(signal.correlationId).toBe(correlationId);
+        vi.setSystemTime(Date.now() + 120_000);
+      }
+      expect(await processPublicDiscoveryQueue(bindings, undefined, true, signal.correlationId, signal.continuationToken))
+        .toMatchObject({ claimed: 1, deferred: 0, published: 1 });
+      expect(pages).toEqual([1, 2, 3, 4, 5]);
+      expect(provider).toHaveBeenCalledTimes(6);
+      await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'VERIFIED' });
+    } finally {
+      provider.mockRestore(); vi.useRealTimers();
+      await restoreRuntime();
+    }
+  });
+
   it.each([false, true])('continues an exact manga admission through cadence and an early wake with competing generic wake %s', async (competingWake) => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });
