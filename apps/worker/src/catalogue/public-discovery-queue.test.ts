@@ -74,6 +74,39 @@ async function preserveProviderRuntime() {
 }
 
 describe('public discovery queue trigger', () => {
+  it('retains the sanitized cause and correlated cost when a direct claim fails', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2100-01-01T00:00:00.000Z'));
+    const discoveryKey = { ...key('c'), fingerprint: 'c07'.padStart(64, '0') };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    await adapter.request({ ...submission('c', 'Synthetic diagnostic'), key: discoveryKey, requestDigest: 'f'.repeat(64) }, new Date().toISOString());
+    const originalClaim = D1PublicDiscoveryV3Adapter.prototype.claimBatch;
+    const claim = vi.spyOn(D1PublicDiscoveryV3Adapter.prototype, 'claimBatch').mockImplementationOnce(async function (this: D1PublicDiscoveryV3Adapter, input) {
+      await originalClaim.call(this, input);
+      throw new Error('D1_ERROR: private title https://private.example/secret');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const correlationId = '00000000-0000-4000-8000-000000000017';
+    try {
+      await expect(processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, discoveryKey, true, correlationId))
+        .rejects.toThrow('public-discovery-processing-failed');
+      expect(claim).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'collector-d1' }));
+      const costs = info.mock.calls.map(([entry]) => JSON.parse(String(entry))).filter(entry => entry.type === 'worker.cost');
+      expect(costs).toHaveLength(1);
+      expect(costs[0]).toMatchObject({ task: 'discovery', correlationId, result: 'failed', providerRequests: 0 });
+      expect(costs[0].d1RowsRead).toBeGreaterThan(0);
+      expect(costs[0].d1RowsWritten).toBeGreaterThan(0);
+      expect(JSON.stringify([...warn.mock.calls, ...info.mock.calls])).not.toMatch(/private title|private\.example/u);
+    } finally {
+      claim.mockRestore();
+      warn.mockRestore();
+      info.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it.each([false, true])('carries the fourth-page checkpoint through the Worker gateway with later cadence deferral %s', async (laterDeferral) => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });

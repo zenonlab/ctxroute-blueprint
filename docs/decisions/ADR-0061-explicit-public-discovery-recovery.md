@@ -139,6 +139,11 @@ page 5 et publication vérifiée sans rejouer les pages précédentes.
 Le CLI de reprise reste limité aux échecs épuisés : les MISS relèvent de
 l'admission normale, les PENDING de l'observation, sans réarmement implicite.
 
+Un échec de collecte directe conserve aussi son code interne fermé et son coût
+réel corrélé avant de remonter le HTTP 503. Le message brut de l'exception reste
+privé. Cette preuve ne change ni l'état de la demande ni les règles de reprise :
+une admission interrompue conserve sa réservation et n'est jamais rejouée.
+
 ## Conséquences
 
 Un claim générique ne reprend pas un jeton PENDING attribué depuis moins de

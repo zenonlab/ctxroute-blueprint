@@ -6294,9 +6294,10 @@
             "git diff --check"
           ],
           "evidence": [
-            "Deux pertes de curseur reproduites en intégration Worker: quatrième argument omis, puis effacement lors d’un report de cadence sans nouveau checkpoint.",
-            "Correction minimale du gateway.defer: nouveau searchProgress prioritaire, sinon conservation du checkpoint de la requête.205 tests Worker et tous typechecks verts; npm run verify complet réussi en clone propre.",
-            "Archify dataflow/architecture verts; recovery dataflow quatre viewports sans débordement. Livraison protégée du correctif à effectuer; claim1,Queue1/1,budgets et reprise explicite inchangés."
+            "PR154 conserve sa livraison verte et la réparation des curseurs. Le pilote suivant q8QmHm révèle un HTTP 503 direct dont la cause et le coût collecteur étaient perdus.",
+            "Régression reproduite puis corrigée : erreur après claim D1, coût réel et UUID conservés, message privé absent, aucune nouvelle tentative. 206 tests Worker, typecheck et npm run verify dans clone propre réussis.",
+            "Archify dataflow/architecture et visual-check réussis ; quatre viewports sans débordement, rendu 1440 inspecté. Diff audité, aucun changement de droits, hooks, claim(1), Queue 1/1 ou admission.",
+            "Correctif de diagnostic local validé, livraison CI à effectuer ; cause initiale du 503 toujours à établir, aucun lot supplémentaire autorisé."
           ]
         },
         {
@@ -6315,9 +6316,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Pilote autorisé JH9olk: dix POST consommés, neuf œuvres Library et une exclusion BLOCKED_CONTENT_TAXONOMY à138s. Échec final read-network-failed conservé; aucun rejeu.",
-            "Dix corrélations historiques reliées aux admissions:31 appels fournisseur,10 résultats acceptés,1242 lectures D1/740 écritures,max144 lectures par clé; zéro429/erreur fournisseur/Queue. Reçus privés pilot-JH9olk-cost-evidence.json.",
-            "Copie hors ligne pilot-preservation-7nr1ct: dix sources/neuf œuvres et tables privées identiques après deux redémarrages; original inchangé,zéro transmission. Banc corrigé:53 tests verts, clôture des lectures et reçus de coût durables."
+            "Pilote checkpoint q8QmHm autorisé immédiatement : arrêt après deux POST, huit clés intactes. Premier HTTP 202 et résultat D1 VERIFIED ; deuxième HTTP 503 après claim, état PROCESSING. Aucun rejeu ni élargissement.",
+            "Preuves privées pilot-q8QmHm-http-proof.json et pilot-q8QmHm-d1-diagnostic.json : cause interne masquée par public-discovery-queue-fallback-failed ; diagnostic corrigé localement, 206 tests Worker et typecheck verts, vérification complète en cours.",
+            "Le pilote précédent JH9olk garde son échec final et ses preuves : dix admissions consommées, neuf œuvres Library et une exclusion justifiée ; coûts/restarts récupérés séparément, pas de certification rétroactive."
           ]
         },
         {
@@ -6336,10 +6337,11 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "JB9dN3 complet après1045s:997 sourcesrésolues,44Review,53exclusions,428retryable;0erreurinterne/projectionmanquante. AucunPOST/refreshtransmis.",
-            "Diagnostic privé residual-readonly-Yvq7S2:5clés D1 indexées,5lectures/0écriture. QuatreMANHWA PENDING sanscurseur; secondelecture confirme desréveils mais search_progress_json NULL.",
-            "Défaut composition reproduit:4eargument searchProgress perdu; reportdecadence suivant effaceaussi lecheckpoint. Correction minimale et205tests Workerverts; livraison CIencours sansréarmement.",
-            "La source NETWORK correspond à NOT_FOUND expiré le27septembre; GETactuel200/MISS. L’admission normale était bloquée par le budgetzéro du banc; pas de conversion artificielle enReview."
+            "JB9dN3 : 1522 = 1025 résolues + 44 Review + 53 exclusions + 400 retryable ; 395 PROVIDER_UNAVAILABLE, 4 PUBLIC_DISCOVERY_PENDING, 1 NETWORK. Redémarrages vérifiés, zéro erreur interne/projection manquante.",
+            "Copie hors ligne residual-readonly-ucFlk5 : les 395 sources correspondent à 341 identités du registre CONFIRM_EXACT_RECOVERY ; une déjà réservée, 340 non réservées. Classification issue du registre historique, état frais à revérifier pour chaque lot.",
+            "Prévol frais checkpoint-pilot : dix MANGA éligibles, 16 lectures D1 et zéro écriture. Confirmation immédiate du scope exact demandée ; aucune nouvelle admission exécutée.",
+            "Quatre demandes anciennes toujours PENDING/PROCESSING : cinq lectures D1 indexées incluant la source NETWORK, zéro écriture. Ne pas rejouer ces clés ; NETWORK conserve son diagnostic de résultat négatif expiré.",
+            "Prochaine action : exécuter le lot scellé après confirmation, vérifier chaîne et coût, puis préparer les lots disjoints restants ; aucun élargissement sur échec technique. Firefox ne bloque pas le travail de convergence Chrome."
           ]
         },
         {
