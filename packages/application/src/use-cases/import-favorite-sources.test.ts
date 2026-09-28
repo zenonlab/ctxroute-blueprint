@@ -5,6 +5,7 @@ import type { ImportableFavorite } from '../resolution';
 import { blockTask, claimTask, commitTask, createDurableTask, recordTaskEffect } from '../tasks';
 import { importFavoriteSources } from './import-favorite-sources';
 import { bundledFavoriteSiteRules, createFavoriteSiteAdapters } from '../favorites/site-rules';
+import { favoriteResolutionVersions } from '../favorites/resolution-result-schema';
 
 const importedAt = '2026-09-06T00:00:00.000Z';
 const favorite: ImportableFavorite = {
@@ -16,7 +17,72 @@ const favorite: ImportableFavorite = {
   url: 'https://reader.example/manga/frieren/chapter-140',
 };
 
+async function restoredFavoriteFixture() {
+  const original = new MemoryStoragePort();
+  await importFavoriteSources([favorite], original, importedAt);
+  const [source] = await original.listFavoriteSources({ limit: 1 });
+  const artifact = source && await original.getFavoriteParseArtifact(source.id);
+  if (!source || !artifact) throw new Error('Expected source and artifact.');
+  const storage = new MemoryStoragePort();
+  const work = createWork({ externalReferences: [{ externalId: '123', provider: 'mangaupdates' }], id: workId('work_restored'), mediaKind: 'manga', preferredTitle: 'Frieren' });
+  const restored = { ...source, matchedWorkId: work.id, resolution: { kind: 'RESOLVED' as const }, resolutionVersions: favoriteResolutionVersions(artifact.artifact) };
+  await storage.putWork(work);
+  await storage.putLibrary(createLibrary(libraryId('library_primary'), [work.id]));
+  await storage.putFavoriteSource(restored);
+  return { artifact, source: restored, storage, work };
+}
+
 describe('importFavoriteSources', () => {
+  it('rebuilds an absent restored artifact without removing an unchanged resolved Work', async () => {
+    const { artifact, source, storage, work } = await restoredFavoriteFixture();
+    await importFavoriteSources([favorite], storage, '2026-09-28T00:00:00.000Z');
+
+    expect(await storage.getFavoriteSource(source.id)).toEqual(source);
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toEqual([work.id]);
+    expect((await storage.getFavoriteParseArtifact(source.id))?.artifact.semanticFingerprint).toBe(artifact.artifact.semanticFingerprint);
+    expect(await storage.getFavoriteResolutionTask('favorite-resolution_4_3432')).toBeUndefined();
+    expect(await storage.getWork(work.id)).toEqual(work);
+  });
+
+  it.each(['title', 'url', 'folderPath', 'presence', 'parser', 'matcher', 'siteRules', 'missingVersions'] as const)('revalidates a restored resolution when %s does not match', async changed => {
+    const { source, storage, work } = await restoredFavoriteFixture();
+    const input = { ...favorite };
+    if (changed === 'title') input.title = 'Different Story chapitre 2';
+    if (changed === 'url') input.url = 'https://reader.example/manga/different-story/chapter-2';
+    if (changed === 'folderPath') input.folderPath = ['Anime'];
+    if (changed === 'presence') await storage.putFavoriteSource({ ...source, presence: 'detached' });
+    if (changed === 'parser' || changed === 'matcher' || changed === 'siteRules') {
+      await storage.putFavoriteSource({ ...source, resolutionVersions: { ...source.resolutionVersions, [changed]: 'previous-v0' } });
+    }
+    if (changed === 'missingVersions') {
+      const { resolutionVersions: _versions, ...legacy } = source;
+      await storage.putFavoriteSource(legacy);
+    }
+
+    await importFavoriteSources([input], storage, importedAt);
+
+    expect((await storage.getFavoriteSource(source.id))?.matchedWorkId).toBeUndefined();
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds).toEqual([]);
+    expect(await storage.getFavoriteResolutionTask('favorite-resolution_4_3432')).toMatchObject({ state: 'READY' });
+    expect(await storage.getWork(work.id)).toEqual(work);
+  });
+
+  it('recreates a restored retryable task once without resetting an interrupted claim', async () => {
+    const { source, storage } = await restoredFavoriteFixture();
+    const { matchedWorkId: _work, ...unresolved } = source;
+    const retryable = { ...unresolved, resolution: { kind: 'RETRYABLE' as const, reason: 'PROVIDER_UNAVAILABLE' as const } };
+    await storage.putFavoriteSource(retryable);
+    await importFavoriteSources([favorite], storage, importedAt);
+    expect(await storage.getFavoriteSource(source.id)).toEqual(retryable);
+    const task = await storage.getFavoriteResolutionTask('favorite-resolution_4_3432');
+    if (!task) throw new Error('Expected restored task.');
+    expect(task).toMatchObject({ state: 'READY', attempt: 0 });
+    const claimed = claimTask(task, 'interrupted', importedAt, '2026-09-06T00:01:00.000Z');
+    await storage.putFavoriteResolutionTask(claimed);
+    await importFavoriteSources([favorite], storage, importedAt);
+    expect(await storage.getFavoriteResolutionTask(task.id)).toEqual(claimed);
+  });
+
   it('reparses and requeues a Manhwaz source after structural title rules change', async () => {
     const storage = new MemoryStoragePort();
     const input = { ...favorite, bookmarkId: 'manhwaz', title: 'kage no jitsuryokusha ni naritakute 006', url: 'https://manhwaz.com/webtoon/kage-no-jitsuryokusha-ni-naritakute-006/chapter-66.1' };

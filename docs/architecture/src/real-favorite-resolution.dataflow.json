@@ -11,7 +11,7 @@
         "id": "local-import",
         "label": "Import local",
         "focus": ["browserFavorites", "inventory", "sourceEvidence", "privateStore", "libraryView"],
-        "note": "Les 1 522 favoris sont lus par lots, parsés localement et projetés sans attendre le réseau."
+        "note": "Import et restauration : cache reconstruit; résolution conservée si titre, URL, dossiers et versions concordent."
       },
       {
         "id": "public-resolution",

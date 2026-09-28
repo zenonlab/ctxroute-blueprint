@@ -71,6 +71,16 @@ Les anciennes enveloppes sync ne sont plus produites; leur retrait n'est pas
 une suppression automatique. Les formats AES-GCM/PBKDF2 existants restent
 inchangés : déchiffrement et validation complète avant remplacement confirmé.
 
+Après restauration, l'absence du cache de parsing ne prouve pas une nouvelle
+identité. L'import reconstruit ce cache sans retirer la résolution ni l'œuvre
+de Library si la source reste observée et si le titre, l'URL, le chemin de
+dossiers et les versions de décision restaurées concordent avec le parsing
+courant. Un changement de ces entrées,
+une version absente ou différente, ou un artefact présent mais divergent,
+conserve le chemin normal de revalidation. Une tâche retryable absente est
+recréée; une résolution terminale conservée ne crée pas d'admission réseau.
+Cette règle n'autorise aucun réarmement automatique D1.
+
 Limite d'implémentation constatée le 2026-09-08 : Firefox ne fournit pas
 `StorageArea.setAccessLevel`. La poursuite autonome conserve sync sur Firefox
 avec une restriction applicative explicite : seul le background compose les

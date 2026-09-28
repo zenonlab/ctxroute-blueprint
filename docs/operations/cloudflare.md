@@ -4,6 +4,22 @@ Tobirink does not expose Wrangler as a release command. Every provider change
 starts from the repository-owned gate, while the extension and Worker runtime
 remain independent of this operational path.
 
+## Contrôle de restauration de la candidate 1.0.47
+
+Conserver le dossier d'installation Chrome, remplacer son code sans
+désinstallation, puis utiliser **Recharger** dans `chrome://extensions`.
+Le manifeste seul ne prouve pas que le nouveau background s'exécute.
+Vérifier les tables privées avant toute reprise après export/restauration,
+puis contrôler la reconstruction locale et deux redémarrages. Un cache de
+parsing absent ne doit pas invalider une source inchangée aux mêmes versions.
+
+Comptabiliser les sources séparément des cartes Library : plusieurs sources
+peuvent rejoindre une œuvre locale déjà présente. Les données publiques et
+les décisions privées doivent être conservées, sans régression de progression.
+Le contrôle hors ligne n'autorise aucune reprise D1 et ne certifie pas les
+attentes réseau. La signature Firefox et les fichiers publics exacts restent
+des preuves distinctes; aucun ZIP non signé ne remplace cette certification.
+
 ## Publication 1.0.45 — certifiée
 
 Le run protégé `36295558091` a validé le SHA main

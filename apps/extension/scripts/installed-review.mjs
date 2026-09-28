@@ -185,6 +185,19 @@ export function assertPreserved(before, after, expected) {
   assert.ok(before.integrity.progress.every((entry) => progress.has(entry.identity) && progress.get(entry.identity) >= entry.value), 'Private progress regressed.');
 }
 
+export async function reloadInstalledReviewExtension(page, extensionId) {
+  assert.match(extensionId, /^[a-p]{32}$/u, 'Reload requires a complete Chrome extension identity.');
+  await page.goto('chrome://extensions/');
+  const developerMode = page.locator('#devMode');
+  if (await developerMode.getAttribute('aria-pressed') !== 'true') await developerMode.click();
+  const reload = page.locator(`extensions-item[id="${extensionId}"] #dev-reload-button`);
+  await reload.click();
+  await reload.waitFor({ state: 'visible' });
+  await page.goto('chrome-extension://' + extensionId + '/options.html');
+  const health = await page.evaluate(() => globalThis.chrome.runtime.sendMessage({ type: 'health.check', version: 1 }));
+  assert.equal(health.ok, true, 'The reloaded extension must answer its health check.');
+}
+
 export async function restartInstalledReviewWorker(context, page, extensionId, deadline = Date.now() + 15_000) {
   const remaining = Math.min(15_000, deadline - Date.now());
   assert.ok(Number.isFinite(remaining) && remaining > 0, 'The service-worker restart requires a positive deadline.');
@@ -407,6 +420,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       debugging = await launch();
       page = await context.newPage();
       await loadExtension();
+      await reloadInstalledReviewExtension(page, session.extensionId);
       assert.notEqual(session.version, oldVersion, 'Upgrade must exercise a different extension version.');
       await waitForInventory();
       const after = await observe('after-upgrade');
