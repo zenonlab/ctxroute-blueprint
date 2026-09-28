@@ -1676,6 +1676,20 @@ au plus une demande historique expressément autorisée.
 
 ## Arrêt du pilote installé du 28 septembre 2026
 
+Le pilote suivant `q8QmHm` s'arrête après deux envois : premier résultat
+VERIFIED projeté dans Library, second HTTP 503. Huit clés restent intactes.
+Une lecture MangaDex bornée et les lectures D1 indexées isolent deux identités
+MangaDex différentes partageant un seul alias, sans référence commune. La
+régression locale reproduit `stale-public-discovery-result` lors de la
+publication de la seconde identité.
+La migration additive `0028` signale les titres partagés par `ambiguous = 1`;
+ces lignes ne sont plus des associations uniques. La publication atomique
+préserve les identités et les références fournisseur uniques, sans fusion,
+effacement ou requalification artificielle en Review. Le déploiement suit la
+CI protégée, migration avant Worker. Un rollback conserve la colonne et les
+données ; l'ancien garde peut de nouveau bloquer ces publications, sans
+annuler les résultats déjà produits. Les clés consommées ne sont pas rejouées.
+
 Le diagnostic ciblé du profil complet `JB9dN3` lit cinq clés sans écriture.
 Les quatre attentes manga n'ont aucun curseur persisté; la composition Worker
 omettait le quatrième argument `searchProgress` du port `defer`. Une régression

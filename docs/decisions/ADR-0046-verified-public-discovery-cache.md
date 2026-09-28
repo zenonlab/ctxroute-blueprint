@@ -266,18 +266,19 @@ publication que si `meta.changes` vaut exactement `1` pour l’UPDATE terminal.
 
 La publication `VERIFIED` matérialise aussi un index canonique unique sur la
 version de normalisation, le titre normalisé et le type `anime` ou `manga`.
-Toutes les variantes du profil sont vérifiées ensemble : une variante déjà
-attribuée à une autre œuvre du même type rejette atomiquement la publication.
+Une variante partagée entre identités vérifiées du même type reçoit désormais
+`ambiguous = 1` dans le même batch, sans fusion ni rejet de ces identités.
+La migration additive `0028` conserve l'association historique, mais celle-ci
+n'est utilisable comme identité unique que lorsque `ambiguous = 0`.
 Le même titre reste permis entre anime et manga. Un rejeu terminal fiable
-matérialise l’index manquant sans rappeler de fournisseur.
+matérialise l'index manquant et préserve l'ambiguïté sans rappeler de fournisseur.
 
-Les gardes canoniques de publication et de rejeu parcourent d'abord la liste
-bornée `json_each` des titres proposés, puis recherchent la clé primaire
-complète `(normalization_version, normalized_title, media_kind)` grâce à un
-`CROSS JOIN` explicite. Le plan inverse ne contraignait que la version et
-relisait tous ses titres pour chaque écriture. Les prédicats de conflit,
-l'ordre des paramètres, les gardes de bail et le batch atomique restent
-inchangés; aucun index ni migration n'est ajouté.
+La détection d'alias partagés utilise la liste bornée `json_each` des titres
+proposés et la clé primaire complète
+`(normalization_version, normalized_title, media_kind)`. Le plan réel de
+l'UPDATE du marqueur est vérifié : aucun scan global du catalogue. Les gardes
+de bail, de digest, de référence fournisseur et le batch atomique restent
+inchangés. Les homonymes ne doivent pas épuiser les tentatives techniques.
 
 Au plus 5 000 demandes peuvent être simultanément `PENDING` ou `PROCESSING`.
 Cette borne est vérifiée dans la même instruction SQL pour une nouvelle clé,
@@ -312,8 +313,8 @@ sauvegarde et vérification de l'absence de consommateur. En revanche,
 `linkedReferences` conserve jusqu'à
 cinq références exactes de fournisseurs qui identifient la même œuvre; elles
 sont dédupliquées dans `catalogue_external_references`. Une collision
-fournisseur ou canonique refuse le batch au lieu de fusionner silencieusement
-des identités distinctes.
+de référence fournisseur refuse toujours le batch. Une collision de titre est
+signalée comme ambiguë sans fusionner silencieusement des identités distinctes.
 
 Avant chaque requête HTTP réelle, le Worker réserve dans D1 la cadence et
 l’exclusivité du fournisseur. AniList est limité à une requête toutes les trois
