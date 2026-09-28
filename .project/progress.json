@@ -6294,9 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Chrome48 exact et Worker de PR151 déployé, CI principale36401186318 verte. Pilote PbFEAL arrêté au budget D1 :38+290=328 lectures, aucun rejeu.",
-            "Régression32titres rouge à442lectures de publication, verte à114 après transition gardée unique puis catalogue et clôture dans le même batch.32titres conservés; une écriture supplémentaire, budget300 inchangé.",
-            "203 tests Worker verts; conflits, baux et rollback SQL/concurrence couverts. Typechecks et Archify dataflow/architecture verts. Vérification complète du nouveau correctif en cours; aucune migration ou nouvelle admission distante."
+            "Deux pertes de curseur reproduites en intégration Worker: quatrième argument omis, puis effacement lors d’un report de cadence sans nouveau checkpoint.",
+            "Correction minimale du gateway.defer: nouveau searchProgress prioritaire, sinon conservation du checkpoint de la requête.205 tests Worker et tous typechecks verts; npm run verify complet réussi en clone propre.",
+            "Archify dataflow/architecture verts; recovery dataflow quatre viewports sans débordement. Livraison protégée du correctif à effectuer; claim1,Queue1/1,budgets et reprise explicite inchangés."
           ]
         },
         {
@@ -6336,9 +6336,10 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Inventaire actualisé certification-inventory-1790590118171:1522 sources,1346 identités,137 doublons supplémentaires;27 requêtes D1 indexées,1305 lectures,zéro écriture/admission.",
-            "Comptes par source selon D1:974 résultats publics disponibles,461 reprises exactes à confirmer,44 admissions absentes,4 continuations à observer;39 sources sans identité à justifier localement. Pas de certification Library complète.",
-            "Aucune autorisation élargie:les dix clés budget-pilot sont consommées; aucun autre lot ni rejeu exécuté."
+            "JB9dN3 complet après1045s:997 sourcesrésolues,44Review,53exclusions,428retryable;0erreurinterne/projectionmanquante. AucunPOST/refreshtransmis.",
+            "Diagnostic privé residual-readonly-Yvq7S2:5clés D1 indexées,5lectures/0écriture. QuatreMANHWA PENDING sanscurseur; secondelecture confirme desréveils mais search_progress_json NULL.",
+            "Défaut composition reproduit:4eargument searchProgress perdu; reportdecadence suivant effaceaussi lecheckpoint. Correction minimale et205tests Workerverts; livraison CIencours sansréarmement.",
+            "La source NETWORK correspond à NOT_FOUND expiré le27septembre; GETactuel200/MISS. L’admission normale était bloquée par le budgetzéro du banc; pas de conversion artificielle enReview."
           ]
         },
         {

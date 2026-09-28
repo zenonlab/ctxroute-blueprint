@@ -127,6 +127,15 @@ La clôture draine les événements tardifs et revérifie chaque coût avant pre
 `TOBIRINK_INSTALLED_RECOVER_EXHAUSTED=1` commande le véritable bouton; cette
 variable ne remplace pas la confirmation immédiate du lot par l'opérateur.
 Un coût public terminal ne certifie jamais à lui seul la projection Library.
+
+La composition Worker transmet aussi le quatrième argument `searchProgress`
+de `gateway.defer` à `deferClaim`. Le curseur et les candidats bornés produits
+après quatre pages doivent traverser cette frontière avant le signal Queue.
+Un report de cadence sans nouveau curseur conserve celui de la requête réclamée
+au lieu de l'effacer; un nouveau checkpoint reste prioritaire.
+La régression intègre le vrai collecteur, la composition et D1 : pages 1 à 4,
+curseur 5 persisté avec zéro tentative consommée, puis reprise corrélée à la
+page 5 et publication vérifiée sans rejouer les pages précédentes.
 Le CLI de reprise reste limité aux échecs épuisés : les MISS relèvent de
 l'admission normale, les PENDING de l'observation, sans réarmement implicite.
 

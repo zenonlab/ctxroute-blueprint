@@ -314,7 +314,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
         claimedCount = claimed.requests.length;
         return claimed;
       },
-      defer: (request, retryAt, now) => port.deferClaim(request, activeTokenDigest, retryAt, now),
+      defer: (request, retryAt, now, searchProgress) => port.deferClaim(request, activeTokenDigest, retryAt, now, searchProgress ?? request.searchProgress),
       publish: async (batch: PublicDiscoveryResultBatch) => {
         const receipt = await port.publishBatch(batch, await digest(activeToken), await digest(JSON.stringify(batch.results)), new Date().toISOString());
         acceptedResults += receipt.published;
