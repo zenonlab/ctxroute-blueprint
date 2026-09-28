@@ -1690,6 +1690,18 @@ CI protégée, migration avant Worker. Un rollback conserve la colonne et les
 données ; l'ancien garde peut de nouveau bloquer ces publications, sans
 annuler les résultats déjà produits. Les clés consommées ne sont pas rejouées.
 
+Après livraison, la seconde identité devient VERIFIED par continuation, sans
+nouveau POST ; cela ne certifie pas rétroactivement le pilote interrompu.
+Le pilote suivant s'arrête après trois envois sur un dépassement de coût :
+5 337 lectures pour le collecteur d'une publication. Le plan distant
+`EXPLAIN QUERY PLAN`, sans écriture, démontre un parcours complet des titres
+canoniques malgré la clause de sélection bornée. Publication et replay imposent
+donc l'index primaire canonique avec `INDEXED BY`. Une régression locale avec
+statistiques de cardinalité périmées reproduit le parcours complet, puis
+vérifie la recherche par les trois colonnes et les budgets inchangés. Aucun
+`ANALYZE`, changement de statistiques ou nouveau réarmement distant n'est
+effectué pour ce correctif ; le rollback du code conserve toutes les données.
+
 Le diagnostic ciblé du profil complet `JB9dN3` lit cinq clés sans écriture.
 Les quatre attentes manga n'ont aucun curseur persisté; la composition Worker
 omettait le quatrième argument `searchProgress` du port `defer`. Une régression

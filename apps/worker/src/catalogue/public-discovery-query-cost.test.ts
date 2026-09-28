@@ -256,6 +256,9 @@ describe('public discovery indexed query cost', () => {
   });
 
   it('bounds publication and replay reads by proposed titles rather than catalogue size', async () => {
+    await env.PUBLIC_DB.exec('ANALYZE');
+    await env.PUBLIC_DB.prepare("UPDATE sqlite_stat1 SET stat = '1 1 1 1' WHERE tbl = 'catalogue_canonical_titles_v1'").run();
+    await env.PUBLIC_DB.exec('ANALYZE sqlite_schema');
     const batch = await claimedPublication(200001, ['Fresh alpha', 'Fresh beta', 'Fresh gamma', 'Fresh delta']);
     const measured = instrumentD1(env.PUBLIC_DB);
     const statements = vi.spyOn(measured.database, 'prepare');
@@ -291,9 +294,9 @@ describe('public discovery indexed query cost', () => {
     const publicationSql = statements.mock.calls.find(([sql]) => sql.includes('state = ?, result_json = ?'))?.[0];
     if (publicationSql === undefined) throw new Error('Publication transition guard must be exercised.');
     expect(publicationSql).not.toContain('catalogue_canonical_titles_v1');
-    const ambiguitySql = statements.mock.calls.find(([sql]) => sql.startsWith('UPDATE catalogue_canonical_titles_v1 SET ambiguous'))?.[0];
+    const ambiguitySql = statements.mock.calls.find(([sql]) => sql.startsWith('UPDATE catalogue_canonical_titles_v1 INDEXED BY'))?.[0];
     if (ambiguitySql === undefined) throw new Error('Title ambiguity marker must be exercised.');
-    const explainAmbiguity = `EXPLAIN QUERY PLAN UPDATE catalogue_canonical_titles_v1 SET ambiguous = 1
+    const explainAmbiguity = `EXPLAIN QUERY PLAN UPDATE catalogue_canonical_titles_v1 INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 SET ambiguous = 1
         WHERE normalization_version = ?1 AND media_kind = ?2 AND work_id <> ?3 AND ambiguous = 0
           AND normalized_title IN (SELECT value FROM json_each(?4))
           AND EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE

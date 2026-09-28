@@ -20,7 +20,7 @@
     { "id": "canaries", "type": "backend", "label": "Canaris neufs", "sublabel": "anime · manga · HTTP + Queue", "stage": 1, "row": 0, "width": 150, "tag": "VERIFIED requis" },
     { "id": "approval", "type": "security", "label": "Confirmation ciblée", "sublabel": "lot · seuils · arrêt", "stage": 1, "row": 2, "tag": "avant écriture" },
     { "id": "rearm", "type": "backend", "label": "Lot scellé v3", "sublabel": "1–10 identités · média connu", "stage": 2, "row": 2, "width": 150, "tag": "un POST par clé" },
-    { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "alias partagés signalés" },
+    { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "alias · index imposé" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "claim(1) · expiration ciblée" },
     { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "manga · fenêtre 90 s", "stage": 3, "row": 2, "tag": "curseur repris · échec fermé" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · candidat lié", "stage": 4, "row": 1, "width": 150, "tag": "pas de preuve Library" }
