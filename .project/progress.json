@@ -6530,6 +6530,66 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-discovery-unknown-lane-checkpoint-20260928",
+      "title": "Conserver les deux lanes pour les médias inconnus",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "contract",
+          "title": "Étendre le checkpoint sans deviner le média",
+          "status": "DONE",
+          "acceptance": [
+            "Le contrat stocke une lane anime complète bornée et compatible v1",
+            "Les checkpoints invalides ou incomplets sont refusés"
+          ],
+          "files": [
+            "packages/public-discovery/src/contracts.ts",
+            "packages/public-discovery/src/resolver.ts",
+            "packages/public-discovery/src/resolver.test.ts",
+            "docs/architecture/src/discovery-recovery.dataflow.json",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/public-discovery -- src/resolver.test.ts",
+            "npm run archify:validate -- discovery-recovery.dataflow"
+          ],
+          "evidence": [
+            "Resolver 83/83, contracts 7/7, Worker D1 43/43, typechecks verts; Archify dataflow 9/9.",
+            "UNKNOWN reprend la page anime et conserve l'ambiguïté inter-lanes sans deviner le média."
+          ]
+        },
+        {
+          "id": "integration",
+          "title": "Prouver D1 et bornes Worker",
+          "status": "DONE",
+          "acceptance": [
+            "UNKNOWN reprend anime puis manga sans répétition",
+            "Ambiguïté inter-lanes conservée et aucun faux VERIFIED",
+            "D1, Worker, verify et E2E passent"
+          ],
+          "files": [
+            "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "apps/worker/src/native-collectors.test.ts",
+            "packages/public-discovery/src/resolver.ts"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/worker -- src/catalogue/public-discovery-queue.test.ts",
+            "npm run verify",
+            "npm run test:e2e --workspace @tobirink/web",
+            "git diff --check"
+          ],
+          "evidence": [
+            "D1 20/20 recherches uniques en 3 claims, checkpoints PENDING à 0 tentative puis terminal; Worker 43/43, resolver 85/85, contrats 7/7.",
+            "npm run verify complet, Web E2E 11 pass/1 skip, Archify dataflow/architecture 9/9, git diff --check verts.",
+            "Aucun POST historique, réarmement, secret, permission ou fichier public modifié."
+          ]
+        }
+      ]
     }
   ]
 }

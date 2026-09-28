@@ -440,3 +440,8 @@
 
 - [x] **Conserver le curseur au budget** — DONE _(evidence: Média connu: D1 conserve fournisseur/alias/page et 12 recherches uniques; Worker ciblé 42/42, resolver 81/81, typechecks verts; UNKNOWN reste borné)_
 - [x] **Valider bornes et absence de boucle** — DONE _(evidence: npm run verify complet; Archify dataflow 9/9 sans avertissement; Worker 42/42, resolver 81/81, D1 checkpoint sans doublon; git diff --check vert)_
+
+## Conserver les deux lanes pour les médias inconnus — DONE
+
+- [x] **Étendre le checkpoint sans deviner le média** — DONE _(evidence: Resolver 83/83, contracts 7/7, Worker D1 43/43, typechecks verts; Archify dataflow 9/9., UNKNOWN reprend la page anime et conserve l'ambiguïté inter-lanes sans deviner le média.)_
+- [x] **Prouver D1 et bornes Worker** — DONE _(evidence: D1 20/20 recherches uniques en 3 claims, checkpoints PENDING à 0 tentative puis terminal; Worker 43/43, resolver 85/85, contrats 7/7., npm run verify complet, Web E2E 11 pass/1 skip, Archify dataflow/architecture 9/9, git diff --check verts., Aucun POST historique, réarmement, secret, permission ou fichier public modifié.)_

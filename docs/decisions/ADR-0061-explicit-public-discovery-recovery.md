@@ -136,8 +136,11 @@ inspectés dans le curseur D1. La continuation reprend à ce point sans répéte
 les recherches terminées. Un refus avant tout appel réussi consomme toujours
 un essai ; une lane antérieure en erreur ne peut pas être sautée par ce
 checkpoint. La recherche réserve aussi le coût d'une hydratation avant de
-dépenser le dernier créneau. `UNKNOWN` reste hors de cette optimisation tant
-que ses deux lanes ne disposent pas d'un checkpoint commun fiable.
+dépenser le dernier créneau. Pour `UNKNOWN`, la lane anime est explorée avant
+la lane manga ; son résultat borné accompagne le curseur manga, afin de garder
+les deux preuves et l'ambiguïté inter-lanes après reprise. Une lane anime en
+erreur n'est jamais déclarée complète. Le CLI opératoire exige encore un
+reparse du média avant toute reprise réelle d'une clé `UNKNOWN`.
 
 Le banc installé utilise le même scope et la même réservation permanente que
 le CLI. Au-delà de deux admissions, un scope est obligatoire; le pilote scellé

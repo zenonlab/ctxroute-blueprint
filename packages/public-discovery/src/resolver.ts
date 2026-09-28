@@ -224,14 +224,45 @@ async function searchLane(
 async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, request: PublicDiscoveryClaimedRequest, deadline: number): Promise<readonly LaneDecision[]> {
   const titles = request.query.discoveryTitles.slice(0, 4);
   const query = matchQueryFor(request, titles);
+  const progress = request.searchProgress;
+  if (progress?.animeLane !== undefined && request.query.mediaKind !== 'UNKNOWN') throw new Error('provider-search-progress-lane-mismatch');
+  if (request.query.mediaKind === 'UNKNOWN') {
+    const mangaProgress = progress !== undefined && mangaProviders.some((provider) => provider === progress.provider) ? progress : undefined;
+    if (mangaProgress !== undefined && progress?.animeLane === undefined) throw new Error('provider-search-progress-lane-mismatch');
+    if (progress?.animeLane !== undefined && mangaProgress === undefined) throw new Error('provider-search-progress-lane-mismatch');
+    const animeLane: LaneDecision = progress?.animeLane === undefined
+      ? await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }, deadline, progress, true)
+      : progress.animeLane;
+    const matchedAnimeCandidates = new Map(animeLane.candidates
+      .filter((candidate) => animeLane.references.some((reference) => reference.provider === candidate.provider && reference.externalId === candidate.externalId))
+      .map((candidate) => [candidateKey(candidate), candidate]));
+    const animeCheckpoint: PublicDiscoverySearchProgress['animeLane'] = animeLane.unavailable === undefined && animeLane.retainedFailure === undefined
+      ? { candidates: [...matchedAnimeCandidates.values()].slice(0, 10),
+        references: animeLane.references.slice(0, 10), state: animeLane.state }
+      : undefined;
+    if (progress?.animeLane !== undefined && (animeCheckpoint === undefined
+      || (animeLane.state === 'MATCH' && (animeLane.references.length !== 1 || animeCheckpoint.candidates.length !== 1))
+      || (animeLane.state === 'AMBIGUOUS' && animeLane.references.length < 2)
+      || (animeLane.state === 'NOT_FOUND' && animeLane.references.length !== 0))) throw new Error('provider-search-progress-lane-mismatch');
+    let mangaLane: LaneDecision;
+    try { mangaLane = await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }, deadline, mangaProgress, animeCheckpoint !== undefined); }
+    catch (error) {
+      if (error instanceof PublicDiscoverySearchContinuationError && animeCheckpoint !== undefined) {
+        throw new PublicDiscoverySearchContinuationError({ ...error.searchProgress, animeLane: animeCheckpoint }, error.retryAt);
+      }
+      if (error instanceof PublicDiscoverySearchContinuationError) throw animeLane.unavailable ?? animeLane.retainedFailure ?? new IncompleteProviderSearchError('unknown-anime-lane-unavailable');
+      throw error;
+    }
+    const lanes = [animeLane, mangaLane];
+    const unavailable = lanes.reduce<Error | undefined>((retained, lane) => lane.unavailable === undefined
+      ? retained : retainProviderFailure(retained, lane.unavailable), undefined);
+    if (unavailable !== undefined) throw lanes.reduce((failure, lane) => lane.retainedFailure === undefined
+      ? failure : retainProviderFailure(failure, lane.retainedFailure), unavailable);
+    return lanes;
+  }
   const lanes = request.query.mediaKind === 'ANIME'
     ? [await searchLane(providers, animeProviders, titles, query, deadline, request.searchProgress, true)]
-    : request.query.mediaKind !== 'UNKNOWN'
-      ? [await searchLane(providers, mangaSearchProviders, titles, query, deadline, request.searchProgress, true)]
-      : [
-          await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }, deadline),
-          await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }, deadline),
-        ];
+    : [await searchLane(providers, mangaSearchProviders, titles, query, deadline, request.searchProgress, true)];
   const unavailable = lanes.reduce<Error | undefined>((retained, lane) => lane.unavailable === undefined
     ? retained : retainProviderFailure(retained, lane.unavailable), undefined);
   if (unavailable !== undefined) {
