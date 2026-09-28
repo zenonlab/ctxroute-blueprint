@@ -2,6 +2,16 @@ import { z } from 'zod';
 
 export const workerDiagnosticsLockValue = 'worker-v1' as const;
 
+export function queueFailureDiagnostic(error?: Error) {
+  const errorType = error === undefined ? 'none' : error.name === 'TypeError' ? 'type-error'
+    : error.name === 'DOMException' ? 'dom-exception' : error.name === 'Error' ? 'error' : 'other-error';
+  if (error === undefined) return { errorType };
+  const message = error.message.trim().toLowerCase().replaceAll(/\s+/gu, ' ');
+  const errorDetail = message === 'internal error' || message === 'internal server error' ? 'internal-error'
+    : message === 'failed to send message' || message === 'queue send failed' ? 'message-rejected' : 'unknown';
+  return { errorType, errorDetail };
+}
+
 export type WorkerRouteFamily = 'catalogue' | 'cover' | 'release' | 'site' | 'unknown';
 
 export interface WorkerDiagnosticEvent {

@@ -1,5 +1,21 @@
 # Extension packaging and rollback
 
+## Pilote du 29 septembre — arrêt sur continuation Queue
+
+La candidate Chrome 1.0.48 a reçu sept admissions via le bouton réel sur un
+lot de dix sources. Au contrôle D1 indexé et borné : six `VERIFIED`, une
+`PENDING` avec checkpoint, trois `FAILED/ATTEMPT_LIMIT` intactes. Le banc
+s'est arrêté sur un HTTP 503 et un signal Queue corrélé; aucune des sept clés
+réservées ne sera rejouée. Les reçus privés restent hors Git. Cette preuve ne
+certifie pas encore Library ni l'ensemble des dix sources.
+
+La télémétrie de cette fenêtre contient des continuations non envoyées et un
+fallback Queue en échec, mais l'ancien journal de continuation effaçait la
+cause de `Queue.send`. Le correctif suivant conserve seulement une classe
+fermée de cette cause et sa corrélation; il ne réarme rien et ne prétend pas
+diagnostiquer rétroactivement la panne exacte. Le téléchargement public reste
+en 1.0.45; aucune promotion ni signature Firefox n'est revendiquée.
+
 ## Candidate 1.0.48 — PENDING sans réadmission
 
 Le second pilote autorisé `tdqu7R` conserve six admissions corrélées avant
