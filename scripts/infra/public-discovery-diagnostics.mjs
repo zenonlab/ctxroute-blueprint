@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 
 const wranglerCli = resolve(dirname(createRequire(import.meta.url).resolve('wrangler/package.json')), 'wrangler-dist/cli.js');
 const common = ['--no-warnings', wranglerCli, 'd1', 'execute', 'tobirink-public', '--remote', '--config', 'apps/worker/wrangler.jsonc', '--json', '--command'];
-const failureCodes = new Set(['account-missing', 'account-invalid', 'access-denied', 'authentication-failed', 'timeout', 'output-limit', 'command-unavailable', 'transport-failed', 'query-failed', 'response-invalid']);
+const failureCodes = new Set(['account-missing', 'account-invalid', 'access-denied', 'token-location-denied', 'authentication-failed', 'timeout', 'output-limit', 'command-unavailable', 'transport-failed', 'query-failed', 'response-invalid']);
 export function discoveryDiagnosticQueries(now) {
   if (new Date(now).toISOString() !== now) throw new TypeError('invalid-diagnostic-clock');
   return {
@@ -34,6 +34,7 @@ function commandFailureCode(result) {
   if (result.error?.code === 'ENOBUFS') return 'output-limit';
   if (result.error?.code === 'ENOENT') return 'command-unavailable';
   const output = `${result.stderr ?? ''}\n${result.stdout ?? ''}`;
+  if (/Cannot use the access token from location\b/iu.test(output)) return 'token-location-denied';
   if (/\[code: 910[69]\]|\bForbidden\b/iu.test(output)) return 'access-denied';
   if (/\[code: 10000\]|Authentication error|\bUnauthorized\b/iu.test(output)) return 'authentication-failed';
   if (/\b(?:ENOTFOUND|ECONNRESET|EAI_AGAIN|ETIMEDOUT)\b|fetch failed/iu.test(output)) return 'transport-failed';

@@ -157,9 +157,12 @@ de sortie. Le processus est tué à l'échéance ; aucun wrapper npm intermédia
 n'est conservé. Les quatre requêtes ne sont pas réessayées et l'étape CI est
 limitée à deux minutes. Les logs disque et rapports d'erreur Wrangler sont
 désactivés. Le rapport ajoute seulement des échecs `{query, code}` issus d'une
-liste fermée : compte absent/invalide, accès refusé, authentification, timeout,
+liste fermée : compte absent/invalide, accès refusé, jeton refusé depuis la
+localisation du runner, authentification générique, timeout,
 sortie excessive, commande absente, transport, requête ou réponse invalide.
 Ni stdout/stderr brut, ni token, ni corps privé ne quitte cette frontière.
+Le code `token-location-denied` ne contient pas l'adresse IP ; il n'est émis
+que si Wrangler fournit explicitement le motif de restriction de localisation.
 Toute requête manquante garde `ok=false` et interdit le plan/application.
 
 L'input `publish_extension` reste faux par défaut : les pushes ne publient

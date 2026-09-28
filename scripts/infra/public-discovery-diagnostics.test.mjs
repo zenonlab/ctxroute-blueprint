@@ -92,6 +92,7 @@ test('diagnostics refuse absent or invalid accounts before invoking Wrangler', (
 
 test('diagnostics classify command failures without exposing stdout, stderr or secrets', () => {
   const cases = [
+    [{ status: 1, stderr: 'private-secret Cannot use the access token from location 203.0.113.42. [code: 10000]' }, 'token-location-denied'],
     [{ status: 1, stderr: 'private-secret GET /accounts failed [code: 9109]' }, 'access-denied'],
     [{ status: 1, stderr: 'private-secret Authentication error [code: 10000]' }, 'authentication-failed'],
     [{ status: null, error: { code: 'ETIMEDOUT', message: 'private-secret' } }, 'timeout'],
@@ -109,7 +110,7 @@ test('diagnostics classify command failures without exposing stdout, stderr or s
     assert.equal(report.failures.length, 4);
     assert.deepEqual(report.failures.map(failure => failure.code), Array(4).fill(expected));
     assert.deepEqual(report.failures.map(failure => failure.query), Object.keys(discoveryDiagnosticQueries(now)));
-    assert.doesNotMatch(JSON.stringify(report), /private-|stderr|stdout|\/accounts/u);
+    assert.doesNotMatch(JSON.stringify(report), /private-|stderr|stdout|\/accounts|203\.0\.113\.42/u);
   }
 });
 
