@@ -24,6 +24,7 @@ const failedRetentionMilliseconds = 30 * 86_400_000;
 const negativeResultFreshnessMilliseconds = 7 * 86_400_000;
 const nonceRetentionMilliseconds = 7 * 86_400_000;
 const queueSignalLeaseMilliseconds = 60_000;
+const continuationOwnershipMilliseconds = 15 * 60_000;
 const refreshFreshnessMilliseconds = 7 * 86_400_000;
 
 type SqlValue = null | number | string;
@@ -304,14 +305,20 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
 
   async nextPendingAt(continuationTokenDigest?: string): Promise<string | undefined> {
     const row = await this.database.prepare(`SELECT MIN(due) AS due FROM (
-      SELECT CASE WHEN state = 'PROCESSING' THEN lease_until ELSE retry_at END AS due
+      SELECT CASE WHEN ?1 IS NULL AND claim_token_hash IS NOT NULL AND state = 'PENDING'
+        THEN MAX(CASE WHEN state = 'PROCESSING' THEN lease_until ELSE retry_at END,
+          strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, ?2))
+        ELSE CASE WHEN state = 'PROCESSING' THEN lease_until ELSE retry_at END END AS due
       FROM public_discovery_requests_v3 WHERE state IN ('PENDING', 'PROCESSING')
         AND (?1 IS NULL OR claim_token_hash = ?1)
       UNION ALL
-      SELECT CASE WHEN refresh_state = 'PROCESSING' THEN lease_until ELSE retry_at END AS due
+      SELECT CASE WHEN ?1 IS NULL AND claim_token_hash IS NOT NULL AND refresh_state = 'PENDING'
+        THEN MAX(CASE WHEN refresh_state = 'PROCESSING' THEN lease_until ELSE retry_at END,
+          strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, ?2))
+        ELSE CASE WHEN refresh_state = 'PROCESSING' THEN lease_until ELSE retry_at END END AS due
       FROM public_discovery_requests_v3 WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING')
         AND (?1 IS NULL OR claim_token_hash = ?1)
-    )`).bind(continuationTokenDigest ?? null).first<{ due: string | null }>();
+    )`).bind(continuationTokenDigest ?? null, `+${continuationOwnershipMilliseconds / 1_000} seconds`).first<{ due: string | null }>();
     return row?.due ?? undefined;
   }
 
@@ -383,6 +390,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         WHERE state IN ('PENDING', 'PROCESSING') AND attempt_count < 8
           AND ((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
           AND (?5 IS NULL OR claim_token_hash = ?5)
+          AND (?5 IS NOT NULL OR ?6 IS NOT NULL OR state = 'PROCESSING' OR claim_token_hash IS NULL OR updated_at <= ?10)
           AND (?6 IS NULL OR (fingerprint = ?6 AND media_kind = ?7 AND parser_version = ?8 AND rules_version = ?9))
         UNION ALL
         SELECT rowid, admission_priority, updated_at, fingerprint
@@ -390,13 +398,14 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING') AND refresh_attempt_count < 8
           AND ((refresh_state = 'PENDING' AND retry_at <= ?3) OR (refresh_state = 'PROCESSING' AND lease_until <= ?3))
           AND (?5 IS NULL OR claim_token_hash = ?5)
+          AND (?5 IS NOT NULL OR ?6 IS NOT NULL OR refresh_state = 'PROCESSING' OR claim_token_hash IS NULL OR updated_at <= ?10)
           AND (?6 IS NULL OR (fingerprint = ?6 AND media_kind = ?7 AND parser_version = ?8 AND rules_version = ?9)))
         ORDER BY admission_priority, updated_at, fingerprint LIMIT ?4)
       RETURNING request_json AS requestJson, search_progress_json AS searchProgressJson, result_json AS resultJson, request_digest AS requestDigest,
         state, attempt_count AS attemptCount, refresh_attempt_count AS refreshAttemptCount,
         admission_priority AS admissionPriority, updated_at AS updatedAt,
         fingerprint, media_kind AS mediaKind, parser_version AS parserVersion, rules_version AS siteRulesVersion`)
-      .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit, input.continuationTokenDigest ?? null, input.key?.fingerprint ?? null, input.key?.mediaKind ?? null, input.key?.parserVersion ?? null, input.key?.siteRulesVersion ?? null)
+      .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit, input.continuationTokenDigest ?? null, input.key?.fingerprint ?? null, input.key?.mediaKind ?? null, input.key?.parserVersion ?? null, input.key?.siteRulesVersion ?? null, futureIso(input.now, -continuationOwnershipMilliseconds))
       .all<{ admissionPriority: number; attemptCount: number; fingerprint: string; mediaKind: PublicDiscoveryKeyV3['mediaKind']; parserVersion: string; refreshAttemptCount: number; requestDigest: string; requestJson: string; resultJson: string | null; searchProgressJson: string | null; siteRulesVersion: string; state: DiscoveryRow['state']; updatedAt: string }>();
     const ordered = rows.results.sort((left, right) => left.admissionPriority - right.admissionPriority
       || left.updatedAt.localeCompare(right.updatedAt) || left.fingerprint.localeCompare(right.fingerprint));

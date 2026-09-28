@@ -128,6 +128,19 @@ l'admission normale, les PENDING de l'observation, sans réarmement implicite.
 
 ## Conséquences
 
+Un claim générique ne reprend pas un jeton PENDING attribué depuis moins de
+quinze minutes sans progrès. Un traitement PROCESSING garde son bail existant;
+son expiration reste récupérable sans délai supplémentaire.
+Les claims par clé ou jeton restent immédiatement
+éligibles à leur échéance. Le prochain réveil générique utilise la même borne,
+pour ne pas boucler pendant cette protection. Après quinze minutes depuis
+`updated_at`, la récupération générique redevient possible : une continuation
+perdue n'abandonne donc pas définitivement la demande. Cette borne correspond
+au bail de traitement existant et dépasse la fenêtre de certification de douze
+minutes; une récupération tardive ne certifie pas rétroactivement le pilote.
+La régression reproduit un réveil générique qui vole le claim et sa corrélation
+avant le signal ciblé. Aucun schéma, réarmement ou budget n'est modifié.
+
 Un réveil ciblé anticipé qui ne peut pas encore réclamer sa ligne conserve
 le jeton opaque et l’UUID de corrélation, puis reprogramme au plus un signal
 ciblé avec un délai de 1 à 900 secondes. Son coût est `backoff`, même si

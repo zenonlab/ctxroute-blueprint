@@ -74,11 +74,11 @@ async function preserveProviderRuntime() {
 }
 
 describe('public discovery queue trigger', () => {
-  it('continues an exact manga admission through cadence and an early wake without spending an attempt', async () => {
+  it.each([false, true])('continues an exact manga admission through cadence and an early wake with competing generic wake %s', async (competingWake) => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-12-03T00:00:00.000Z'));
-    const discoveryKey = { ...key('d'), mediaKind: 'MANGA' as const };
+    const discoveryKey = { ...key(competingWake ? 'e' : 'd'), mediaKind: 'MANGA' as const };
     const query = { discoveryTitles: ['Spirit Circle'], sourceTitles: ['Spirit Circle'], mediaKind: 'MANGA' as const,
       explicitProviderReference: { provider: 'mangaupdates' as const, externalId: '13893304082' } };
     const metrics = { backlogBytes: 0, backlogCount: 0 };
@@ -117,6 +117,11 @@ describe('public discovery queue trigger', () => {
       expect(await state()).toEqual({ state: 'PENDING', attempts: 0 });
       expect(provider).not.toHaveBeenCalled();
       vi.setSystemTime(Date.now() + 1_000);
+      if (competingWake) {
+        expect(await processPublicDiscoveryQueue(bindings))
+          .toMatchObject({ claimed: 0, published: 0 });
+        expect(provider).not.toHaveBeenCalled();
+      }
       const discovery = vi.fn((correlationId?: string, continuationToken?: string) => processPublicDiscoveryQueue(bindings, undefined, true, correlationId, continuationToken));
       const message = { body: signal, attempts: 1, ack: vi.fn(), retry: vi.fn() };
       await handleNativeCollectorQueue([message], { agenda: vi.fn(), discovery });
@@ -127,13 +132,31 @@ describe('public discovery queue trigger', () => {
       expect(message.retry).not.toHaveBeenCalled();
       expect(await state()).toEqual({ state: 'VERIFIED', attempts: 1 });
       expect(provider).toHaveBeenCalledTimes(1);
-      expect(claim).toHaveBeenCalledTimes(3);
+      expect(claim).toHaveBeenCalledTimes(competingWake ? 4 : 3);
       expect(claim.mock.calls.every(([input]) => input.limit === 1)).toBe(true);
       expect(queue.send).toHaveBeenCalledTimes(2);
       expect(queueFallback).toHaveBeenCalledTimes(1);
     } finally {
       provider.mockRestore(); claim.mockRestore(); vi.useRealTimers();
       await restoreRuntime();
+    }
+  });
+  it('recovers an orphaned pending token after fifteen minutes without progress', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const request = { ...submission('f', 'Synthetic orphaned continuation'), requestDigest: 'a'.repeat(64) };
+    const now = '2026-12-04T00:00:00.000Z';
+    const tokenHash = 'b'.repeat(64);
+    await adapter.request(request, now, tokenHash);
+    try {
+      expect(await adapter.nextPendingAt(tokenHash)).toBe(now);
+      expect(await adapter.nextPendingAt()).toBe('2026-12-04T00:15:00.000Z');
+      const input = { claimToken: 'c'.repeat(43), tokenDigest: 'd'.repeat(64), limit: 1, leaseUntil: '2026-12-04T00:30:00.000Z' };
+      expect((await adapter.claimBatch({ ...input, now: '2026-12-04T00:14:59.999Z' })).requests).toHaveLength(0);
+      const recovered = await adapter.claimBatch({ ...input, now: '2026-12-04T00:15:00.000Z' });
+      expect(recovered.requests).toHaveLength(1);
+      expect(recovered.requests[0]).toMatchObject({ key: request.key, attempt: 1 });
+    } finally {
+      await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(request.key.fingerprint).run();
     }
   });
   it('spends eight unavailable-provider attempts across fresh consumers, then stops without rearming FAILED', async () => {
@@ -433,7 +456,7 @@ describe('public discovery queue trigger', () => {
     expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, claim_token_hash AS claim FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
       .bind(request.key.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 0, claim: 'b'.repeat(64) });
     expect((await adapter.claimBatch({ claimToken: 'c'.repeat(48), tokenDigest: 'd'.repeat(64), now: '2026-09-20T12:00:07.000Z', leaseUntil: '2026-09-20T12:15:07.000Z', limit: 1 })).requests).toHaveLength(0);
-    const resumed = await adapter.claimBatch({ claimToken: 'c'.repeat(48), tokenDigest: 'd'.repeat(64), now: '2026-09-20T12:00:08.000Z', leaseUntil: '2026-09-20T12:15:08.000Z', limit: 1 });
+    const resumed = await adapter.claimBatch({ claimToken: 'c'.repeat(48), continuationTokenDigest: 'b'.repeat(64), tokenDigest: 'd'.repeat(64), now: '2026-09-20T12:00:08.000Z', leaseUntil: '2026-09-20T12:15:08.000Z', limit: 1 });
     expect(resumed.requests[0]?.attempt).toBe(1);
     await adapter.publishBatch({ claimToken: resumed.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440001', results: [{ key: request.key, requestDigest: request.requestDigest, resolution: { reason: 'synthetic-no-match', state: 'NOT_FOUND' } }], schemaVersion: 3, verifiedAt: '2026-09-20T12:00:09.000Z' }, 'd'.repeat(64), 'e'.repeat(64), '2026-09-20T12:00:09.000Z');
   });
@@ -488,7 +511,7 @@ describe('public discovery queue trigger', () => {
     await adapter.deferClaim(claim.requests[0]!, 'b'.repeat(64), '2026-09-20T13:00:08.000Z', now, progress);
     expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
       .bind(request.key.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 0, progress: JSON.stringify(progress) });
-    const resumed = await adapter.claimBatch({ claimToken: 'c'.repeat(48), tokenDigest: 'd'.repeat(64), now: '2026-09-20T13:00:08.000Z', leaseUntil: '2026-09-20T13:15:08.000Z', limit: 1 });
+    const resumed = await adapter.claimBatch({ claimToken: 'c'.repeat(48), continuationTokenDigest: 'b'.repeat(64), tokenDigest: 'd'.repeat(64), now: '2026-09-20T13:00:08.000Z', leaseUntil: '2026-09-20T13:15:08.000Z', limit: 1 });
     expect(resumed.requests).toHaveLength(1);
     expect(resumed.requests[0]).toMatchObject({ attempt: 1, searchProgress: progress });
     await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(request.key.fingerprint).run();
@@ -530,6 +553,7 @@ describe('public discovery queue trigger', () => {
       verifiedAt: now,
     }, await tokenDigest('c'.repeat(43)), '3'.repeat(64), now);
     const firstClaim = await adapter.claimBatch({
+      continuationTokenDigest: await tokenDigest(firstToken),
       claimToken: 'e'.repeat(43), leaseUntil: '2026-09-20T12:15:00.000Z', limit: 1, now, tokenDigest: await tokenDigest('e'.repeat(43)),
     });
     await adapter.publishBatch({
@@ -570,7 +594,9 @@ describe('public discovery queue trigger', () => {
       .bind(request.key.fingerprint).first()).toEqual({ state: 'VERIFIED', refreshState: 'PENDING', attempts: 0 });
     await expect(adapter.read(request.key, now)).resolves.toMatchObject({ state: 'VERIFIED', profile: { workId: 'work_anilist_999998' } });
     expect((await adapter.claimBatch({ claimToken: 'h'.repeat(48), tokenDigest: 'h'.repeat(64), now: '2026-09-20T12:00:07.000Z', leaseUntil: '2026-09-20T12:15:07.000Z', limit: 1 })).requests).toHaveLength(0);
-    const resumed = await adapter.claimBatch({ claimToken: 'h'.repeat(48), tokenDigest: 'h'.repeat(64), now: '2026-09-20T12:00:08.000Z', leaseUntil: '2026-09-20T12:15:08.000Z', limit: 1 });
+    expect((await adapter.claimBatch({ claimToken: 'h'.repeat(48), tokenDigest: 'h'.repeat(64), now: '2026-09-20T12:00:08.000Z', leaseUntil: '2026-09-20T12:15:08.000Z', limit: 1 })).requests).toHaveLength(0);
+    expect(await adapter.nextPendingAt('g'.repeat(64))).toBe('2026-09-20T12:00:08.000Z');
+    const resumed = await adapter.claimBatch({ claimToken: 'h'.repeat(48), continuationTokenDigest: 'g'.repeat(64), tokenDigest: 'h'.repeat(64), now: '2026-09-20T12:00:08.000Z', leaseUntil: '2026-09-20T12:15:08.000Z', limit: 1 });
     expect(resumed.requests[0]?.attempt).toBe(1);
     await adapter.publishBatch({ claimToken: resumed.claimToken, nonce: '550e8400-e29b-41d4-a716-446655440003', results: [verified], schemaVersion: 3, verifiedAt: '2026-09-20T12:00:09.000Z' }, 'h'.repeat(64), 'i'.repeat(64), '2026-09-20T12:00:09.000Z');
   });

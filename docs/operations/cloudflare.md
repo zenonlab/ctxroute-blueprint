@@ -1699,6 +1699,17 @@ le lot. Les reçus détaillés restent privés. Aucun coût de campagne n'est
 extrapolé depuis cet échec; la cause des continuations incomplètes reste à
 reproduire localement avant tout élargissement.
 
+Une course est maintenant reproduite sur D1 local : à l'échéance du différé,
+un réveil générique peut réclamer la ligne avant son signal ciblé, remplacer
+son jeton et publier sans l'UUID d'admission. Cela démontre un défaut possible,
+pas la cause certaine de chacune des trois attentes historiques. La protection
+des jetons PENDING pendant quinze minutes sans progrès empêche cette course
+dans la fenêtre du pilote; les claims ciblés restent éligibles à leur échéance.
+Le calcul du réveil générique respecte la même borne; les baux PROCESSING
+expirés restent récupérables et un jeton orphelin redevient éligible à quinze
+minutes. Les 200 tests Worker passent, y compris refresh, curseur, concurrence
+et récupération. Aucun appel réel ni réarmement ne sert à cette validation.
+
 Le pilote privé `jfltzN`, explicitement autorisé sur dix identités, s'arrête
 après une réservation POST : `read-network-failed` pendant
 le redémarrage du navigateur. Aucune corrélation d'admission n'a été reçue;
