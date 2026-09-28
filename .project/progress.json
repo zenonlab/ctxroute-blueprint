@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "BLOCKED",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,14 +6294,16 @@
             "git diff --check"
           ],
           "evidence": [
-            "Correctif MangaUpdates et diagnostic CI sur PR #159 SHA d4ed8cb; clone propre npm run verify, E2E et 143 tests infra verts; Archify architecture et dataflow validés.",
-            "external: CI 36449189428 vérifie le jeton de compte actif mais D1 répond HTTP 401/code 10000; le connecteur refuse la lecture des jetons avec 9109. Aucun plan/apply, aucune permission ni secret modifiés."
+            "Candidate 1.0.48 et Worker corrigé déployés via PR159 et CI main 36473535402; archive publique inchangée.",
+            "Wrangler OAuth reconnecté avec les 29 permissions initiales. Tail réel corrélé en 17 s après reproduction de la borne initiale trop courte; banc local corrigé à 24 sondes/75 s, aucun Worker ni extension modifié.",
+            "npm run verify complet vert après exclusion explicite des archives privées ignorées de ESLint et Vitest; infra 144/144, tests ciblés 22/22 et 57/57, Archify dataflow/architecture 9/9, git diff --check verts.",
+            "Web E2E 11 pass/1 skip. Branche fix/recovery-tail-readiness-20260928 créée depuis origin/main; CI du nouveau diff à vérifier avant pilote."
           ]
         },
         {
           "id": "pilot",
           "title": "Prouver dix reprises depuis le bouton",
-          "status": "BLOCKED",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Confirmation immédiate du lot exact avant reprise",
             "Chaîne bouton à Library corrélée et coût certifié"
@@ -6314,14 +6316,16 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Batch-003: dix réservations et dix POST via le bouton, neuf Library et une attente; verdict correlation-failed, clés consommées sans rejeu.",
-            "external: le Worker corrigé ne peut être déployé tant que le jeton CI actif est refusé par D1; aucun nouveau lot autorisé ni soumis."
+            "Batch-003 historique: dix réservations et dix POST via le bouton, neuf Library et une attente; verdict correlation-failed, clés consommées sans rejeu.",
+            "Worker corrigé déployé par CI main 36473535402; batch-004 privé disjoint prévolé avec Wrangler OAuth: dix MANGA éligibles, 16 lectures D1, zéro écriture et zéro réservation.",
+            "Wrangler OAuth reconnecté via session Choukky: 29 permissions avant/après, ancien profil sauvegardé mode 0600, whoami et D1 lisibles avec injection mémoire; .env inchangé.",
+            "Démarrage tail reproduit trop lent pour l'ancienne borne; banc local corrigé à 24 sondes/75 s, tests ciblés 22/22 et 57/57, Archify dataflow 9/9. Sonde synthétique réelle corrélée en 17 s; aucun POST batch-004 tenté."
           ]
         },
         {
           "id": "converge",
           "title": "Faire converger toutes les sources",
-          "status": "BLOCKED",
+          "status": "TODO",
           "acceptance": [
             "1522 sources expliquées, aucun blocage technique",
             "Confirmation distincte des reprises épuisées"
@@ -6335,7 +6339,7 @@
           ],
           "evidence": [
             "Dernière réconciliation complète: 1522=1042 résolues+47 Review+53 exclusions+380 retryable, Library837, zéro erreur interne; données préservées.",
-            "external: CI Cloudflare refuse D1 401/10000 avant plan/apply, donc correctif de continuation non déployé; aucune campagne élargie engagée."
+            "Le blocage CI Cloudflare est levé; convergence encore conditionnée par un pilote bouton corrélé et des confirmations exactes par lot."
           ]
         },
         {
@@ -6354,9 +6358,9 @@
             "npm run package:extension"
           ],
           "evidence": [
-            "Chrome candidate1.0.48 ZIP SHA60e1109a inchangé; profil complet après deux redémarrages conserve1522 sources et837 œuvres, mais380 reprises techniques empêchent la certification de la bibliothèque.",
-            "Firefox stable156.0.1 et web-ext10.7 installés; archive Firefox1.0.48 non signée, aucun XPI Mozilla non listé. Aucune publication ni installation durable certifiée.",
-            "external: ni session Mozilla/signature configurée ni navigateur connecté (liste des navigateurs vide, Computer Use native pipe startup failed). Ne pas créer de secret, grant ou contournement de signature tacitement."
+            "Chrome candidate 1.0.48 ZIP SHA60e1109a inchangé; profil complet après deux redémarrages conserve 1522 sources et 837 œuvres, mais 380 reprises techniques empêchent la certification de la bibliothèque.",
+            "Firefox stable 156.0.1 et web-ext 10.7 installés; archive Firefox 1.0.48 non signée, aucun XPI Mozilla non listé. Aucune publication ni installation durable certifiée.",
+            "external: Chrome Choukky connecté en lecture via CDP; Developer Hub Mozilla affiche Sign in, donc aucune session de signature. Aucun compte, secret, droit ni contournement de signature créé implicitement."
           ]
         },
         {

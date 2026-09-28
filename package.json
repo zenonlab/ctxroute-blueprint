@@ -39,7 +39,7 @@
     "infra:apply": "node scripts/infra/tobirink-provider-gate.mjs apply",
     "test:d1": "npm run test --workspace @tobirink/worker -- src/catalogue",
     "test:a11y": "vitest run --root apps/extension accessibility",
-    "test:performance": "npm run build:extension && npm run build:extension:firefox && vitest run --root . scripts/performance",
+    "test:performance": "npm run build:extension && npm run build:extension:firefox && vitest run --root . scripts/performance --exclude 'build/**'",
     "package:extension": "node scripts/release/package-extension.mjs",
     "build:ui-workbench": "npm run build --workspace @tobirink/ui-workbench",
     "test:ui-workbench": "npm run test --workspace @tobirink/ui-workbench",

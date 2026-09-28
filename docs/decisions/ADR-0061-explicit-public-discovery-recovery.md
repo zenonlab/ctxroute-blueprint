@@ -123,6 +123,10 @@ le CLI. Au-delà de deux admissions, un scope est obligatoire; le pilote scellé
 exige exactement une source par clé et un budget explicite égal à la taille du
 lot, sans refresh. Le POST dispose de 45 secondes. L'observateur démarre avant
 le chargement du profil et le clic explicite, puis suit chaque UUID d'admission.
+Son amorçage autorise au plus vingt-quatre lectures `MISS` espacées de
+2,5 secondes; le banc lui accorde soixante-quinze secondes, hors budget par clé.
+Sans cette preuve, il échoue fermé avant toute admission. Les lectures de
+prévol sont comptées séparément des 300 lectures D1 corrélées par clé.
 La clôture draine les événements tardifs et revérifie chaque coût avant preuve.
 `TOBIRINK_INSTALLED_RECOVER_EXHAUSTED=1` commande le véritable bouton; cette
 variable ne remplace pas la confirmation immédiate du lot par l'opérateur.

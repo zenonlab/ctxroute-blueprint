@@ -37,6 +37,6 @@
   ],
   "cards": [
     { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Réservation durable commune au pilote et au CLI", "Runtimes du média vérifiés avant chaque admission", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Curseur 25→100 après 4 pages, sans saut ni POST", "UNKNOWN doit être reparsé avant toute admission", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
-    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Jeton protégé du claim générique pendant 15 min sans progrès", "Réveil vide corrélé compté, sans preuve finale", "Échec observateur conservé en code autorisé", "Coûts et échecs corrélés · zéro 429/Queue · D1 cumulé ≤ 300", "Coûts scellés · lectures closes et drainées · redémarrage local"] }
+    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Jeton protégé du claim générique pendant 15 min sans progrès", "Réveil vide corrélé compté, sans preuve finale", "Observateur prêt ≤ 75 s avant admission ou échec fermé", "Coûts et échecs corrélés · zéro 429/Queue · D1 cumulé ≤ 300", "Coûts scellés · lectures closes et drainées · redémarrage local"] }
   ]
 }

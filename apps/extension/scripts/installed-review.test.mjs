@@ -156,6 +156,20 @@ describe('sealed installed admissions', () => {
 
 describe('installed recovery correlation', () => {
   const requestId = '00000000-0000-4000-8000-000000000001';
+  it('closes an unready observer before any admission after the startup deadline', async () => {
+    vi.useFakeTimers();
+    const observer = { failed: new Promise(() => {}), close: vi.fn(async () => undefined) };
+    try {
+      const pending = createInstalledRecoveryObservation({ start: () => observer,
+        ready: async (_observer, signal) => new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('startup-aborted')), { once: true });
+        }), onFailure: vi.fn() });
+      const failure = expect(pending).rejects.toThrow('startup-aborted');
+      await vi.advanceTimersByTimeAsync(75_000);
+      await failure;
+      expect(observer.close).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
   async function fixture(overrides = {}) {
     const cost = { providerRequests: 1, acceptedResults: 1, provider429s: 0, providerHttpErrors: 0,
       providerNetworkErrors: 0, queueFailures: 0, d1RowsRead: 200, d1RowsWritten: 20, ...overrides };
