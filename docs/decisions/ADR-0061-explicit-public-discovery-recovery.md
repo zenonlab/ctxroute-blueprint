@@ -33,6 +33,12 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ## Décision
 
+Le banc installé ne redémarre ni le service worker ni le navigateur pendant
+les admissions du pilote scellé. Il attend la projection locale et la preuve
+corrélée, met l'analyse en pause par l'interface, puis draine les routes avant
+les tests de conservation. Une interruption garde la réservation, même sans
+réponse d'admission reçue : une lecture de contrôle n'autorise jamais un renvoi.
+
 L’extension expose une action utilisateur explicite, visible uniquement lorsqu’un compteur `providerPaused` est présent. Cette action :
 
 - lit les `FavoriteSource` observés et leurs artefacts privés ;

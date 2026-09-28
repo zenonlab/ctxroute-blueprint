@@ -1,5 +1,17 @@
 # Extension packaging and rollback
 
+## Pilote autorisé — échec conservé
+
+Le pilote `jfltzN` utilise le ZIP exact 1.0.47 et les dix identités autorisées.
+Il s'arrête après une réservation POST et trois lectures, au redémarrage prématuré
+du navigateur (`read-network-failed`). Aucune corrélation d'admission reçue,
+donc aucune réception distante, preuve fournisseur ou Library revendiquée. Une lecture de contrôle
+renvoie `UNAVAILABLE`; la réservation reste consommée sans répétition.
+Les neuf autres clés n'ont pas été soumises. Le banc est corrigé localement
+pour attendre corrélation, pause et drainage avant redémarrage; ses 49 tests
+passent après deux régressions rouges. Aucun nouveau pilote ni téléchargement
+public n'est lancé sur la base de ce seul correctif.
+
 ## Candidate 1.0.47 — restauration sans invalidation artificielle
 
 La candidate 1.0.46 et ses preuves restent conservées, sans promotion publique.
@@ -13,8 +25,8 @@ restaurée dont titre, URL, dossiers et versions concordent. Des entrées ou
 versions différentes conservent la revalidation; une tâche retryable absente
 est reconstruite, mais un claim déjà présent n'est pas réinitialisé. Aucun
 réarmement D1 ni accès fournisseur navigateur n'est ajouté. La candidate
-1.0.47 doit repasser le parcours installé exact et la CI avant certification;
-le pointeur public reste 1.0.45 et aucun XPI signé n'est disponible.
+1.0.47 reprend la certification sur ses propres fichiers; le pointeur public
+reste 1.0.45 et aucun XPI signé n'est disponible.
 
 La preuve privée `upgrade-preservation-odNPls` passe sur le ZIP Chrome exact
 SHA-256 `5df8493bf93e1bb0429222fad2a28bd27f432a6dd8dbc3391fefeca75310f088`
@@ -37,9 +49,24 @@ aucun résultat n'est revendiqué avant la copie du ZIP vérifié. Deux builds
 isolés reproduisent les SHA des deux ZIP; le Firefox non signé fait 319 184
 octets, SHA-256 `bb3a7ed714193bf7b291b6f09c444043fa62a84d06e0c66a4e8dccd58ccb22e0`.
 Archify passe en showcase 9/9 sans diagnostic. Le nouvel import intégral
-de 1.0.47 dans un profil vierge reste en cours et ne remplace pas cette preuve.
+de 1.0.47 dans le profil vierge privé `aNGPPs` passe à 937 secondes :
+1 522 sources, 1 483 retryables attendus hors ligne, 39 sans identité,
+zéro traitement actif, erreur interne ou œuvre projetée manquante. Les
+redémarrages worker et navigateur sont vérifiés; aucune requête n'est transmise.
+Cette preuve complète celle du profil repris sans démontrer la convergence
+en ligne. `web-ext lint` rapporte zéro erreur et quatre avertissements existants.
 
-## Candidate 1.0.46 — certification en cours
+La PR 149 est fusionnée en `cf3ee8c96de783a1ec41027124dd27bbb47fb1ee`.
+Le prévol protégé `36363039239` passe sur `487e30e`, puis la CI principale
+`36363397552` passe et déploie le Worker par la gate déclarée. Ses builds
+reproduisent les SHA des fichiers testés. Canaris et publication d'archives
+restent ignorés; la page publique de téléchargement annonce toujours 1.0.45.
+Le prévol suivant lit 16 lignes D1 sans écriture : dix candidats éligibles,
+MangaUpdates différé. Il ne vaut pas autorisation de reprise. Le lot exact
+reste soumis à confirmation immédiate; Chrome non connecté et l'accès Mozilla
+indisponible empêchent la signature et la certification Firefox durable.
+
+## Candidate 1.0.46 — preuves conservées
 
 Le pointeur public reste en 1.0.45. La candidate corrige l'export de
 `hydration.publicDiscovery` sans perdre identité, dates ni compatibilité v1–v5.
