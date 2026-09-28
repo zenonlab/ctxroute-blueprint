@@ -1,6 +1,6 @@
 import { applyD1Migrations, createExecutionContext, env } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
-import { FavoriteProviderRetryError, type FavoriteProviderPort, type ProviderCandidateEnvelope } from '@tobirink/public-discovery';
+import { FavoriteProviderRetryError, runPublicDiscoveryBatch, type FavoriteProviderPort, type ProviderCandidateEnvelope, type PublicDiscoveryProviderPorts } from '@tobirink/public-discovery';
 import { HttpPublicDiscoveryAdapter } from '../../../../packages/adapters-browser/src/catalogue/http-public-discovery-adapter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPublicDiscoveryApp } from './public-discovery-routes';
@@ -165,6 +165,58 @@ describe('public discovery queue trigger', () => {
       provider.mockRestore(); vi.useRealTimers();
       await restoreRuntime();
     }
+  });
+
+  it('persists a known-media budget checkpoint in D1 and publishes without repeating completed provider searches', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-10T00:00:00.000Z'));
+    const discoveryKey = { ...key('c'), fingerprint: 'c09'.padStart(64, '0'), mediaKind: 'MANGA' as const };
+    const titles = ['Alpha', 'Beta', 'Gamma', 'Delta'];
+    const requestDigest = 'f'.repeat(64);
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const searched: string[] = [];
+    let callsInInvocation = 0;
+    const providerPort = (provider: keyof PublicDiscoveryProviderPorts): FavoriteProviderPort => ({
+      hydrate: async () => undefined,
+      search: async ({ titles: queryTitles }) => {
+        callsInInvocation += 1;
+        searched.push(`${provider}:${queryTitles[0]}`);
+        return { candidates: [], complete: true, digest: 'empty', provider, truncated: false };
+      },
+    });
+    const providers: PublicDiscoveryProviderPorts = {
+      anilist: providerPort('anilist'), mangaupdates: providerPort('mangaupdates'), mangadex: providerPort('mangadex'),
+      'kitsu-anime': providerPort('kitsu-anime'), 'kitsu-manga': providerPort('kitsu-manga'),
+    };
+    try {
+      await adapter.request({ key: discoveryKey, query: { discoveryTitles: titles, mediaKind: 'MANGA', sourceTitles: titles }, requestDigest, schemaVersion: 3 }, new Date().toISOString());
+      for (const claimToken of ['a'.repeat(48), 'b'.repeat(48)]) {
+        callsInInvocation = 0;
+        const claimTokenHash = await tokenDigest(claimToken);
+        const claimed = await adapter.claimBatch({ claimToken, tokenDigest: claimTokenHash, key: discoveryKey,
+          now: new Date().toISOString(), leaseUntil: new Date(Date.now() + 15 * 60_000).toISOString(), limit: 1 });
+        const report = await runPublicDiscoveryBatch({
+          gateway: {
+            claim: async () => claimed,
+            defer: (item, retryAt, now, progress) => adapter.deferClaim(item, claimTokenHash, retryAt, now, progress),
+            publish: async (batch) => adapter.publishBatch(batch, claimTokenHash, await tokenDigest(JSON.stringify(batch.results)), new Date().toISOString()),
+          },
+          limit: 1, nonce: () => crypto.randomUUID(), now: () => new Date().toISOString(),
+          resolver: createBudgetedDiscoveryResolver(providers, () => callsInInvocation * 4, () => 1),
+        });
+        if (claimToken.startsWith('a')) {
+          expect(report).toMatchObject({ claimed: 1, deferred: 1, failed: 0, published: 0 });
+          const checkpoint = await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+            .bind(discoveryKey.fingerprint).first<{ state: string; attempts: number; progress: string }>();
+          expect(checkpoint).toMatchObject({ state: 'PENDING', attempts: 0 });
+          expect(JSON.parse(checkpoint!.progress)).toMatchObject({ provider: 'mangaupdates', titleIndex: 1, cursor: '1' });
+          vi.setSystemTime(Date.now() + 2_000);
+        } else expect(report).toMatchObject({ claimed: 1, deferred: 0, failed: 0, published: 1 });
+      }
+      expect(searched).toHaveLength(12);
+      expect(new Set(searched).size).toBe(12);
+      await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'NOT_FOUND' });
+    } finally { vi.useRealTimers(); }
   });
 
   it.each([false, true])('continues an exact manga admission through cadence and an early wake with competing generic wake %s', async (competingWake) => {
@@ -426,8 +478,11 @@ describe('public discovery queue trigger', () => {
       expect(measured.calls()).toBeLessThanOrEqual(50);
       await expect(port.read(discoveryKey, new Date().toISOString())).resolves.toEqual({ state: 'UNAVAILABLE', reason: 'ATTEMPT_LIMIT' });
       expect(queue.send).toHaveBeenCalledTimes(8);
-      expect(provider).toHaveBeenCalledTimes(8 * 18);
-      expect(warn.mock.calls).toEqual(Array.from({ length: 8 }, () => ['public-discovery-provider-failed', 'public-discovery-invocation-budget']));
+      expect(provider).toHaveBeenCalledTimes(8 * 16);
+      expect(warn.mock.calls.map(([value]) => JSON.parse(String(value)))).toEqual(Array.from({ length: 8 }, (_value, index) => ({
+        schemaVersion: 1, type: 'native-collector.provider-failed', correlationId,
+        attempt: index + 1, code: 'public-discovery-invocation-budget',
+      })));
     } finally {
       provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
       await env.PUBLIC_DB.batch(runtime.results.map(row => env.PUBLIC_DB.prepare(`UPDATE public_discovery_provider_runtime

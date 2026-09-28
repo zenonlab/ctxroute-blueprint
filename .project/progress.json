@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,10 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Candidate 1.0.48 et Worker corrigé déployés via PR159 et CI main 36473535402; archive publique inchangée.",
-            "Wrangler OAuth reconnecté avec les 29 permissions initiales. Tail réel corrélé en 17 s après reproduction de la borne initiale trop courte; banc local corrigé à 24 sondes/75 s, aucun Worker ni extension modifié.",
-            "npm run verify complet vert après exclusion explicite des archives privées ignorées de ESLint et Vitest; infra 144/144, tests ciblés 22/22 et 57/57, Archify dataflow/architecture 9/9, git diff --check verts.",
-            "Web E2E 11 pass/1 skip. Branche fix/recovery-tail-readiness-20260928 créée depuis origin/main; CI du nouveau diff à vérifier avant pilote."
+            "PR160 fusionnée en ac073904 après prévol protégé 36478625693 vert sur a2e6d70; CI main 36479532036 verte avec apply Worker et sondes publiques. Canaris et archives skipped.",
+            "Banc de reprise: 24 sondes MISS/75 s avant admission, preuve tail réelle corrélée en 17 s; zéro POST historique. Ancien OAuth Wrangler sauvegardé mode 0600 et reconnexion avec les mêmes 29 permissions.",
+            "npm run verify complet, Web E2E 11 pass/1 skip, infra 144/144, tests ciblés 22/22 et 57/57, Archify architecture/dataflow 9/9, diff-check verts. Artefacts privés build/ conservés; ESLint/Vitest les excluent désormais."
           ]
         },
         {
@@ -6358,9 +6357,9 @@
             "npm run package:extension"
           ],
           "evidence": [
-            "Chrome candidate 1.0.48 ZIP SHA60e1109a inchangé; profil complet après deux redémarrages conserve 1522 sources et 837 œuvres, mais 380 reprises techniques empêchent la certification de la bibliothèque.",
+            "Chrome candidate 1.0.48 ZIP inchangé; profil complet après deux redémarrages conserve 1522 sources et 837 œuvres, mais 380 reprises techniques empêchent la certification de la bibliothèque.",
             "Firefox stable 156.0.1 et web-ext 10.7 installés; archive Firefox 1.0.48 non signée, aucun XPI Mozilla non listé. Aucune publication ni installation durable certifiée.",
-            "external: Chrome Choukky connecté en lecture via CDP; Developer Hub Mozilla affiche Sign in, donc aucune session de signature. Aucun compte, secret, droit ni contournement de signature créé implicitement."
+            "external: vérification du Developer Hub dans le vrai contexte Choukky connecté via CDP; Mozilla redirige vers accounts.firefox.com et demande un e-mail ou une clé d'accès. Aucune session de signature, aucun secret saisi ni droit créé."
           ]
         },
         {
@@ -6414,6 +6413,120 @@
             "Régression rouge puis verte: curseur legacy81→page21/100 et prochain85 sans saut; cible en 100e position et priorité exact>flou; 91 tests ciblés verts.",
             "Preuve API réelle ciblée: 10000 hits/400 pages25; page21/100 répond200 en4104ms et136629 octets (<8s/<512KiB), zéro admission D1.",
             "Clone propre avec diff exact: npm run verify vert, Web E2E11 pass/1 skip; Public Discovery179, Worker207, Archify dataflow9/9/0warning, ADR/docs et diff-check verts. Code local non déployé."
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-discovery-provider-response-repair-20260928",
+      "title": "Réparer la résolution selon les réponses fournisseur",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "diagnostic",
+          "title": "Rendre les échecs fournisseur corrélables",
+          "status": "DONE",
+          "acceptance": [
+            "Code fermé lié à la corrélation sans données privées",
+            "Régression Queue sans publication ni fuite"
+          ],
+          "files": [
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/native-collectors.test.ts",
+            "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md"
+          ],
+          "commands": [
+            "npm exec vitest -- run apps/worker/src/native-collectors.test.ts apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Codes fermés corrélés aux UUID sans titre/URL; Worker ciblé 63/63, Archify dataflow 9/9, diff-check propre"
+          ]
+        },
+        {
+          "id": "fallback",
+          "title": "Utiliser les références fournisseur vérifiées",
+          "status": "DONE",
+          "acceptance": [
+            "Fallback lié hydraté sans titre inventé ni faux VERIFIED",
+            "Panne et 404 couverts par régression",
+            "Archify dataflow validé"
+          ],
+          "files": [
+            "packages/public-discovery/src/resolver.ts",
+            "packages/public-discovery/src/resolver.test.ts",
+            "docs/architecture/src/discovery-recovery.dataflow.json",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md"
+          ],
+          "commands": [
+            "npm exec vitest -- run packages/public-discovery/src/resolver.test.ts",
+            "npm run archify:validate -- discovery-recovery.dataflow",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": [
+            "MangaDex→MangaUpdates ID lié contrôlé; resolver 79/79, Worker 63/63, typechecks, Archify 9/9, npm run verify complet et diff-check verts"
+          ]
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-discovery-budget-resume-20260928",
+      "title": "Reprendre la recherche après budget Worker",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "checkpoint",
+          "title": "Conserver le curseur au budget",
+          "status": "DONE",
+          "acceptance": [
+            "Recherche média connu reprend au fournisseur, titre et page courants",
+            "Aucun même appel fournisseur répété après checkpoint",
+            "Premier claim sans progrès conserve borne d'échec"
+          ],
+          "files": [
+            "packages/public-discovery/src/resolver.ts",
+            "packages/public-discovery/src/resolver.test.ts",
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/architecture/src/discovery-recovery.dataflow.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/public-discovery -- src/resolver.test.ts",
+            "npm run test --workspace @tobirink/worker -- src/catalogue/public-discovery-queue.test.ts"
+          ],
+          "evidence": [
+            "Média connu: D1 conserve fournisseur/alias/page et 12 recherches uniques; Worker ciblé 42/42, resolver 81/81, typechecks verts; UNKNOWN reste borné"
+          ]
+        },
+        {
+          "id": "audit",
+          "title": "Valider bornes et absence de boucle",
+          "status": "DONE",
+          "acceptance": [
+            "D1 reste à 50 appels/claim et Queue à 1/1",
+            "Aucun auto-réarmement FAILED ni POST réel",
+            "Documentation et suites globales vertes"
+          ],
+          "files": [
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/architecture/src/discovery-recovery.dataflow.json"
+          ],
+          "commands": [
+            "npm run archify:validate -- discovery-recovery.dataflow",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": [
+            "npm run verify complet; Archify dataflow 9/9 sans avertissement; Worker 42/42, resolver 81/81, D1 checkpoint sans doublon; git diff --check vert"
           ]
         }
       ]
