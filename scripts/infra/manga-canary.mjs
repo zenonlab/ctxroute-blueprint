@@ -5,6 +5,7 @@ import { StringDecoder } from 'node:string_decoder';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
+import WebSocket from 'ws';
 
 const requestInit = { headers: { 'content-type': 'application/json' }, method: 'POST', redirect: 'error' };
 const timeout = 15_000;
@@ -316,8 +317,64 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
   };
 }
 
+function startWebSocketCostObserver({ allowProviderContinuation, tailUrl, webSocketFactory }) {
+  let url;
+  try { url = new URL(tailUrl); }
+  catch { throw observerError('invalid-tail-url'); }
+  if (url.protocol !== 'wss:' || url.hostname !== 'tail.developers.workers.dev'
+    || url.username !== '' || url.password !== '') throw observerError('invalid-tail-url');
+  const observation = createCostObservation({ allowProviderContinuation });
+  let socket;
+  try { socket = webSocketFactory(tailUrl, 'trace-v1'); }
+  catch { throw observerError('failed'); }
+  let stopping = false;
+  let exited = false;
+  let failure;
+  let closePromise;
+  let rejectFailure;
+  const failed = new Promise((_resolve, reject) => { rejectFailure = reject; });
+  failed.catch(() => undefined);
+  const fail = error => { failure ??= error; rejectFailure(failure); };
+  const closed = new Promise(resolve => {
+    socket.addEventListener('close', () => { exited = true; resolve(); if (!stopping) fail(observerError('exited')); });
+  });
+  socket.addEventListener('error', () => fail(observerError('failed')));
+  socket.addEventListener('open', () => {
+    try { socket.send(JSON.stringify({ debug: false }), { binary: false, compress: false, mask: false, fin: true }); }
+    catch { fail(observerError('failed')); }
+  });
+  socket.addEventListener('message', event => {
+    if (!failure) { try { observation.push(event.data); } catch (error) { fail(error); } }
+  });
+  function check() { if (failure) throw failure; observation.check(); }
+  async function close() {
+    stopping = true;
+    if (!exited) {
+      try { socket.close(); }
+      catch { throw observerError('cleanup-failed'); }
+      let timer;
+      try { await Promise.race([closed, new Promise(resolve => { timer = setTimeout(resolve, 2_000); })]); }
+      finally { clearTimeout(timer); }
+      if (!exited) {
+        socket.terminate();
+        let terminationTimer;
+        try { await Promise.race([closed, new Promise(resolve => { terminationTimer = setTimeout(resolve, 1_000); })]); }
+        finally { clearTimeout(terminationTimer); }
+        if (!exited) throw observerError('cleanup-failed');
+      }
+    }
+    if (failure) throw failure;
+    observation.finish();
+  }
+  return { failed, check, track: (requestId, expectation) => { check(); observation.track(requestId, expectation); },
+    read: requestId => { check(); return observation.read(requestId); }, snapshot: observation.snapshot,
+    close: () => { closePromise ??= close(); return closePromise; } };
+}
+
 export function startCostObserver({ allowProviderContinuation = false, spawnProcess = spawn,
-  killProcess = process.kill.bind(process), platform = process.platform } = {}) {
+  killProcess = process.kill.bind(process), platform = process.platform,
+  tailUrl = process.env.TOBIRINK_WORKER_TAIL_URL, webSocketFactory = (url, protocol) => new WebSocket(url, protocol, { headers: { 'User-Agent': 'wrangler/4.129.0' } }) } = {}) {
+  if (tailUrl !== undefined) return startWebSocketCostObserver({ allowProviderContinuation, tailUrl, webSocketFactory });
   // The CI observer owns a POSIX process group so npm's Wrangler descendants cannot outlive it.
   if (platform === 'win32') throw observerError('unsupported-platform');
   const env = { ...process.env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_SANITIZE: 'true', WRANGLER_SEND_METRICS: 'false',

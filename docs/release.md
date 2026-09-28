@@ -128,6 +128,12 @@ réservations durables du CLI. `TOBIRINK_INSTALLED_SOURCE_SCOPE` désigne ce sco
 pilote contient exactement autant de favoris. Après confirmation immédiate du
 lot, `TOBIRINK_INSTALLED_RECOVER_EXHAUSTED=1` clique le bouton de reprise réel.
 L'observateur démarre avant le profil et vérifie les coûts après drainage.
+Si Wrangler Tail est refusé par la restriction IP locale, une session Tail
+éphémère créée par l'API Cloudflare peut être passée uniquement en mémoire via
+`TOBIRINK_WORKER_TAIL_URL`. Ne pas la mettre dans un fichier, une commande
+versionnée ou un journal; la fermer puis la supprimer côté Cloudflare. Le banc
+refuse toute admission tant que le coût d'une lecture `MISS` corrélée n'est pas
+observé par ce transport.
 Les scopes, profils et reçus restent privés et hors Git.
 
 Le registre du 28 septembre conserve 1 522 sources et 1 346 identités publiques

@@ -147,6 +147,14 @@ le CLI. Au-delà de deux admissions, un scope est obligatoire; le pilote scellé
 exige exactement une source par clé et un budget explicite égal à la taille du
 lot, sans refresh. Le POST dispose de 45 secondes. L'observateur démarre avant
 le chargement du profil et le clic explicite, puis suit chaque UUID d'admission.
+Quand le jeton Wrangler local ne peut pas ouvrir Tail, l'opérateur peut fournir
+une URL de session Tail Cloudflare éphémère par `TOBIRINK_WORKER_TAIL_URL`.
+Le transport WebSocket impose `wss`, l'hôte Tail officiel et le sous-protocole
+`trace-v1`. Le client `ws` direct utilise la trame attendue par Tail et
+termine la connexion si Cloudflare ne confirme pas sa fermeture après deux
+secondes; il alimente le même parseur borné, sans écrire l'URL dans les reçus
+ni les journaux. Une erreur de transport ou une fermeture prématurée échoue
+fermée. La session est fermée après observation et supprimée côté Cloudflare.
 Son amorçage autorise au plus vingt-quatre lectures `MISS` espacées de
 2,5 secondes; le banc lui accorde soixante-quinze secondes, hors budget par clé.
 Sans cette preuve, il échoue fermé avant toute admission. Les lectures de
