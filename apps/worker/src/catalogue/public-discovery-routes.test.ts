@@ -24,6 +24,12 @@ async function jsonDigest(value: DiscoverySubmission): Promise<string> {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+async function expireContinuationOwnership(key: ReturnType<typeof discoveryKey>): Promise<void> {
+  await env.PUBLIC_DB.prepare(`UPDATE public_discovery_requests_v3 SET updated_at = ?1
+    WHERE fingerprint = ?2 AND media_kind = ?3 AND parser_version = ?4 AND rules_version = ?5`)
+    .bind(new Date(Date.now() - 900_000).toISOString(), key.fingerprint, key.mediaKind, key.parserVersion, key.siteRulesVersion).run();
+}
+
 function verifiedResult(key: { fingerprint: string; mediaKind: 'ANIME' | 'MANGA' | 'MANHWA' | 'MANHUA' | 'UNKNOWN'; parserVersion: string; siteRulesVersion: string }, requestDigest: string, workMarker: string, externalId = workMarker, title = `Work ${workMarker}`) {
   return {
     key,
@@ -380,6 +386,7 @@ describe('verified public discovery cache', () => {
       body: JSON.stringify({ key, query: { discoveryTitles: ['Unknown Work'], mediaKind: 'ANIME', sourceTitles: ['Unknown Work'] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
+    await expireContinuationOwnership(key);
     const claimed = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
       body: JSON.stringify({ limit: 20 }), headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST',
     });
@@ -409,6 +416,7 @@ describe('verified public discovery cache', () => {
       body: JSON.stringify({ key, query: { discoveryTitles: ['Frieren'], mediaKind: 'ANIME', sourceTitles: ['Frieren'] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
+    await expireContinuationOwnership(key);
     const claimed = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
       body: JSON.stringify({ limit: 50 }), headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST',
     });
@@ -504,7 +512,7 @@ describe('verified public discovery cache', () => {
     const now = new Date().toISOString();
     const claim = await adapter.claimBatch({
       claimToken: 'r'.repeat(48), leaseUntil: new Date(Date.parse(now) + 900_000).toISOString(), limit: 20,
-      now, tokenDigest: 'r'.repeat(64),
+      key, now, tokenDigest: 'r'.repeat(64),
     });
     const refreshed = claim.requests.find(({ key: claimedKey }) => claimedKey.fingerprint === key.fingerprint);
     expect(refreshed).toMatchObject({
@@ -712,6 +720,7 @@ describe('verified public discovery cache', () => {
       body: JSON.stringify({ key, query: { discoveryTitles: ['Lease Test'], mediaKind: 'ANIME', sourceTitles: ['Lease Test'] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
+    await expireContinuationOwnership(key);
     const claimed = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
       body: JSON.stringify({ limit: 50 }), headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST',
     });
@@ -748,6 +757,7 @@ describe('verified public discovery cache', () => {
       body: JSON.stringify({ key, query: { discoveryTitles: ['Conflict'], mediaKind: 'ANIME', sourceTitles: ['Conflict'] }, schemaVersion: 3 }),
       headers: { 'Content-Type': 'application/json' }, method: 'POST',
     });
+    await expireContinuationOwnership(key);
     const claimed = await app.request('https://tobirink.test/v3/catalogue/discoveries/collector/claims', {
       body: JSON.stringify({ limit: 50 }), headers: { Authorization: `Bearer ${'x'.repeat(32)}`, 'Content-Type': 'application/json' }, method: 'POST',
     });

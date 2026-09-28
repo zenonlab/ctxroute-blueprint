@@ -1,5 +1,53 @@
 # Extension packaging and rollback
 
+## Candidate 1.0.48 — PENDING sans réadmission
+
+Le second pilote autorisé `tdqu7R` conserve six admissions corrélées avant
+l'arrêt `duplicate-mutation-key` : la septième tentative est un doublon
+bloqué avant transmission. Quatre clés du lot restent intactes. Une lecture
+de contrôle des six clés admises retourne trois `VERIFIED` et trois `PENDING`;
+elle ne remplace pas une preuve de coût ni de projection dans Library.
+
+La cause est reproduite par trois régressions : l'adaptateur réadmettait
+automatiquement `PENDING` à l'expiration de son horloge. La candidate 1.0.48
+relit désormais cet état sans POST, y compris après redémarrage, et borne
+une échéance passée à une minute pour éviter une boucle locale. L'admission
+normale de `MISS` et la reprise explicite de `UNAVAILABLE` restent distinctes.
+Les 24 tests ciblés passent. Aucun reçu n'est supprimé ou réarmé; les fichiers
+1.0.47 et les preuves d'échec restent conservés. Le téléchargement public reste
+1.0.45; aucune nouvelle certification distante n'est revendiquée.
+
+Les deux builds isolés reproduisent le ZIP Chrome de 319 121 octets,
+SHA-256 `60e1109a58e5de6628c05add12f586107016fc315c07c6252acc24b4e27bffcc`,
+et le ZIP Firefox non signé de 319 162 octets,
+SHA-256 `09f95b9289239b22b3d8453562ee0faf9e39a6a5dd7a33f7a41fb55e1026800c`.
+La régression sur archive installée échoue avec 1.0.47 (deux admissions),
+puis passe avec 1.0.48 : après échéance PENDING et redémarrage, une seule
+admission, puis résultat et Library. Les fournisseurs de ce test sont simulés.
+
+La preuve privée `upgrade-preservation-SfSBt5` vérifie le ZIP Chrome exact :
+1 522 sources et 805 œuvres conservées depuis 1.0.45, tables privées identiques
+après export/restauration chiffrés, rechargement explicite et deux redémarrages.
+La reconstruction termine avec 1 008 sources résolues localement, 44 Review,
+418 retryables hors ligne et 52 exclusions déjà présentes. Aucun des 469 appels
+tentés n'est transmis; le profil original reste inchangé et son code restauré.
+Cette preuve ne certifie ni les attentes distantes ni Firefox durable.
+
+`npm run verify` intégral passe dans le clone propre; le prévol protégé
+`36397102935` passe sur `bf447a5`, sans canari ni publication. Les E2E Web
+passent avec onze succès et un test ignoré sur le ZIP exact, après correction
+du placement de l'archive dans le clone et libération du port de test.
+Les échecs de préparation restent conservés. Les vues Archify architecture,
+reprise et résolution réelle passent; `web-ext lint` rapporte zéro erreur
+et quatre avertissements existants. Ces validations ne lèvent pas les blocages
+du pilote réel ou de la signature Mozilla.
+
+L'import vierge privé `rshn9Y` passe sur le même ZIP en 944 secondes :
+1 522 sources, 1 483 attentes hors ligne et 39 sources sans identité, zéro
+traitement actif, erreur interne ou œuvre projetée manquante. Les redémarrages
+worker et navigateur sont vérifiés; aucun POST, GET ou refresh n'est transmis.
+Le verdict reste `offline-regression-passed`, avec `converged: false`.
+
 ## Pilote autorisé — échec conservé
 
 Le pilote `jfltzN` utilise le ZIP exact 1.0.47 et les dix identités autorisées.

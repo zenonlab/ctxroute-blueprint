@@ -183,11 +183,8 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     const cached = this.cache.get(JSON.stringify(key));
     const state = cached !== undefined && cached.expiresAt > Date.now() ? cached.state : await this.read(key);
     if (state.state !== 'MISS' && state.state !== 'PENDING') return state;
-    const pendingClock = `public-discovery-pending-v1:${JSON.stringify(key)}`;
     if (state.state === 'PENDING') {
-      const due = await this.clock(pendingClock);
-      if (due === 0) { await this.saveClock(pendingClock, Date.parse(state.retryAt)); return state; }
-      if (due > Date.now()) return { state: 'PENDING', retryAt: new Date(due).toISOString() };
+      return { state: 'PENDING', retryAt: new Date(Math.max(Date.now() + 60_000, Date.parse(state.retryAt))).toISOString() };
     }
     return this.admit(key, query);
   }

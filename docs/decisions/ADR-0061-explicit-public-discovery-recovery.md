@@ -33,6 +33,11 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ## Décision
 
+Après admission, `PENDING` est observé sans second POST, y compris après
+expiration de `retryAt` ou redémarrage. Une échéance passée est bornée à une
+minute pour éviter une boucle locale. `MISS` conserve l'admission normale;
+`UNAVAILABLE` conserve la confirmation explicite de reprise.
+
 Le banc installé ne redémarre ni le service worker ni le navigateur pendant
 les admissions du pilote scellé. Il attend la projection locale et la preuve
 corrélée, met l'analyse en pause par l'interface, puis draine les routes avant
@@ -122,6 +127,19 @@ Le CLI de reprise reste limité aux échecs épuisés : les MISS relèvent de
 l'admission normale, les PENDING de l'observation, sans réarmement implicite.
 
 ## Conséquences
+
+Un claim générique ne reprend pas un jeton PENDING attribué depuis moins de
+quinze minutes sans progrès. Un traitement PROCESSING garde son bail existant;
+son expiration reste récupérable sans délai supplémentaire.
+Les claims par clé ou jeton restent immédiatement
+éligibles à leur échéance. Le prochain réveil générique utilise la même borne,
+pour ne pas boucler pendant cette protection. Après quinze minutes depuis
+`updated_at`, la récupération générique redevient possible : une continuation
+perdue n'abandonne donc pas définitivement la demande. Cette borne correspond
+au bail de traitement existant et dépasse la fenêtre de certification de douze
+minutes; une récupération tardive ne certifie pas rétroactivement le pilote.
+La régression reproduit un réveil générique qui vole le claim et sa corrélation
+avant le signal ciblé. Aucun schéma, réarmement ou budget n'est modifié.
 
 Un réveil ciblé anticipé qui ne peut pas encore réclamer sa ligne conserve
 le jeton opaque et l’UUID de corrélation, puis reprogramme au plus un signal

@@ -1676,6 +1676,40 @@ au plus une demande historique expressément autorisée.
 
 ## Arrêt du pilote installé du 28 septembre 2026
 
+Le second essai autorisé `tdqu7R` s'arrête après six admissions corrélées et
+un doublon bloqué avant transmission. Les six réservations sont consommées,
+les quatre autres clés intactes; aucun renvoi n'est permis. La lecture de
+contrôle retrouve trois résultats `VERIFIED` et trois `PENDING`, sans certifier
+le coût ou la projection locale. Le timeout `PENDING` du navigateur ne doit
+pas réadmettre une demande : la candidate 1.0.48 conserve une lecture seule
+et un prochain contrôle au moins une minute plus tard. La Queue et sa
+continuation restent responsables de l'exécution; aucune garde serveur
+ni limite d'admission n'est assouplie.
+
+La relecture historique des journaux est limitée aux six corrélations et à
+leur fenêtre initiale de douze minutes; elle ne relance aucune demande.
+Neuf enregistrements de coût totalisent 43 appels fournisseur, trois résultats
+acceptés, 901 lignes D1 lues et 260 écrites. Aucun 429 ni erreur réseau ou
+Queue n'y apparaît. Ce relevé reste partiel : trois chaînes n'ont pas de
+résultat terminal prouvé, et aucune projection Library n'est certifiée.
+Une continuation sans appel fournisseur ni nouvelle émission ne vaut pas succès.
+La requête de télémétrie a parcouru 1 620 313 lignes de journaux (674 995 745
+octets), distinctes des lectures D1; ne pas répéter ce balayage pour surveiller
+le lot. Les reçus détaillés restent privés. Aucun coût de campagne n'est
+extrapolé depuis cet échec; la cause des continuations incomplètes reste à
+reproduire localement avant tout élargissement.
+
+Une course est maintenant reproduite sur D1 local : à l'échéance du différé,
+un réveil générique peut réclamer la ligne avant son signal ciblé, remplacer
+son jeton et publier sans l'UUID d'admission. Cela démontre un défaut possible,
+pas la cause certaine de chacune des trois attentes historiques. La protection
+des jetons PENDING pendant quinze minutes sans progrès empêche cette course
+dans la fenêtre du pilote; les claims ciblés restent éligibles à leur échéance.
+Le calcul du réveil générique respecte la même borne; les baux PROCESSING
+expirés restent récupérables et un jeton orphelin redevient éligible à quinze
+minutes. Les 200 tests Worker passent, y compris refresh, curseur, concurrence
+et récupération. Aucun appel réel ni réarmement ne sert à cette validation.
+
 Le pilote privé `jfltzN`, explicitement autorisé sur dix identités, s'arrête
 après une réservation POST : `read-network-failed` pendant
 le redémarrage du navigateur. Aucune corrélation d'admission n'a été reçue;

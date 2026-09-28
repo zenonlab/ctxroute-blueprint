@@ -45,6 +45,13 @@ consumer Queue natif du Worker. Un résultat fonctionnel, y compris introuvable 
 
 ## Décision
 
+Une échéance `PENDING` autorise uniquement une nouvelle lecture côté extension,
+jamais une nouvelle admission. La continuation Queue appartient au Worker.
+Même après redémarrage ou expiration de l'horloge locale, l'adaptateur conserve
+`PENDING` et attend au moins une minute avant le prochain contrôle si l'échéance
+serveur est passée. La réparation idempotente côté serveur reste disponible,
+mais n'est plus déclenchée automatiquement par une lecture `PENDING`.
+
 Le protocole public v3 utilise une clé versionnée composée de l’empreinte
 SHA-256 du titre canonique local, du type média, de la version du parseur et de
 la version des règles. La demande contient deux listes contenant chacune au

@@ -193,7 +193,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
 });
 
 test('packaged extension preserves a pending manhwa across worker and browser restarts before mocked verification', async ({ browserName }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   expect(browserName).toBe('chromium');
   const repository = resolve(import.meta.dirname, '../../..');
   const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
@@ -207,13 +207,17 @@ test('packaged extension preserves a pending manhwa across worker and browser re
   const forbiddenRequests: string[] = [];
   let admissions = 0;
   let admittedAt = 0;
+  let overduePendingObservations = 0;
   let providerCompleted = false;
   let context: BrowserContext | undefined;
   let page: Page | undefined;
   let options: Page | undefined;
   const discoveryState = () => {
     if (admissions === 0) return { state: 'MISS' };
-    if (!providerCompleted) return { retryAt: new Date(admittedAt + 60_000).toISOString(), state: 'PENDING' };
+    if (!providerCompleted) {
+      if (Date.now() >= admittedAt + 60_000) overduePendingObservations += 1;
+      return { retryAt: new Date(admittedAt + 60_000).toISOString(), state: 'PENDING' };
+    }
     return {
       state: 'VERIFIED', verifiedAt: new Date().toISOString(), nextRefreshAt: new Date(Date.now() + 86_400_000).toISOString(),
       profile: {
@@ -314,6 +318,8 @@ test('packaged extension preserves a pending manhwa across worker and browser re
     expect(afterBrowser.bookmarks).toEqual(pending.bookmarks);
     expect(afterBrowser.catalogue.snapshot.items).toEqual(pending.catalogue.snapshot.items);
     expect(afterBrowser.status.counts).toMatchObject({ observed: 1, resolved: 0, publicDiscoveryPending: 1 });
+    await expect.poll(() => overduePendingObservations, { timeout: 120_000, intervals: [500, 1_000, 2_000] }).toBeGreaterThan(0);
+    expect(admissions).toBe(1);
     providerCompleted = true;
     await expect.poll(async () => (await readState(options!)).status.counts?.resolved, { timeout: 100_000, intervals: [500, 1_000, 2_000] }).toBe(1);
     const verified = await readState(options);
