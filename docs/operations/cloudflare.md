@@ -151,10 +151,12 @@ de compte n'est requis. Les erreurs 9109 observées le 26 septembre concernaient
 la lecture `/accounts`, pas une panne D1 prouvée. Un ID explicite ne garantit
 pas les droits D1 : une lecture avec l'identité CI doit encore réussir.
 
-Avant ces lectures, la CI vérifie le même jeton par `GET /user/tokens/verify`
-depuis le runner. Elle ne publie que le statut actif ou un code fermé, le statut
-HTTP et le code d'erreur numérique ; l'identifiant, l'adresse IP et les messages
-Cloudflare restent masqués. Ce prévol ne modifie ni jeton ni ressource.
+Avant ces lectures, la CI vérifie le même jeton depuis le runner, d'abord par
+`GET /accounts/{account_id}/tokens/verify`, puis par `GET /user/tokens/verify`
+si nécessaire. Elle ne publie que le type compte/utilisateur et le statut actif,
+ou deux codes fermés avec statuts HTTP et codes d'erreur numériques ;
+l'identifiant du jeton, l'adresse IP et les messages Cloudflare restent masqués.
+Ce prévol ne modifie ni jeton ni ressource.
 
 Chaque requête SELECT utilise directement le CLI Wrangler verrouillé dans
 un processus enfant via l'exécutable Node courant, avec une limite de quinze secondes et de 1 Mio

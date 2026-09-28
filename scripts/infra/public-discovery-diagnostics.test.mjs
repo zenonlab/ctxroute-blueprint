@@ -8,33 +8,49 @@ const environment = { CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), CLOUDFLARE_API_TOKE
 
 test('Cloudflare token preflight reports only bounded non-secret status', async () => {
   const request = async (url, options) => {
-    assert.equal(url, 'https://api.cloudflare.com/client/v4/user/tokens/verify');
+    assert.equal(url, `https://api.cloudflare.com/client/v4/accounts/${environment.CLOUDFLARE_ACCOUNT_ID}/tokens/verify`);
     assert.equal(options.headers.Authorization, 'Bearer private-test-token');
     assert.ok(options.signal);
     return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ success: true, result: { id: 'private-token-id', status: 'active' } }) };
   };
-  assert.deepEqual(await verifyDiagnosticToken({ environment, request }), { ok: true, status: 'active' });
+  assert.deepEqual(await verifyDiagnosticToken({ environment, request }), { ok: true, kind: 'account', status: 'active' });
   assert.deepEqual(await verifyDiagnosticToken({ environment: {}, request }), { ok: false, code: 'token-missing' });
+  assert.deepEqual(await verifyDiagnosticToken({ environment: { CLOUDFLARE_API_TOKEN: 'private-test-token' }, request }), { ok: false, code: 'account-invalid' });
   const denial = await verifyDiagnosticToken({ environment, request: async () => ({
     ok: false, status: 403, headers: { get: () => null },
     text: async () => JSON.stringify({ success: false, errors: [{ code: 10000, message: 'Cannot use the access token from location 203.0.113.42 private-secret' }] }),
   }) });
-  assert.deepEqual(denial, { ok: false, code: 'token-location-denied', httpStatus: 403, cloudflareCode: 10000 });
+  assert.deepEqual(denial, { ok: false, account: { ok: false, code: 'token-location-denied', httpStatus: 403, cloudflareCode: 10000 }, user: { ok: false, code: 'token-location-denied', httpStatus: 403, cloudflareCode: 10000 } });
   assert.doesNotMatch(JSON.stringify(denial), /private-|203\.0\.113\.42/u);
 });
 
 test('Cloudflare token preflight distinguishes expiry, generic rejection and malformed responses', async () => {
   const response = (body, status = 200) => ({ ok: status === 200, status, headers: { get: () => null }, text: async () => JSON.stringify(body) });
   for (const status of ['expired', 'disabled']) {
-    assert.deepEqual(await verifyDiagnosticToken({ environment, request: async () => response({ success: true, result: { status } }) }),
-      { ok: false, code: `token-${status}`, httpStatus: 200, cloudflareCode: null });
+    const result = await verifyDiagnosticToken({ environment, request: async () => response({ success: true, result: { status } }) });
+    assert.equal(result.account.code, `token-${status}`);
+    assert.equal(result.user.code, `token-${status}`);
   }
-  assert.deepEqual(await verifyDiagnosticToken({ environment, request: async () => response({ success: false, errors: [{ code: 10000, message: 'private-secret' }] }, 401) }),
-    { ok: false, code: 'token-verification-failed', httpStatus: 401, cloudflareCode: 10000 });
-  assert.deepEqual(await verifyDiagnosticToken({ environment, request: async () => response({ success: true, result: { status: 'private-invalid' } }) }),
-    { ok: false, code: 'token-response-invalid', httpStatus: 200, cloudflareCode: null });
-  assert.deepEqual(await verifyDiagnosticToken({ environment, request: async () => { throw new Error('private-secret'); } }),
-    { ok: false, code: 'token-transport-failed' });
+  const rejected = await verifyDiagnosticToken({ environment, request: async () => response({ success: false, errors: [{ code: 10000, message: 'private-secret' }] }, 401) });
+  assert.equal(rejected.account.code, 'token-verification-failed');
+  assert.equal(rejected.user.httpStatus, 401);
+  assert.doesNotMatch(JSON.stringify(rejected), /private-/u);
+  const malformed = await verifyDiagnosticToken({ environment, request: async () => response({ success: true, result: { status: 'private-invalid' } }) });
+  assert.equal(malformed.account.code, 'token-response-invalid');
+  const unavailable = await verifyDiagnosticToken({ environment, request: async () => { throw new Error('private-secret'); } });
+  assert.equal(unavailable.account.code, 'token-transport-failed');
+});
+
+test('Cloudflare token preflight falls back to the user token endpoint', async () => {
+  const calls = [];
+  const result = await verifyDiagnosticToken({ environment, request: async url => {
+    calls.push(url);
+    if (url.includes('/accounts/')) return { ok: false, status: 401, headers: { get: () => null }, text: async () => JSON.stringify({ success: false, errors: [{ code: 1000, message: 'private-secret' }] }) };
+    return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ success: true, result: { id: 'private-id', status: 'active' } }) };
+  } });
+  assert.deepEqual(result, { ok: true, kind: 'user', status: 'active' });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1], 'https://api.cloudflare.com/client/v4/user/tokens/verify');
 });
 
 test('diagnostics distinguish actual age from retry deadline and group media', () => {

@@ -6,15 +6,14 @@ import { pathToFileURL } from 'node:url';
 const wranglerCli = resolve(dirname(createRequire(import.meta.url).resolve('wrangler/package.json')), 'wrangler-dist/cli.js');
 const common = ['--no-warnings', wranglerCli, 'd1', 'execute', 'tobirink-public', '--remote', '--config', 'apps/worker/wrangler.jsonc', '--json', '--command'];
 const failureCodes = new Set(['account-missing', 'account-invalid', 'access-denied', 'token-location-denied', 'authentication-failed', 'timeout', 'output-limit', 'command-unavailable', 'transport-failed', 'query-failed', 'response-invalid']);
-const tokenVerifyUrl = 'https://api.cloudflare.com/client/v4/user/tokens/verify';
+const tokenVerifyBase = 'https://api.cloudflare.com/client/v4';
 
-export async function verifyDiagnosticToken({ environment = process.env, request = globalThis.fetch } = {}) {
-  if (!environment.CLOUDFLARE_API_TOKEN) return { ok: false, code: 'token-missing' };
+async function verifyTokenAt(url, token, request) {
   let response;
   let payload;
   try {
-    response = await request(tokenVerifyUrl, {
-      headers: { Authorization: `Bearer ${environment.CLOUDFLARE_API_TOKEN}` },
+    response = await request(url, {
+      headers: { Authorization: `Bearer ${token}` },
       signal: globalThis.AbortSignal.timeout(5_000),
     });
     if (Number(response.headers?.get('content-length')) > 16_384) return { ok: false, code: 'token-response-invalid' };
@@ -33,6 +32,16 @@ export async function verifyDiagnosticToken({ environment = process.env, request
   if (!response.ok || payload?.success !== true) return { ok: false, code: 'token-verification-failed', httpStatus, cloudflareCode };
   if (payload?.result?.status !== 'active') return { ok: false, code: 'token-response-invalid', httpStatus, cloudflareCode };
   return { ok: true, status: 'active' };
+}
+
+export async function verifyDiagnosticToken({ environment = process.env, request = globalThis.fetch } = {}) {
+  if (!environment.CLOUDFLARE_API_TOKEN) return { ok: false, code: 'token-missing' };
+  if (!/^[a-f0-9]{32}$/u.test(environment.CLOUDFLARE_ACCOUNT_ID ?? '')) return { ok: false, code: 'account-invalid' };
+  const account = await verifyTokenAt(`${tokenVerifyBase}/accounts/${environment.CLOUDFLARE_ACCOUNT_ID}/tokens/verify`, environment.CLOUDFLARE_API_TOKEN, request);
+  if (account.ok) return { ok: true, kind: 'account', status: account.status };
+  const user = await verifyTokenAt(`${tokenVerifyBase}/user/tokens/verify`, environment.CLOUDFLARE_API_TOKEN, request);
+  if (user.ok) return { ok: true, kind: 'user', status: user.status };
+  return { ok: false, account, user };
 }
 export function discoveryDiagnosticQueries(now) {
   if (new Date(now).toISOString() !== now) throw new TypeError('invalid-diagnostic-clock');
