@@ -123,6 +123,11 @@ l'identifiant de corrélation, sans titre, URL ni empreinte de favori. Les
 opérations fournisseur échouées portent le même identifiant et leur étape
 `search` ou `hydrate`. Ces événements expliquent un échec sans transformer
 `ATTEMPT_LIMIT` en diagnostic fournisseur et sans modifier l'état D1.
+Un envoi Queue de continuation refusé émet aussi un événement structuré
+`public-discovery-continuation-unsent`, avec corrélation et cause fermée
+`internal-error`, `message-rejected` ou `unknown`. Le message d'exception
+reste absent. L'échec interdit toujours le certificat et n'autorise aucun
+second POST de la même clé.
 
 Si la recherche a identifié un candidat portant un ID lié d'un autre
 fournisseur, un échec transitoire de l'hydratation primaire essaie cet ID exact

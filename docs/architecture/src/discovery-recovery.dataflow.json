@@ -37,6 +37,6 @@
   ],
   "cards": [
     { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Réservation durable commune au pilote et au CLI", "ID lié hydraté avec contrôle du titre et du média", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Curseur 25→100 après 4 pages, sans saut ni POST", "UNKNOWN : deux lanes reprises ; CLI exige reparse", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
-    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Jeton protégé du claim générique pendant 15 min sans progrès", "Réveil vide corrélé compté, sans preuve finale", "Tail Wrangler ou WebSocket Cloudflare, prêt ≤ 75 s avant admission", "Coûts et codes d'échec corrélés · zéro 429/Queue · D1 cumulé ≤ 300", "Coûts scellés · lectures closes et drainées · redémarrage local"] }
+    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Jeton protégé du claim générique pendant 15 min sans progrès", "Réveil vide corrélé compté, sans preuve finale", "Tail Wrangler ou WebSocket Cloudflare, prêt ≤ 75 s avant admission", "Coûts et cause Queue fermée · zéro 429/Queue · D1 cumulé ≤ 300", "Coûts scellés · lectures closes et drainées · redémarrage local"] }
   ]
 }

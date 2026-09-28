@@ -11,7 +11,7 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type { WorkerRuntime, WorkerServices } from '../composition';
 import { processPublicDiscoveryQueue, type NativeCollectorSignal } from '../native-collectors';
-import { boundedDuration, emitWorkerCostDiagnostic, type WorkerCostDiagnosticEvent, type WorkerCostResult, type WorkerCostTask } from '../diagnostics';
+import { boundedDuration, emitWorkerCostDiagnostic, queueFailureDiagnostic, type WorkerCostDiagnosticEvent, type WorkerCostResult, type WorkerCostTask } from '../diagnostics';
 import type { D1MetricTotals, InstrumentedD1 } from '../operational-metrics';
 interface DiscoveryQueuePort {
   send(body: NativeCollectorSignal, options?: { contentType?: 'json' }): Promise<QueueSendResponse | void>;
@@ -107,17 +107,8 @@ function queueFailureCode(error: Error | undefined): string {
   return 'public-discovery-queue-runtime-failed';
 }
 
-function queueFailureDetail(error: Error): 'internal-error' | 'message-rejected' | 'unknown' {
-  const message = error.message.trim().toLowerCase().replaceAll(/\s+/gu, ' ');
-  if (message === 'internal error' || message === 'internal server error') return 'internal-error';
-  if (message === 'failed to send message' || message === 'queue send failed') return 'message-rejected';
-  return 'unknown';
-}
-
 function emitQueueHealth(code: string, error?: Error): void {
-  const errorType = error === undefined ? 'none' : error.name === 'TypeError' ? 'type-error' : error.name === 'DOMException' ? 'dom-exception' : error.name === 'Error' ? 'error' : 'other-error';
-  const errorDetail = error === undefined ? {} : { errorDetail: queueFailureDetail(error) };
-  console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code, errorType, ...errorDetail }));
+  console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code, ...queueFailureDiagnostic(error) }));
 }
 
 async function sendDiscoverySignal(services: DiscoveryServices, port: PublicDiscoveryV3Port, key: PublicDiscoveryKeyV3, requestDigest: string, correlationId: string, admissionToken: string, startFallback?: (key: PublicDiscoveryKeyV3) => Promise<void>): Promise<boolean> {

@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { boundedDuration, classifyWorkerRoute, emitWorkerCostDiagnostic, emitWorkerDiagnostic, workerDiagnosticsLockValue, workerMethod } from './diagnostics';
+import { boundedDuration, classifyWorkerRoute, emitWorkerCostDiagnostic, emitWorkerDiagnostic, queueFailureDiagnostic, workerDiagnosticsLockValue, workerMethod } from './diagnostics';
 
 describe('worker diagnostics', () => {
+  it('classifies Queue errors without retaining private provider content', () => {
+    expect(queueFailureDiagnostic(new Error('Internal error'))).toEqual({ errorType: 'error', errorDetail: 'internal-error' });
+    expect(queueFailureDiagnostic(new Error('Failed to send message'))).toEqual({ errorType: 'error', errorDetail: 'message-rejected' });
+    const unknown = queueFailureDiagnostic(new Error('private title https://private.example/secret'));
+    expect(unknown).toEqual({ errorType: 'error', errorDetail: 'unknown' });
+    expect(JSON.stringify(unknown)).not.toMatch(/private|title|https|secret/iu);
+  });
+
   it('emits only for the exact lock value and never serializes request content', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const event = { durationMs: 12, method: 'POST' as const, requestId: 'request-1', routeFamily: 'catalogue' as const, schemaVersion: 1 as const, status: 202, type: 'worker.request' as const };

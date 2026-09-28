@@ -19,7 +19,7 @@ import {
 } from '@tobirink/public-discovery';
 import { D1AgendaCollectionAdapter, type AgendaLaneClaim } from './releases/public-release-collectors';
 import { createProviderTransportAdapter, type ProviderTransportBindings } from './provider-transport-adapter';
-import { boundedDuration, emitWorkerCostDiagnostic, workerDiagnosticsLockValue, type WorkerCostDiagnosticEvent, type WorkerCostProvider, type WorkerCostResult } from './diagnostics';
+import { boundedDuration, emitWorkerCostDiagnostic, queueFailureDiagnostic, workerDiagnosticsLockValue, type WorkerCostDiagnosticEvent, type WorkerCostProvider, type WorkerCostResult } from './diagnostics';
 import { instrumentAgendaR2, instrumentD1, instrumentProviderFetch, instrumentQueueSend, type D1MetricTotals, type ProviderMetricTotals, type ProviderTransportMetricTotals, type R2MetricTotals, type QueueMetricTotals } from './operational-metrics';
 import { z } from 'zod';
 
@@ -373,8 +373,11 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     try {
       await queue.send(continuation.signal, { contentType: 'json', delaySeconds });
       continuationScheduled = true;
-    } catch {
-      console.warn('public-discovery-continuation-unsent');
+    } catch (caught) {
+      const error = caught instanceof Error ? caught : undefined;
+      console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health', code: 'public-discovery-continuation-unsent',
+        correlationId: continuation.signal.type === 'public-discovery-ready' ? continuation.signal.correlationId : undefined,
+        ...queueFailureDiagnostic(error) }));
     }
   }
   const result = report.replayed > 0 && report.published === 0 ? 'deduplicated' : report.published > 0 ? 'changed' : (report.deferred ?? 0) > 0 || specificPendingAt !== undefined ? 'backoff' : 'unchanged';

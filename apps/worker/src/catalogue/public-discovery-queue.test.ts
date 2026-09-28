@@ -273,6 +273,37 @@ describe('public discovery queue trigger', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it('retains a closed Queue cause when a deferred continuation cannot be sent', async () => {
+    const restoreRuntime = await preserveProviderRuntime();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-03T00:00:00.000Z'));
+    const discoveryKey = { ...key('f'), fingerprint: 'e3'.padStart(64, '0'), mediaKind: 'MANGA' as const };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = { metrics: async () => metrics, send: vi.fn(async () => { throw new Error('Internal error'); }),
+      sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const correlationId = '00000000-0000-4000-8000-000000000018';
+    try {
+      await env.PUBLIC_DB.prepare('UPDATE public_discovery_provider_runtime SET next_allowed_at = ?1 WHERE provider = ?2')
+        .bind(Date.now() + 120_000, 'mangaupdates').run();
+      await adapter.request({ ...submission('f', 'Synthetic deferred work'), key: discoveryKey,
+        query: { discoveryTitles: ['Synthetic deferred work'], sourceTitles: ['Synthetic deferred work'], mediaKind: 'MANGA',
+          explicitProviderReference: { provider: 'mangaupdates', externalId: '13893304082' } }, requestDigest: 'e'.repeat(64) }, new Date().toISOString());
+      const report = await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: queue }, discoveryKey, true, correlationId);
+      expect(report).toMatchObject({ claimed: 1, deferred: 1, continuationScheduled: false,
+        metrics: { queueFailures: 1, providerRequests: 0 } });
+      expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.health',
+        code: 'public-discovery-continuation-unsent', correlationId, errorType: 'error', errorDetail: 'internal-error' }));
+      expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 0 });
+    } finally {
+      warn.mockRestore(); vi.useRealTimers();
+      await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
+      await restoreRuntime();
+    }
+  });
+
   it.each([false, true])('continues an exact manga admission through cadence and an early wake with competing generic wake %s', async (competingWake) => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });
