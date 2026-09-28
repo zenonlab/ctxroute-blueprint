@@ -17,14 +17,14 @@ describe('installed recovery restart preparation', () => {
     const completion = new Promise(resolve => { complete = resolve; });
     const observer = { finish: vi.fn(async () => { await completion; events.push('correlated'); return ['cost']; }) };
     const page = { getByRole: vi.fn(() => ({ click: async () => { events.push('paused'); } })) };
-    const guard = { drain: async () => { events.push('drained'); }, throwIfFailed: () => { events.push('checked'); } };
+    const guard = { closeReadPhase: () => { events.push('reads-closed'); }, drain: async () => { events.push('drained'); }, throwIfFailed: () => { events.push('checked'); } };
     const pending = prepareInstalledRecoveryRestart(page, guard, observer, 10);
     await Promise.resolve();
     expect(events).toEqual([]);
     complete();
     await expect(pending).resolves.toEqual(['cost']);
     expect(observer.finish).toHaveBeenCalledWith(10);
-    expect(events).toEqual(['correlated', 'paused', 'drained', 'checked']);
+    expect(events).toEqual(['correlated', 'reads-closed', 'paused', 'drained', 'checked']);
     expect(page.getByRole).toHaveBeenCalledWith('button', { name: 'Mettre en pause', exact: true });
   });
 
@@ -163,9 +163,10 @@ describe('installed recovery correlation', () => {
       track: vi.fn(), read: vi.fn(() => cost) };
     const ready = vi.fn(async () => undefined);
     const complete = vi.fn(async () => ({ cost, terminal: { state: 'VERIFIED' } }));
-    const observation = await createInstalledRecoveryObservation({ start: () => observer, ready, complete, onFailure: vi.fn() });
+    const recordCost = vi.fn(async () => undefined);
+    const observation = await createInstalledRecoveryObservation({ start: () => observer, ready, complete, recordCost, onFailure: vi.fn() });
     const response = { headers: () => ({ 'x-tobirink-request-id': requestId }), text: async () => JSON.stringify({ state: 'PENDING' }) };
-    return { observation, response, observer, ready, complete };
+    return { observation, response, observer, ready, complete, recordCost };
   }
 
   it('starts observation before admission and drains before certifying final costs', async () => {
@@ -176,6 +177,15 @@ describe('installed recovery correlation', () => {
     expect(context.observer.track).toHaveBeenCalledWith(requestId, { provider: 'any', status: 202, task: 'discovery' });
     expect(await context.observation.finish(1)).toEqual([{ providerRequests: 1, d1RowsRead: 200, d1RowsWritten: 20 }]);
     expect(context.observer.close).toHaveBeenCalledOnce();
+    expect(context.recordCost).toHaveBeenCalledWith({ requestId, cost: context.observer.read(requestId) });
+    await context.observation.close();
+  });
+
+  it('rejects certification when the durable cost checkpoint fails', async () => {
+    const context = await fixture();
+    context.recordCost.mockRejectedValue(new Error('checkpoint-failed'));
+    await context.observation.onAdmission({ key: key() }, context.response);
+    await expect(context.observation.finish(1)).rejects.toThrow('checkpoint-failed');
     await context.observation.close();
   });
 
@@ -193,6 +203,7 @@ describe('installed recovery correlation', () => {
       const context = await fixture(cost);
       await context.observation.onAdmission({ key: key() }, context.response);
       await expect(context.observation.finish(1)).rejects.toThrow('cost policy');
+      expect(context.recordCost).not.toHaveBeenCalled();
       await context.observation.close();
     }
     const context = await fixture();
@@ -572,6 +583,53 @@ describe('installed review network guard', () => {
     await resumed.instance.handle(second);
     expect(second.fetch).not.toHaveBeenCalled();
     expect(resumed.instance.snapshot()).toMatchObject({ failure: 'read-budget-exceeded', readSlots: 1 });
+  });
+
+  it('drains accepted reads while preventing new reads before a browser restart', async () => {
+    const { instance } = await guard({ online: true, readBudget: 2 });
+    const active = fakeRoute({ url: discoveryUrl(key(7)) });
+    const simulatedResponse = active.fetch.getMockImplementation();
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    active.fetch.mockImplementation(async () => { await pending; return simulatedResponse(); });
+    const handling = instance.handle(active);
+    await vi.waitFor(() => expect(active.fetch).toHaveBeenCalledOnce());
+    instance.closeReadPhase();
+    const late = fakeRoute({ url: discoveryUrl(key(8)) });
+    await instance.handle(late);
+    expect(late.fetch).not.toHaveBeenCalled();
+    expect(late.abort).toHaveBeenCalledOnce();
+    let drained = false;
+    const draining = instance.drain().then(() => { drained = true; });
+    await Promise.resolve();
+    expect(drained).toBe(false);
+    release();
+    await handling;
+    await draining;
+    expect(instance.snapshot()).toMatchObject({ failure: undefined, forwardedReads: 1, inFlight: 0, readPhaseClosed: true });
+  });
+
+  it('keeps accepted read failures fatal after closing the read phase', async () => {
+    const { instance } = await guard({ online: true, readBudget: 1 });
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    const active = fakeRoute({ url: discoveryUrl(), fetchError: true, onFetch: () => pending });
+    const handling = instance.handle(active);
+    await vi.waitFor(() => expect(active.fetch).toHaveBeenCalledOnce());
+    instance.closeReadPhase();
+    release();
+    await handling;
+    await instance.drain();
+    expect(instance.snapshot().failure).toBe('read-network-failed');
+  });
+
+  it('does not relax mutation guards when the read phase closes', async () => {
+    const { instance } = await guard({ online: true, readBudget: 1 });
+    instance.closeReadPhase();
+    const mutation = fakeRoute({ body: { key: key(), query, schemaVersion: 3 }, method: 'POST', url: 'https://tobirink.com/v3/catalogue/discoveries/requests' });
+    await instance.handle(mutation);
+    expect(mutation.fetch).not.toHaveBeenCalled();
+    expect(instance.snapshot()).toMatchObject({ blockedByBudget: 1, forwardedRequests: 0 });
   });
 
   it('installs HTTP and WebSocket routes and rejects sockets without connecting', async () => {

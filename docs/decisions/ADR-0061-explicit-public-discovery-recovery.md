@@ -40,8 +40,12 @@ minute pour éviter une boucle locale. `MISS` conserve l'admission normale;
 
 Le banc installé ne redémarre ni le service worker ni le navigateur pendant
 les admissions du pilote scellé. Il attend la projection locale et la preuve
-corrélée, met l'analyse en pause par l'interface, puis draine les routes avant
-les tests de conservation. Une interruption garde la réservation, même sans
+corrélée, persiste les coûts validés par UUID dans des reçus privés exclusifs,
+ferme l'admission des nouvelles lectures, met l'analyse en pause par
+l'interface, puis draine les routes avant les tests locaux de conservation.
+Les lectures déjà engagées conservent leur caractère fatal en cas d'erreur;
+la fermeture ne relâche aucune garde de mutation. Un échec d'écriture du reçu
+de coût interdit la certification. Une interruption garde la réservation, même sans
 réponse d'admission reçue : une lecture de contrôle n'autorise jamais un renvoi.
 
 L’extension expose une action utilisateur explicite, visible uniquement lorsqu’un compteur `providerPaused` est présent. Cette action :
