@@ -1676,6 +1676,28 @@ au plus une demande historique expressément autorisée.
 
 ## Arrêt du pilote installé du 28 septembre 2026
 
+Le pilote `JH9olk`, autorisé après le correctif de coût, atteint dix sources
+expliquées à 138 secondes : neuf œuvres dans Library et une exclusion
+`BLOCKED_CONTENT_TAXONOMY` par la règle métier existante. Les snapshots après
+redémarrage du worker puis du navigateur restent identiques. Le verdict final
+reste pourtant `failed/read-network-failed`; il n'est pas remplacé par succès.
+Le banc doit clore sa phase de lectures après corrélation : il conserve les
+coûts par UUID en privé, refuse sans transmission toute nouvelle lecture,
+puis draine celles déjà acceptées avant les redémarrages locaux. Une erreur
+d'une lecture déjà engagée reste fatale; les gardes de mutation ne changent
+pas. Les dix réservations restent consommées, sans nouveau POST.
+
+La relecture historique bornée retrouve les dix corrélations et leurs coûts
+d'admission : 31 appels fournisseur, dix résultats acceptés, 1 242 lectures
+D1 et 740 écritures; maximum 144 lectures par clé, zéro erreur fournisseur,
+429 ou Queue dans ces événements. Les reçus restent privés dans
+`build/recovery/pilot-JH9olk-cost-evidence.json`. Les lignes scannées par
+l'outil de télémétrie ne sont pas des lectures D1. La copie hors ligne
+`pilot-preservation-7nr1ct` conserve exactement les dix sources, neuf œuvres
+et les tables privées après deux redémarrages navigateur; profil original
+inchangé, zéro requête transmise. Cette preuve complémentaire ne réécrit
+pas le verdict échoué du banc initial et ne certifie pas les 1 522 sources.
+
 Le troisième lot expressément confirmé utilise le ZIP Chrome 1.0.48 exact
 et le Worker fusionné en `1daa9fc`, CI principale `36401186318` verte.
 Le pilote privé `PbFEAL` s'arrête avec `correlation-failed` : six réservations

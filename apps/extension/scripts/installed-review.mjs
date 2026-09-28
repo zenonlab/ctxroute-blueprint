@@ -24,6 +24,7 @@ function integer(value, fallback, minimum, maximum) {
 
 export async function prepareInstalledRecoveryRestart(page, networkGuard, recoveryObservation, expected) {
   const costs = await recoveryObservation.finish(expected);
+  networkGuard.closeReadPhase();
   await page.getByRole('button', { name: 'Mettre en pause', exact: true }).click();
   await networkGuard.drain();
   networkGuard.throwIfFailed();
@@ -338,6 +339,9 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       recordAdmission: async receipt => {
         const keyDigest = createHash('sha256').update(JSON.stringify(receipt.key)).digest('hex');
         await writeFile(join(descriptorRoot, `${session.token}.correlation-${keyDigest}.json`), JSON.stringify(receipt) + '\n', { flag: 'wx', mode: 0o600 });
+      },
+      recordCost: async receipt => {
+        await writeFile(join(descriptorRoot, `${session.token}.cost-${receipt.requestId}.json`), JSON.stringify(receipt) + '\n', { flag: 'wx', mode: 0o600 });
       },
     });
     log({ event: 'installed-session', session: session.token, mode: config.online ? 'online-private-copy' : 'offline', dataOrigin, selected: session.expected, available: corpus.length, budgetSeconds: config.budgetSeconds, network: networkGuard.snapshot() });

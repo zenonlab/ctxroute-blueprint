@@ -6315,16 +6315,15 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Confirmation immédiate reçue pour scope owned-pilot-20260928, sceau ce433430037c142676b0d825d4a95c8cf765f0daeeaa769e0b59a2980a9eeb3e : 9 MANGA/1 MANHWA, maximum dix POST; Chrome48 exact et Worker principal CI36401186318 verts.",
-            "Pilote PbFEAL arrêté en observation : six réservations/POST comptabilisés, cinq corrélations enregistrées, quatre lectures navigateur; arrêt correlation-failed. Aucun renvoi ni élargissement, quatre clés non réservées.",
-            "Cause de dépassement reproduite avec les événements de l’invocation : 38 lectures D1 admission +290 collector =328 >300. L’observateur rejoue discovery-canary-observer-d1-budget. Budget inchangé; aucun certificat Library/convergence.",
-            "Lecture historique bornée à48,509s : cinq coûts corrélés (quatre changed/un backoff), sans 429/erreur fournisseur/Queue dans ces enregistrements; reçus0600 privés. Télémétrie distincte : 1358399 puis3079 lignes de logs, pas de mutations ni surveillance répétée."
+            "Pilote autorisé JH9olk: dix POST consommés, neuf œuvres Library et une exclusion BLOCKED_CONTENT_TAXONOMY à138s. Échec final read-network-failed conservé; aucun rejeu.",
+            "Dix corrélations historiques reliées aux admissions:31 appels fournisseur,10 résultats acceptés,1242 lectures D1/740 écritures,max144 lectures par clé; zéro429/erreur fournisseur/Queue. Reçus privés pilot-JH9olk-cost-evidence.json.",
+            "Copie hors ligne pilot-preservation-7nr1ct: dix sources/neuf œuvres et tables privées identiques après deux redémarrages; original inchangé,zéro transmission. Banc corrigé:53 tests verts, clôture des lectures et reçus de coût durables."
           ]
         },
         {
           "id": "converge",
           "title": "Faire converger toutes les sources",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "1522 sources expliquées, aucun blocage technique",
             "Confirmation distincte des reprises épuisées"
@@ -6336,7 +6335,11 @@
           "commands": [
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
-          "evidence": []
+          "evidence": [
+            "Inventaire actualisé certification-inventory-1790590118171:1522 sources,1346 identités,137 doublons supplémentaires;27 requêtes D1 indexées,1305 lectures,zéro écriture/admission.",
+            "Comptes par source selon D1:974 résultats publics disponibles,461 reprises exactes à confirmer,44 admissions absentes,4 continuations à observer;39 sources sans identité à justifier localement. Pas de certification Library complète.",
+            "Aucune autorisation élargie:les dix clés budget-pilot sont consommées; aucun autre lot ni rejeu exécuté."
+          ]
         },
         {
           "id": "certify",

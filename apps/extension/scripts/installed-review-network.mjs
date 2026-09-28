@@ -192,6 +192,7 @@ class InstalledReviewNetworkGuard {
     this.captured = new Set(capturedSubmissions.map(({ key }) => digestKey(key)));
     this.failure = sealedFailure?.code;
     this.inFlight = new Set();
+    this.readPhaseClosed = false;
     this.reservation = Promise.resolve();
     this.counts = {
       attemptedMutations: 0,
@@ -229,6 +230,7 @@ class InstalledReviewNetworkGuard {
       inFlight: this.inFlight.size,
       mutationBudget: this.options.mutationBudget,
       readBudget: this.options.readBudget,
+      readPhaseClosed: this.readPhaseClosed,
       refreshBudget: this.options.refreshBudget,
     };
   }
@@ -253,6 +255,10 @@ class InstalledReviewNetworkGuard {
 
   async drain() {
     while (this.inFlight.size > 0) await Promise.allSettled(this.inFlight);
+  }
+
+  closeReadPhase() {
+    this.readPhaseClosed = true;
   }
 
   async abort(route, code, fatal = true) {
@@ -284,6 +290,7 @@ class InstalledReviewNetworkGuard {
     this.counts.readAttempts += 1;
     const reservation = await this.exclusively(async () => {
       if (this.failure !== undefined) return 'guard-failed';
+      if (this.readPhaseClosed) return 'read-phase-closed';
       const sequence = this.previousReadSlots.length + this.counts.forwardedReads + 1;
       if (sequence > this.options.readBudget) return 'read-budget-exceeded';
       const path = join(this.options.receiptRoot, `${this.options.token}.read-${String(sequence).padStart(4, '0')}.json`);
@@ -294,7 +301,7 @@ class InstalledReviewNetworkGuard {
       return 'reserved';
     });
     if (reservation !== 'reserved') {
-      await this.abort(route, reservation, reservation !== 'guard-failed');
+      await this.abort(route, reservation, !['guard-failed', 'read-phase-closed'].includes(reservation));
       return;
     }
     if (this.failure !== undefined) {
@@ -493,7 +500,7 @@ export async function installInstalledReviewNetworkRoutes(context, guard) {
   await context.routeWebSocket('**/*', guard.handleWebSocket);
 }
 
-export async function createInstalledRecoveryObservation({ onFailure, recordAdmission, start = startCostObserver, ready = awaitObserverReady, complete = awaitRecoveryCompletion }) {
+export async function createInstalledRecoveryObservation({ onFailure, recordAdmission, recordCost, start = startCostObserver, ready = awaitObserverReady, complete = awaitRecoveryCompletion }) {
   const observer = start({ allowProviderContinuation: true });
   const controller = new AbortController();
   const tasks = [];
@@ -533,13 +540,14 @@ export async function createInstalledRecoveryObservation({ onFailure, recordAdmi
       observer.check();
       assert.equal(failure, undefined, 'Recovery correlation failed.');
       assert.equal(admissions.length, expected, 'Every scoped admission requires correlated evidence.');
-      return admissions.map(requestId => {
+      return Promise.all(admissions.map(async requestId => {
         const cost = observer.read(requestId);
         assert.ok(cost && cost.providerRequests >= 1 && cost.acceptedResults >= 1 && cost.provider429s === 0
           && cost.providerHttpErrors === 0 && cost.providerNetworkErrors === 0 && cost.queueFailures === 0
           && cost.d1RowsRead <= 300, 'Recovery correlated cost policy failed.');
+        await recordCost?.({ requestId, cost });
         return { providerRequests: cost.providerRequests, d1RowsRead: cost.d1RowsRead, d1RowsWritten: cost.d1RowsWritten };
-      });
+      }));
     },
     async close() { controller.abort(); await observer.close(); await Promise.all(tasks); },
   };
