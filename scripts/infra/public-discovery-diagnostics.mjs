@@ -43,6 +43,31 @@ export async function verifyDiagnosticToken({ environment = process.env, request
   if (user.ok) return { ok: true, kind: 'user', status: user.status };
   return { ok: false, account, user };
 }
+
+export async function probeDiagnosticD1Access({ environment = process.env, request = globalThis.fetch } = {}) {
+  if (!environment.CLOUDFLARE_API_TOKEN) return { ok: false, code: 'token-missing' };
+  if (!/^[a-f0-9]{32}$/u.test(environment.CLOUDFLARE_ACCOUNT_ID ?? '')) return { ok: false, code: 'account-invalid' };
+  let response;
+  let payload;
+  try {
+    response = await request(`${tokenVerifyBase}/accounts/${environment.CLOUDFLARE_ACCOUNT_ID}/d1/database?name=tobirink-public&per_page=10`, {
+      headers: { Authorization: `Bearer ${environment.CLOUDFLARE_API_TOKEN}` },
+      signal: globalThis.AbortSignal.timeout(5_000),
+    });
+    if (Number(response.headers?.get('content-length')) > 16_384) return { ok: false, code: 'response-invalid' };
+    const body = await response.text();
+    if (body.length > 16_384) return { ok: false, code: 'response-invalid' };
+    payload = JSON.parse(body);
+  } catch { return { ok: false, code: 'transport-failed' }; }
+  const httpStatus = Number.isInteger(response.status) ? response.status : null;
+  const cloudflareCode = Array.isArray(payload?.errors) && Number.isInteger(payload.errors[0]?.code) ? payload.errors[0].code : null;
+  if (Array.isArray(payload?.errors) && payload.errors.some(error => /Cannot use the access token from location\b/iu.test(error?.message ?? ''))) {
+    return { ok: false, code: 'token-location-denied', httpStatus, cloudflareCode };
+  }
+  if (!response.ok || payload?.success !== true) return { ok: false, code: 'd1-access-denied', httpStatus, cloudflareCode };
+  if (!Array.isArray(payload.result)) return { ok: false, code: 'response-invalid', httpStatus, cloudflareCode };
+  return { ok: true, databasePresent: payload.result.some(database => database?.name === 'tobirink-public') };
+}
 export function discoveryDiagnosticQueries(now) {
   if (new Date(now).toISOString() !== now) throw new TypeError('invalid-diagnostic-clock');
   return {
@@ -127,7 +152,11 @@ export function collectDiscoveryDiagnostics({ now = new Date().toISOString(), qu
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const report = process.argv[2] === '--verify-token' ? await verifyDiagnosticToken() : collectDiscoveryDiagnostics();
+  let report;
+  if (process.argv[2] === '--verify-token') {
+    const token = await verifyDiagnosticToken();
+    report = token.ok ? { token, d1: await probeDiagnosticD1Access() } : { token };
+  } else report = collectDiscoveryDiagnostics();
   process.stdout.write(`${JSON.stringify(report)}\n`);
-  if (!report.ok) process.exitCode = 1;
+  if (report.ok === false || report.token?.ok === false || report.d1?.ok === false) process.exitCode = 1;
 }

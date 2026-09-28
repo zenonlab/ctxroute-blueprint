@@ -157,6 +157,9 @@ si nécessaire. Elle ne publie que le type compte/utilisateur et le statut actif
 ou deux codes fermés avec statuts HTTP et codes d'erreur numériques ;
 l'identifiant du jeton, l'adresse IP et les messages Cloudflare restent masqués.
 Ce prévol ne modifie ni jeton ni ressource.
+Il sonde ensuite `GET /accounts/{account_id}/d1/database` avec le même jeton,
+en limitant la réponse et sans publier l'inventaire ; seule la présence de la
+base attendue ou un code de refus fermé est rapportée.
 
 Chaque requête SELECT utilise directement le CLI Wrangler verrouillé dans
 un processus enfant via l'exécutable Node courant, avec une limite de quinze secondes et de 1 Mio

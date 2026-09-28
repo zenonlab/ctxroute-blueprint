@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { collectDiscoveryDiagnostics, discoveryDiagnosticQueries, executeDiagnosticQuery, verifyDiagnosticToken } from './public-discovery-diagnostics.mjs';
+import { collectDiscoveryDiagnostics, discoveryDiagnosticQueries, executeDiagnosticQuery, probeDiagnosticD1Access, verifyDiagnosticToken } from './public-discovery-diagnostics.mjs';
 
 const now = '2026-09-23T12:00:00.000Z';
 const environment = { CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), CLOUDFLARE_API_TOKEN: 'private-test-token' };
@@ -51,6 +51,21 @@ test('Cloudflare token preflight falls back to the user token endpoint', async (
   assert.deepEqual(result, { ok: true, kind: 'user', status: 'active' });
   assert.equal(calls.length, 2);
   assert.equal(calls[1], 'https://api.cloudflare.com/client/v4/user/tokens/verify');
+});
+
+test('D1 access probe classifies location denial without exposing the inventory', async () => {
+  const request = async (url, options) => {
+    assert.equal(url, `https://api.cloudflare.com/client/v4/accounts/${environment.CLOUDFLARE_ACCOUNT_ID}/d1/database?name=tobirink-public&per_page=10`);
+    assert.equal(options.headers.Authorization, 'Bearer private-test-token');
+    return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ success: true, result: [{ name: 'tobirink-public', uuid: 'private-database-id' }] }) };
+  };
+  assert.deepEqual(await probeDiagnosticD1Access({ environment, request }), { ok: true, databasePresent: true });
+  const denied = await probeDiagnosticD1Access({ environment, request: async () => ({
+    ok: false, status: 403, headers: { get: () => null },
+    text: async () => JSON.stringify({ success: false, errors: [{ code: 10000, message: 'Cannot use the access token from location 203.0.113.42 private-secret' }] }),
+  }) });
+  assert.deepEqual(denied, { ok: false, code: 'token-location-denied', httpStatus: 403, cloudflareCode: 10000 });
+  assert.doesNotMatch(JSON.stringify(denied), /private-|203\.0\.113\.42/u);
 });
 
 test('diagnostics distinguish actual age from retry deadline and group media', () => {
