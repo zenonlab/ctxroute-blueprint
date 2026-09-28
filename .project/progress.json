@@ -6294,10 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR155 diagnostic livré via CI 36418526654 verte, merge b292333f ; coûts et cause fermée des erreurs directes conservés. Aucun canari ni archive publié.",
-            "Cause du 503 q8QmHm démontrée : deux fiches MangaDex distinctes sans référence commune partagent un alias ; la garde canonique refuse la seconde publication. Preuves privées fournisseur (1 GET) et D1 indexées, aucune mutation.",
-            "Régression synthétique rouge stale-public-discovery-result, puis correction locale : migration additive 0028 ambiguous, publications distinctes atomiques, contrainte des références fournisseur intacte, replay sans écriture et rollback du marqueur vérifiés.",
-            "207 tests Worker et typechecks verts ; npm run verify propre, E2E et validation finale des diagrammes en cours avant commit/livraison. Aucun réarmement supplémentaire."
+            "PR156 et CI36420872368 livrées ; q8QmHm corrigé devient VERIFIED attempt5 sans nouveau POST. L’ancien pilote reste non certifié.",
+            "Pilote suivant : 5337 lectures collecteur et32 admission. EXPLAIN distant sans écriture prouve SCAN canonique ; INDEXED BY donne la recherche des trois colonnes. Régression avec statistiques périmées rouge puis verte, publication/replay et conflit de référence bornés.",
+            "207 tests Worker et types verts ; runbook et Archify dataflow/showcase/visual-check validés, captures inspectées. Vérification complète et E2E en clone propre en cours ; hooks, seuil300, Queue1/1 et admissions inchangés."
           ]
         },
         {
@@ -6316,9 +6315,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Pilote checkpoint q8QmHm autorisé immédiatement : arrêt après deux POST, huit clés intactes. Premier HTTP 202 et résultat D1 VERIFIED ; deuxième HTTP 503 après claim, état PROCESSING. Aucun rejeu ni élargissement.",
-            "Preuves privées pilot-q8QmHm-http-proof.json et pilot-q8QmHm-d1-diagnostic.json : cause interne masquée par public-discovery-queue-fallback-failed ; diagnostic corrigé localement, 206 tests Worker et typecheck verts, vérification complète en cours.",
-            "Le pilote précédent JH9olk garde son échec final et ses preuves : dix admissions consommées, neuf œuvres Library et une exclusion justifiée ; coûts/restarts récupérés séparément, pas de certification rétroactive."
+            "Pilote Mg67yX autorisé pour batch-001, arrêté après trois réservations/envois ; sept clés intactes, deux corrélations reçues. Aucune répétition autorisée.",
+            "Télémétrie corrélée : une publication MangaDex consomme 5337 lectures collecteur +32 admission, dépassement réel de 300 ; arrêt correlation-failed. Plan distant EXPLAIN confirme SCAN canonique, zéro écriture diagnostic.",
+            "Régression locale avec statistiques périmées rouge puis verte ; INDEXED BY imposé pour publication et replay. q8QmHm antérieur devient VERIFIED attempt5 par continuation, sans nouveau POST ; aucun ancien échec requalifié en certificat."
           ]
         },
         {
@@ -6337,11 +6336,9 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "JB9dN3 après projection du pilote : 1522 = 1026 résolues + 44 Review + 53 exclusions + 399 retryable (393 PROVIDER_UNAVAILABLE, 5 PENDING, 1 NETWORK). Une nouvelle œuvre Library, 822 connues, zéro erreur interne/projection manquante.",
-            "Contrôle installé de 355 s : 417 lectures HTTP, zéro POST/refresh transmis, six tentatives bloquées ; redémarrages vérifiés. Ancienne preuve/profil sauvegardés avant la reprise.",
-            "Les 395 anciennes sources épuisées représentaient 341 identités, dont 340 non réservées avant q8QmHm. Deux clés maintenant consommées ; huit clés du dernier scope intactes. Pas de nouveau lot exécuté.",
-            "Deuxième clé q8QmHm réclamée automatiquement après expiration du bail, puis nouvel échec de publication. Collision d'alias distincts reproduite localement ; correction additive en vérification, jamais convertie artificiellement en Review.",
-            "Les quatre anciennes recherches MangaUpdates et le MISS à admettre restent à traiter. Leur état technique n'est pas assimilé à une résolution ou exclusion ; aucune certification de convergence."
+            "Réconciliation après PR156, JB9dN3 en 716s : 1522 = 1026 résolues + 44 Review + 53 exclusions + 399 retryable ; cinq PENDING, un NETWORK et 393 PROVIDER_UNAVAILABLE. Projection sans œuvre manquante ; redémarrages navigateur/worker vérifiés.",
+            "433 lectures HTTP, zéro POST transmis, 12 mutations bloquées, zéro fournisseur/étranger ; budget cumulé 2854/5000. Sauvegarde préalable privée pre-alias-reconcile-oxNi1h conservée ; verdict incomplete inchangé.",
+            "Campagne préparée non autorisée : 232 identités connues, 24 lots disjoints ; 106 UNKNOWN séparées. Prévol batch-001 : dix éligibles (9 MANGA/1 ANIME), vingt lectures D1/zéro écriture, aucune réservation existante ; MangaUpdates DEFERRED, autres fournisseurs READY."
           ]
         },
         {

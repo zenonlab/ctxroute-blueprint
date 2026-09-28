@@ -541,7 +541,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           AND state = 'VERIFIED' AND refresh_state = 'IDLE'
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)`)
         .bind(profile.workId, JSON.stringify(candidate.titles), ...guardValues),
-      this.database.prepare(`UPDATE catalogue_canonical_titles_v1 SET ambiguous = 1
+      this.database.prepare(`UPDATE catalogue_canonical_titles_v1 INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 SET ambiguous = 1
         WHERE normalization_version = ?1 AND media_kind = ?2 AND work_id <> ?3 AND ambiguous = 0
           AND normalized_title IN (SELECT value FROM json_each(?4))
           AND EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
@@ -628,7 +628,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       ...keyValues(result.key), result.requestDigest, resultJson,
     ];
     const outcomes = await this.database.batch([
-      this.database.prepare(`UPDATE catalogue_canonical_titles_v1 SET ambiguous = 1
+      this.database.prepare(`UPDATE catalogue_canonical_titles_v1 INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 SET ambiguous = 1
         WHERE normalization_version = ?1 AND media_kind = ?2 AND work_id <> ?3 AND ambiguous = 0
           AND normalized_title IN (SELECT value FROM json_each(?4))
           AND EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
