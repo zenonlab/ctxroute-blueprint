@@ -445,3 +445,7 @@
 
 - [x] **Étendre le checkpoint sans deviner le média** — DONE _(evidence: Resolver 83/83, contracts 7/7, Worker D1 43/43, typechecks verts; Archify dataflow 9/9., UNKNOWN reprend la page anime et conserve l'ambiguïté inter-lanes sans deviner le média.)_
 - [x] **Prouver D1 et bornes Worker** — DONE _(evidence: D1 20/20 recherches uniques en 3 claims, checkpoints PENDING à 0 tentative puis terminal; Worker 43/43, resolver 85/85, contrats 7/7., npm run verify complet, Web E2E 11 pass/1 skip, Archify dataflow/architecture 9/9, git diff --check verts., Aucun POST historique, réarmement, secret, permission ou fichier public modifié.)_
+
+## Récupérer une identité exacte via référence fournisseur liée — DONE
+
+- [x] **Ajouter un secours lié et vérifié** — DONE _(evidence: Resolver 93/93 et Worker Queue 44/44: secours MangaUpdates→MangaDex seulement après échec consommé; cadence sans appel supplémentaire., npm run verify, Archify architecture/dataflow, git diff --check verts; aucun D1 ni archive publique muté.)_
