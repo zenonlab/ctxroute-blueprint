@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { publicDiscoveryCandidateSchema, publicDiscoveryLookupSubmissionSchema, publicDiscoveryQuerySchema, publicDiscoveryRefreshSubmissionSchema, publicDiscoverySubmissionSchema } from '.';
+import { publicDiscoveryCandidateSchema, publicDiscoveryLookupSubmissionSchema, publicDiscoveryQuerySchema, publicDiscoveryRefreshSubmissionSchema, publicDiscoverySearchProgressSchema, publicDiscoverySubmissionSchema } from '.';
 
 const query = {
   discoveryTitles: ['One'],
@@ -39,5 +39,12 @@ describe('public discovery request minimization', () => {
     };
     expect(publicDiscoveryCandidateSchema.parse(candidate).linkedReferences).toEqual(candidate.linkedReferences);
     expect(publicDiscoveryCandidateSchema.safeParse({ ...candidate, relations: [{ relationType: 'ADAPTATION' }] }).success).toBe(false);
+  });
+
+  it('reads old search checkpoints and rejects an incomplete anime lane', () => {
+    const base = { candidates: [], cursor: '1', provider: 'mangaupdates', titleIndex: 0, version: 1 };
+    expect(publicDiscoverySearchProgressSchema.parse(base)).toEqual(base);
+    expect(publicDiscoverySearchProgressSchema.safeParse({ ...base, animeLane: { candidates: [], references: [], state: 'MATCH' } }).success).toBe(false);
+    expect(publicDiscoverySearchProgressSchema.safeParse({ ...base, animeLane: { candidates: [], references: [], state: 'NOT_FOUND' } }).success).toBe(true);
   });
 });

@@ -96,6 +96,17 @@ export const publicDiscoveryTerminalResolutionSchema = z.discriminatedUnion('sta
 ]);
 
 export const publicDiscoverySearchProgressSchema = z.strictObject({
+  animeLane: z.strictObject({
+    candidates: z.array(publicDiscoveryCandidateSchema).max(10),
+    references: z.array(publicDiscoveryReferenceV3Schema).max(10),
+    state: z.enum(['MATCH', 'AMBIGUOUS', 'NOT_FOUND']),
+  }).superRefine((lane, context) => {
+    if ((lane.state === 'MATCH' && lane.references.length !== 1)
+      || (lane.state === 'AMBIGUOUS' && lane.references.length < 2)
+      || (lane.state === 'NOT_FOUND' && lane.references.length !== 0)) {
+      context.addIssue({ code: 'custom', message: 'invalid-anime-lane-references' });
+    }
+  }).optional(),
   candidates: z.array(publicDiscoveryCandidateSchema).max(25),
   cursor: z.string().regex(/^[1-9]\d{0,4}$/u),
   provider: publicDiscoveryProviderSchema,

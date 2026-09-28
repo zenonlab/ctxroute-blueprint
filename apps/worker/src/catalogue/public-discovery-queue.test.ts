@@ -219,6 +219,60 @@ describe('public discovery queue trigger', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it('persists both unknown-media lanes across Worker budgets without repeating a provider search', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-11T00:00:00.000Z'));
+    const discoveryKey = { ...key('c'), fingerprint: 'c10'.padStart(64, '0'), mediaKind: 'UNKNOWN' as const };
+    const titles = ['Alpha', 'Beta', 'Gamma', 'Delta'];
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const searched: string[] = [];
+    let callsInInvocation = 0;
+    const providerPort = (provider: keyof PublicDiscoveryProviderPorts): FavoriteProviderPort => ({
+      hydrate: async () => undefined,
+      search: async ({ titles: queryTitles }) => {
+        callsInInvocation += 1;
+        searched.push(`${provider}:${queryTitles[0]}`);
+        return { candidates: [], complete: true, digest: 'empty', provider, truncated: false };
+      },
+    });
+    const providers: PublicDiscoveryProviderPorts = {
+      anilist: providerPort('anilist'), mangaupdates: providerPort('mangaupdates'), mangadex: providerPort('mangadex'),
+      'kitsu-anime': providerPort('kitsu-anime'), 'kitsu-manga': providerPort('kitsu-manga'),
+    };
+    try {
+      await adapter.request({ key: discoveryKey, query: { discoveryTitles: titles, mediaKind: 'UNKNOWN', sourceTitles: titles },
+        requestDigest: 'e'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
+      for (const tokenPrefix of ['a', 'b', 'c']) {
+        callsInInvocation = 0;
+        const claimToken = tokenPrefix.repeat(48);
+        const claimTokenHash = await tokenDigest(claimToken);
+        const claimed = await adapter.claimBatch({ claimToken, tokenDigest: claimTokenHash, key: discoveryKey,
+          now: new Date().toISOString(), leaseUntil: new Date(Date.now() + 15 * 60_000).toISOString(), limit: 1 });
+        const report = await runPublicDiscoveryBatch({
+          gateway: {
+            claim: async () => claimed,
+            defer: (item, retryAt, now, progress) => adapter.deferClaim(item, claimTokenHash, retryAt, now, progress),
+            publish: async (batch) => adapter.publishBatch(batch, claimTokenHash, await tokenDigest(JSON.stringify(batch.results)), new Date().toISOString()),
+          },
+          limit: 1, nonce: () => crypto.randomUUID(), now: () => new Date().toISOString(),
+          resolver: createBudgetedDiscoveryResolver(providers, () => callsInInvocation * 4, () => 1),
+        });
+        expect(report.failed).toBe(0);
+        if (tokenPrefix !== 'c') {
+          expect(report).toMatchObject({ claimed: 1, deferred: 1, published: 0 });
+          const checkpoint = await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+            .bind(discoveryKey.fingerprint).first<{ state: string; attempts: number; progress: string }>();
+          expect(checkpoint).toMatchObject({ state: 'PENDING', attempts: 0 });
+          expect(JSON.parse(checkpoint!.progress)).toMatchObject({ animeLane: { state: 'NOT_FOUND' } });
+          vi.setSystemTime(Date.now() + 2_000);
+        } else expect(report).toMatchObject({ claimed: 1, deferred: 0, published: 1 });
+      }
+      expect(searched).toHaveLength(20);
+      expect(new Set(searched).size).toBe(20);
+      await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'NOT_FOUND' });
+    } finally { vi.useRealTimers(); }
+  });
+
   it.each([false, true])('continues an exact manga admission through cadence and an early wake with competing generic wake %s', async (competingWake) => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });

@@ -271,6 +271,64 @@ describe('standalone provider resolver', () => {
     expect(ports.mangadex.search.mock.calls.map(([query]) => query.titles[0])).toEqual(['Alias', 'Target', 'Target']);
   });
 
+  it('resumes an unknown-media anime page without restarting the first page', async () => {
+    const target = candidate('anilist', 'ANIME', '42', 'Target');
+    const ports = providers({ anilist: target });
+    const pages: string[] = [];
+    ports.anilist.search.mockImplementation(async ({ cursor }) => {
+      pages.push(cursor);
+      return { candidates: cursor === '5' ? [target] : [], complete: cursor === '5',
+        digest: cursor, nextCursor: cursor === '5' ? undefined : String(Number(cursor) + 1), provider: 'anilist', truncated: cursor !== '5' };
+    });
+    const input = request('UNKNOWN');
+    let checkpoint;
+    try { await createPublicDiscoveryResolver(ports).resolve(input); }
+    catch (error) {
+      if (!(error instanceof PublicDiscoverySearchContinuationError)) throw error;
+      checkpoint = error.searchProgress;
+    }
+    expect(checkpoint).toMatchObject({ provider: 'anilist', cursor: '5' });
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, searchProgress: checkpoint })).resolves.toMatchObject({
+      state: 'VERIFIED', profile: { candidate: { provider: 'anilist', externalId: '42' } },
+    });
+    expect(pages).toEqual(['1', '2', '3', '4', '5']);
+  });
+
+  it('preserves an anime match while an unknown-media manga lane crosses the invocation budget', async () => {
+    const anime = candidate('anilist', 'ANIME', '42', 'Target');
+    const manga = candidate('mangaupdates', 'MANGA', '24', 'Target');
+    const ports = providers({ anilist: anime, mangaupdates: manga });
+    ports.mangaupdates.search.mockRejectedValueOnce(new PublicDiscoveryInvocationYieldError());
+    const input = request('UNKNOWN');
+    let checkpoint;
+    try { await createPublicDiscoveryResolver(ports).resolve(input); }
+    catch (error) {
+      if (!(error instanceof PublicDiscoverySearchContinuationError)) throw error;
+      checkpoint = error.searchProgress;
+    }
+    expect(checkpoint).toMatchObject({ provider: 'mangaupdates', animeLane: { state: 'MATCH', references: [{ provider: 'anilist', externalId: '42' }] } });
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, searchProgress: checkpoint })).resolves.toMatchObject({ state: 'AMBIGUOUS' });
+    expect(ports.anilist.search).toHaveBeenCalledOnce();
+    expect(ports.anilist.hydrate).not.toHaveBeenCalled();
+    expect(ports.mangaupdates.search).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not checkpoint past an unavailable anime lane for unknown media', async () => {
+    const ports = providers();
+    ports.anilist.search.mockRejectedValueOnce(new Error('HTTP 503'));
+    ports.mangaupdates.search.mockImplementation(async ({ cursor }) => ({ candidates: [], complete: false, digest: 'partial',
+      nextCursor: String(Number(cursor) + 1), provider: 'mangaupdates', truncated: true }));
+    await expect(createPublicDiscoveryResolver(ports).resolve(request('UNKNOWN'))).rejects.toThrow('HTTP 503');
+  });
+
+  it('rejects a manga checkpoint that omits the completed anime lane', async () => {
+    const ports = providers();
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...request('UNKNOWN'), searchProgress: {
+      candidates: [], cursor: '1', provider: 'mangaupdates', titleIndex: 0, version: 1,
+    } })).rejects.toThrow('provider-search-progress-lane-mismatch');
+    expect(ports.anilist.search).not.toHaveBeenCalled();
+  });
+
   it('does not skip a provider that failed before a later budget checkpoint', async () => {
     const ports = providers();
     ports.mangadex.search.mockRejectedValueOnce(new Error('HTTP 503'));
