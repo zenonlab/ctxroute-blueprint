@@ -6294,9 +6294,10 @@
             "git diff --check"
           ],
           "evidence": [
-            "Pilote batch-002 arrêté après dix POST : télémétrie liée aux admissions démontre un réveil Queue vide corrélé provider:none/unchanged, zéro appel/écriture, 78 lectures D1 ; le validateur échouait bien que la demande restât PENDING.",
-            "Correction de l’observateur seulement : réveil vide accepté uniquement après continuation corrélée réellement programmée, ses lectures comptées dans la borne300, aucune preuve avant fournisseur final. Régression rouge puis verte ; 49 tests canari, 70 tests ciblés infra.",
-            "Verify complet en clone propre, Web E2E 11 pass/1 skip, Archify dataflow showcase et visual-check quatre tailles, validations ADR/docs et diff-check réussis. Publication par PR/CI encore à faire ; aucun POST rejoué."
+            "Banc installé local: code de corrélation fermé dans rapport privé; tests132/132, aucun budget ou admission élargi. Pilote batch-003 échoué, dix clés consommées.",
+            "Correctif local MangaUpdates: pages100, curseur v1 conservé en unités25 (81→page21, prochain85), comparaison globale par tranches25; aucun nouveau POST. Preuve API réelle4,104ms/136,629octets sous les bornes.",
+            "Clone propre avec diff exact: npm run verify vert, Web E2E11 pass/1 skip; Public Discovery179/179, Worker207/207, Archify dataflow9/9/0warning, ADR/docs et diff-check verts. Root verify pollué par archives build ignorées.",
+            "PR158/main CI36429534504 verts pour le précédent code; ce nouveau correctif n’est ni commité, ni en CI, ni déployé, et ne certifie pas rétrospectivement le pilote."
           ]
         },
         {
@@ -6315,9 +6316,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Lot batch-002 autorisé par « go » après prévol exact scellé : dix réservations durables et dix POST, aucun rejeu. Profil LagK4m à l’arrêt : quatre œuvres Library, une AMBIGUOUS en Review et cinq PENDING ; original correlation-failed, jamais certifié.",
-            "D1 dix clés indexées/10 lectures/zéro écriture : quatre VERIFIED, une AMBIGUOUS, cinq PENDING. Télémétrie privée 27 événements corrélés : réveil Queue avec même UUID mais provider:none/unchanged, zéro appel, 78 lectures, zéro écriture déclenche fausse erreur ; aucune 429, panne fournisseur ni panne Queue observée dans les événements corrélés.",
-            "Régression observateur rouge puis verte : 49 tests canari ; réveil vide comptabilisé au budget300, interdit de certification avant appel fournisseur final, sans assouplir refus isolé ni erreur Queue. CI locale complète en cours."
+            "Lot batch-003 confirmé,10 réservations et10 POST via bouton, aucun rejeu. Profil qhnT56 failed/correlation-failed à280s malgré9 Library/1 attente ; jamais certifié.",
+            "Lecture D1 exacte par index primaire via connecteur Cloudflare:10 lignes lues/0 écrite,9 VERIFIED/1 PROCESSING ; lecture suivante10/0 montre la même clé PENDING, attempt0, curseur MangaUpdates45, updatedAt14:18UTC. La recherche continue sans nouvel envoi.",
+            "Wrangler refusé par restriction IP code9109 ; connecteur Cloudflare read-only fonctionne. Une requête Observability bornée 7min a scanné2,238,332 lignes/218MB et n'a renvoyé aucune trace exploitable : arrêt des balayages coûteux, cause du pilote non démontrée."
           ]
         },
         {
@@ -6336,9 +6337,9 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "JB9dN3 après projection des résultats : 1522 = 1028 résolues +44 Review +53 exclusions +397 retryable ; 391 PROVIDER_UNAVAILABLE, cinq PENDING et un NETWORK. Library824 œuvres connues, aucune projection manquante, redémarrages vérifiés.",
-            "425 lectures HTTP, zéro POST transmis/fournisseur/étranger ; douze mutations bloquées ; budget cumulé3279/5000. Sauvegarde privée pre-index-reconcile-8yobTu et toutes preuves antérieures conservées.",
-            "106 identités UNKNOWN reparsées hors réseau avec code actuel :106 restent UNKNOWN, aucun média inventé. Campagne connue préparée non autorisée ; batch-001 a désormais trois réservations permanentes après arrêt budget, sept clés intactes."
+            "Fenêtre complète895s sur profil JB9dN3/candidate Chrome1.0.48 et export Downloads exact :1522=1042 RESOLVED+47 Review+53 exclusions+380 retryable (370 PROVIDER_UNAVAILABLE,9 PENDING,1 NETWORK). Library837 œuvres,0 erreur interne,0 projection manquante ; verdict incomplete.",
+            "Service worker et navigateur redémarrés, compteurs conservés. Sauvegarde isolée créée avant reprise;484 lectures HTTP,4235/5000 emplacements cumulés,14 mutations bloquées,0 POST/refresh/fournisseur. Toutes les anciennes preuves conservées.",
+            "D1 indexé ciblé1 ligne/0 écriture à14:39UTC:clé batch-003 non terminale PENDING,attempt0,curseur MangaUpdates65 et0 candidat; Queue1/1,backlog7,âge max~12min. Recherche avance, mais ne satisfait pas la borne pilote; aucun autre lot autorisé."
           ]
         },
         {
@@ -6357,10 +6358,9 @@
             "npm run package:extension"
           ],
           "evidence": [
-            "Chrome 1.0.48 exact : upgrade-preservation-SfSBt5 conserve 1522 sources/805 œuvres, export-restauration chiffré exact et deux redémarrages; original inchangé, zéro requête transmise.",
-            "Import vierge rshn9Y : 944 s, 1522 sources, 1483 attentes hors ligne/39 sans identité, aucun traitement actif ni erreur interne; redémarrages vérifiés, zéro transmission. Pas de convergence distante certifiée.",
-            "Firefox 156.0.1 installé, signature/notarisation vérifiées. web-ext lint candidate48 : zéro erreur, quatre avertissements existants; ZIP non signé.",
-            "external: contrôle natif Firefox échoue avec Sky Computer Use native pipe startup failed; accès de signature Mozilla indisponible. Aucun XPI signé ni certification Firefox durable."
+            "Chrome candidate1.0.48 ZIP SHA60e1109a inchangé; profil complet après deux redémarrages conserve1522 sources et837 œuvres, mais380 reprises techniques empêchent la certification de la bibliothèque.",
+            "Firefox stable156.0.1 et web-ext10.7 installés; archive Firefox1.0.48 non signée, aucun XPI Mozilla non listé. Aucune publication ni installation durable certifiée.",
+            "external: ni session Mozilla/signature configurée ni navigateur connecté (liste des navigateurs vide, Computer Use native pipe startup failed). Ne pas créer de secret, grant ou contournement de signature tacitement."
           ]
         },
         {
@@ -6378,6 +6378,43 @@
             "git diff --check"
           ],
           "evidence": []
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-mangaupdates-broad-search-20260928",
+      "title": "Borner la recherche MangaUpdates saturée sans faux résultat",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "selective-search",
+          "title": "Réduire les pages saturées avec reprise compatible",
+          "status": "DONE",
+          "acceptance": [
+            "Recherche saturée bornée sans faux NOT_FOUND",
+            "Checkpoint existant repris sans rejouer le POST",
+            "Régressions provider et Worker vertes"
+          ],
+          "files": [
+            "packages/public-discovery/src/**/*",
+            "apps/worker/src/**/*",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/operations/cloudflare.md",
+            "docs/architecture/src/discovery-recovery.dataflow.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/public-discovery",
+            "npm run archify:validate -- discovery-recovery.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Régression rouge puis verte: curseur legacy81→page21/100 et prochain85 sans saut; cible en 100e position et priorité exact>flou; 91 tests ciblés verts.",
+            "Preuve API réelle ciblée: 10000 hits/400 pages25; page21/100 répond200 en4104ms et136629 octets (<8s/<512KiB), zéro admission D1.",
+            "Clone propre avec diff exact: npm run verify vert, Web E2E11 pass/1 skip; Public Discovery179, Worker207, Archify dataflow9/9/0warning, ADR/docs et diff-check verts. Code local non déployé."
+          ]
         }
       ]
     }

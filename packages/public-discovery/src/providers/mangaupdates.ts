@@ -1,11 +1,14 @@
 import { assertFavoriteProviderSearchQuery, createProviderCandidate, createProviderCandidateEnvelope, favoriteProviderInspectionLimit, favoriteProviderPage, favoriteProviderPolicy, inspectFavoriteTitleCandidates } from '../provider-kit';
-import type { FavoriteMediaKind, FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, ProviderCandidate } from '../provider-kit';
+import type { FavoriteMediaKind, FavoriteProviderCandidatePort, FavoriteProviderHydrationPort, FavoriteProviderReference, FavoriteProviderSearchQuery, MatchLevel, ProviderCandidate } from '../provider-kit';
 import { z } from 'zod';
 import { FavoriteProviderRateGate, readFavoriteProviderIdentityJson, readFavoriteProviderJson } from '../provider-http';
 import type { FavoriteProviderFetch } from '../provider-http';
 
 export const mangaUpdatesApiOrigin = 'https://api.mangaupdates.com';
 const seriesEndpoint = `${mangaUpdatesApiOrigin}/v1/series`;
+const mangaUpdatesPageSize = 100;
+const legacyPageSize = favoriteProviderInspectionLimit;
+const matchLevels: readonly MatchLevel[] = ['source-id', 'ordered-exact', 'explicit-season', 'reordered-significant-words', 'bounded-edit-distance'];
 const nonEmptyString = z.string().trim().min(1);
 const identifierSchema = z.union([z.number().int().positive(), nonEmptyString]).transform(String);
 const mangaUpdatesImageSchema = z.object({
@@ -26,7 +29,7 @@ const mangaUpdatesSeriesSchema = z.object({
   url: z.preprocess((value) => value ?? undefined, z.url().optional()),
 }).passthrough();
 const mangaUpdatesResultSchema = z.object({ record: mangaUpdatesSeriesSchema }).passthrough();
-const mangaUpdatesSearchSchema = z.object({ results: z.array(mangaUpdatesResultSchema).max(favoriteProviderInspectionLimit), total_hits: z.number().int().nonnegative() }).passthrough();
+const mangaUpdatesSearchSchema = z.object({ results: z.array(mangaUpdatesResultSchema).max(mangaUpdatesPageSize), total_hits: z.number().int().nonnegative() }).passthrough();
 type MangaUpdatesSeries = z.infer<typeof mangaUpdatesSeriesSchema>;
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 const adultLabels = new Set(['adult', 'erotica', 'hentai', 'lolicon', 'pornographic', 'shotacon', 'smut']);
@@ -74,9 +77,9 @@ export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCand
   async search(input: FavoriteProviderSearchQuery) {
     const query = assertFavoriteProviderSearchQuery(input);
     if (query.provider !== 'mangaupdates') throw new TypeError('MangaUpdates adapter requires provider mangaupdates.');
-    const page = favoriteProviderPage(query.cursor);
+    const page = Math.floor((favoriteProviderPage(query.cursor) - 1) * legacyPageSize / mangaUpdatesPageSize) + 1;
     const response = await this.gate.run(favoriteProviderPolicy.mangaupdates.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, `${seriesEndpoint}/search`, {
-      body: JSON.stringify({ page, perpage: favoriteProviderInspectionLimit, search: query.titles[0] }),
+      body: JSON.stringify({ page, perpage: mangaUpdatesPageSize, search: query.titles[0] }),
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       method: 'POST',
     }, mangaUpdatesSearchSchema));
@@ -89,14 +92,22 @@ export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCand
       return bounded ? [candidate(result.record)] : [];
     });
     const matchQuery = query.explicitProviderReference === undefined ? { sourceTitles: query.titles } : { sourceTitles: query.titles, explicitProviderReference: query.explicitProviderReference };
-    const evidence = inspectFavoriteTitleCandidates(matchQuery, inspected);
-    const references = new Set(evidence.candidateReferences.map((reference) => `${reference.provider}:${reference.externalId}`));
+    const references = new Set<string>();
+    let bestLevel = matchLevels.length;
+    for (let offset = 0; offset < inspected.length; offset += favoriteProviderInspectionLimit) {
+      const evidence = inspectFavoriteTitleCandidates(matchQuery, inspected.slice(offset, offset + favoriteProviderInspectionLimit));
+      if (evidence.candidateReferences.length === 0) continue;
+      const level = matchLevels.indexOf(evidence.level);
+      if (level > bestLevel) continue;
+      if (level < bestLevel) { references.clear(); bestLevel = level; }
+      for (const reference of evidence.candidateReferences) references.add(`${reference.provider}:${reference.externalId}`);
+    }
     const candidates = inspected.filter((item) => references.has(`${item.provider}:${item.externalId}`));
     if (candidates.length > query.limit) throw new RangeError('MangaUpdates has more comparable identities than the bounded candidate contract permits.');
-    const upstreamTruncated = response.value.total_hits > page * favoriteProviderInspectionLimit;
+    const upstreamTruncated = response.value.total_hits > page * mangaUpdatesPageSize;
     const truncated = upstreamTruncated || oversized;
     const envelope = { candidates, complete: !truncated, digest: response.digest, provider: 'mangaupdates' as const, truncated };
-    return createProviderCandidateEnvelope(upstreamTruncated ? { ...envelope, nextCursor: String(page + 1) } : envelope);
+    return createProviderCandidateEnvelope(upstreamTruncated ? { ...envelope, nextCursor: String(page * mangaUpdatesPageSize / legacyPageSize + 1) } : envelope);
   }
 
   async hydrate(reference: FavoriteProviderReference) {

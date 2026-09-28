@@ -76,7 +76,7 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     let requestInit: RequestInit | undefined;
     const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
       requestInit = init;
-      return new Response(JSON.stringify({ results: [{ record: series }], total_hits: 26 }), { headers: { 'content-type': 'application/json' } });
+      return new Response(JSON.stringify({ results: [{ record: series }], total_hits: 101 }), { headers: { 'content-type': 'application/json' } });
     });
     const adapter = new MangaUpdatesFavoriteProviderAdapter(fetcher);
     const result = await adapter.search({ limit: 1, provider: 'mangaupdates', titles: ['Synthetic Series'] });
@@ -84,7 +84,43 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     expect(result).toMatchObject({ complete: false, provider: 'mangaupdates', truncated: true });
     expect(result.candidates[0]).toMatchObject({ cover: { attribution: 'MangaUpdates', url: series.image.url.original }, displayTitle: 'Synthetic Series', editorialStatus: 'COMPLETED', externalId: '12345', mediaKind: 'MANHWA', metadataVersion: 2, startYear: 2020, titleVariants: [{ title: 'Synthetic Series' }, { title: 'Synthetic Alias' }], titles: ['Synthetic Series', 'Synthetic Alias'] });
     expect(result.candidates[0]).not.toHaveProperty('chapterCount');
-    expect(JSON.parse(String(requestInit?.body))).toMatchObject({ perpage: 25 });
+    expect(JSON.parse(String(requestInit?.body))).toMatchObject({ perpage: 100 });
+  });
+
+  it('maps an existing 25-result checkpoint to a 100-result page without skipping identities', async () => {
+    let requestInit: RequestInit | undefined;
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
+      requestInit = init;
+      return Response.json({ results: [{ record: series }], total_hits: 10_000 });
+    });
+
+    const result = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ cursor: '81', limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] });
+
+    expect(JSON.parse(String(requestInit?.body))).toMatchObject({ page: 21, perpage: 100 });
+    expect(result).toMatchObject({ candidates: [{ externalId: '12345' }], complete: false, nextCursor: '85' });
+  });
+
+  it('inspects every result in a larger page before declaring the provider exhausted', async () => {
+    const unrelated = Array.from({ length: 99 }, (_value, index) => ({ record: { ...series, series_id: index + 1, title: `Unrelated ${index + 1}` } }));
+    const fetcher = vi.fn(async () => Response.json({ results: [...unrelated, { record: series }], total_hits: 100 }));
+
+    const result = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] });
+
+    expect(result).toMatchObject({ complete: true, truncated: false });
+    expect(result.candidates.map(({ externalId }) => externalId)).toEqual(['12345']);
+  });
+
+  it('keeps an exact identity ahead of a weaker match from another inspection chunk', async () => {
+    const unrelated = Array.from({ length: 98 }, (_value, index) => ({ record: { ...series, series_id: index + 1, title: `Unrelated ${index + 1}` } }));
+    const fetcher = vi.fn(async () => Response.json({ results: [
+      { record: { ...series, series_id: 67890, title: 'Synthetic Seriez', associated: [] } },
+      ...unrelated,
+      { record: series },
+    ], total_hits: 100 }));
+
+    const result = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] });
+
+    expect(result.candidates.map(({ externalId }) => externalId)).toEqual(['12345']);
   });
 
   it('finds a comparable identity at the end of the minimum provider page without trusting API order', async () => {
@@ -98,11 +134,11 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
   });
 
   it('returns an advancing empty evidence page when no provider result is comparable', async () => {
-    const fetcher = vi.fn(async () => Response.json({ results: [{ record: { ...series, title: 'Unrelated Work' } }], total_hits: 26 }));
+    const fetcher = vi.fn(async () => Response.json({ results: [{ record: { ...series, title: 'Unrelated Work' } }], total_hits: 101 }));
 
     const result = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] });
 
-    expect(result).toMatchObject({ candidates: [], complete: false, nextCursor: '2', truncated: true });
+    expect(result).toMatchObject({ candidates: [], complete: false, nextCursor: '5', truncated: true });
   });
 
   it('hydrates the exact series route and rejects a foreign reference', async () => {

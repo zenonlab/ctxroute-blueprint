@@ -178,7 +178,7 @@ describe('standalone provider resolver', () => {
     const fetcher = vi.fn(async (url: string, init: RequestInit) => {
       if (url.endsWith('/search')) {
         const body = JSON.parse(String(init.body));
-        return Response.json({ results: [{ record: series(body.page, body.page === 1 ? 'Unrelated work' : 'Target') }], total_hits: 26 });
+        return Response.json({ results: [{ record: series(body.page, body.page === 1 ? 'Unrelated work' : 'Target') }], total_hits: 101 });
       }
       return Response.json(series(2, 'Target'));
     });

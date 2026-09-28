@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { awaitObserverReady, awaitRecoveryCompletion, reserveRecoveryPost, validateSourceScope } from '../../../scripts/infra/discovery-recovery-batch.mjs';
+import { awaitObserverReady, awaitRecoveryCompletion, reserveRecoveryPost, safeFailureCode, validateSourceScope } from '../../../scripts/infra/discovery-recovery-batch.mjs';
 import { startCostObserver } from '../../../scripts/infra/manga-canary.mjs';
 
 const publicOrigin = 'https://tobirink.com';
@@ -60,6 +60,18 @@ const failureCodeSchema = z.enum([
   'refresh-budget-exceeded', 'unexpected-tobirink-route', 'websocket-rejected',
 ]);
 const failureSchema = z.strictObject({ code: failureCodeSchema, schemaVersion: z.literal(1) });
+const correlationFailureCodes = new Set([
+  'discovery-canary-observer-accepted-results', 'discovery-canary-observer-ambiguous-cost',
+  'discovery-canary-observer-byte-limit', 'discovery-canary-observer-correlation-limit',
+  'discovery-canary-observer-d1-budget', 'discovery-canary-observer-duplicate-request',
+  'discovery-canary-observer-exception', 'discovery-canary-observer-failed-result',
+  'discovery-canary-observer-http-429', 'discovery-canary-observer-invalid-cost',
+  'discovery-canary-observer-no-provider-calls', 'discovery-canary-observer-outcome',
+  'discovery-canary-observer-provider-429', 'discovery-canary-observer-provider-error',
+  'discovery-canary-observer-provider-mismatch', 'discovery-canary-observer-queue-failure',
+  'discovery-canary-observer-request-mismatch', 'discovery-canary-observer-truncated',
+  'discovery-recovery-cost-missing', 'discovery-recovery-http-429',
+]);
 const headerSchema = z.record(z.string(), z.string());
 const discoveryQuerySchema = keySchema;
 const releaseQuerySchema = z.strictObject({
@@ -506,8 +518,11 @@ export async function createInstalledRecoveryObservation({ onFailure, recordAdmi
   const tasks = [];
   const admissions = [];
   let failure;
+  let failureCode;
   const fail = error => {
     failure ??= error;
+    const code = safeFailureCode(error);
+    failureCode ??= correlationFailureCodes.has(code) ? code : 'discovery-recovery-failed';
     controller.abort();
     void onFailure();
   };
@@ -517,6 +532,7 @@ export async function createInstalledRecoveryObservation({ onFailure, recordAdmi
   catch (error) { await observer.close(); throw error; }
   finally { clearTimeout(readinessTimer); }
   return {
+    failureCode: () => failureCode,
     async onAdmission(submission, response) {
       assert.equal(failure, undefined, 'Recovery observer failed.');
       const requestId = response.headers()['x-tobirink-request-id'];
