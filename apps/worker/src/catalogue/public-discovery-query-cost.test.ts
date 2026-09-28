@@ -54,6 +54,24 @@ async function claimedPublication(id: number, titles: string[]) {
 }
 
 describe('public discovery indexed query cost', () => {
+  it('publishes distinct verified identities sharing only an alternate title', async () => {
+    const first = await claimedPublication(200040, ['First distinct identity', 'Shared alternate title']);
+    const second = await claimedPublication(200041, ['Second distinct identity', 'Shared alternate title']);
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    await expect(adapter.publishBatch(first, 'c'.repeat(64), 'e'.repeat(64), now)).resolves.toEqual({ published: 1, replayed: 0 });
+    await expect(adapter.publishBatch(second, 'c'.repeat(64), 'e'.repeat(64), now)).resolves.toEqual({ published: 1, replayed: 0 });
+    expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_works WHERE work_id IN (?1, ?2)')
+      .bind('work_publication_cost_200040', 'work_publication_cost_200041').first()).toEqual({ count: 2 });
+    expect(await env.PUBLIC_DB.prepare('SELECT ambiguous FROM catalogue_canonical_titles_v1 WHERE normalization_version = ?1 AND normalized_title = ?2 AND media_kind = ?3')
+      .bind(favoriteTitlePreparationVersion, 'shared alternate title', 'anime').first()).toEqual({ ambiguous: 1 });
+    const replay = instrumentD1(env.PUBLIC_DB);
+    expect(await new D1PublicDiscoveryV3Adapter(replay.database).publishBatch(second, 'c'.repeat(64), 'e'.repeat(64), now))
+      .toEqual({ published: 0, replayed: 1 });
+    expect(replay.snapshot().rowsWritten).toBe(0);
+    expect(await env.PUBLIC_DB.prepare('SELECT work_id FROM catalogue_canonical_titles_v1 WHERE normalization_version = ?1 AND normalized_title = ?2 AND media_kind = ?3 AND ambiguous = 0 LIMIT 1')
+      .bind(favoriteTitlePreparationVersion, 'shared alternate title', 'anime').first()).toBeNull();
+  });
+
   it('leaves admission headroom when publishing all thirty-two provider titles', async () => {
     const titles = Array.from({ length: 32 }, (_, index) => `Rich publication alias ${index}`);
     const batch = await claimedPublication(200032, titles);
@@ -78,6 +96,8 @@ describe('public discovery indexed query cost', () => {
   });
 
   it('rolls back the terminal transition and catalogue when the transaction fails', async () => {
+    const existing = await claimedPublication(200043, ['Earlier rollback identity', 'Atomic rollback publication']);
+    await new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB).publishBatch(existing, 'c'.repeat(64), 'e'.repeat(64), now);
     const batch = await claimedPublication(200033, ['Atomic rollback publication']);
     const execute = env.PUBLIC_DB.batch.bind(env.PUBLIC_DB);
     const transaction = vi.spyOn(env.PUBLIC_DB, 'batch').mockImplementation(statements => execute([
@@ -90,21 +110,25 @@ describe('public discovery indexed query cost', () => {
       .bind(fingerprint(200033)).first()).toEqual({ state: 'PROCESSING', token: 'c'.repeat(64), lease: leaseUntil });
     expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_works WHERE work_id = ?1')
       .bind('work_publication_cost_200033').first()).toEqual({ count: 0 });
+    expect(await env.PUBLIC_DB.prepare('SELECT ambiguous FROM catalogue_canonical_titles_v1 WHERE normalization_version = ?1 AND normalized_title = ?2 AND media_kind = ?3')
+      .bind(favoriteTitlePreparationVersion, 'atomic rollback publication', 'anime').first()).toEqual({ ambiguous: 0 });
     expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_titles WHERE work_id = ?1')
       .bind('work_publication_cost_200033').first()).toEqual({ count: 0 });
   });
 
-  it('allows only one concurrent publisher to claim the same canonical title', async () => {
+  it('marks a title shared by concurrent verified publishers without merging their identities', async () => {
     const first = await claimedPublication(200034, ['Concurrent guarded publication']);
     const second = await claimedPublication(200035, ['Concurrent guarded publication']);
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const results = await Promise.allSettled([first, second].map(batch => adapter.publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now)));
-    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(2);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(0);
     expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_works WHERE work_id IN (?1, ?2)')
-      .bind('work_publication_cost_200034', 'work_publication_cost_200035').first()).toEqual({ count: 1 });
+      .bind('work_publication_cost_200034', 'work_publication_cost_200035').first()).toEqual({ count: 2 });
     expect(await env.PUBLIC_DB.prepare("SELECT count(*) AS count FROM public_discovery_requests_v3 WHERE fingerprint IN (?1, ?2) AND state = 'VERIFIED' AND claim_token_hash IS NULL AND lease_until IS NULL")
-      .bind(fingerprint(200034), fingerprint(200035)).first()).toEqual({ count: 1 });
+      .bind(fingerprint(200034), fingerprint(200035)).first()).toEqual({ count: 2 });
+    expect(await env.PUBLIC_DB.prepare('SELECT ambiguous FROM catalogue_canonical_titles_v1 WHERE normalization_version = ?1 AND normalized_title = ?2 AND media_kind = ?3')
+      .bind(favoriteTitlePreparationVersion, 'concurrent guarded publication', 'anime').first()).toEqual({ ambiguous: 1 });
   });
 
   it('does not scan global pending work after an exact terminal publication', async () => {
@@ -266,13 +290,21 @@ describe('public discovery indexed query cost', () => {
     expect(referenceLookup).toBeGreaterThan(proposedLoop);
     const publicationSql = statements.mock.calls.find(([sql]) => sql.includes('state = ?, result_json = ?'))?.[0];
     if (publicationSql === undefined) throw new Error('Publication transition guard must be exercised.');
-    const canonicalGuard = publicationSql.slice(publicationSql.lastIndexOf('AND NOT EXISTS') + 4);
-    const explainGuard = `EXPLAIN QUERY PLAN SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
-      CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value
-      WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`;
-    expect(canonicalGuard.replace(/\s+/gu, ' ')).toBe(explainGuard.slice('EXPLAIN QUERY PLAN SELECT 1 WHERE '.length).replace(/\s+/gu, ' '));
-    const plan = await env.PUBLIC_DB.prepare(explainGuard)
-      .bind(JSON.stringify(['fresh alpha', 'fresh beta', 'fresh gamma', 'fresh delta']), favoriteTitlePreparationVersion, 'anime', 'work_publication_cost_200001')
+    expect(publicationSql).not.toContain('catalogue_canonical_titles_v1');
+    const ambiguitySql = statements.mock.calls.find(([sql]) => sql.startsWith('UPDATE catalogue_canonical_titles_v1 SET ambiguous'))?.[0];
+    if (ambiguitySql === undefined) throw new Error('Title ambiguity marker must be exercised.');
+    const explainAmbiguity = `EXPLAIN QUERY PLAN UPDATE catalogue_canonical_titles_v1 SET ambiguous = 1
+        WHERE normalization_version = ?1 AND media_kind = ?2 AND work_id <> ?3 AND ambiguous = 0
+          AND normalized_title IN (SELECT value FROM json_each(?4))
+          AND EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+            fingerprint = ?5 AND media_kind = ?6 AND parser_version = ?7 AND rules_version = ?8
+            AND state = 'VERIFIED' AND refresh_state = 'IDLE'
+            AND claim_token_hash = ?9 AND request_digest = ?10 AND lease_until > ?11)`;
+    expect(ambiguitySql.replace(/\s+/gu, ' ')).toBe(explainAmbiguity.slice('EXPLAIN QUERY PLAN '.length).replace(/\s+/gu, ' '));
+    const plan = await env.PUBLIC_DB.prepare(explainAmbiguity)
+      .bind(favoriteTitlePreparationVersion, 'anime', 'work_publication_cost_200001',
+        JSON.stringify(['fresh alpha', 'fresh beta', 'fresh gamma', 'fresh delta']),
+        fingerprint(200001), 'ANIME', '5', '3', 'c'.repeat(64), 'd'.repeat(64), now)
       .all<{ detail: string }>();
     expect(plan.results.some(({ detail }) => detail.includes('normalization_version=? AND normalized_title=? AND media_kind=?'))).toBe(true);
     const titleGuardPlan = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN SELECT 1
@@ -281,13 +313,14 @@ describe('public discovery indexed query cost', () => {
       .bind(favoriteTitlePreparationVersion, 'fresh alpha', 'anime', 'work_publication_cost_200001').all<{ detail: string }>();
     console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'canonical-title-index', details: titleGuardPlan.results.map(({ detail }) => detail) }));
     expect(titleGuardPlan.results.some(({ detail }) => detail.includes('sqlite_autoindex_catalogue_canonical_titles_v1_1'))).toBe(true);
-    console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'canonical-publication-guard', details: plan.results.map(({ detail }) => detail) }));
+    console.info(JSON.stringify({ type: 'local-discovery-query-plan', scenario: 'canonical-ambiguity-marker', details: plan.results.map(({ detail }) => detail) }));
     expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_titles WHERE work_id = ?1').bind('work_publication_cost_200001').first())
       .toEqual({ count: 4 });
   });
 
-  it('rejects a canonical conflict without any catalogue or terminal write at bounded cost', async () => {
+  it('rejects an exact provider reference conflict without any catalogue or terminal write at bounded cost', async () => {
     const batch = await claimedPublication(200002, ['Fresh conflict-free alias', 'synthetic catalogue 582 alias 4']);
+    batch.results[0]!.resolution.profile.references = [{ provider: 'anilist', externalId: 'work_cost_1' }];
     const measured = instrumentD1(env.PUBLIC_DB);
     await expect(new D1PublicDiscoveryV3Adapter(measured.database).publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now))
       .rejects.toThrow('stale-public-discovery-result');

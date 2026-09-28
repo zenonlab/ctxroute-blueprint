@@ -661,7 +661,7 @@ describe('verified public discovery cache', () => {
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM public_discovery_requests_v3').first()).toEqual({ count: (requestsBefore?.count ?? 0) + 1 });
   });
 
-  it('rejects a normalized-title collision atomically', async () => {
+  it('marks normalized-title ambiguity atomically without rejecting verified identities', async () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const token = 'c'.repeat(48);
     const tokenDigest = 'd'.repeat(64);
@@ -677,11 +677,13 @@ describe('verified public discovery cache', () => {
       }, tokenDigest, marker.repeat(64), verifiedAt);
     };
     await expect(publish('1', 'L’Épopée')).resolves.toEqual({ published: 1, replayed: 0 });
-    await expect(publish('2', 'L Epopee')).rejects.toThrow('stale-public-discovery-result');
+    await expect(publish('2', 'L Epopee')).resolves.toEqual({ published: 1, replayed: 0 });
     expect(await env.PUBLIC_DB.prepare('SELECT work_id AS workId FROM catalogue_canonical_titles_v1 WHERE normalized_title = ?1 AND media_kind = ?2')
       .bind('l epopee', 'anime').first()).toEqual({ workId: 'work_1' });
-    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_works WHERE work_id = ?1').bind('work_2').first()).toEqual({ count: 0 });
-    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey('2').fingerprint).first()).toEqual({ state: 'PROCESSING' });
+    expect(await env.PUBLIC_DB.prepare('SELECT ambiguous FROM catalogue_canonical_titles_v1 WHERE normalization_version = ?1 AND normalized_title = ?2 AND media_kind = ?3')
+      .bind('favorite-title-preparation-v2', 'l epopee', 'anime').first()).toEqual({ ambiguous: 1 });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_works WHERE work_id = ?1').bind('work_2').first()).toEqual({ count: 1 });
+    expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey('2').fingerprint).first()).toEqual({ state: 'VERIFIED' });
   });
 
   it('backfills the canonical index when an exact historical terminal result is replayed', async () => {

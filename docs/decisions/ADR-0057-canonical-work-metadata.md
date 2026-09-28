@@ -14,7 +14,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-17
-- Revised: 2026-09-19
+- Revised: 2026-09-28
 
 ## Contexte
 
@@ -53,6 +53,16 @@ absents ne font jamais progresser un compteur et une prévision Agenda ne peut
 alimenter ces colonnes.
 
 ## Conséquences
+
+Deux identités fournisseur vérifiées peuvent partager un titre alternatif ou
+être homonymes. Un titre normalisé n'est donc pas une contrainte d'identité.
+La publication conserve la contrainte unique des références fournisseur, mais
+signale atomiquement les collisions de titres par `ambiguous = 1` dans
+`catalogue_canonical_titles_v1`, sans remplacer la première association ni
+fusionner les œuvres. La migration additive conserve toutes les lignes.
+Une association par titre ne peut être considérée unique que si `ambiguous = 0`;
+les références exactes restent utilisables. Le signal d'ambiguïté est conservé
+au replay et au refresh, sans nouvelle collecte ni réarmement.
 
 Les alias convergent vers une seule fiche, les mises à jour partielles sont
 non destructives et les filtres disposent de colonnes stables. Le backfill

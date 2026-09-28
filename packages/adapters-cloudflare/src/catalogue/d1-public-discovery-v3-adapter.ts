@@ -462,12 +462,10 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     if (!refresh) throw new Error('public-discovery-defer-claim-lost');
   }
 
-  private publicationGuardValues(result: PublicDiscoveryResult, profile: PublicDiscoveryVerifiedProfile | undefined, canonical: CanonicalFacts | undefined, tokenDigest: string, now: string): SqlValue[] {
+  private publicationGuardValues(result: PublicDiscoveryResult, profile: PublicDiscoveryVerifiedProfile | undefined, tokenDigest: string, now: string): SqlValue[] {
     return [
       ...keyValues(result.key), tokenDigest, result.requestDigest, now,
       JSON.stringify(profile?.references ?? []), profile?.workId ?? '',
-      JSON.stringify(canonical?.normalizedTitles ?? []), favoriteTitlePreparationVersion,
-      canonical?.mediaKind ?? 'anime', canonical?.workId ?? '',
     ];
   }
 
@@ -498,7 +496,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       OR EXISTS (SELECT 1 FROM json_each(?5) AS proposed
         WHERE NOT EXISTS (SELECT 1 FROM catalogue_canonical_titles_v1 INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1
           WHERE normalization_version = ?6 AND normalized_title = proposed.value
-            AND media_kind = ?2 AND work_id = ?1))
+            AND media_kind = ?2 AND (work_id = ?1 OR ambiguous = 1)))
       OR EXISTS (SELECT 1 FROM json_each(?7) AS proposed
         WHERE NOT EXISTS (SELECT 1 FROM catalogue_external_references INDEXED BY sqlite_autoindex_catalogue_external_references_1
           WHERE provider = json_extract(proposed.value, '$.provider')
@@ -543,6 +541,14 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           AND state = 'VERIFIED' AND refresh_state = 'IDLE'
           AND claim_token_hash = ? AND request_digest = ? AND lease_until > ?)`)
         .bind(profile.workId, JSON.stringify(candidate.titles), ...guardValues),
+      this.database.prepare(`UPDATE catalogue_canonical_titles_v1 SET ambiguous = 1
+        WHERE normalization_version = ?1 AND media_kind = ?2 AND work_id <> ?3 AND ambiguous = 0
+          AND normalized_title IN (SELECT value FROM json_each(?4))
+          AND EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+            fingerprint = ?5 AND media_kind = ?6 AND parser_version = ?7 AND rules_version = ?8
+            AND state = 'VERIFIED' AND refresh_state = 'IDLE'
+            AND claim_token_hash = ?9 AND request_digest = ?10 AND lease_until > ?11)`)
+        .bind(favoriteTitlePreparationVersion, canonical.mediaKind, canonical.workId, JSON.stringify(canonical.normalizedTitles), ...guardValues),
       this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
           normalization_version, normalized_title, media_kind, work_id, created_at)
         SELECT ?, proposed.value, ?, ?, ? FROM json_each(?) AS proposed
@@ -620,25 +626,25 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     const canonical = this.canonicalFacts(profile);
     const guard = [
       ...keyValues(result.key), result.requestDigest, resultJson,
-      JSON.stringify(canonical.normalizedTitles), favoriteTitlePreparationVersion,
-      canonical.mediaKind, canonical.workId,
     ];
-    const outcomes = await this.database.batch(canonical.normalizedTitles.map((normalizedTitle) => this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
+    const outcomes = await this.database.batch([
+      this.database.prepare(`UPDATE catalogue_canonical_titles_v1 SET ambiguous = 1
+        WHERE normalization_version = ?1 AND media_kind = ?2 AND work_id <> ?3 AND ambiguous = 0
+          AND normalized_title IN (SELECT value FROM json_each(?4))
+          AND EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+            fingerprint = ?5 AND media_kind = ?6 AND parser_version = ?7 AND rules_version = ?8
+            AND state = 'VERIFIED' AND request_digest = ?9 AND result_json = ?10)`)
+        .bind(favoriteTitlePreparationVersion, canonical.mediaKind, canonical.workId, JSON.stringify(canonical.normalizedTitles), ...guard),
+      this.database.prepare(`INSERT INTO catalogue_canonical_titles_v1(
         normalization_version, normalized_title, media_kind, work_id, created_at)
-      SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
+      SELECT ?1, proposed.value, ?2, ?3, ?4 FROM json_each(?5) AS proposed
+      WHERE EXISTS (SELECT 1 FROM public_discovery_requests_v3 WHERE
         fingerprint = ? AND media_kind = ? AND parser_version = ? AND rules_version = ?
         AND state = 'VERIFIED' AND request_digest = ? AND result_json = ?)
-        AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
-            CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value
-          WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)
       ON CONFLICT(normalization_version, normalized_title, media_kind) DO NOTHING`)
-      .bind(favoriteTitlePreparationVersion, normalizedTitle, canonical.mediaKind, canonical.workId, createdAt, ...guard)));
+        .bind(favoriteTitlePreparationVersion, canonical.mediaKind, canonical.workId, createdAt, JSON.stringify(canonical.normalizedTitles), ...guard),
+    ]);
     if (outcomes.some((outcome) => !outcome.success)) throw new Error('public-discovery-batch-failed');
-    const conflict = await this.database.prepare(`SELECT 1 AS conflict FROM json_each(?1) AS proposed
-      CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value
-      WHERE existing.normalization_version = ?2 AND existing.media_kind = ?3 AND existing.work_id <> ?4 LIMIT 1`)
-      .bind(JSON.stringify(canonical.normalizedTitles), favoriteTitlePreparationVersion, canonical.mediaKind, canonical.workId).first();
-    if (conflict) throw new Error('public-discovery-canonical-title-conflict');
   }
 
   private async publishOne(result: PublicDiscoveryResult, tokenDigest: string, verifiedAt: string, now: string): Promise<'published' | 'replayed'> {
@@ -669,7 +675,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
     }
     if (!row || (row.state !== 'PROCESSING' && !refreshing) || row.claimTokenHash !== tokenDigest || row.requestDigest !== result.requestDigest) throw new Error('stale-public-discovery-result');
     const canonical = profile ? this.canonicalFacts(profile) : undefined;
-    const guardValues = this.publicationGuardValues(result, profile, canonical, tokenDigest, now);
+    const guardValues = this.publicationGuardValues(result, profile, tokenDigest, now);
     const catalogue = profile && canonical && await this.catalogueNeedsPublication(profile, canonical)
       ? this.catalogueStatements(profile, canonical, verifiedAt, [...keyValues(result.key), tokenDigest, result.requestDigest, now])
       : [];
@@ -690,10 +696,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
           CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
             ON existing.provider = json_extract(proposed.value, '$.provider')
             AND existing.external_id = json_extract(proposed.value, '$.externalId')
-          WHERE existing.work_id <> ?)
-        AND NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
-          CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value
-          WHERE existing.normalization_version = ? AND existing.media_kind = ? AND existing.work_id <> ?)`)
+          WHERE existing.work_id <> ?)`)
       .bind(result.resolution.state, resultJson, verifiedAt, verifiedAt, resultExpiresAt, verifiedAt,
         futureIso(verifiedAt, refreshFreshnessMilliseconds), ...guardValues));
     statements.push(...catalogue, this.database.prepare(`UPDATE public_discovery_requests_v3
