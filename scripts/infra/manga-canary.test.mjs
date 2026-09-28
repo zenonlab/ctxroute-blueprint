@@ -604,6 +604,49 @@ test('tail is unfiltered, disables raw disk output and terminates only its own g
   assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
 });
 
+test('Cloudflare Tail WebSocket observes correlated events and closes without Wrangler', async () => {
+  const sockets = [];
+  const socket = new globalThis.EventTarget();
+  socket.sent = [];
+  socket.send = value => socket.sent.push(value);
+  socket.close = () => socket.dispatchEvent(new globalThis.Event('close'));
+  const observer = startCostObserver({ tailUrl: 'wss://tail.developers.workers.dev/fixture',
+    webSocketFactory: (url, protocol) => { sockets.push({ url, protocol }); return socket; },
+    spawnProcess: () => { throw new Error('Wrangler must not start.'); } });
+  assert.deepEqual(sockets, [{ url: 'wss://tail.developers.workers.dev/fixture', protocol: 'trace-v1' }]);
+  socket.dispatchEvent(new globalThis.Event('open'));
+  assert.deepEqual(socket.sent, ['{"debug":false}']);
+  observer.track(identity(1), { task: 'discovery-lookup', status: 200 });
+  socket.dispatchEvent(new globalThis.MessageEvent('message', { data: frame(envelope(identity(1), [lookupCost()])) }));
+  assert.ok(observer.read(identity(1)));
+  await observer.close();
+  await observer.close();
+  assert.throws(() => startCostObserver({ tailUrl: 'wss://example.org/fixture', webSocketFactory: () => socket }), /invalid-tail-url/u);
+});
+
+test('Cloudflare Tail WebSocket fails closed on transport errors and malformed frames', async () => {
+  for (const event of [new globalThis.Event('error'), new globalThis.MessageEvent('message', { data: '{"broken":}' })]) {
+    const socket = new globalThis.EventTarget();
+    socket.send = () => undefined;
+    socket.close = () => socket.dispatchEvent(new globalThis.Event('close'));
+    const observer = startCostObserver({ tailUrl: 'wss://tail.developers.workers.dev/fixture', webSocketFactory: () => socket });
+    socket.dispatchEvent(event);
+    await assert.rejects(observer.failed, /observer-failed|invalid-frame/u);
+    await assert.rejects(observer.close(), /observer-failed|invalid-frame/u);
+  }
+});
+
+test('Cloudflare Tail WebSocket force-closes a stalled close handshake', async () => {
+  const socket = new globalThis.EventTarget();
+  let terminated = 0;
+  socket.send = () => undefined;
+  socket.close = () => undefined;
+  socket.terminate = () => { terminated += 1; socket.dispatchEvent(new globalThis.Event('close')); };
+  const observer = startCostObserver({ tailUrl: 'wss://tail.developers.workers.dev/fixture', webSocketFactory: () => socket });
+  await observer.close();
+  assert.equal(terminated, 1);
+});
+
 test('complete certificate proves two own admissions and excludes lookups and unrelated traffic', async () => {
   const context = harness({ receive: ({ call, value, emit }) => {
     emit(envelope(identity(100 + Number(call.requestId.slice(-3))), [
