@@ -1676,6 +1676,34 @@ au plus une demande historique expressément autorisée.
 
 ## Arrêt du pilote installé du 28 septembre 2026
 
+Le troisième lot expressément confirmé utilise le ZIP Chrome 1.0.48 exact
+et le Worker fusionné en `1daa9fc`, CI principale `36401186318` verte.
+Le pilote privé `PbFEAL` s'arrête avec `correlation-failed` : six réservations
+et POST comptabilisés, cinq corrélations enregistrées, quatre lectures
+navigateur. Aucun renvoi n'est exécuté; les quatre autres clés restent intactes.
+La relecture historique des 48,509 secondes du pilote identifie une invocation
+avec 38 lectures D1 d'admission et 290 de collecte, soit 328 pour la clé.
+Le rejeu local de ces événements reproduit exactement
+`discovery-canary-observer-d1-budget`. La borne de 300 reste inchangée.
+Les cinq coûts corrélés disponibles comportent quatre résultats `changed`
+et un `backoff`, sans 429 ni erreur fournisseur ou Queue dans ces relevés.
+Cela ne certifie ni la sixième réponse ni Library. Les deux lectures de
+télémétrie parcourent respectivement 1 358 399 et 3 079 lignes de journaux,
+distinctes de D1; leurs reçus sont privés en mode 0600. Aucun nouveau lot
+ne doit partir avant reproduction et réduction du coût D1, sans retirer
+les gardes de publication atomique ni relever le budget.
+
+La reproduction synthétique à 32 titres mesure 442 lectures pour la seule
+publication. La transition terminale gardée est désormais la première écriture
+du batch D1; son jeton, conservé uniquement jusqu'à la fin du batch, autorise
+les projections suivantes sans répéter sept fois les recherches de conflits.
+Le même cas mesure 114 lectures et 208 écritures, conserve les 32 titres et
+coûte une écriture de plus pour clôturer le jeton. Les tests injectent une
+erreur SQL après les projections et vérifient le rollback complet, puis font
+concourir deux publications sur le même titre canonique : une seule réussit.
+La borne globale de 300 inclut toujours admission et continuations; cette
+mesure locale ne certifie pas rétroactivement le pilote interrompu.
+
 Le second essai autorisé `tdqu7R` s'arrête après six admissions corrélées et
 un doublon bloqué avant transmission. Les six réservations sont consommées,
 les quatre autres clés intactes; aucun renvoi n'est permis. La lecture de

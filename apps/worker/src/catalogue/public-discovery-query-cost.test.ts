@@ -54,6 +54,18 @@ async function claimedPublication(id: number, titles: string[]) {
 }
 
 describe('public discovery indexed query cost', () => {
+  it('leaves admission headroom when publishing all thirty-two provider titles', async () => {
+    const titles = Array.from({ length: 32 }, (_, index) => `Rich publication alias ${index}`);
+    const batch = await claimedPublication(200032, titles);
+    const measured = instrumentD1(env.PUBLIC_DB);
+    expect(await new D1PublicDiscoveryV3Adapter(measured.database).publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now))
+      .toEqual({ published: 1, replayed: 0 });
+    const cost = measured.snapshot();
+    console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'thirty-two-titles', ...cost }));
+    expect(cost.rowsRead).toBeLessThanOrEqual(220);
+    expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_titles WHERE work_id = ?1')
+      .bind('work_publication_cost_200032').first()).toEqual({ count: 32 });
+  });
   it('does not scan terminal history during an empty Queue wake', async () => {
     const measured = instrumentD1(env.PUBLIC_DB);
     const adapter = new D1PublicDiscoveryV3Adapter(measured.database);
@@ -63,6 +75,36 @@ describe('public discovery indexed query cost', () => {
     console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'empty-wake', terminalRows: 1024, ...cost }));
     expect(cost.rowsWritten).toBe(0);
     expect(cost.rowsRead).toBeLessThan(32);
+  });
+
+  it('rolls back the terminal transition and catalogue when the transaction fails', async () => {
+    const batch = await claimedPublication(200033, ['Atomic rollback publication']);
+    const execute = env.PUBLIC_DB.batch.bind(env.PUBLIC_DB);
+    const transaction = vi.spyOn(env.PUBLIC_DB, 'batch').mockImplementation(statements => execute([
+      ...statements, env.PUBLIC_DB.prepare("SELECT json('invalid-publication-test')"),
+    ]));
+    try {
+      await expect(new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB).publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now)).rejects.toThrow();
+    } finally { transaction.mockRestore(); }
+    expect(await env.PUBLIC_DB.prepare('SELECT state, claim_token_hash AS token, lease_until AS lease FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+      .bind(fingerprint(200033)).first()).toEqual({ state: 'PROCESSING', token: 'c'.repeat(64), lease: leaseUntil });
+    expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_works WHERE work_id = ?1')
+      .bind('work_publication_cost_200033').first()).toEqual({ count: 0 });
+    expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_titles WHERE work_id = ?1')
+      .bind('work_publication_cost_200033').first()).toEqual({ count: 0 });
+  });
+
+  it('allows only one concurrent publisher to claim the same canonical title', async () => {
+    const first = await claimedPublication(200034, ['Concurrent guarded publication']);
+    const second = await claimedPublication(200035, ['Concurrent guarded publication']);
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const results = await Promise.allSettled([first, second].map(batch => adapter.publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now)));
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+    expect(await env.PUBLIC_DB.prepare('SELECT count(*) AS count FROM catalogue_works WHERE work_id IN (?1, ?2)')
+      .bind('work_publication_cost_200034', 'work_publication_cost_200035').first()).toEqual({ count: 1 });
+    expect(await env.PUBLIC_DB.prepare("SELECT count(*) AS count FROM public_discovery_requests_v3 WHERE fingerprint IN (?1, ?2) AND state = 'VERIFIED' AND claim_token_hash IS NULL AND lease_until IS NULL")
+      .bind(fingerprint(200034), fingerprint(200035)).first()).toEqual({ count: 1 });
   });
 
   it('does not scan global pending work after an exact terminal publication', async () => {
@@ -206,7 +248,7 @@ describe('public discovery indexed query cost', () => {
     expect(replay.rowsWritten).toBe(0);
     const externalReferenceGuards = statements.mock.calls.map(([sql]) => sql)
       .filter(sql => sql.includes('CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1'));
-    expect(externalReferenceGuards).toHaveLength(7);
+    expect(externalReferenceGuards).toHaveLength(1);
     expect(statements.mock.calls.map(([sql]) => sql).join('\n')).not.toContain('FROM catalogue_external_references AS existing');
     const externalGuardPlan = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN SELECT 1 WHERE NOT EXISTS (
       SELECT 1 FROM json_each(?1) AS proposed
@@ -222,8 +264,8 @@ describe('public discovery indexed query cost', () => {
     const referenceLookup = externalPlanDetails.findIndex(detail => detail.includes('sqlite_autoindex_catalogue_external_references_1 (provider=? AND external_id=?)'));
     expect(proposedLoop).toBeGreaterThanOrEqual(0);
     expect(referenceLookup).toBeGreaterThan(proposedLoop);
-    const publicationSql = statements.mock.calls.find(([sql]) => sql.startsWith('INSERT OR IGNORE INTO catalogue_titles('))?.[0];
-    if (publicationSql === undefined) throw new Error('Publication title guard must be exercised.');
+    const publicationSql = statements.mock.calls.find(([sql]) => sql.includes('state = ?, result_json = ?'))?.[0];
+    if (publicationSql === undefined) throw new Error('Publication transition guard must be exercised.');
     const canonicalGuard = publicationSql.slice(publicationSql.lastIndexOf('AND NOT EXISTS') + 4);
     const explainGuard = `EXPLAIN QUERY PLAN SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM json_each(?) AS proposed
       CROSS JOIN catalogue_canonical_titles_v1 AS existing INDEXED BY sqlite_autoindex_catalogue_canonical_titles_v1_1 ON existing.normalized_title = proposed.value

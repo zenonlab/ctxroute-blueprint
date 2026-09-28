@@ -45,6 +45,19 @@ consumer Queue natif du Worker. Un résultat fonctionnel, y compris introuvable 
 
 ## Décision
 
+La publication utilise un seul batch transactionnel D1 : transition terminale
+conditionnée par le bail, le digest et tous les conflits de références/titres,
+projection du catalogue, puis effacement du jeton et du bail. Le jeton reste
+présent uniquement à l'intérieur de cette transaction et atteste la transition
+réussie pour les écritures suivantes; `refresh_state = IDLE` distingue cette
+transition d'un refresh encore PROCESSING. Les conflits sont ainsi évalués
+une fois, sans refaire les mêmes recherches pour chaque table. Une erreur SQL
+annule tout le batch, y compris la transition; un refus de garde n'autorise
+aucune projection. Aucun état terminal intermédiaire n'est publié hors batch.
+Le rollback de code ne change pas le schéma. Les 32 titres restent conservés,
+avec une régression de coût et des tests de conflit/bail/rollback.
+Cette garantie s'appuie sur le [batch transactionnel D1](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch).
+
 Une échéance `PENDING` autorise uniquement une nouvelle lecture côté extension,
 jamais une nouvelle admission. La continuation Queue appartient au Worker.
 Même après redémarrage ou expiration de l'horloge locale, l'adaptateur conserve

@@ -33,7 +33,7 @@
     { "from": "rearm", "to": "d1", "label": "reçu avant admission", "classification": "digest identique · arrêt 429/Queue/sans fournisseur/D1 > 300", "variant": "emphasis", "labelDy": -23 },
     { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "terminal ou continuation confirmée", "variant": "emphasis", "labelDy": -53 },
     { "from": "queue", "to": "collector", "label": "claim exact borné", "classification": "clé ciblée · aucun scan global", "variant": "emphasis", "labelDy": 24 },
-    { "from": "collector", "to": "result", "label": "résultat ou reprise sûre", "classification": "terminal ou checkpoint durable remboursé", "variant": "emphasis", "labelDx": 100 }
+    { "from": "collector", "to": "result", "label": "publication atomique", "classification": "garde unique · catalogue · clôture du jeton", "variant": "emphasis", "labelDx": 100 }
   ],
   "cards": [
     { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Réservation durable commune au pilote et au CLI", "Runtimes du média vérifiés avant chaque admission", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Le curseur reprend après quatre pages sans rejouer la tranche", "UNKNOWN doit être reparsé avant toute admission", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
