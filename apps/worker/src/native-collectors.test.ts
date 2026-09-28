@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FavoriteProviderRetryError, type FavoriteProviderPort, type PublicDiscoveryProviderPorts } from '@tobirink/public-discovery';
+import { FavoriteProviderRetryError, PublicDiscoverySearchContinuationError, type FavoriteProviderPort, type PublicDiscoveryProviderPorts } from '@tobirink/public-discovery';
 import { z } from 'zod';
 import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, createBudgetedDiscoveryResolver, handleNativeCollectorQueue, providerFailureCode, resolveWithDeadline, type NativeCollectorSignal } from './native-collectors';
 import { instrumentProviderFetch } from './operational-metrics';
@@ -67,16 +67,52 @@ describe('native collector queue', () => {
       'kitsu-manga': { ...port('kitsu-manga'), search },
     };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const resolver = createBudgetedDiscoveryResolver(providers, () => 0, () => 1);
+    const correlationId = '00000000-0000-4000-8000-000000000001';
+    const resolver = createBudgetedDiscoveryResolver(providers, () => 0, () => 1, 100_000, correlationId);
     await expect(resolver.resolve({
       attempt: 1, key: { fingerprint: 'a'.repeat(64), mediaKind: 'MANGA', parserVersion: 'parser-v1', siteRulesVersion: 'rules-v1' },
       query: { discoveryTitles: ['private title'], mediaKind: 'MANGA', sourceTitles: ['private title'] },
       requestDigest: 'b'.repeat(64), schemaVersion: 3,
     })).rejects.toThrow('private title');
     expect(search).toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledWith('public-discovery-provider-operation-failed', 'kitsu-manga', 'search', 'provider-response-invalid-json');
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({ schemaVersion: 1, type: 'native-collector.provider-operation-failed', correlationId,
+      provider: 'kitsu-manga', operation: 'search', code: 'provider-response-invalid-json' }));
     expect(JSON.stringify(warn.mock.calls)).not.toContain(privateTitle);
     expect(JSON.stringify(warn.mock.calls)).not.toContain(privateUrl);
+  });
+
+  it('continues known-media searches after the invocation budget without repeating completed aliases', async () => {
+    const titles = ['Alpha', 'Beta', 'Gamma', 'Delta'];
+    const searched: string[] = [];
+    let callsInInvocation = 0;
+    const providerPort = (provider: keyof PublicDiscoveryProviderPorts): FavoriteProviderPort => ({
+      hydrate: async () => undefined,
+      search: async ({ titles: queryTitles }) => {
+        callsInInvocation += 1;
+        searched.push(`${provider}:${queryTitles[0]}`);
+        return { candidates: [], complete: true, digest: 'empty', provider, truncated: false };
+      },
+    });
+    const providers: PublicDiscoveryProviderPorts = {
+      anilist: providerPort('anilist'), mangaupdates: providerPort('mangaupdates'), mangadex: providerPort('mangadex'),
+      'kitsu-anime': providerPort('kitsu-anime'), 'kitsu-manga': providerPort('kitsu-manga'),
+    };
+    const input = { attempt: 1, key: { fingerprint: 'a'.repeat(64), mediaKind: 'MANGA' as const, parserVersion: 'parser-v1', siteRulesVersion: 'rules-v1' },
+      query: { discoveryTitles: titles, mediaKind: 'MANGA' as const, sourceTitles: titles }, requestDigest: 'b'.repeat(64), schemaVersion: 3 as const };
+    const first = createBudgetedDiscoveryResolver(providers, () => callsInInvocation * 4, () => 1);
+    let checkpoint;
+    try { await first.resolve(input); }
+    catch (error) {
+      if (!(error instanceof PublicDiscoverySearchContinuationError)) throw error;
+      checkpoint = error.searchProgress;
+    }
+    expect(checkpoint).toMatchObject({ provider: 'mangaupdates', titleIndex: 1, cursor: '1' });
+    expect(callsInInvocation).toBe(9);
+    callsInInvocation = 0;
+    const second = createBudgetedDiscoveryResolver(providers, () => callsInInvocation * 4, () => 1);
+    await expect(second.resolve({ ...input, searchProgress: checkpoint })).resolves.toEqual({ reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' });
+    expect(searched).toHaveLength(12);
+    expect(new Set(searched).size).toBe(12);
   });
 
   it('routes an operational recovery signal without invoking collectors or resetting requests', async () => {

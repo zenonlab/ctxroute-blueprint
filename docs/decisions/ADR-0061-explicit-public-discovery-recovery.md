@@ -118,6 +118,27 @@ Une erreur tardive ou un coût final invalide empêche donc le reçu terminal.
 Cette évolution ne change ni `claim(1)`, ni Queue 1/1, ni les règles de
 réarmement ou d’arrêt.
 
+Le collecteur journalise un code d'échec fermé, le numéro de claim et
+l'identifiant de corrélation, sans titre, URL ni empreinte de favori. Les
+opérations fournisseur échouées portent le même identifiant et leur étape
+`search` ou `hydrate`. Ces événements expliquent un échec sans transformer
+`ATTEMPT_LIMIT` en diagnostic fournisseur et sans modifier l'état D1.
+
+Si la recherche a identifié un candidat portant un ID lié d'un autre
+fournisseur, un échec transitoire de l'hydratation primaire essaie cet ID exact
+avant une nouvelle recherche par titre. L'identité retournée doit correspondre
+à l'ID lié et rester compatible avec le média, les contraintes et le titre de
+la source ; un lien absent ou incompatible ne devient pas `VERIFIED`.
+
+Pour les médias connus, un budget D1 Worker atteint après des appels fournisseur
+réussis conserve le fournisseur, l'alias, la page et les candidats déjà
+inspectés dans le curseur D1. La continuation reprend à ce point sans répéter
+les recherches terminées. Un refus avant tout appel réussi consomme toujours
+un essai ; une lane antérieure en erreur ne peut pas être sautée par ce
+checkpoint. La recherche réserve aussi le coût d'une hydratation avant de
+dépenser le dernier créneau. `UNKNOWN` reste hors de cette optimisation tant
+que ses deux lanes ne disposent pas d'un checkpoint commun fiable.
+
 Le banc installé utilise le même scope et la même réservation permanente que
 le CLI. Au-delà de deux admissions, un scope est obligatoire; le pilote scellé
 exige exactement une source par clé et un budget explicite égal à la taille du

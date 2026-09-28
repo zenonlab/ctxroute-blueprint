@@ -7,6 +7,8 @@ import {
   FavoriteProviderRetryError,
   createPublicDiscoveryProviders,
   createPublicDiscoveryResolver,
+  PublicDiscoveryInvocationYieldError,
+  PublicDiscoverySearchContinuationError,
   runPublicDiscoveryBatch,
   type PublicDiscoveryBatchReport,
   type PublicDiscoveryClaimedRequest,
@@ -147,6 +149,7 @@ export function createBudgetedDiscoveryResolver(
   usedCalls: () => number,
   claimedCount: () => number,
   timeoutMilliseconds = publicDiscoveryResolutionTimeoutMilliseconds,
+  correlationId?: string,
 ) {
   let completed = 0;
   let outstanding = 0;
@@ -157,18 +160,23 @@ export function createBudgetedDiscoveryResolver(
       const first = completed === 0;
       const scope = { closed: false, exceeded: false };
       const diagnosed = new Set<keyof PublicDiscoveryProviderPorts>();
-      const operation = async <T>(run: () => Promise<T>): Promise<T> => {
+      let completedProviderCalls = 0;
+      const operation = async <T>(action: 'search' | 'hydrate', run: () => Promise<T>): Promise<T> => {
         if (scope.closed) throw new Error('public-discovery-resolution-closed');
         // Publication (7) also covers this claim's alternative defer (2).
         // Reserve two for each OTHER claim, plus nextPendingAt (1).
         const otherClaims = Math.max(0, claimedCount() - completed - 1);
-        if (exhausted || usedCalls() + outstanding + 4 + 7 + 2 * otherClaims + 1 > 50) {
+        if (exhausted || usedCalls() + outstanding + 4 + (action === 'search' ? 4 : 0) + 7 + 2 * otherClaims + 1 > 50) {
           scope.exceeded = true;
           exhausted = true;
-          throw new PublicDiscoveryInvocationBudgetError();
+          throw completedProviderCalls === 0 ? new PublicDiscoveryInvocationBudgetError() : new PublicDiscoveryInvocationYieldError();
         }
         outstanding += 4;
-        try { return await run(); }
+        try {
+          const result = await run();
+          completedProviderCalls += 1;
+          return result;
+        }
         finally { outstanding -= 4; }
       };
       const observe = async <T>(providerName: keyof PublicDiscoveryProviderPorts, action: 'search' | 'hydrate', run: () => Promise<T>): Promise<T> => {
@@ -177,14 +185,14 @@ export function createBudgetedDiscoveryResolver(
           const code = providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined);
           if (!diagnosed.has(providerName) && (code.startsWith('provider-response-invalid') || code.startsWith('provider-runtime-') || code === 'provider-timeout' || code === 'provider-unavailable')) {
             diagnosed.add(providerName);
-            console.warn('public-discovery-provider-operation-failed', providerName, action, code);
+            console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.provider-operation-failed', correlationId, provider: providerName, operation: action, code }));
           }
           throw error;
         }
       };
       const wrap = (providerName: keyof PublicDiscoveryProviderPorts, provider: FavoriteProviderPort): FavoriteProviderPort => ({
-        search: query => operation(() => observe(providerName, 'search', () => provider.search(query))),
-        hydrate: reference => operation(() => observe(providerName, 'hydrate', () => provider.hydrate(reference))),
+        search: query => operation('search', () => observe(providerName, 'search', () => provider.search(query))),
+        hydrate: reference => operation('hydrate', () => observe(providerName, 'hydrate', () => provider.hydrate(reference))),
       });
       try {
         if (exhausted) throw deferred();
@@ -199,6 +207,7 @@ export function createBudgetedDiscoveryResolver(
         return result;
       } catch (error) {
         if (scope.exceeded) {
+          if (error instanceof PublicDiscoverySearchContinuationError) throw error;
           if (first) throw new PublicDiscoveryInvocationBudgetError();
           throw deferred();
         }
@@ -234,7 +243,7 @@ function providerFetch(bindings: NativeCollectorBindings) {
 
 export function providerFailureCode(error: Error | undefined): string {
   if (error === undefined) return 'provider-unknown';
-  if (error instanceof PublicDiscoveryInvocationBudgetError || error instanceof PublicDiscoveryInvocationBudgetRetryError) return 'public-discovery-invocation-budget';
+  if (error instanceof PublicDiscoveryInvocationBudgetError || error instanceof PublicDiscoveryInvocationBudgetRetryError || error instanceof PublicDiscoveryInvocationYieldError) return 'public-discovery-invocation-budget';
   if (error instanceof z.ZodError) {
     const fields = new Set(['titles', 'abbreviatedTitles', 'posterImage', 'canonicalTitle', 'slug', 'subtype', 'ageRating', 'status', 'startDate', 'endDate', 'userCount', 'chapterCount', 'volumeCount', 'episodeCount', 'nsfw', 'title', 'altTitles', 'contentRating', 'originalLanguage', 'tags', 'relationships', 'fileName', 'links', 'limit', 'offset', 'total', 'series_id', 'total_hits', 'associated', 'categories', 'genres', 'image', 'type', 'url']);
     const categories = new Set(['invalid_type', 'too_big', 'too_small', 'invalid_format', 'invalid_value', 'invalid_union', 'unrecognized_keys', 'custom']);
@@ -301,7 +310,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   const resolver = createBudgetedDiscoveryResolver(createPublicDiscoveryProviders(
     providers.fetch,
     new D1ProviderRuntimeControl(d1.database),
-  ), d1.calls, () => claimedCount);
+  ), d1.calls, () => claimedCount, publicDiscoveryResolutionTimeoutMilliseconds, correlationId);
   const report = await runPublicDiscoveryBatch({
     gateway: {
       claim: async (limit) => {
@@ -329,7 +338,8 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       resolve: async (request) => {
         try { return await resolver.resolve(request); }
         catch (error) {
-          console.warn('public-discovery-provider-failed', providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined));
+          console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.provider-failed', correlationId,
+            attempt: request.attempt, code: providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined) }));
           throw error;
         }
       },

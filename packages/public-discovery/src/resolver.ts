@@ -55,6 +55,13 @@ export class PublicDiscoverySearchContinuationError extends FavoriteProviderRetr
   }
 }
 
+export class PublicDiscoveryInvocationYieldError extends FavoriteProviderRetryError {
+  constructor() {
+    super('public-discovery-invocation-budget', Date.now() + 1_000);
+    this.name = 'PublicDiscoveryInvocationYieldError';
+  }
+}
+
 function candidateKey(candidate: ProviderCandidate): string { return `${candidate.provider}:${candidate.externalId}`; }
 
 function matchQueryFor(request: PublicDiscoveryClaimedRequest, titles: readonly string[]): FavoriteTitleMatchQuery {
@@ -88,6 +95,7 @@ async function searchProvider(
   matchQuery: FavoriteTitleMatchQuery,
   deadline: number,
   progress?: PublicDiscoverySearchProgress,
+  allowBudgetContinuation = false,
 ): Promise<LaneDecision> {
   if (progress !== undefined && progress.provider !== provider) throw new Error('provider-search-progress-provider-mismatch');
   const uniqueTitles = [...new Set(titles)].slice(0, 4);
@@ -99,7 +107,14 @@ async function searchProvider(
     const seen = new Set(['1']);
     if (cursor !== '1') seen.add(cursor);
     for (let page = 0; page < searchPageLimit; page += 1) {
-      const envelope = await searchBeforeDeadline(port, { cursor, limit: 20, provider, titles: [title] }, deadline);
+      let envelope;
+      try { envelope = await searchBeforeDeadline(port, { cursor, limit: 20, provider, titles: [title] }, deadline); }
+      catch (error) {
+        if (allowBudgetContinuation && error instanceof PublicDiscoveryInvocationYieldError) {
+          throw new PublicDiscoverySearchContinuationError({ candidates: [...candidates.values()], cursor, provider, titleIndex, version: 1 }, error.retryAt);
+        }
+        throw error;
+      }
       if (envelope.provider !== provider) throw new Error('provider-envelope-mismatch');
       if (envelope.candidates.length > 20) throw new IncompleteProviderSearchError('candidate-page-limit');
       // An exact identity may be accepted without exhausting every fuzzy result.
@@ -174,6 +189,7 @@ async function searchLane(
   query: FavoriteTitleMatchQuery,
   deadline: number,
   progress?: PublicDiscoverySearchProgress,
+  allowBudgetContinuation = false,
 ): Promise<LaneDecision> {
   const inspected: ProviderCandidate[] = [];
   let unavailable: Error | undefined;
@@ -182,11 +198,14 @@ async function searchLane(
   for (const provider of order.slice(startIndex)) {
     let result: LaneDecision;
     try {
-      result = await searchProvider(provider, providers[provider], titles, query, deadline, provider === progress?.provider ? progress : undefined);
+      result = await searchProvider(provider, providers[provider], titles, query, deadline, provider === progress?.provider ? progress : undefined, allowBudgetContinuation);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       if (isProviderInvariantError(error)) throw error;
-      if (error instanceof PublicDiscoverySearchContinuationError) throw error;
+      if (error instanceof PublicDiscoverySearchContinuationError) {
+        if (unavailable !== undefined) throw unavailable;
+        throw error;
+      }
       // Bounded incomplete searches consume an attempt; do not turn them into
       // cadence-only deferrals that could restart page one without limit.
       unavailable = retainProviderFailure(unavailable, error);
@@ -206,9 +225,9 @@ async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, re
   const titles = request.query.discoveryTitles.slice(0, 4);
   const query = matchQueryFor(request, titles);
   const lanes = request.query.mediaKind === 'ANIME'
-    ? [await searchLane(providers, animeProviders, titles, query, deadline, request.searchProgress)]
+    ? [await searchLane(providers, animeProviders, titles, query, deadline, request.searchProgress, true)]
     : request.query.mediaKind !== 'UNKNOWN'
-      ? [await searchLane(providers, mangaSearchProviders, titles, query, deadline, request.searchProgress)]
+      ? [await searchLane(providers, mangaSearchProviders, titles, query, deadline, request.searchProgress, true)]
       : [
           await searchLane(providers, animeProviders, titles, { ...query, mediaKind: 'ANIME' }, deadline),
           await searchLane(providers, mangaProviders, titles, { ...query, mediaKind: 'MANGA' }, deadline),
@@ -308,6 +327,17 @@ async function hydrateWithTransientFallback(
     const order = providerOrderFor(request);
     const start = Math.max(0, order.indexOf(reference.provider) + 1);
     let lastUnavailable = retainProviderFailure(retainedFailure, error);
+    for (const linked of searched?.linkedReferences ?? []) {
+      if (!order.slice(start).includes(linked.provider)) continue;
+      try {
+        const resolution = await hydrateReference(providers, linked, 'matched-provider-identity-not-found');
+        if (resolution.state === 'VERIFIED' && isPublicDiscoveryCandidateCompatible(query, resolution.profile.candidate)
+          && matchCandidates([resolution.profile.candidate], query, true)?.state === 'MATCH') return resolution;
+      } catch (linkedError) {
+        if (!(linkedError instanceof Error) || isProviderInvariantError(linkedError)) throw linkedError;
+        lastUnavailable = retainProviderFailure(lastUnavailable, linkedError);
+      }
+    }
     for (const provider of order.slice(start)) {
       let lane: LaneDecision;
       try {
