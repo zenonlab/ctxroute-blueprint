@@ -22,7 +22,7 @@
     { "id": "rearm", "type": "backend", "label": "Lot scellé v3", "sublabel": "1–10 identités · média connu", "stage": 2, "row": 2, "width": 150, "tag": "un POST par clé" },
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "alias · index imposé" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "claim(1) · expiration ciblée" },
-    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "manga · fenêtre 90 s", "stage": 3, "row": 2, "tag": "curseur repris · échec fermé" },
+    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "manga · 100/page · 90 s", "stage": 3, "row": 2, "tag": "curseur repris · échec fermé" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · candidat lié", "stage": 4, "row": 1, "width": 150, "tag": "pas de preuve Library" }
   ],
   "flows": [
@@ -36,7 +36,7 @@
     { "from": "collector", "to": "result", "label": "publication atomique", "classification": "garde unique · catalogue · clôture du jeton", "variant": "emphasis", "labelDx": 100 }
   ],
   "cards": [
-    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Réservation durable commune au pilote et au CLI", "Runtimes du média vérifiés avant chaque admission", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Curseur après 4 pages : Worker → D1 → Queue, sans rejeu", "UNKNOWN doit être reparsé avant toute admission", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
-    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Jeton protégé du claim générique pendant 15 min sans progrès", "Réveil vide corrélé compté, sans preuve finale", "Coûts et échecs corrélés · zéro 429/Queue · D1 cumulé ≤ 300", "Coûts scellés · lectures closes et drainées · redémarrage local"] }
+    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Réservation durable commune au pilote et au CLI", "Runtimes du média vérifiés avant chaque admission", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Curseur 25→100 après 4 pages, sans saut ni POST", "UNKNOWN doit être reparsé avant toute admission", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
+    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Jeton protégé du claim générique pendant 15 min sans progrès", "Réveil vide corrélé compté, sans preuve finale", "Échec observateur conservé en code autorisé", "Coûts et échecs corrélés · zéro 429/Queue · D1 cumulé ≤ 300", "Coûts scellés · lectures closes et drainées · redémarrage local"] }
   ]
 }

@@ -189,6 +189,23 @@ describe('installed recovery correlation', () => {
     await context.observation.close();
   });
 
+  it.each([
+    ['discovery-canary-observer-d1-budget', 'discovery-canary-observer-d1-budget'],
+    ['private-title', 'discovery-recovery-failed'],
+    ['discovery-canary-observer-private-title', 'discovery-recovery-failed'],
+  ])('records a safe correlation failure for %s', async (message, expected) => {
+    let rejectFailure;
+    const failed = new Promise((_resolve, reject) => { rejectFailure = reject; });
+    const observer = { failed, check: vi.fn(), close: vi.fn(async () => undefined), track: vi.fn(), read: vi.fn() };
+    const onFailure = vi.fn();
+    const observation = await createInstalledRecoveryObservation({ start: () => observer, ready: async () => undefined,
+      complete: vi.fn(), onFailure });
+    rejectFailure(new Error(message));
+    await vi.waitFor(() => expect(onFailure).toHaveBeenCalledOnce());
+    expect(observation.failureCode()).toBe(expected);
+    await observation.close();
+  });
+
   it('rejects missing, duplicate or incomplete admission correlations', async () => {
     const context = await fixture();
     await expect(context.observation.onAdmission({ key: key() }, { ...context.response, headers: () => ({}) })).rejects.toThrow();

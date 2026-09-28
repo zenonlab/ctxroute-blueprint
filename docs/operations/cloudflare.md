@@ -151,15 +151,28 @@ de compte n'est requis. Les erreurs 9109 observées le 26 septembre concernaient
 la lecture `/accounts`, pas une panne D1 prouvée. Un ID explicite ne garantit
 pas les droits D1 : une lecture avec l'identité CI doit encore réussir.
 
+Avant ces lectures, la CI vérifie le même jeton depuis le runner, d'abord par
+`GET /accounts/{account_id}/tokens/verify`, puis par `GET /user/tokens/verify`
+si nécessaire. Elle ne publie que le type compte/utilisateur et le statut actif,
+ou deux codes fermés avec statuts HTTP et codes d'erreur numériques ;
+l'identifiant du jeton, l'adresse IP et les messages Cloudflare restent masqués.
+Ce prévol ne modifie ni jeton ni ressource.
+Il sonde ensuite `GET /accounts/{account_id}/d1/database` avec le même jeton,
+en limitant la réponse et sans publier l'inventaire ; seule la présence de la
+base attendue ou un code de refus fermé est rapportée.
+
 Chaque requête SELECT utilise directement le CLI Wrangler verrouillé dans
 un processus enfant via l'exécutable Node courant, avec une limite de quinze secondes et de 1 Mio
 de sortie. Le processus est tué à l'échéance ; aucun wrapper npm intermédiaire
 n'est conservé. Les quatre requêtes ne sont pas réessayées et l'étape CI est
 limitée à deux minutes. Les logs disque et rapports d'erreur Wrangler sont
 désactivés. Le rapport ajoute seulement des échecs `{query, code}` issus d'une
-liste fermée : compte absent/invalide, accès refusé, authentification, timeout,
+liste fermée : compte absent/invalide, accès refusé, jeton refusé depuis la
+localisation du runner, authentification générique, timeout,
 sortie excessive, commande absente, transport, requête ou réponse invalide.
 Ni stdout/stderr brut, ni token, ni corps privé ne quitte cette frontière.
+Le code `token-location-denied` ne contient pas l'adresse IP ; il n'est émis
+que si Wrangler fournit explicitement le motif de restriction de localisation.
 Toute requête manquante garde `ok=false` et interdit le plan/application.
 
 L'input `publish_extension` reste faux par défaut : les pushes ne publient
@@ -1821,3 +1834,66 @@ Le banc diffère désormais les redémarrages du pilote après la projection,
 la corrélation, la pause explicite et le drainage des routes. Les preuves de
 l'échec restent privées et intactes. Ce correctif local ne certifie pas les
 dix reprises et ne permet pas de rejouer la clé interrompue.
+
+Le pilote `qhnT56` du lot privé `batch-003`, confirmé séparément, a réservé
+et transmis exactement dix POST via le bouton installé. Neuf œuvres sont
+projetées dans Library et une demande reste `PENDING`; le contrôle public
+en lecture seule retrouve neuf `VERIFIED` et une `PENDING`. Le banc s'arrête
+à 280 secondes sur `correlation-failed` avant la preuve des dix coûts et des
+redémarrages. Le verdict reste `failed`, sans certification ni estimation de
+campagne. Aucune de ces dix clés ne sera renvoyée. Les dix reçus et le rapport
+privés sont conservés; le profil complet précédent reste à 1 033 résolues,
+47 Review, 53 exclusions et 389 reprises avant cette projection.
+
+Le diagnostic du banc conserve désormais dans son rapport privé et son résumé
+un code fermé issu de l'observateur (`discovery-canary-observer-*` ou
+`discovery-recovery-*`), avec repli générique pour tout message inconnu.
+Cette modification n'identifie pas rétroactivement la cause du pilote
+`qhnT56`; elle évite une nouvelle reprise aveugle. Aucun nouveau lot ne
+part tant que cette cause et la continuation restante ne sont pas expliquées.
+
+Une lecture D1 ultérieure par les dix clés primaires (dix lignes lues, zéro
+écrite) confirme neuf `VERIFIED` et une ligne active. À 14:18 UTC, cette
+dernière est `PENDING`, tentative 0, curseur MangaUpdates 45 : la continuation
+progresse, mais elle dépasse déjà la fenêtre de certification du pilote.
+Le jeton Wrangler est refusé depuis l'IP courante (`9109`) ; le connecteur
+Cloudflare permet toujours les lectures indexées. Une unique recherche
+historique Observability sur sept minutes a parcouru 2 238 332 lignes et
+218 Mo sans fournir de trace exploitable. Aucun autre balayage historique
+de ce type n'est lancé : son coût est disproportionné pour le diagnostic.
+
+Le profil complet `JB9dN3`, repris avec le même export Downloads après
+sauvegarde de sa copie isolée, a terminé sa fenêtre locale de 895 secondes sans admission
+ni refresh : 1 522 sources = 1 042 résolues, 47 Review, 53 exclusions et
+380 reprises (370 `PROVIDER_UNAVAILABLE`, neuf `PUBLIC_DISCOVERY_PENDING`,
+une `NETWORK`). Library contient 837 œuvres ; aucune projection ne manque et
+aucune erreur interne n'apparaît. Les compteurs restent identiques après
+redémarrage du service worker et du navigateur. Cette exécution a transmis
+484 lectures, bloqué 14 mutations et consommé 4 235 des 5 000 emplacements
+de lecture cumulés ; son verdict reste `incomplete`.
+
+À 14:39 UTC, la seule demande non terminale du lot `batch-003` est encore
+`PENDING`, tentative 0, avec curseur MangaUpdates 65 et zéro candidat retenu.
+Ses lectures D1 ciblées restent à une ligne lue et zéro écrite chacune.
+La Queue conserve un consommateur `1/1`, sept messages en attente et un plus
+ancien d'environ douze minutes. Trois recherches synthétiques publiques de
+MangaUpdates (aucun titre privé) ont répondu 200 ; `stype:title` et
+`orderby:score` n'ont pas diminué les 1 295 résultats du terme de contrôle.
+Modifier le filtre fournisseur sur cette seule hypothèse serait spéculatif.
+
+Le goulot est maintenant reproduit sur la seule clé active, sans nouvelle
+admission : son premier titre de 68 caractères renvoie `total_hits=10000`,
+25 résultats par page jusqu'à la page 400, puis HTTP 400 à la page 401. Son
+second titre renvoie zéro résultat. Une recherche directe à 100 résultats sur
+la page correspondante répond 200 en 4 104 ms pour 136 629 octets, sous les
+limites de huit secondes et 512 Kio. Ces essais sont des lectures fournisseur
+opératoires, pas des preuves de résultat D1 ni des POST Discovery.
+
+La candidate locale demande donc 100 résultats par page MangaUpdates et garde
+le curseur historique exprimé en tranches de 25 : `81` devient la page 21,
+dont le premier résultat suit exactement les 80 anciennes pages. Le prochain
+curseur est `85`. Quatre tranches de 25 préservent l'inspection bornée et la
+priorité globale des correspondances. Le plafond théorique passe de 400 à
+100 appels fournisseur pour ce titre ; cela ne promet pas une résolution en
+douze minutes avec Queue, cadence et autres travaux. Les dix réservations
+`batch-003` restent consommées, le pilote échoué et la correction non déployée.

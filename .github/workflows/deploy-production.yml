@@ -112,6 +112,13 @@ jobs:
             --dir apps/extension/.output/packages
           node --input-type=module -e "import { readExtensionPublicationCandidate } from './scripts/infra/cloudflare-driver.mjs'; await readExtensionPublicationCandidate();"
 
+      - name: Verify Cloudflare CI token
+        timeout-minutes: 1
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/infra/public-discovery-diagnostics.mjs --verify-token
+
       - name: Collect aggregate Discovery diagnostics
         timeout-minutes: 2
         env:

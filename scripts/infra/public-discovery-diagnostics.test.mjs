@@ -1,10 +1,72 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { collectDiscoveryDiagnostics, discoveryDiagnosticQueries, executeDiagnosticQuery } from './public-discovery-diagnostics.mjs';
+import { collectDiscoveryDiagnostics, discoveryDiagnosticQueries, executeDiagnosticQuery, probeDiagnosticD1Access, verifyDiagnosticToken } from './public-discovery-diagnostics.mjs';
 
 const now = '2026-09-23T12:00:00.000Z';
 const environment = { CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), CLOUDFLARE_API_TOKEN: 'private-test-token' };
+
+test('Cloudflare token preflight reports only bounded non-secret status', async () => {
+  const request = async (url, options) => {
+    assert.equal(url, `https://api.cloudflare.com/client/v4/accounts/${environment.CLOUDFLARE_ACCOUNT_ID}/tokens/verify`);
+    assert.equal(options.headers.Authorization, 'Bearer private-test-token');
+    assert.ok(options.signal);
+    return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ success: true, result: { id: 'private-token-id', status: 'active' } }) };
+  };
+  assert.deepEqual(await verifyDiagnosticToken({ environment, request }), { ok: true, kind: 'account', status: 'active' });
+  assert.deepEqual(await verifyDiagnosticToken({ environment: {}, request }), { ok: false, code: 'token-missing' });
+  assert.deepEqual(await verifyDiagnosticToken({ environment: { CLOUDFLARE_API_TOKEN: 'private-test-token' }, request }), { ok: false, code: 'account-invalid' });
+  const denial = await verifyDiagnosticToken({ environment, request: async () => ({
+    ok: false, status: 403, headers: { get: () => null },
+    text: async () => JSON.stringify({ success: false, errors: [{ code: 10000, message: 'Cannot use the access token from location 203.0.113.42 private-secret' }] }),
+  }) });
+  assert.deepEqual(denial, { ok: false, account: { ok: false, code: 'token-location-denied', httpStatus: 403, cloudflareCode: 10000 }, user: { ok: false, code: 'token-location-denied', httpStatus: 403, cloudflareCode: 10000 } });
+  assert.doesNotMatch(JSON.stringify(denial), /private-|203\.0\.113\.42/u);
+});
+
+test('Cloudflare token preflight distinguishes expiry, generic rejection and malformed responses', async () => {
+  const response = (body, status = 200) => ({ ok: status === 200, status, headers: { get: () => null }, text: async () => JSON.stringify(body) });
+  for (const status of ['expired', 'disabled']) {
+    const result = await verifyDiagnosticToken({ environment, request: async () => response({ success: true, result: { status } }) });
+    assert.equal(result.account.code, `token-${status}`);
+    assert.equal(result.user.code, `token-${status}`);
+  }
+  const rejected = await verifyDiagnosticToken({ environment, request: async () => response({ success: false, errors: [{ code: 10000, message: 'private-secret' }] }, 401) });
+  assert.equal(rejected.account.code, 'token-verification-failed');
+  assert.equal(rejected.user.httpStatus, 401);
+  assert.doesNotMatch(JSON.stringify(rejected), /private-/u);
+  const malformed = await verifyDiagnosticToken({ environment, request: async () => response({ success: true, result: { status: 'private-invalid' } }) });
+  assert.equal(malformed.account.code, 'token-response-invalid');
+  const unavailable = await verifyDiagnosticToken({ environment, request: async () => { throw new Error('private-secret'); } });
+  assert.equal(unavailable.account.code, 'token-transport-failed');
+});
+
+test('Cloudflare token preflight falls back to the user token endpoint', async () => {
+  const calls = [];
+  const result = await verifyDiagnosticToken({ environment, request: async url => {
+    calls.push(url);
+    if (url.includes('/accounts/')) return { ok: false, status: 401, headers: { get: () => null }, text: async () => JSON.stringify({ success: false, errors: [{ code: 1000, message: 'private-secret' }] }) };
+    return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ success: true, result: { id: 'private-id', status: 'active' } }) };
+  } });
+  assert.deepEqual(result, { ok: true, kind: 'user', status: 'active' });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1], 'https://api.cloudflare.com/client/v4/user/tokens/verify');
+});
+
+test('D1 access probe classifies location denial without exposing the inventory', async () => {
+  const request = async (url, options) => {
+    assert.equal(url, `https://api.cloudflare.com/client/v4/accounts/${environment.CLOUDFLARE_ACCOUNT_ID}/d1/database?name=tobirink-public&per_page=10`);
+    assert.equal(options.headers.Authorization, 'Bearer private-test-token');
+    return { ok: true, status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ success: true, result: [{ name: 'tobirink-public', uuid: 'private-database-id' }] }) };
+  };
+  assert.deepEqual(await probeDiagnosticD1Access({ environment, request }), { ok: true, databasePresent: true });
+  const denied = await probeDiagnosticD1Access({ environment, request: async () => ({
+    ok: false, status: 403, headers: { get: () => null },
+    text: async () => JSON.stringify({ success: false, errors: [{ code: 10000, message: 'Cannot use the access token from location 203.0.113.42 private-secret' }] }),
+  }) });
+  assert.deepEqual(denied, { ok: false, code: 'token-location-denied', httpStatus: 403, cloudflareCode: 10000 });
+  assert.doesNotMatch(JSON.stringify(denied), /private-|203\.0\.113\.42/u);
+});
 
 test('diagnostics distinguish actual age from retry deadline and group media', () => {
   const db = new DatabaseSync(':memory:');
@@ -92,6 +154,7 @@ test('diagnostics refuse absent or invalid accounts before invoking Wrangler', (
 
 test('diagnostics classify command failures without exposing stdout, stderr or secrets', () => {
   const cases = [
+    [{ status: 1, stderr: 'private-secret Cannot use the access token from location 203.0.113.42. [code: 10000]' }, 'token-location-denied'],
     [{ status: 1, stderr: 'private-secret GET /accounts failed [code: 9109]' }, 'access-denied'],
     [{ status: 1, stderr: 'private-secret Authentication error [code: 10000]' }, 'authentication-failed'],
     [{ status: null, error: { code: 'ETIMEDOUT', message: 'private-secret' } }, 'timeout'],
@@ -109,7 +172,7 @@ test('diagnostics classify command failures without exposing stdout, stderr or s
     assert.equal(report.failures.length, 4);
     assert.deepEqual(report.failures.map(failure => failure.code), Array(4).fill(expected));
     assert.deepEqual(report.failures.map(failure => failure.query), Object.keys(discoveryDiagnosticQueries(now)));
-    assert.doesNotMatch(JSON.stringify(report), /private-|stderr|stdout|\/accounts/u);
+    assert.doesNotMatch(JSON.stringify(report), /private-|stderr|stdout|\/accounts|203\.0\.113\.42/u);
   }
 });
 

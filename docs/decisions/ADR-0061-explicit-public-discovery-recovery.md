@@ -131,6 +131,14 @@ Un coût public terminal ne certifie jamais à lui seul la projection Library.
 La composition Worker transmet aussi le quatrième argument `searchProgress`
 de `gateway.defer` à `deferClaim`. Le curseur et les candidats bornés produits
 après quatre pages doivent traverser cette frontière avant le signal Queue.
+MangaUpdates lit désormais cent résultats par page sans changer la représentation
+du curseur historique en tranches de vingt-cinq : un curseur persistant 81
+reprend à la page 21 de cent, au même premier résultat, et le prochain curseur
+devient 85. Les cent résultats sont inspectés en quatre tranches bornées de
+vingt-cinq ; la priorité de correspondance reste globale, les candidats
+retenus restent plafonnés à vingt, et le plafond HTTP de 512 Kio demeure.
+Ce changement ne relance aucun POST et ne certifie pas rétrospectivement un
+pilote expiré.
 Un report de cadence sans nouveau curseur conserve celui de la requête réclamée
 au lieu de l'effacer; un nouveau checkpoint reste prioritaire.
 La régression intègre le vrai collecteur, la composition et D1 : pages 1 à 4,
@@ -171,6 +179,12 @@ exige toujours un coût fournisseur terminal corrélé à la borne d’observati
 Sans cette preuve, même une lecture `VERIFIED` laisse le certificat incomplet.
 Le rollback de cette qualification ne réarme ni ne supprime aucune ligne.
 
+Si l'observateur du profil installé échoue, son rapport privé conserve
+uniquement un code de cause issu d'une allowlist fermée ; un message inconnu
+devient `discovery-recovery-failed`. Le résumé ne publie jamais l'exception
+brute. Ce diagnostic n'autorise ni rejeu d'une clé réservée ni certification
+rétroactive d'un pilote interrompu.
+
 La récupération est observable et réversible au niveau applicatif : désactiver le contrôle empêche toute nouvelle action, sans supprimer ni réécrire les données existantes. Une reprise de centaines d’entrées prend volontairement du temps afin de respecter la cadence publique ; les réponses `PENDING` restent dans la file et sont réconciliées ultérieurement.
 
 ## Validation
@@ -182,4 +196,5 @@ La récupération est observable et réversible au niveau applicatif : désactiv
 - test du rendu UI ;
 - tests du runner opérateur : scope obligatoire et privé borné à 16 Kio, identité complète et digest, refus du journal legacy ou divergent, SQL ciblé par dix clés primaires, réservation exclusive conservée entre processus et lots ;
 - tests d’observation : différés de 120 et 600 secondes, fenêtre de coût après le terminal, lecture à soixante secondes, deadline totale, drain final et refus des erreurs tardives sans reçu terminal ;
+- tests de diagnostic : motif d'observateur autorisé conservé, message inconnu ou ressemblant à un code rabattu sur le code générique ;
 - aucune récupération distante exécutée pendant cette modification.

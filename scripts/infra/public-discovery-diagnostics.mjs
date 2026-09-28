@@ -5,7 +5,69 @@ import { pathToFileURL } from 'node:url';
 
 const wranglerCli = resolve(dirname(createRequire(import.meta.url).resolve('wrangler/package.json')), 'wrangler-dist/cli.js');
 const common = ['--no-warnings', wranglerCli, 'd1', 'execute', 'tobirink-public', '--remote', '--config', 'apps/worker/wrangler.jsonc', '--json', '--command'];
-const failureCodes = new Set(['account-missing', 'account-invalid', 'access-denied', 'authentication-failed', 'timeout', 'output-limit', 'command-unavailable', 'transport-failed', 'query-failed', 'response-invalid']);
+const failureCodes = new Set(['account-missing', 'account-invalid', 'access-denied', 'token-location-denied', 'authentication-failed', 'timeout', 'output-limit', 'command-unavailable', 'transport-failed', 'query-failed', 'response-invalid']);
+const tokenVerifyBase = 'https://api.cloudflare.com/client/v4';
+
+async function verifyTokenAt(url, token, request) {
+  let response;
+  let payload;
+  try {
+    response = await request(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: globalThis.AbortSignal.timeout(5_000),
+    });
+    if (Number(response.headers?.get('content-length')) > 16_384) return { ok: false, code: 'token-response-invalid' };
+    const body = await response.text();
+    if (body.length > 16_384) return { ok: false, code: 'token-response-invalid' };
+    payload = JSON.parse(body);
+  } catch { return { ok: false, code: 'token-transport-failed' }; }
+  const httpStatus = Number.isInteger(response.status) ? response.status : null;
+  const cloudflareCode = Array.isArray(payload?.errors) && Number.isInteger(payload.errors[0]?.code) ? payload.errors[0].code : null;
+  if (Array.isArray(payload?.errors) && payload.errors.some(error => /Cannot use the access token from location\b/iu.test(error?.message ?? ''))) {
+    return { ok: false, code: 'token-location-denied', httpStatus, cloudflareCode };
+  }
+  if (payload?.result?.status === 'expired' || payload?.result?.status === 'disabled') {
+    return { ok: false, code: `token-${payload.result.status}`, httpStatus, cloudflareCode };
+  }
+  if (!response.ok || payload?.success !== true) return { ok: false, code: 'token-verification-failed', httpStatus, cloudflareCode };
+  if (payload?.result?.status !== 'active') return { ok: false, code: 'token-response-invalid', httpStatus, cloudflareCode };
+  return { ok: true, status: 'active' };
+}
+
+export async function verifyDiagnosticToken({ environment = process.env, request = globalThis.fetch } = {}) {
+  if (!environment.CLOUDFLARE_API_TOKEN) return { ok: false, code: 'token-missing' };
+  if (!/^[a-f0-9]{32}$/u.test(environment.CLOUDFLARE_ACCOUNT_ID ?? '')) return { ok: false, code: 'account-invalid' };
+  const account = await verifyTokenAt(`${tokenVerifyBase}/accounts/${environment.CLOUDFLARE_ACCOUNT_ID}/tokens/verify`, environment.CLOUDFLARE_API_TOKEN, request);
+  if (account.ok) return { ok: true, kind: 'account', status: account.status };
+  const user = await verifyTokenAt(`${tokenVerifyBase}/user/tokens/verify`, environment.CLOUDFLARE_API_TOKEN, request);
+  if (user.ok) return { ok: true, kind: 'user', status: user.status };
+  return { ok: false, account, user };
+}
+
+export async function probeDiagnosticD1Access({ environment = process.env, request = globalThis.fetch } = {}) {
+  if (!environment.CLOUDFLARE_API_TOKEN) return { ok: false, code: 'token-missing' };
+  if (!/^[a-f0-9]{32}$/u.test(environment.CLOUDFLARE_ACCOUNT_ID ?? '')) return { ok: false, code: 'account-invalid' };
+  let response;
+  let payload;
+  try {
+    response = await request(`${tokenVerifyBase}/accounts/${environment.CLOUDFLARE_ACCOUNT_ID}/d1/database?name=tobirink-public&per_page=10`, {
+      headers: { Authorization: `Bearer ${environment.CLOUDFLARE_API_TOKEN}` },
+      signal: globalThis.AbortSignal.timeout(5_000),
+    });
+    if (Number(response.headers?.get('content-length')) > 16_384) return { ok: false, code: 'response-invalid' };
+    const body = await response.text();
+    if (body.length > 16_384) return { ok: false, code: 'response-invalid' };
+    payload = JSON.parse(body);
+  } catch { return { ok: false, code: 'transport-failed' }; }
+  const httpStatus = Number.isInteger(response.status) ? response.status : null;
+  const cloudflareCode = Array.isArray(payload?.errors) && Number.isInteger(payload.errors[0]?.code) ? payload.errors[0].code : null;
+  if (Array.isArray(payload?.errors) && payload.errors.some(error => /Cannot use the access token from location\b/iu.test(error?.message ?? ''))) {
+    return { ok: false, code: 'token-location-denied', httpStatus, cloudflareCode };
+  }
+  if (!response.ok || payload?.success !== true) return { ok: false, code: 'd1-access-denied', httpStatus, cloudflareCode };
+  if (!Array.isArray(payload.result)) return { ok: false, code: 'response-invalid', httpStatus, cloudflareCode };
+  return { ok: true, databasePresent: payload.result.some(database => database?.name === 'tobirink-public') };
+}
 export function discoveryDiagnosticQueries(now) {
   if (new Date(now).toISOString() !== now) throw new TypeError('invalid-diagnostic-clock');
   return {
@@ -34,6 +96,7 @@ function commandFailureCode(result) {
   if (result.error?.code === 'ENOBUFS') return 'output-limit';
   if (result.error?.code === 'ENOENT') return 'command-unavailable';
   const output = `${result.stderr ?? ''}\n${result.stdout ?? ''}`;
+  if (/Cannot use the access token from location\b/iu.test(output)) return 'token-location-denied';
   if (/\[code: 910[69]\]|\bForbidden\b/iu.test(output)) return 'access-denied';
   if (/\[code: 10000\]|Authentication error|\bUnauthorized\b/iu.test(output)) return 'authentication-failed';
   if (/\b(?:ENOTFOUND|ECONNRESET|EAI_AGAIN|ETIMEDOUT)\b|fetch failed/iu.test(output)) return 'transport-failed';
@@ -89,7 +152,11 @@ export function collectDiscoveryDiagnostics({ now = new Date().toISOString(), qu
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  const report = collectDiscoveryDiagnostics();
+  let report;
+  if (process.argv[2] === '--verify-token') {
+    const token = await verifyDiagnosticToken();
+    report = token.ok ? { token, d1: await probeDiagnosticD1Access() } : { token };
+  } else report = collectDiscoveryDiagnostics();
   process.stdout.write(`${JSON.stringify(report)}\n`);
-  if (!report.ok) process.exitCode = 1;
+  if (report.ok === false || report.token?.ok === false || report.d1?.ok === false) process.exitCode = 1;
 }
