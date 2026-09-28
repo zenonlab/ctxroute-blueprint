@@ -6294,8 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Pilote réel tdqu7R reproduit une réadmission PENDING après échéance ; doublon bloqué. Trois régressions rouges avant correctif,24tests ciblés verts après.",
-            "Candidate1.0.48 : PENDING relu sansPOST aprèséchéance/redémarrage, plancher1minute contreboucle. MISS admissionnormale et UNAVAILABLE repriseexplicite préservés. Validation complète en cours, archives47conservées/public45inchangé."
+            "Candidate 1.0.48 : trois régressions unitaires rouges puis 24 vertes; archive 47 rouge (deux admissions), archive 48 verte après échéance et redémarrage (un POST).",
+            "npm run verify intégral vert en clone propre; CI protégée 36397102935 verte sur bf447a5 sans canari/publication; E2E Web 11 succès/1 ignoré après correction de préparation. Deux builds isolés reproduisent les ZIP. Archify architecture et deux dataflows passent; Firefox lint 0 erreur/4 avertissements.",
+            "Upgrade exact SfSBt5 : 1522 sources/805 œuvres, restauration chiffrée exacte et deux redémarrages, profil original inchangé, 0 requête transmise. Pilote distant non certifié; investigation des continuations requise avant élargissement."
           ]
         },
         {
@@ -6352,9 +6353,10 @@
             "npm run package:extension"
           ],
           "evidence": [
-            "ZIPChrome47 : preuveodNPls conservation après restauration/reconstruction/deuxredémarrages ; importviergeaNGPPs1522sources horsligne à937s. Ce n’est pas une convergence distante ni une certification Firefox durable.",
-            "Firefox156.0.1 confirmé dans /Applications/Firefox.app ; codesign --verify --deep --strict passe et spctl accepted / Notarized Developer ID. web-ext10.7 déjà installé ; aucun XPI signé présent.",
-            "external: aucun navigateur connecté ; tentative de contrôle direct Firefox explicitement demandée échoue avec Sky Computer Use native pipe startup failed. Aucun accès Mozilla de signature disponible ; aucun contournement ou changement de permission effectué."
+            "Chrome 1.0.48 exact : upgrade-preservation-SfSBt5 conserve 1522 sources/805 œuvres, export-restauration chiffré exact et deux redémarrages; original inchangé, zéro requête transmise.",
+            "Import vierge rshn9Y : 944 s, 1522 sources, 1483 attentes hors ligne/39 sans identité, aucun traitement actif ni erreur interne; redémarrages vérifiés, zéro transmission. Pas de convergence distante certifiée.",
+            "Firefox 156.0.1 installé, signature/notarisation vérifiées. web-ext lint candidate48 : zéro erreur, quatre avertissements existants; ZIP non signé.",
+            "external: contrôle natif Firefox échoue avec Sky Computer Use native pipe startup failed; accès de signature Mozilla indisponible. Aucun XPI signé ni certification Firefox durable."
           ]
         },
         {

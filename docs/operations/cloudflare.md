@@ -1686,6 +1686,19 @@ et un prochain contrôle au moins une minute plus tard. La Queue et sa
 continuation restent responsables de l'exécution; aucune garde serveur
 ni limite d'admission n'est assouplie.
 
+La relecture historique des journaux est limitée aux six corrélations et à
+leur fenêtre initiale de douze minutes; elle ne relance aucune demande.
+Neuf enregistrements de coût totalisent 43 appels fournisseur, trois résultats
+acceptés, 901 lignes D1 lues et 260 écrites. Aucun 429 ni erreur réseau ou
+Queue n'y apparaît. Ce relevé reste partiel : trois chaînes n'ont pas de
+résultat terminal prouvé, et aucune projection Library n'est certifiée.
+Une continuation sans appel fournisseur ni nouvelle émission ne vaut pas succès.
+La requête de télémétrie a parcouru 1 620 313 lignes de journaux (674 995 745
+octets), distinctes des lectures D1; ne pas répéter ce balayage pour surveiller
+le lot. Les reçus détaillés restent privés. Aucun coût de campagne n'est
+extrapolé depuis cet échec; la cause des continuations incomplètes reste à
+reproduire localement avant tout élargissement.
+
 Le pilote privé `jfltzN`, explicitement autorisé sur dix identités, s'arrête
 après une réservation POST : `read-network-failed` pendant
 le redémarrage du navigateur. Aucune corrélation d'admission n'a été reçue;
