@@ -1,5 +1,44 @@
 # Extension packaging and rollback
 
+## Candidate 1.0.47 — restauration sans invalidation artificielle
+
+La candidate 1.0.46 et ses preuves restent conservées, sans promotion publique.
+La reprise réelle après restauration reproduit une rupture supplémentaire :
+l'absence des artefacts dérivés est interprétée comme un changement d'identité,
+ce qui retire des résolutions automatiques et des œuvres de la projection
+Library avant une nouvelle résolution. Une régression échoue avant correction.
+
+L'import reconstruit maintenant les artefacts sans invalider une résolution
+restaurée dont titre, URL, dossiers et versions concordent. Des entrées ou
+versions différentes conservent la revalidation; une tâche retryable absente
+est reconstruite, mais un claim déjà présent n'est pas réinitialisé. Aucun
+réarmement D1 ni accès fournisseur navigateur n'est ajouté. La candidate
+1.0.47 doit repasser le parcours installé exact et la CI avant certification;
+le pointeur public reste 1.0.45 et aucun XPI signé n'est disponible.
+
+La preuve privée `upgrade-preservation-odNPls` passe sur le ZIP Chrome exact
+SHA-256 `5df8493bf93e1bb0429222fad2a28bd27f432a6dd8dbc3391fefeca75310f088`
+(319 143 octets). Les tables privées sont identiques après export/restauration,
+avant reprise. La reconstruction prend 99 secondes : 1 522 sources,
+1 008 résolues par les données locales, 44 Review, 418 retryables hors ligne et
+52 exclusions déjà présentes, zéro traitement actif. Library conserve les
+805 œuvres et leurs métadonnées publiques, puis 462 cartes en attente.
+Le total passe légitimement de 1 309 à 1 267 : 42 sources rejoignent des œuvres
+déjà présentes. Les alias peuvent s'enrichir et la progression observée
+augmenter, mais aucune ancienne valeur ne régresse. Deux redémarrages
+conservent cet état; le profil original reste inchangé et son code restauré.
+Aucun des 470 appels externes tentés n'est transmis. Ce test ne certifie pas
+la résolution distante des 418 attentes ni une installation Firefox signée.
+
+Les 29 tests d'import, 476 tests applicatifs et `npm run verify` intégral
+passent; les E2E sur le paquet exact passent avec 11 succès et un test ignoré.
+Le premier essai E2E sans archive dans le clone échoue et reste conservé;
+aucun résultat n'est revendiqué avant la copie du ZIP vérifié. Deux builds
+isolés reproduisent les SHA des deux ZIP; le Firefox non signé fait 319 184
+octets, SHA-256 `bb3a7ed714193bf7b291b6f09c444043fa62a84d06e0c66a4e8dccd58ccb22e0`.
+Archify passe en showcase 9/9 sans diagnostic. Le nouvel import intégral
+de 1.0.47 dans un profil vierge reste en cours et ne remplace pas cette preuve.
+
 ## Candidate 1.0.46 — certification en cours
 
 Le pointeur public reste en 1.0.45. La candidate corrige l'export de

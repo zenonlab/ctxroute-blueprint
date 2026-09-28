@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "DONE",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,12 +6294,8 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR148 fusionnée : commits fonctionnels a19c40a et af5248e ; merge c51a2c0915797ec009680a152111b7271e74c013. CI protégée36358734333 SUCCESS sur af5248e ; premier échec E2E36358211431 conservé, attente initiale de l'inventaire corrigée puis E2E11 succès/1 ignoré.",
-            "npm run verify intégral réussi en clone propre,137 tests infra, tous workspaces, couverture, typechecks, performance, CRG, intégration, audit0 vulnérabilité, Archify architecture et vues modifiées showcase9/9. Hooks commit et push actifs.",
-            "Candidate1.0.46 : publicDiscovery v1-v5, aller-retour privé1522 sources/805 œuvres, lots1-10 toutes identités média connues, réservation commune pilote/CLI, POST45s et observation corrélée. Archives reproduites indépendamment.",
-            "Publication séparée du build : manifeste final version/commit/format/MIME/taille/SHA, XPI à payload identique et signature structurelle ; lecture bornée des noms attendus depuis un brouillon GitHub avec droits existants. Signature réelle et transport distant encore à certifier.",
-            "Import neuf exact hors ligne lhJsdT :1522 sources,1483 retryables attendus et39 sans identité,0 traitement actif/erreur interne/œuvre projetée manquante à940s ; worker puis navigateur redémarrés ;0 sortie réseau/admission. Ne prouve pas convergence en ligne.",
-            "Le workflow main36359066098 est en cours, sans canari ni publication demandés ; le pointeur public reste1.0.45. Aucune reprise D1 effectuée ; Mozilla non configuré et Chrome toujours déconnecté."
+            "Candidate1.0.46 intégrée et CI précédente verte ; preuves conservées. Nouvelle reproduction pendant certification : après restauration sans cache dérivé, importFavoriteSources assimile artifact absent à changement sémantique et retire les liens automatiques/Library.",
+            "Correctif borné requis : préserver les résolutions restaurées uniquement si entrées et versions concordent, reconstruire les tâches retryables sans réarmer D1, tester négatifs avant une nouvelle candidate."
           ]
         },
         {
@@ -6357,8 +6353,9 @@
             "npm run package:extension"
           ],
           "evidence": [
-            "Preuve privée upgrade-preservation-trumND : copie réelle1.0.45 vers ZIP1.0.46 exact, bouton Chrome Recharger, export/restauration chiffrés réels, deux redémarrages ;1522 sources/805 œuvres/766 progressions/44 Review conservées, original inchangé, zéro réseau transmis.",
-            "Ancien background persistant reproduit malgré manifeste actualisé ; banc corrigé avec rechargement UI et santé,47 tests passent. Hors ligne en pause : caches invalidés, total Library1309→805 ; reconstruction des cartes en attente encore à vérifier. Firefox signé et convergence non certifiés."
+            "Preuve privée odNPls sur ZIP1.0.47 SHA5df8493b : tables privées restaurées exactement avant reprise, puis reconstruction en99s et deux redémarrages ;1522 sources=1008 résolues localement+44 Review+418 retryables hors ligne+52 exclusions.805 œuvres et métadonnées publiques conservées ; aucune progression ne régresse.",
+            "Library1267=805 œuvres+462 cartes en attente ;42 anciennes cartes rejoignent une œuvre déjà présente.470 requêtes bloquées,0 transmises ; profil original inchangé, code restauré. Ne certifie ni résolution distante des418 attentes ni Firefox signé.",
+            "Nouvel import vierge1.0.47 en cours, session privée aNGPPs, réseau entièrement bloqué et borne1200s ; anciens échecs, preuves1.0.46 et archives conservés."
           ]
         },
         {

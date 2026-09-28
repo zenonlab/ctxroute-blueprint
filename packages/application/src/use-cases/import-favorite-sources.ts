@@ -86,7 +86,16 @@ export async function importFavoriteSources(
         });
         const evidence = extractFavoriteSourceEvidence({ sourceKey: source.id, title: favorite.title, url: favorite.url }, sourceAdapters);
         const artifact = parseFavoriteObservation(observation, evidence);
-        const sameArtifact = existingArtifact?.artifact.semanticFingerprint === artifact.semanticFingerprint;
+        const versions = favoriteResolutionVersions(artifact);
+        const restoredVersions = existingSource?.resolutionVersions;
+        const sameRestoredInput = existingArtifact === undefined && existingSource !== undefined && restoredVersions !== undefined
+          && restoredVersions.parser === versions.parser && restoredVersions.matcher === versions.matcher
+          && restoredVersions.siteRules === versions.siteRules && restoredVersions.schema === versions.schema
+          && restoredVersions.decision === versions.decision && restoredVersions.receipt === versions.receipt
+          && existingSource.presence === 'observed' && existingSource.title === favorite.title && existingSource.url === favorite.url
+          && existingSource.folderPath.length === favorite.folderPath.length
+          && existingSource.folderPath.every((folder, index) => folder === favorite.folderPath[index]);
+        const sameArtifact = sameRestoredInput || existingArtifact?.artifact.semanticFingerprint === artifact.semanticFingerprint;
         if (!sameArtifact && source.resolution !== undefined) {
           const decision = source.reviewId === undefined ? undefined : await session.getReview(source.reviewId);
           const staleAutomaticReview = decision?.decisionOrigin === 'automatic';
@@ -158,7 +167,8 @@ export async function importFavoriteSources(
               versions: favoriteResolutionVersions(artifact),
             });
           }
-        } else if (!identityMissing && (corrected || !sameArtifact)) {
+        } else if (!identityMissing && (corrected || !sameArtifact
+          || existingTask === undefined && (source.resolution === undefined || source.resolution.kind === 'RETRYABLE'))) {
           await session.putFavoriteResolutionTask(task);
         }
       }
