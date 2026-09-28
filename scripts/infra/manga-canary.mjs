@@ -162,13 +162,17 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
       const preProviderBackoff = collector.provider === 'none' && collector.providerRequests === 0
         && collector.acceptedResults === 0 && collector.result === 'backoff' && collector.queueSends === 1
         && collector.correlationId === requestId;
+      const emptyWake = collector.provider === 'none' && collector.providerRequests === 0
+        && collector.acceptedResults === 0 && collector.result === 'unchanged' && collector.queueSends === 0
+        && collector.d1RowsWritten === 0 && collector.correlationId === requestId
+        && selected.some(previous => previous !== collector && previous.correlationId === requestId && previous.queueSends === 1);
       const providerContinuation = allowProviderContinuation && collector.provider !== 'none' && collector.providerRequests > 0
         && collector.acceptedResults === 0 && collector.result === 'unchanged' && collector.queueSends === 1;
-      if (collector.provider === 'none' && !preProviderBackoff) fail('provider-mismatch');
-      if (collector.providerRequests === 0 && !preProviderBackoff) fail('no-provider-calls');
+      if (collector.provider === 'none' && !preProviderBackoff && !emptyWake) fail('provider-mismatch');
+      if (collector.providerRequests === 0 && !preProviderBackoff && !emptyWake) fail('no-provider-calls');
       if (collector.queueFailures > 0) fail('queue-failure');
       if (collector.acceptedResults === 0 && ['failed', 'backoff'].includes(collector.result) && collector.queueSends !== 1) fail('failed-result');
-      if (collector.acceptedResults === 0 && !['failed', 'backoff'].includes(collector.result) && !providerContinuation) fail('accepted-results');
+      if (collector.acceptedResults === 0 && !['failed', 'backoff'].includes(collector.result) && !providerContinuation && !emptyWake) fail('accepted-results');
       if (collector.acceptedResults === 1 && ['failed', 'backoff'].includes(collector.result)) fail('failed-result');
       if (collector.acceptedResults > 1 || collector.acceptedResults === 1 && collector.result !== 'changed') fail('accepted-results');
     }

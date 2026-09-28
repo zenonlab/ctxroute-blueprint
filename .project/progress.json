@@ -6294,9 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR156 et CI36420872368 livrées ; q8QmHm corrigé devient VERIFIED attempt5 sans nouveau POST. L’ancien pilote reste non certifié.",
-            "Pilote suivant : 5337 lectures collecteur et32 admission. EXPLAIN distant sans écriture prouve SCAN canonique ; INDEXED BY donne la recherche des trois colonnes. Régression avec statistiques périmées rouge puis verte, publication/replay et conflit de référence bornés.",
-            "207 tests Worker et types verts ; runbook et Archify dataflow/showcase/visual-check validés, captures inspectées. Vérification complète et E2E en clone propre en cours ; hooks, seuil300, Queue1/1 et admissions inchangés."
+            "Pilote batch-002 arrêté après dix POST : télémétrie liée aux admissions démontre un réveil Queue vide corrélé provider:none/unchanged, zéro appel/écriture, 78 lectures D1 ; le validateur échouait bien que la demande restât PENDING.",
+            "Correction de l’observateur seulement : réveil vide accepté uniquement après continuation corrélée réellement programmée, ses lectures comptées dans la borne300, aucune preuve avant fournisseur final. Régression rouge puis verte ; 49 tests canari, 70 tests ciblés infra.",
+            "Verify complet en clone propre, Web E2E 11 pass/1 skip, Archify dataflow showcase et visual-check quatre tailles, validations ADR/docs et diff-check réussis. Publication par PR/CI encore à faire ; aucun POST rejoué."
           ]
         },
         {
@@ -6315,9 +6315,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Pilote Mg67yX autorisé pour batch-001, arrêté après trois réservations/envois ; sept clés intactes, deux corrélations reçues. Aucune répétition autorisée.",
-            "Télémétrie corrélée : une publication MangaDex consomme 5337 lectures collecteur +32 admission, dépassement réel de 300 ; arrêt correlation-failed. Plan distant EXPLAIN confirme SCAN canonique, zéro écriture diagnostic.",
-            "Régression locale avec statistiques périmées rouge puis verte ; INDEXED BY imposé pour publication et replay. q8QmHm antérieur devient VERIFIED attempt5 par continuation, sans nouveau POST ; aucun ancien échec requalifié en certificat."
+            "Lot batch-002 autorisé par « go » après prévol exact scellé : dix réservations durables et dix POST, aucun rejeu. Profil LagK4m à l’arrêt : quatre œuvres Library, une AMBIGUOUS en Review et cinq PENDING ; original correlation-failed, jamais certifié.",
+            "D1 dix clés indexées/10 lectures/zéro écriture : quatre VERIFIED, une AMBIGUOUS, cinq PENDING. Télémétrie privée 27 événements corrélés : réveil Queue avec même UUID mais provider:none/unchanged, zéro appel, 78 lectures, zéro écriture déclenche fausse erreur ; aucune 429, panne fournisseur ni panne Queue observée dans les événements corrélés.",
+            "Régression observateur rouge puis verte : 49 tests canari ; réveil vide comptabilisé au budget300, interdit de certification avant appel fournisseur final, sans assouplir refus isolé ni erreur Queue. CI locale complète en cours."
           ]
         },
         {
@@ -6336,9 +6336,9 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Réconciliation après PR156, JB9dN3 en 716s : 1522 = 1026 résolues + 44 Review + 53 exclusions + 399 retryable ; cinq PENDING, un NETWORK et 393 PROVIDER_UNAVAILABLE. Projection sans œuvre manquante ; redémarrages navigateur/worker vérifiés.",
-            "433 lectures HTTP, zéro POST transmis, 12 mutations bloquées, zéro fournisseur/étranger ; budget cumulé 2854/5000. Sauvegarde préalable privée pre-alias-reconcile-oxNi1h conservée ; verdict incomplete inchangé.",
-            "Campagne préparée non autorisée : 232 identités connues, 24 lots disjoints ; 106 UNKNOWN séparées. Prévol batch-001 : dix éligibles (9 MANGA/1 ANIME), vingt lectures D1/zéro écriture, aucune réservation existante ; MangaUpdates DEFERRED, autres fournisseurs READY."
+            "JB9dN3 après projection des résultats : 1522 = 1028 résolues +44 Review +53 exclusions +397 retryable ; 391 PROVIDER_UNAVAILABLE, cinq PENDING et un NETWORK. Library824 œuvres connues, aucune projection manquante, redémarrages vérifiés.",
+            "425 lectures HTTP, zéro POST transmis/fournisseur/étranger ; douze mutations bloquées ; budget cumulé3279/5000. Sauvegarde privée pre-index-reconcile-8yobTu et toutes preuves antérieures conservées.",
+            "106 identités UNKNOWN reparsées hors réseau avec code actuel :106 restent UNKNOWN, aucun média inventé. Campagne connue préparée non autorisée ; batch-001 a désormais trois réservations permanentes après arrêt budget, sept clés intactes."
           ]
         },
         {
