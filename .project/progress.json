@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "IN_PROGRESS",
+          "status": "BLOCKED",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,16 +6294,14 @@
             "git diff --check"
           ],
           "evidence": [
-            "Banc installé local: code de corrélation fermé dans rapport privé; tests132/132, aucun budget ou admission élargi. Pilote batch-003 échoué, dix clés consommées.",
-            "Correctif local MangaUpdates: pages100, curseur v1 conservé en unités25 (81→page21, prochain85), comparaison globale par tranches25; aucun nouveau POST. Preuve API réelle4,104ms/136,629octets sous les bornes.",
-            "Clone propre avec diff exact: npm run verify vert, Web E2E11 pass/1 skip; Public Discovery179/179, Worker207/207, Archify dataflow9/9/0warning, ADR/docs et diff-check verts. Root verify pollué par archives build ignorées.",
-            "PR158/main CI36429534504 verts pour le précédent code; ce nouveau correctif n’est ni commité, ni en CI, ni déployé, et ne certifie pas rétrospectivement le pilote."
+            "Correctif MangaUpdates et diagnostic CI sur PR #159 SHA d4ed8cb; clone propre npm run verify, E2E et 143 tests infra verts; Archify architecture et dataflow validés.",
+            "external: CI 36449189428 vérifie le jeton de compte actif mais D1 répond HTTP 401/code 10000; le connecteur refuse la lecture des jetons avec 9109. Aucun plan/apply, aucune permission ni secret modifiés."
           ]
         },
         {
           "id": "pilot",
           "title": "Prouver dix reprises depuis le bouton",
-          "status": "IN_PROGRESS",
+          "status": "BLOCKED",
           "acceptance": [
             "Confirmation immédiate du lot exact avant reprise",
             "Chaîne bouton à Library corrélée et coût certifié"
@@ -6316,15 +6314,14 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Lot batch-003 confirmé,10 réservations et10 POST via bouton, aucun rejeu. Profil qhnT56 failed/correlation-failed à280s malgré9 Library/1 attente ; jamais certifié.",
-            "Lecture D1 exacte par index primaire via connecteur Cloudflare:10 lignes lues/0 écrite,9 VERIFIED/1 PROCESSING ; lecture suivante10/0 montre la même clé PENDING, attempt0, curseur MangaUpdates45, updatedAt14:18UTC. La recherche continue sans nouvel envoi.",
-            "Wrangler refusé par restriction IP code9109 ; connecteur Cloudflare read-only fonctionne. Une requête Observability bornée 7min a scanné2,238,332 lignes/218MB et n'a renvoyé aucune trace exploitable : arrêt des balayages coûteux, cause du pilote non démontrée."
+            "Batch-003: dix réservations et dix POST via le bouton, neuf Library et une attente; verdict correlation-failed, clés consommées sans rejeu.",
+            "external: le Worker corrigé ne peut être déployé tant que le jeton CI actif est refusé par D1; aucun nouveau lot autorisé ni soumis."
           ]
         },
         {
           "id": "converge",
           "title": "Faire converger toutes les sources",
-          "status": "IN_PROGRESS",
+          "status": "BLOCKED",
           "acceptance": [
             "1522 sources expliquées, aucun blocage technique",
             "Confirmation distincte des reprises épuisées"
@@ -6337,9 +6334,8 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Fenêtre complète895s sur profil JB9dN3/candidate Chrome1.0.48 et export Downloads exact :1522=1042 RESOLVED+47 Review+53 exclusions+380 retryable (370 PROVIDER_UNAVAILABLE,9 PENDING,1 NETWORK). Library837 œuvres,0 erreur interne,0 projection manquante ; verdict incomplete.",
-            "Service worker et navigateur redémarrés, compteurs conservés. Sauvegarde isolée créée avant reprise;484 lectures HTTP,4235/5000 emplacements cumulés,14 mutations bloquées,0 POST/refresh/fournisseur. Toutes les anciennes preuves conservées.",
-            "D1 indexé ciblé1 ligne/0 écriture à14:39UTC:clé batch-003 non terminale PENDING,attempt0,curseur MangaUpdates65 et0 candidat; Queue1/1,backlog7,âge max~12min. Recherche avance, mais ne satisfait pas la borne pilote; aucun autre lot autorisé."
+            "Dernière réconciliation complète: 1522=1042 résolues+47 Review+53 exclusions+380 retryable, Library837, zéro erreur interne; données préservées.",
+            "external: CI Cloudflare refuse D1 401/10000 avant plan/apply, donc correctif de continuation non déployé; aucune campagne élargie engagée."
           ]
         },
         {
