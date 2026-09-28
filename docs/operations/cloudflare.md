@@ -1702,6 +1702,18 @@ vérifie la recherche par les trois colonnes et les budgets inchangés. Aucun
 `ANALYZE`, changement de statistiques ou nouveau réarmement distant n'est
 effectué pour ce correctif ; le rollback du code conserve toutes les données.
 
+Le lot installé suivant réserve ses dix clés et observe quatre VERIFIED, une
+AMBIGUOUS projetée en Review et cinq PENDING avant un arrêt de corrélation.
+Les coûts Worker corrélés montrent un réveil Queue portant l'identifiant de
+l'admission mais sans claim ni fournisseur : `provider:none`, `unchanged`,
+zéro envoi Queue et 78 lectures D1. Ce réveil vide n'est ni un résultat ni une
+nouvelle admission. L'observateur le conserve dans le coût cumulé de sa clé,
+exige une continuation antérieure effectivement programmée, et attend toujours
+un appel fournisseur final et un état terminal dans les bornes existantes.
+Un réveil isolé, une erreur Queue, un coût supérieur à 300 ou l'absence de
+résultat final restent des échecs. Les dix réservations sont consommées ; le
+lot interrompu ne devient pas certifié a posteriori et aucun POST n'est rejoué.
+
 Le diagnostic ciblé du profil complet `JB9dN3` lit cinq clés sans écriture.
 Les quatre attentes manga n'ont aucun curseur persisté; la composition Worker
 omettait le quatrième argument `searchProgress` du port `defer`. Une régression

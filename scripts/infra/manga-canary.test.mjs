@@ -304,6 +304,49 @@ test('pre-provider cadence backoff waits for the correlated provider continuatio
   assert.equal(proof.d1RowsRead, 135);
 });
 
+test('a correlated empty Queue wake counts toward the budget without certifying before a provider result', () => {
+  const requestId = identity(1);
+  const observation = createCostObservation({ allowProviderContinuation: true });
+  observation.track(requestId, expectation);
+  observation.push(frame(envelope(requestId, [
+    cost({ acceptedResults: 0, correlationId: requestId, d1RowsRead: 40, provider: 'mangaupdates',
+      providerRequests: 4, queueSends: 1, result: 'backoff' }),
+    admissionCost({ d1RowsRead: 15 }),
+  ])));
+  observation.push(frame(queueEnvelope(requestId, [
+    cost({ acceptedResults: 0, correlationId: requestId, d1RowsRead: 75, d1RowsWritten: 0,
+      provider: 'none', providerRequests: 0, providerTransportDurationMs: 0, queueSends: 0, result: 'unchanged' }),
+  ])));
+  assert.equal(observation.read(requestId), undefined);
+  observation.push(frame(queueEnvelope(requestId, [cost({ correlationId: requestId, d1RowsRead: 40 })])));
+  const proof = observation.read(requestId);
+  assert.equal(proof.providerRequests, 5);
+  assert.equal(proof.acceptedResults, 1);
+  assert.equal(proof.d1RowsRead, 170);
+  assert.equal(proof.collectorD1RowsRead, 155);
+});
+
+test('an empty Queue wake alone cannot certify and its reads remain bounded', () => {
+  const requestId = identity(1);
+  const idle = cost({ acceptedResults: 0, correlationId: requestId, d1RowsRead: 70, d1RowsWritten: 0,
+    provider: 'none', providerRequests: 0, providerTransportDurationMs: 0, queueSends: 0, result: 'unchanged' });
+  const isolated = createCostObservation({ allowProviderContinuation: true });
+  isolated.track(requestId, expectation);
+  assert.throws(() => isolated.push(frame(envelope(requestId, [idle, admissionCost()]))), /provider-mismatch/u);
+
+  const continued = createCostObservation({ allowProviderContinuation: true });
+  continued.track(requestId, expectation);
+  continued.push(frame(envelope(requestId, [
+    cost({ acceptedResults: 0, correlationId: requestId, d1RowsRead: 40, provider: 'mangaupdates',
+      providerRequests: 4, queueSends: 1, result: 'backoff' }), admissionCost(),
+  ])));
+  continued.push(frame(queueEnvelope(requestId, [idle])));
+  assert.equal(continued.read(requestId), undefined);
+  assert.throws(() => continued.push(frame(queueEnvelope(requestId, [
+    { ...idle, d1RowsRead: 190 },
+  ]))), /d1-budget/u);
+});
+
 test('pre-provider backoff requires its own correlation and exactly one continuation', () => {
   for (const changes of [{ correlationId: undefined }, { queueSends: 0 }, { queueSends: 2 }, { result: 'unchanged' }]) {
     const requestId = identity(1);
