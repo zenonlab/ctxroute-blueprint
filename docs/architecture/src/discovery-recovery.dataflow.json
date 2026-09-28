@@ -4,7 +4,7 @@
   "meta": {
     "title": "Reprise bornée de Public Discovery",
     "output": "discovery-recovery.dataflow.html",
-    "viewBox": [1080, 760],
+    "viewBox": [1080, 500],
     "quality_profile": "showcase"
   },
   "stages": [
