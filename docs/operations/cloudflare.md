@@ -1,5 +1,20 @@
 # Cloudflare operations gate
 
+## Pilote du 29 septembre — preuve partielle conservée
+
+La PR 173 est déployée par le run protégé `36626795362`, Worker
+`c25963f5-6c26-45d5-9dfc-2685a6cb12b4`. Le pilote installé `L84rnV`
+s'arrête après un POST sur les deux clés restantes du lot 008 : 329 lectures
+D1, 18 appels fournisseur, aucun résultat accepté à cette borne. La seconde
+clé n'est pas envoyée; la première reste réservée. Ce résultat ne certifie
+ni le lot ni la convergence générale.
+
+Le diagnostic distingue deux défauts : une recherche multi-mots reste large
+(3 778 résultats dans le cas observé), et l'adaptateur ignorait `hit_title`
+alors que les records de recherche n'incluent pas `associated`. Conserver
+cet alias corrige une perte de preuve; cela ne prouve pas que ce titre
+particulier sera résolu, ni que toute pagination respecte déjà le budget.
+
 Tobirink does not expose Wrangler as a release command. Every provider change
 starts from the repository-owned gate, while the extension and Worker runtime
 remain independent of this operational path.
