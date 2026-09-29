@@ -12,6 +12,29 @@ restaure manifeste et verrou ensemble; il réintroduirait l'alerte de sécurité
 
 ## Pilote du 29 septembre — preuve partielle conservée
 
+La PR 175 est ensuite déployée par `36633990299`, Worker
+`ce2a7c5a-f2af-4a94-8756-13e572cfd58b`. La neuvième demande reprend son
+checkpoint automatiquement et termine `NOT_FOUND`, sans nouveau POST.
+La dernière clé du lot, `j22d38`, termine également `NOT_FOUND` par le vrai
+bouton : un POST, dix appels fournisseur, 201 lectures D1 corrélées et
+65 écritures; Review et deux redémarrages sont vérifiés.
+
+Le contrôle installé en lecture seule `Z7Uz2H` comptabilise les dix sources :
+six œuvres Library et quatre Review `NOT_FOUND`, aucune attente ni erreur
+interne, deux redémarrages conservés, cinq lectures HTTP et zéro POST.
+Cela prouve leur état terminal et leur projection, pas rétroactivement les
+budgets des pilotes interrompus. `NOT_FOUND` signifie absence de correspondance
+vérifiée, pas absence de l'œuvre dans le monde.
+
+Le nouvel import headless de Downloads `ScAMsw`, sur le ZIP exact 1.0.49,
+observe après 1 196 secondes : 1 522 sources, 1 052 résolues, 54 Review,
+53 exclusions et 363 attentes, pour 865 œuvres. Les deux redémarrages
+conservent les données; aucune erreur interne ni œuvre résolue non projetée.
+Par rapport à `qBDa7Q`, sept sources résolues et quatre Review supplémentaires
+expliquent onze attentes de moins. Ce test reste incomplet : 1 642 lectures
+HTTP, zéro admission/refresh transmis, 142 mutations bloquées et 18 soumissions
+capturées. Il ne certifie ni la reprise des demandes restantes ni Firefox.
+
 La PR 173 est déployée par le run protégé `36626795362`, Worker
 `c25963f5-6c26-45d5-9dfc-2685a6cb12b4`. Le pilote installé `L84rnV`
 s'arrête après un POST sur les deux clés restantes du lot 008 : 329 lectures
