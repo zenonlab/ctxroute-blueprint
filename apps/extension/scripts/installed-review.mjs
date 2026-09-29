@@ -22,6 +22,14 @@ function integer(value, fallback, minimum, maximum) {
   return parsed;
 }
 
+export async function drainInstalledReviewReads(networkGuard) {
+  const alreadyClosed = networkGuard.snapshot().readPhaseClosed;
+  networkGuard.closeReadPhase();
+  await networkGuard.drain();
+  networkGuard.throwIfFailed();
+  return alreadyClosed;
+}
+
 export async function prepareInstalledRecoveryRestart(page, networkGuard, recoveryObservation, expected) {
   const costs = await recoveryObservation.finish(expected);
   networkGuard.closeReadPhase();
@@ -335,6 +343,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       onAdmission: async (submission, response) => recoveryObservation.onAdmission(submission, response),
       onFailure: async () => { void closeContext(false); } });
     if (sourceScope !== undefined) recoveryObservation = await createInstalledRecoveryObservation({
+      recoveryBatchSize: sourceScope.entries.length,
       onFailure: async () => networkGuard.fail('correlation-failed'),
       recordAdmission: async receipt => {
         const keyDigest = createHash('sha256').update(JSON.stringify(receipt.key)).digest('hex');
@@ -443,12 +452,14 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     }
     let workerRestartObserved;
     const verifyRestarts = async baseline => {
+      const readsAlreadyClosed = await drainInstalledReviewReads(networkGuard);
       stage = 'service-worker-restart';
       workerRestartObserved = await restartInstalledReviewWorker(context, page, session.extensionId, Math.min(deadline - 15_000, Date.now() + 15_000));
       const afterWorker = await observe('after-service-worker-restart');
       assertPreserved(baseline, afterWorker, session.expected);
       stage = 'browser-restart';
       await closeContext();
+      if (!readsAlreadyClosed) networkGuard.openReadPhase();
       debugging = await launch();
       page = await context.newPage();
       await loadExtension();
@@ -486,6 +497,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       correlatedCosts = await prepareInstalledRecoveryRestart(page, networkGuard, recoveryObservation, sourceScope.entries.length);
       await verifyRestarts(final);
     }
+    await drainInstalledReviewReads(networkGuard);
     await closeContext();
     await networkGuard.drain();
     networkGuard.throwIfFailed();

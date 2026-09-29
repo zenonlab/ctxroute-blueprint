@@ -673,6 +673,64 @@ test('unrelated business failures never certify or taint successful correlated w
   assert.equal(observation.snapshot().results.failed, 0);
 });
 
+for (const recoveryBatchSize of [1, 5, 10]) test(`recovery observer handles 24 preflights and ${recoveryBatchSize} correlated admissions`, () => {
+  const observation = createCostObservation({ allowProviderContinuation: true, recoveryBatchSize });
+  for (let number = 1; number <= 24; number += 1) {
+    observation.track(identity(number), { task: 'discovery-lookup', status: 200 });
+    observation.push(frame(envelope(identity(number), [lookupCost()])));
+  }
+  for (let number = 25; number < 25 + recoveryBatchSize; number += 1) {
+    const requestId = identity(number);
+    observation.track(requestId, expectation);
+    observation.push(frame(admissionEnvelope(requestId)));
+    for (let wake = 0; wake < 12; wake += 1) {
+      observation.push(frame(queueEnvelope(requestId, [cost({ correlationId: requestId, acceptedResults: 0,
+        provider: 'none', providerRequests: 0, providerTransportDurationMs: 0, d1RowsRead: 1, d1RowsWritten: 0,
+        queueSends: 1, result: 'backoff' })])));
+    }
+    observation.push(frame(queueEnvelope(requestId)));
+    assert.equal(observation.read(requestId).acceptedResults, 1);
+  }
+  observation.finish();
+  assert.equal(observation.snapshot().observedEvents, recoveryBatchSize);
+});
+
+test('recovery batch bounds retain the per-key event ceiling and identify the failed limit', () => {
+  const observation = createCostObservation({ allowProviderContinuation: true, recoveryBatchSize: 10 });
+  const requestId = identity(1);
+  observation.track(requestId, expectation);
+  observation.push(frame(admissionEnvelope(requestId)));
+  const backoff = frame(queueEnvelope(requestId, [cost({ correlationId: requestId, acceptedResults: 0,
+    provider: 'none', providerRequests: 0, providerTransportDurationMs: 0, d1RowsRead: 0, d1RowsWritten: 0,
+    queueSends: 1, result: 'backoff' })]));
+  for (let wake = 0; wake < 128; wake += 1) observation.push(backoff);
+  assert.throws(() => observation.push(backoff), /correlation-limit/u);
+  assert.deepEqual(observation.failureEvidence(), { kind: 'key-events', observed: 129, limit: 128 });
+  const tracked = createCostObservation({ allowProviderContinuation: true, recoveryBatchSize: 10 });
+  for (let number = 1; number <= 34; number += 1) tracked.track(identity(number), expectation);
+  assert.throws(() => tracked.track(identity(35), expectation), /correlation-limit/u);
+  assert.deepEqual(tracked.failureEvidence(), { kind: 'tracked', observed: 35, limit: 34 });
+});
+
+test('invalid recovery batch sizes fail before starting a Tail process', () => {
+  for (const recoveryBatchSize of [0, 11, 1.5, NaN, '10']) {
+    const fake = fakeTail();
+    assert.throws(() => startCostObserver({ ...fake, allowProviderContinuation: true, recoveryBatchSize }), /invalid-budget/u);
+    assert.equal(fake.launches.length, 0);
+  }
+  assert.throws(() => createCostObservation({ recoveryBatchSize: 10 }), /invalid-budget/u);
+});
+
+test('recovery aggregate bounds still stop excess envelopes and bytes', () => {
+  const observation = createCostObservation({ allowProviderContinuation: true, recoveryBatchSize: 1 });
+  for (let number = 1; number <= 152; number += 1) observation.push(frame(envelope(identity(number), [lookupCost()])));
+  assert.throws(() => observation.push(frame(envelope(identity(153), [lookupCost()]))), /correlation-limit/u);
+  assert.deepEqual(observation.failureEvidence(), { kind: 'envelopes', observed: 153, limit: 152 });
+  const bytes = createCostObservation({ allowProviderContinuation: true, recoveryBatchSize: 10 });
+  assert.throws(() => bytes.push(Buffer.alloc(10 * 1024 * 1024 + 1)), /byte-limit/u);
+  assert.deepEqual(bytes.failureEvidence(), { kind: 'bytes', observed: 10 * 1024 * 1024 + 1, limit: 10 * 1024 * 1024 });
+});
+
 test('bounds reject 129 envelopes, 15 tracked IDs, byte overflow, deep arrays and truncated JSON', () => {
   const envelopes = createCostObservation();
   for (let number = 1; number <= 128; number += 1) envelopes.push(frame(envelope(identity(number), [lookupCost()])));

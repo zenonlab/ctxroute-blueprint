@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createInstalledRecoveryObservation, createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
-import { prepareInstalledRecoveryRestart, reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
+import { drainInstalledReviewReads, prepareInstalledRecoveryRestart, reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
 import { reserveRecoveryPost } from '../../../scripts/infra/discovery-recovery-batch.mjs';
 
 describe('installed recovery restart preparation', () => {
@@ -235,7 +235,7 @@ describe('installed recovery correlation', () => {
       expect(observer.close).toHaveBeenCalledOnce();
     } finally { vi.useRealTimers(); }
   });
-  async function fixture(overrides = {}) {
+  async function fixture(overrides = {}, recoveryBatchSize = 1) {
     const cost = { providerRequests: 1, acceptedResults: 1, provider429s: 0, providerHttpErrors: 0,
       providerNetworkErrors: 0, queueFailures: 0, d1RowsRead: 200, d1RowsWritten: 20, ...overrides };
     const observer = { failed: new Promise(() => {}), check: vi.fn(), close: vi.fn(async () => undefined),
@@ -243,10 +243,18 @@ describe('installed recovery correlation', () => {
     const ready = vi.fn(async () => undefined);
     const complete = vi.fn(async () => ({ cost, terminal: { state: 'VERIFIED' } }));
     const recordCost = vi.fn(async () => undefined);
-    const observation = await createInstalledRecoveryObservation({ start: () => observer, ready, complete, recordCost, onFailure: vi.fn() });
+    const start = vi.fn(() => observer);
+    const observation = await createInstalledRecoveryObservation({ start, recoveryBatchSize, ready, complete, recordCost, onFailure: vi.fn() });
     const response = { headers: () => ({ 'x-tobirink-request-id': requestId }), text: async () => JSON.stringify({ state: 'PENDING' }) };
-    return { observation, response, observer, ready, complete, recordCost };
+    return { observation, response, observer, ready, complete, recordCost, start };
   }
+
+  it('passes the sealed batch size to the observer before admission', async () => {
+    const context = await fixture({}, 10);
+    expect(context.start).toHaveBeenCalledExactlyOnceWith({ allowProviderContinuation: true, recoveryBatchSize: 10 });
+    expect(context.observer.track).not.toHaveBeenCalled();
+    await context.observation.close();
+  });
 
   it('starts observation before admission and checkpoints its cost before the next admission', async () => {
     const context = await fixture();
@@ -708,19 +716,31 @@ describe('installed review network guard', () => {
     active.fetch.mockImplementation(async () => { await pending; return simulatedResponse(); });
     const handling = instance.handle(active);
     await vi.waitFor(() => expect(active.fetch).toHaveBeenCalledOnce());
-    instance.closeReadPhase();
+    let drained = false;
+    const draining = drainInstalledReviewReads(instance).then(alreadyClosed => {
+      drained = true;
+      expect(alreadyClosed).toBe(false);
+    });
     const late = fakeRoute({ url: discoveryUrl(key(8)) });
     await instance.handle(late);
     expect(late.fetch).not.toHaveBeenCalled();
     expect(late.abort).toHaveBeenCalledOnce();
-    let drained = false;
-    const draining = instance.drain().then(() => { drained = true; });
     await Promise.resolve();
     expect(drained).toBe(false);
     release();
     await handling;
     await draining;
     expect(instance.snapshot()).toMatchObject({ failure: undefined, forwardedReads: 1, inFlight: 0, readPhaseClosed: true });
+    instance.openReadPhase();
+    const resumed = fakeRoute({ url: discoveryUrl(key(9)) });
+    await instance.handle(resumed);
+    expect(resumed.fetch).toHaveBeenCalledOnce();
+    expect(instance.snapshot()).toMatchObject({ forwardedReads: 2, readSlots: 2, readPhaseClosed: false });
+    const excessive = fakeRoute({ url: discoveryUrl(key(10)) });
+    await instance.handle(excessive);
+    expect(excessive.fetch).not.toHaveBeenCalled();
+    expect(instance.snapshot().failure).toBe('read-budget-exceeded');
+    expect(() => instance.openReadPhase()).toThrow();
   });
 
   it('keeps accepted read failures fatal after closing the read phase', async () => {

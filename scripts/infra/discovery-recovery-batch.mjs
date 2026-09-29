@@ -530,7 +530,7 @@ async function executeCandidate(candidate, index, journal) {
   let failure;
   let result;
   try {
-    observer = startCostObserver({ allowProviderContinuation: true });
+    observer = startCostObserver({ allowProviderContinuation: true, recoveryBatchSize: 1 });
     const work = async () => {
       await awaitObserverReady(observer, controller.signal);
       const initial = await lookup(candidate.submission.key, controller.signal);

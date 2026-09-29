@@ -290,6 +290,11 @@ class InstalledReviewNetworkGuard {
     this.readPhaseClosed = true;
   }
 
+  openReadPhase() {
+    this.throwIfFailed();
+    this.readPhaseClosed = false;
+  }
+
   async abort(route, code, fatal = true) {
     const sealing = fatal ? this.fail(code) : undefined;
     await route.abort('blockedbyclient').catch(() => undefined);
@@ -537,8 +542,8 @@ export async function installInstalledReviewNetworkRoutes(context, guard) {
   await context.routeWebSocket('**/*', guard.handleWebSocket);
 }
 
-export async function createInstalledRecoveryObservation({ onFailure, recordAdmission, recordCost, start = startCostObserver, ready = awaitObserverReady, complete = awaitRecoveryCompletion }) {
-  const observer = start({ allowProviderContinuation: true });
+export async function createInstalledRecoveryObservation({ onFailure, recordAdmission, recordCost, recoveryBatchSize = 1, start = startCostObserver, ready = awaitObserverReady, complete = awaitRecoveryCompletion }) {
+  const observer = start({ allowProviderContinuation: true, recoveryBatchSize });
   const controller = new AbortController();
   const tasks = [];
   const admissions = [];
