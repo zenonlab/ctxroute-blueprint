@@ -1,6 +1,32 @@
 # Cloudflare operations gate
 
+## Navigateur du banc installé
+
+`TOBIRINK_INSTALLED_BROWSER_CHANNEL=chrome` utilise Google Chrome installé,
+dans un profil headless temporaire distinct du profil personnel. Le défaut
+`chromium` reste celui de la CI et ne certifie pas Chrome stable. Le canal est
+scellé dans la session, conservé à la reprise et accompagné des versions réelles
+dans le reçu privé. Une ancienne session sans canal reste une session Chromium.
+Les bornes réseau et le ZIP fourni restent identiques pour les deux canaux.
+
+## Coût des continuations ciblées
+
+La régression locale d'une recherche manga sur vingt pages compte l'admission,
+les réservations fournisseur, les continuations et la publication terminale.
+Le claim générique coûtait quatorze lectures malgré une clé déjà connue.
+Le claim direct conserve les quatre champs d'identité, le jeton et les baux;
+le total de la fixture passe de 308 à 253 lectures, sans augmenter la borne.
+Ce résultat ne certifie pas toutes les recherches longues ni les anciennes
+exécutions dépassant 300. Le chemin sans clé et la pagination restent inchangés.
+Rollback de code uniquement : aucun schéma, état historique ou résultat supprimé.
+
 ## Sonde fournisseur partagée
+
+Livrée par PR 176, commit `ceddb895b2ee549bb1dd203b7f18713f644a7027`,
+fusion `d67c561abbf464102670dae544c299591896a7b6`. CI branche `36641593619`
+et main `36642337584` vertes; Worker `6ad93a0f-bf98-4e13-acce-836ae731282b`.
+Vérification complète, 248 tests Discovery, 220 tests Worker et E2E Web
+11 réussis/1 ignoré. Contrôles publics réussis; aucune archive promue.
 
 Après ouverture du circuit, la continuation existante réserve une sonde après
 dix minutes, ou après le `Retry-After` s'il est plus long. D1 réserve la fenêtre

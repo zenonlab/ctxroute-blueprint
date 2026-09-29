@@ -6294,9 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Correctif sonde partagée validé localement : bail D1 avant HTTP, dix minutes/Retry-After, huit secondes/8 Kio, checkpoint et données VERIFIED conservés, aucun réarmement historique.",
-            "npm run verify réussi; 248 tests public-discovery et 220 Worker; E2E Web 11 réussis/1 ignoré; Archify dataflow et discovery-recovery showcase verts; git diff --check propre.",
-            "Pas encore déployé. Pagination coûteuse du lot009 indépendante; neuf clés intactes. Chrome 1.0.49 ZIP SHA inchangé 53db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b."
+            "Régression locale vingt pages manga (2000 résultats) : 308 lectures avant, 253 après claim direct sur clé complète; résultats, jeton, baux et limite300 inchangés. 221 tests Worker passent, typecheck réparé puis vert; verify finale en cours.",
+            "Banc installé distingue désormais Chrome stable et Chromium, conserve le canal de session et trace les versions réelles. Tests packaging 15 réussis; aucun changement d’archive.",
+            "PR176 reste la production actuelle. Optimisation du claim pas encore déployée; aucune reprise historique ni admission nouvelle effectuée."
           ]
         },
         {

@@ -34,6 +34,13 @@ Statut : accepté
 
 ### Reprise après indisponibilité fournisseur
 
+Lorsqu'une continuation porte la clé complète, son claim utilise directement
+l'index d'identité plutôt que la sélection générique avec UNION et tri. Le
+jeton de continuation, les échéances et les plafonds de tentatives restent
+contrôlés dans cette même mise à jour atomique. Le chemin sans clé conserve
+son ordonnanceur borné. Cette optimisation ne change ni la pagination ni les
+critères d'identité et ne relève pas les 300 lectures corrélées autorisées.
+
 Le circuit fournisseur réserve atomiquement une unique sonde de réouverture.
 Après dix minutes (ou un `Retry-After` plus long), une requête fixe sans titre
 utilisateur teste le transport existant, avec huit secondes et 8 Kio maximum.

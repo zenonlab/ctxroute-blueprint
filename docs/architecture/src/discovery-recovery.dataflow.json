@@ -17,10 +17,10 @@
   "nodes": [
     { "id": "snapshot", "type": "database", "label": "Export D1 frais", "sublabel": "OAuth local · SHA-256", "stage": 0, "row": 0, "tag": "lecture seule" },
     { "id": "inventory", "type": "backend", "label": "Inventaire agrégé", "sublabel": "FAILED/ATTEMPT_LIMIT", "stage": 0, "row": 2, "tag": "sans titres ni clés" },
-    { "id": "canaries", "type": "backend", "label": "Preuve corrélée", "sublabel": "Tail borné au lot", "stage": 1, "row": 0, "width": 150, "tag": "300 lectures par clé" },
+    { "id": "canaries", "type": "backend", "label": "Preuve corrélée", "sublabel": "admission · pages · résultat", "stage": 1, "row": 0, "width": 150, "tag": "300 lectures par clé" },
     { "id": "approval", "type": "security", "label": "Confirmation ciblée", "sublabel": "lot · seuils · arrêt", "stage": 1, "row": 2, "tag": "avant écriture" },
     { "id": "rearm", "type": "backend", "label": "Lot scellé v3", "sublabel": "1–10 identités · média connu", "stage": 2, "row": 2, "width": 150, "tag": "un POST par clé" },
-    { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "jeton indexé · clé exacte" },
+    { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "clé directe · jeton indexé" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "claim(1) · expiration ciblée" },
     { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "sonde partagée · 10 min", "stage": 3, "row": 2, "tag": "bail D1 · curseur conservé" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · ID lié contrôlé", "stage": 4, "row": 1, "width": 150, "tag": "Library exige deux liens exacts" }

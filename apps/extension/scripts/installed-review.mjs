@@ -40,6 +40,8 @@ export async function prepareInstalledRecoveryRestart(page, networkGuard, recove
 }
 
 export function installedReviewConfig(env = process.env) {
+  const browserChannel = env.TOBIRINK_INSTALLED_BROWSER_CHANNEL ?? 'chromium';
+  assert.ok(['chromium', 'chrome'].includes(browserChannel), 'Installed review requires an explicit supported browser channel.');
   const online = env.TOBIRINK_REAL_RUN === '1';
   assert.ok(!online || env.TOBIRINK_FAVORITES_EXPORT, 'Online testing requires an explicit private bookmark export.');
   const budgetSeconds = integer(env.TOBIRINK_INSTALLED_BUDGET_SECONDS, online ? 600 : 240, 30, 1800);
@@ -63,7 +65,7 @@ export function installedReviewConfig(env = process.env) {
   assert.ok(milestones.length <= 12, 'At most twelve observation milestones are allowed.');
   const session = env.TOBIRINK_INSTALLED_SESSION;
   assert.ok(session === undefined || /^tobirink-installed-review-[A-Za-z0-9]{6,32}$/u.test(session), 'Invalid installed-review session token.');
-  return { online, budgetSeconds, bookmarkLimit, mutationBudget, captureSubmissions, refreshBudget, readBudget, sourceScopePath, recoverExhausted, favoritesExport: env.TOBIRINK_FAVORITES_EXPORT, session,
+  return { browserChannel, online, budgetSeconds, bookmarkLimit, mutationBudget, captureSubmissions, refreshBudget, readBudget, sourceScopePath, recoverExhausted, favoritesExport: env.TOBIRINK_FAVORITES_EXPORT, session,
     milestones: [...new Set(milestones.filter((value) => value < budgetSeconds - 5))].sort((left, right) => left - right) };
 }
 
@@ -280,7 +282,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
   const startedAt = Date.now();
   const deadline = startedAt + config.budgetSeconds * 1000;
   const observations = [];
-  const dataOrigin = { source: config.favoritesExport === undefined ? 'synthetic' : 'private-bookmark-export', privateDatabaseCopied: false, personalProfileCertified: false };
+  const dataOrigin = { browserChannel: config.browserChannel, browserVersions: [], source: config.favoritesExport === undefined ? 'synthetic' : 'private-bookmark-export', privateDatabaseCopied: false, personalProfileCertified: false };
   let stage = 'prepare';
   let context;
   let closeFailure = false;
@@ -325,6 +327,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       assert.equal(session.token, config.session);
       assert.equal(session.root, join(tmpdir(), session.token), 'Resume must use the generated temporary profile.');
       assert.equal(session.online, config.online, 'Resume must preserve the configured network mode.');
+      assert.equal(session.browserChannel ?? 'chromium', config.browserChannel, 'Resume must preserve the browser channel.');
       assert.deepEqual(session.network, network, 'Resume must preserve the configured network budgets.');
       assert.equal(session.source ?? 'synthetic', dataOrigin.source, 'Resume must preserve the source provenance.');
       assert.equal(session.expected, bookmarks.length, 'Resume must preserve the source count.');
@@ -332,7 +335,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       assert.equal(previousArchive, undefined, 'A resumed session must not be reseeded or downgraded.');
     } else {
       const root = await mkdtemp(join(tmpdir(), 'tobirink-installed-review-'));
-      session = { schemaVersion: 3, token: basename(root), root, corpusDigest, expected: bookmarks.length, network, online: config.online, source: dataOrigin.source, seeded: false };
+      session = { schemaVersion: 3, token: basename(root), root, browserChannel: config.browserChannel, corpusDigest, expected: bookmarks.length, network, online: config.online, source: dataOrigin.source, seeded: false };
       await mkdir(join(root, 'extension'), { mode: 0o700 });
       if (archive !== undefined) extractArchive(previousArchive ?? archive, join(root, 'extension'));
       else await cp(fileURLToPath(new URL('../.output/chrome-mv3', import.meta.url)), join(root, 'extension'), { recursive: true });
@@ -356,10 +359,13 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     log({ event: 'installed-session', session: session.token, mode: config.online ? 'online-private-copy' : 'offline', dataOrigin, selected: session.expected, available: corpus.length, budgetSeconds: config.budgetSeconds, network: networkGuard.snapshot() });
     const require = createRequire(new URL('../../web/package.json', import.meta.url));
     const { chromium } = require('@playwright/test');
-    const launchOptions = { args: ['--enable-unsafe-extension-debugging'], ignoreDefaultArgs: ['--disable-extensions'], channel: 'chromium', headless: true };
+    const launchOptions = { args: ['--enable-unsafe-extension-debugging'], ignoreDefaultArgs: ['--disable-extensions'], channel: config.browserChannel, headless: true };
     if (!config.online) launchOptions.args.push('--host-resolver-rules=MAP * 127.0.0.1, EXCLUDE localhost', '--proxy-server=http://127.0.0.1:9', '--proxy-bypass-list=<-loopback>');
     const launch = async () => {
       context = await chromium.launchPersistentContext(join(session.root, 'profile'), { ...launchOptions, timeout: Math.max(1, Math.min(30_000, deadline - Date.now())) });
+      const browserVersion = context.browser().version();
+      if (!dataOrigin.browserVersions.includes(browserVersion)) dataOrigin.browserVersions.push(browserVersion);
+      log({ event: 'installed-browser', channel: config.browserChannel, version: browserVersion });
       await installInstalledReviewNetworkRoutes(context, networkGuard);
       await context.setOffline(!config.online);
       context.setDefaultTimeout(Math.max(1, Math.min(20_000, deadline - Date.now())));

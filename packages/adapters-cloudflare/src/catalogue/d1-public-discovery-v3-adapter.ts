@@ -404,7 +404,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       await this.failExhaustedKey(input.key, input.now);
       await this.failExhaustedRefreshKey(input.key, input.now);
     }
-    const rows = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+    const statement = input.key === undefined ? this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = CASE WHEN state = 'VERIFIED' THEN state ELSE 'PROCESSING' END,
       refresh_state = CASE WHEN state = 'VERIFIED' THEN 'PROCESSING' ELSE refresh_state END,
       claim_token_hash = ?1, lease_until = ?2,
@@ -450,8 +450,27 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         state, attempt_count AS attemptCount, refresh_attempt_count AS refreshAttemptCount,
         admission_priority AS admissionPriority, updated_at AS updatedAt,
         fingerprint, media_kind AS mediaKind, parser_version AS parserVersion, rules_version AS siteRulesVersion`)
-      .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit, input.continuationTokenDigest ?? null, input.key?.fingerprint ?? null, input.key?.mediaKind ?? null, input.key?.parserVersion ?? null, input.key?.siteRulesVersion ?? null, futureIso(input.now, -continuationOwnershipMilliseconds))
-      .all<{ admissionPriority: number; attemptCount: number; fingerprint: string; mediaKind: PublicDiscoveryKeyV3['mediaKind']; parserVersion: string; refreshAttemptCount: number; requestDigest: string; requestJson: string; resultJson: string | null; searchProgressJson: string | null; siteRulesVersion: string; state: DiscoveryRow['state']; updatedAt: string }>();
+      .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit, input.continuationTokenDigest ?? null, null, null, null, null, futureIso(input.now, -continuationOwnershipMilliseconds))
+      : this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+          state = CASE WHEN state = 'VERIFIED' THEN state ELSE 'PROCESSING' END,
+          refresh_state = CASE WHEN state = 'VERIFIED' THEN 'PROCESSING' ELSE refresh_state END,
+          claim_token_hash = ?1, lease_until = ?2,
+          attempt_count = CASE WHEN state = 'VERIFIED' THEN attempt_count ELSE attempt_count + 1 END,
+          refresh_attempt_count = CASE WHEN state = 'VERIFIED' THEN refresh_attempt_count + 1 ELSE refresh_attempt_count END,
+          retry_at = ?2, updated_at = ?3
+          WHERE fingerprint = ?6 AND media_kind = ?7 AND parser_version = ?8 AND rules_version = ?9
+            AND ?4 > 0 AND (?5 IS NULL OR claim_token_hash = ?5)
+            AND ((state = 'PENDING' AND attempt_count < 8 AND retry_at <= ?3)
+              OR (state = 'PROCESSING' AND attempt_count < 8 AND lease_until <= ?3)
+              OR (state = 'VERIFIED' AND refresh_attempt_count < 8
+                AND ((refresh_state = 'PENDING' AND retry_at <= ?3) OR (refresh_state = 'PROCESSING' AND lease_until <= ?3))))
+          RETURNING request_json AS requestJson, search_progress_json AS searchProgressJson, result_json AS resultJson, request_digest AS requestDigest,
+            state, attempt_count AS attemptCount, refresh_attempt_count AS refreshAttemptCount,
+            admission_priority AS admissionPriority, updated_at AS updatedAt,
+            fingerprint, media_kind AS mediaKind, parser_version AS parserVersion, rules_version AS siteRulesVersion`)
+        .bind(input.tokenDigest, input.leaseUntil, input.now, input.limit, input.continuationTokenDigest ?? null,
+          input.key.fingerprint, input.key.mediaKind, input.key.parserVersion, input.key.siteRulesVersion);
+    const rows = await statement.all<{ admissionPriority: number; attemptCount: number; fingerprint: string; mediaKind: PublicDiscoveryKeyV3['mediaKind']; parserVersion: string; refreshAttemptCount: number; requestDigest: string; requestJson: string; resultJson: string | null; searchProgressJson: string | null; siteRulesVersion: string; state: DiscoveryRow['state']; updatedAt: string }>();
     const ordered = rows.results.sort((left, right) => left.admissionPriority - right.admissionPriority
       || left.updatedAt.localeCompare(right.updatedAt) || left.fingerprint.localeCompare(right.fingerprint));
     const requests = ordered.map((row) => {
