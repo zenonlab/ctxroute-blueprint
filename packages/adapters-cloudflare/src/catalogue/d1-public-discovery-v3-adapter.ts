@@ -217,7 +217,25 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       RETURNING fingerprint`).bind(...keyValues(key), now).first();
   }
 
-  private async failExhaustedBatch(now: string, limit: number): Promise<void> {
+  private async failExhaustedBatch(now: string, limit: number, continuationTokenDigest?: string): Promise<void> {
+    if (continuationTokenDigest !== undefined) {
+      await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+        state = 'FAILED', failure_reason = 'ATTEMPT_LIMIT', failed_at = ?1,
+        claim_token_hash = NULL, lease_until = NULL, retry_at = ?1, updated_at = ?1, purge_after = ?3
+        WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_continuation
+          WHERE claim_token_hash = ?4 AND state = 'PROCESSING' AND attempt_count >= 8 AND lease_until <= ?1
+          ORDER BY updated_at, fingerprint LIMIT ?2)
+        RETURNING fingerprint`).bind(now, limit, futureIso(now, failedRetentionMilliseconds), continuationTokenDigest).all();
+      await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+        refresh_state = 'IDLE', refresh_attempt_count = 0,
+        claim_token_hash = NULL, lease_until = NULL, updated_at = ?1
+        WHERE rowid IN (SELECT rowid FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_continuation
+          WHERE claim_token_hash = ?3 AND state = 'VERIFIED' AND refresh_state = 'PROCESSING'
+            AND refresh_attempt_count >= 8 AND lease_until <= ?1
+          ORDER BY updated_at, fingerprint LIMIT ?2)
+        RETURNING fingerprint`).bind(now, limit, continuationTokenDigest).all();
+      return;
+    }
     await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
       state = 'FAILED', failure_reason = 'ATTEMPT_LIMIT', failed_at = ?1,
       claim_token_hash = NULL, lease_until = NULL, retry_at = ?1, updated_at = ?1,
@@ -304,6 +322,16 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   }
 
   async nextPendingAt(continuationTokenDigest?: string): Promise<string | undefined> {
+    if (continuationTokenDigest !== undefined) {
+      const row = await this.database.prepare(`SELECT MIN(CASE
+          WHEN state = 'PROCESSING' OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING')
+          THEN lease_until ELSE retry_at END) AS due
+        FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_continuation
+        WHERE claim_token_hash = ?1 AND (state IN ('PENDING', 'PROCESSING')
+          OR (state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING')))`)
+        .bind(continuationTokenDigest).first<{ due: string | null }>();
+      return row?.due ?? undefined;
+    }
     const row = await this.database.prepare(`SELECT MIN(due) AS due FROM (
       SELECT CASE WHEN ?1 IS NULL AND claim_token_hash IS NOT NULL AND state = 'PENDING'
         THEN MAX(CASE WHEN state = 'PROCESSING' THEN lease_until ELSE retry_at END,
@@ -371,7 +399,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   }
 
   async claimBatch(input: { claimToken: string; continuationTokenDigest?: string; key?: PublicDiscoveryKeyV3; leaseUntil: string; limit: number; now: string; tokenDigest: string }): Promise<PublicDiscoveryClaimBatch> {
-    if (input.key === undefined) await this.failExhaustedBatch(input.now, input.limit);
+    if (input.key === undefined) await this.failExhaustedBatch(input.now, input.limit, input.continuationTokenDigest);
     else {
       await this.failExhaustedKey(input.key, input.now);
       await this.failExhaustedRefreshKey(input.key, input.now);
@@ -383,11 +411,28 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       attempt_count = CASE WHEN state = 'VERIFIED' THEN attempt_count ELSE attempt_count + 1 END,
       refresh_attempt_count = CASE WHEN state = 'VERIFIED' THEN refresh_attempt_count + 1 ELSE refresh_attempt_count END,
       retry_at = ?2, updated_at = ?3
-      WHERE (state IN ('PENDING', 'PROCESSING') OR (state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING')))
-        AND rowid IN (SELECT rowid FROM (
+      WHERE rowid IN (SELECT rowid FROM (
+        SELECT rowid, admission_priority, updated_at, fingerprint
+        FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_continuation
+        WHERE ?5 IS NOT NULL AND claim_token_hash = ?5
+          AND (?6 IS NULL OR (fingerprint = ?6 AND media_kind = ?7 AND parser_version = ?8 AND rules_version = ?9))
+          AND ((state = 'PENDING' AND attempt_count < 8 AND retry_at <= ?3)
+            OR (state = 'PROCESSING' AND attempt_count < 8 AND lease_until <= ?3)
+            OR (state = 'VERIFIED' AND refresh_attempt_count < 8
+              AND ((refresh_state = 'PENDING' AND retry_at <= ?3) OR (refresh_state = 'PROCESSING' AND lease_until <= ?3))))
+        UNION ALL
+        SELECT rowid, admission_priority, updated_at, fingerprint
+        FROM public_discovery_requests_v3 INDEXED BY sqlite_autoindex_public_discovery_requests_v3_1
+        WHERE ?5 IS NULL AND ?6 IS NOT NULL
+          AND fingerprint = ?6 AND media_kind = ?7 AND parser_version = ?8 AND rules_version = ?9
+          AND ((state = 'PENDING' AND attempt_count < 8 AND retry_at <= ?3)
+            OR (state = 'PROCESSING' AND attempt_count < 8 AND lease_until <= ?3)
+            OR (state = 'VERIFIED' AND refresh_attempt_count < 8
+              AND ((refresh_state = 'PENDING' AND retry_at <= ?3) OR (refresh_state = 'PROCESSING' AND lease_until <= ?3))))
+        UNION ALL
         SELECT rowid, admission_priority, updated_at, fingerprint
         FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_claim_priority
-        WHERE state IN ('PENDING', 'PROCESSING') AND attempt_count < 8
+        WHERE ?5 IS NULL AND ?6 IS NULL AND state IN ('PENDING', 'PROCESSING') AND attempt_count < 8
           AND ((state = 'PENDING' AND retry_at <= ?3) OR (state = 'PROCESSING' AND lease_until <= ?3))
           AND (?5 IS NULL OR claim_token_hash = ?5)
           AND (?5 IS NOT NULL OR ?6 IS NOT NULL OR state = 'PROCESSING' OR claim_token_hash IS NULL OR updated_at <= ?10)
@@ -395,7 +440,7 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
         UNION ALL
         SELECT rowid, admission_priority, updated_at, fingerprint
         FROM public_discovery_requests_v3 INDEXED BY public_discovery_v3_refresh_claim
-        WHERE state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING') AND refresh_attempt_count < 8
+        WHERE ?5 IS NULL AND ?6 IS NULL AND state = 'VERIFIED' AND refresh_state IN ('PENDING', 'PROCESSING') AND refresh_attempt_count < 8
           AND ((refresh_state = 'PENDING' AND retry_at <= ?3) OR (refresh_state = 'PROCESSING' AND lease_until <= ?3))
           AND (?5 IS NULL OR claim_token_hash = ?5)
           AND (?5 IS NOT NULL OR ?6 IS NOT NULL OR refresh_state = 'PROCESSING' OR claim_token_hash IS NULL OR updated_at <= ?10)

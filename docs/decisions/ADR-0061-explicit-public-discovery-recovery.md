@@ -289,6 +289,16 @@ La clôture draine les événements tardifs et revérifie chaque coût avant pre
 variable ne remplace pas la confirmation immédiate du lot par l'opérateur.
 Un coût public terminal ne certifie jamais à lui seul la projection Library.
 
+La migration additive `0029` indexe le hash du jeton de continuation. Une
+continuation réclame seulement les lignes de son jeton par cet index; un claim
+par clé utilise l'index primaire. Les contrôles atomiques du jeton et du bail
+restent dans la même instruction SQL.
+Son échéance est également lue par jeton, sans parcourir les autres demandes
+actives. Le claim générique garde ses priorités et sa récupération des baux
+expirés. Le coût cumulé autorisé reste de 300 lectures : cette optimisation
+ne certifie ni les anciennes exécutions ni une recherche arbitrairement longue.
+Un rollback du Worker conserve l'index, sans supprimer de demande ou de résultat.
+
 La composition Worker transmet aussi le quatrième argument `searchProgress`
 de `gateway.defer` à `deferClaim`. Le curseur et les candidats bornés produits
 après quatre pages doivent traverser cette frontière avant le signal Queue.

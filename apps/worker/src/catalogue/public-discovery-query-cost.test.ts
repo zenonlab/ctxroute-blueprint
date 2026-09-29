@@ -54,6 +54,41 @@ async function claimedPublication(id: number, titles: string[]) {
 }
 
 describe('public discovery indexed query cost', () => {
+  it.each(['token', 'key'] as const)('bounds a %s claim independently of unrelated active requests', async (selection) => {
+    await env.PUBLIC_DB.prepare(`WITH RECURSIVE fixture(n) AS (
+        SELECT 1 UNION ALL SELECT n + 1 FROM fixture WHERE n < 128
+      ) INSERT INTO public_discovery_requests_v3(
+        fingerprint, media_kind, parser_version, rules_version, request_digest, request_json,
+        state, retry_at, created_at, updated_at)
+      SELECT printf('%064x', 300000 + n), 'ANIME', '5', '3', printf('%064x', n), '{}',
+        'PENDING', ?1, ?1, ?1 FROM fixture`).bind(future).run();
+    const key = { fingerprint: fingerprint(300200), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
+    const token = '9'.repeat(64);
+    await new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB).request({ key, requestDigest: '8'.repeat(64), schemaVersion: 3,
+      query: { discoveryTitles: ['Bounded continuation'], sourceTitles: [], mediaKind: 'ANIME' },
+    }, now, token);
+    try {
+      const measured = instrumentD1(env.PUBLIC_DB);
+      const adapter = new D1PublicDiscoveryV3Adapter(measured.database);
+      expect(await adapter.nextPendingAt(token)).toBe(now);
+      const claimed = await adapter.claimBatch({ claimToken: '7'.repeat(48), tokenDigest: '6'.repeat(64),
+        ...(selection === 'token' ? { continuationTokenDigest: token } : { key }), now, leaseUntil, limit: 1 });
+      expect(claimed.requests.map(request => request.key)).toEqual([key]);
+      expect(await adapter.nextPendingAt(token)).toBeUndefined();
+      expect(await adapter.nextPendingAt('6'.repeat(64))).toBe(leaseUntil);
+      const replay = await adapter.claimBatch({ claimToken: '5'.repeat(48), tokenDigest: '4'.repeat(64),
+        continuationTokenDigest: token, key, now, leaseUntil, limit: 1 });
+      expect(replay.requests).toEqual([]);
+      expect(await adapter.nextPendingAt('6'.repeat(64))).toBe(leaseUntil);
+      const cost = measured.snapshot();
+      console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'owned-continuation', selection, ...cost }));
+      expect(cost.rowsRead).toBeLessThanOrEqual(60);
+    } finally {
+      await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint BETWEEN ?1 AND ?2')
+        .bind(fingerprint(300001), fingerprint(300200)).run();
+    }
+  });
+
   it('publishes distinct verified identities sharing only an alternate title', async () => {
     const first = await claimedPublication(200040, ['First distinct identity', 'Shared alternate title']);
     const second = await claimedPublication(200041, ['Second distinct identity', 'Shared alternate title']);
