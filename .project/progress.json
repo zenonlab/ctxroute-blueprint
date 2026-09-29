@@ -6294,10 +6294,10 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR173 deployed via CI36626795362; installed L84rnV still fails 329-read budget. Selective search is insufficient; no certification claimed.",
-            "New reproduced defect: MangaUpdates search omits associated but returns hit_title. Adapter now retains provider alias; three regressions red then green, translated-hit hydration and wrong-ID regression included.",
-            "233 Public Discovery tests, npm run verify, Web E2E11 passed/1 skipped, typecheck and Archify dataflow showcase9/9 pass. Real provider translated-hit search+hydration returns one matching identity, zero D1 admissions.",
-            "No new replay, schema, budget, provider dependency or public archive; broad pagination remains unresolved."
+            "PR174 hit_title fix deployed via CI36630273811; tests233 and real translated-hit search/hydration verified identity, zero D1 admissions.",
+            "L84rnV correlation later emitted provider-search-cursor at attempt2: terminal MU page38 contained unrelated overlong title; persisted checkpoint mu2:37.",
+            "New final-page regression red then green: omit overlong titles only after existing matcher excludes them; potential matches remain incomplete. Real page38 now complete in one provider call/zero D1 admissions.",
+            "235 Public Discovery tests, npm run verify, Web E2E11 passed/1 skipped and Archify dataflow9/9 pass; no replay/budget increase. Broad pagination still exceeds pilot cost ceiling."
           ]
         },
         {

@@ -15,6 +15,15 @@ alors que les records de recherche n'incluent pas `associated`. Conserver
 cet alias corrige une perte de preuve; cela ne prouve pas que ce titre
 particulier sera résolu, ni que toute pagination respecte déjà le budget.
 
+L'observation suivante de la même corrélation révèle `provider-search-cursor`
+à la tentative 2. Le checkpoint conservé est `mu2:37`; la page finale 38
+répond avec 78 records dont un titre canonique trop long. Le garde global
+transformait cette dernière page en résultat incomplet sans curseur suivant,
+puis le resolver refusait cette incohérence. La correction distingue un titre
+omis sans correspondance d'une omission potentiellement pertinente avec le
+comparateur existant. Elle ne relève pas la borne de certification : le
+dépassement historique de 329 lectures reste un échec conservé.
+
 Tobirink does not expose Wrangler as a release command. Every provider change
 starts from the repository-owned gate, while the extension and Worker runtime
 remain independent of this operational path.

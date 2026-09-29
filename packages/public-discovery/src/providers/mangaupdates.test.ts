@@ -14,7 +14,7 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
 
   it('does not treat an unprojectable search hit title as an exhausted search', async () => {
     const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({
-      results: [{ record: series, hit_title: 'A'.repeat(201) }], total_hits: 1,
+      results: [{ record: series, hit_title: 'Synthetic Series' + '.'.repeat(201) }], total_hits: 1,
     }));
     await expect(adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] }))
       .resolves.toMatchObject({ complete: false, truncated: true });
@@ -79,14 +79,22 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     expect(result.candidates[0]).not.toHaveProperty('cover');
   });
 
-  it('keeps exact evidence but marks pages with unprojectable long titles incomplete', async () => {
+  it('exhausts a final page containing only unrelated unprojectable titles', async () => {
     const overlong = { ...series, series_id: 67890, title: 'A'.repeat(201), associated: [] };
     const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({ results: [{ record: overlong }, { record: series }], total_hits: 2 }));
     const result = await adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] });
-    expect(result).toMatchObject({ complete: false, truncated: true, candidates: [{ externalId: '12345' }] });
+    expect(result).toMatchObject({ complete: true, truncated: false, candidates: [{ externalId: '12345' }] });
     expect(result).not.toHaveProperty('nextCursor');
     const unmatched = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({ results: [{ record: overlong }], total_hits: 1 }));
-    await expect(unmatched.search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] })).resolves.toMatchObject({ candidates: [], complete: false, truncated: true });
+    await expect(unmatched.search({ cursor: 'mu2:38', limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] })).resolves.toMatchObject({ candidates: [], complete: true, truncated: false });
+  });
+
+  it('keeps a potentially matching omitted long title incomplete', async () => {
+    const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({
+      results: [{ record: { ...series, title: 'A'.repeat(201), associated: [] } }], total_hits: 1,
+    }));
+    await expect(adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['A'.repeat(199)] }))
+      .resolves.toMatchObject({ candidates: [], complete: false, truncated: true });
   });
 
   it('does not claim completeness after omitting a late alias', async () => {

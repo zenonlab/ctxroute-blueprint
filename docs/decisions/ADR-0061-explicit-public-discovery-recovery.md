@@ -388,6 +388,15 @@ hydraté. Un alias mal formé échoue au schéma; un alias trop long conserve
 le statut incomplet. Les curseurs et les budgets restent inchangés.
 Le rollback retire cette projection sans mutation D1.
 
+Une dernière page MangaUpdates contenant un titre de plus de 200 caractères
+sans rapport avec la requête ne rend plus toute la recherche incomplète.
+Le comparateur existant inspecte les titres trop longs avant leur omission :
+une correspondance potentielle, y compris après normalisation ou distance
+bornée, conserve le statut incomplet. Les titres trop longs restent exclus
+du contrat publié. Plus de 32 alias conserve également l'incomplétude.
+Les budgets, curseurs et décisions humaines ne changent pas; le rollback
+rétablit seulement le garde conservateur, sans mutation des résultats D1.
+
 - typecheck extension ;
 - régression reproduite avec le véritable `HttpPublicDiscoveryAdapter` : receiver préservé et requête HTTP réellement transmise ;
 - tests des clés et payloads communs, des indices synchronisés et de la prélecture groupée ;
