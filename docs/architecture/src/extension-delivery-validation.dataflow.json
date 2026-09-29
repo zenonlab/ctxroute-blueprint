@@ -39,7 +39,7 @@
     { "id": "contractSuites", "type": "security", "label": "Contrats", "sublabel": "Intégration / IndexedDB", "stage": 2, "row": 0, "tag": "local" },
     { "id": "uiEvidence", "type": "frontend", "label": "UI accessible", "sublabel": "UI / Workbench / a11y", "stage": 2, "row": 2, "tag": "automatisé" },
     { "id": "securityEvidence", "type": "security", "label": "Sécurité + perf", "sublabel": "CSP / permissions", "stage": 2, "row": 4, "tag": "sans DNR fournisseur" },
-    { "id": "chromeRuntime", "type": "external", "label": "Runtime Chrome", "sublabel": "upgrade / redémarrages", "stage": 3, "row": 0, "tag": "convergence à mesurer" },
+    { "id": "chromeRuntime", "type": "external", "label": "Chrome / Chromium", "sublabel": "canal + version tracés", "stage": 3, "row": 0, "tag": "profil isolé · redémarrages" },
     { "id": "firefoxRuntime", "type": "external", "label": "Runtime Firefox", "sublabel": "parcours interactifs", "stage": 3, "row": 2, "tag": "vérifié" },
     { "id": "packageManifest", "type": "database", "label": "Paquets + hashes", "sublabel": "ZIP candidat / SHA-256", "stage": 3, "row": 4, "tag": "candidate déterministe" },
     { "id": "releaseEvidence", "type": "backend", "label": "Preuves versionnées", "sublabel": "support / a11y / release", "stage": 4, "row": 4, "tag": "auditables" },

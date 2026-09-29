@@ -6294,9 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Sonde partagée livrée par PR176 : commit ceddb895b2ee549bb1dd203b7f18713f644a7027, main d67c561abbf464102670dae544c299591896a7b6, CI branche 36641593619 et main 36642337584 vertes; Worker 6ad93a0f-bf98-4e13-acce-836ae731282b, contrôles publics réussis.",
-            "npm run verify réussi; 248 tests public-discovery et 220 Worker, E2E Web 11 réussis/1 ignoré, Archify showcase zéro erreur/avertissement, diff propre. Réservation atomique dix minutes, sonde huit secondes/8 Kio, conservation VERIFIED et reprise automatique vérifiées.",
-            "Aucun réarmement, canari neuf ou publication d’archive; ZIP Chrome SHA inchangé 53db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b. Pagination coûteuse et convergence restent non certifiées; lot009 première clé NOT_FOUND en lecture seule, neuf non soumises."
+            "Régression locale vingt pages manga (2000 résultats) : 308 lectures avant, 253 après claim direct sur clé complète; résultats, jeton, baux et limite300 inchangés. 221 tests Worker passent, typecheck réparé puis vert; verify finale en cours.",
+            "Banc installé distingue désormais Chrome stable et Chromium, conserve le canal de session et trace les versions réelles. Tests packaging 15 réussis; aucun changement d’archive.",
+            "PR176 reste la production actuelle. Optimisation du claim pas encore déployée; aucune reprise historique ni admission nouvelle effectuée."
           ]
         },
         {

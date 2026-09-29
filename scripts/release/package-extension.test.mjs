@@ -39,6 +39,13 @@ describe('extension release packaging', () => {
 });
 
 describe('installed extension certification', () => {
+  it('distinguishes installed Chrome from the default Chromium test channel', () => {
+    expect(installedReviewConfig({}).browserChannel).toBe('chromium');
+    expect(installedReviewConfig({ TOBIRINK_INSTALLED_BROWSER_CHANNEL: 'chrome' }).browserChannel).toBe('chrome');
+    for (const browserChannel of ['firefox', 'chrome-beta', '', '/Applications/browser']) {
+      expect(() => installedReviewConfig({ TOBIRINK_INSTALLED_BROWSER_CHANNEL: browserChannel })).toThrow(/supported browser channel/);
+    }
+  });
   const snapshot = () => ({ inventory: 'complete', counts: { observed: 2, processing: 0, resolved: 1, review: 1, retryable: 0, blocked: 0, unsupported: 0 }, unresolved: 0, missingProjectedWorks: 0 });
   const retained = () => ({ aggregate: snapshot(), integrity: { sources: ['source'], works: ['work'], library: ['work'], humanReviews: ['human-decision'], progress: [{ identity: 'progress', value: 5 }] } });
 
