@@ -299,13 +299,28 @@ describe('verified public discovery cache', () => {
 
   it('serializes provider reservations and opens the configurable D1 circuit', async () => {
     const controls = new D1ProviderRuntimeControl(env.PUBLIC_DB, 2, 10_000, 8_000);
-    await expect(controls.reserve('anilist', 10_000, 3_000)).resolves.toBe(10_000);
-    await expect(controls.reserve('anilist', 10_000, 3_000)).resolves.toBe(18_000);
+    await expect(controls.reserve('anilist', 10_000, 3_000)).resolves.toEqual({ notBefore: 10_000, probeOnly: false });
+    await expect(controls.reserve('anilist', 10_000, 3_000)).resolves.toEqual({ notBefore: 18_000, probeOnly: false });
     await controls.recordSuccess('anilist', 11_000);
-    await expect(controls.reserve('anilist', 11_000, 3_000)).resolves.toBe(21_000);
+    await expect(controls.reserve('anilist', 11_000, 3_000)).rejects.toMatchObject({ retryAt: 21_000 });
     await controls.recordFailure('mangaupdates', 10_000);
     await controls.recordFailure('mangaupdates', 10_000);
-    await expect(controls.reserve('mangaupdates', 10_000, 6_000)).resolves.toBe(20_000);
+    await expect(controls.reserve('mangaupdates', 10_000, 6_000)).rejects.toMatchObject({ retryAt: 20_000 });
+  });
+
+  it('reserves one shared probe and holds its ten-minute window across an interrupted owner', async () => {
+    const controls = new D1ProviderRuntimeControl(env.PUBLIC_DB, 1);
+    await controls.recordFailure('mangaupdates', 10_000);
+    await expect(controls.reserve('mangaupdates', 609_999, 6_000)).rejects.toMatchObject({ retryAt: 610_000 });
+    const reservations = await Promise.allSettled(Array.from({ length: 10 }, () => controls.reserve('mangaupdates', 610_000, 6_000)));
+    expect(reservations.filter((result) => result.status === 'fulfilled')).toEqual([
+      { status: 'fulfilled', value: { notBefore: 610_000, probeOnly: true } },
+    ]);
+    expect(reservations.filter((result) => result.status === 'rejected')).toHaveLength(9);
+    await expect(controls.reserve('mangaupdates', 620_000, 6_000)).rejects.toMatchObject({ retryAt: 1_210_000 });
+    await expect(controls.reserve('mangaupdates', 1_210_000, 6_000)).resolves.toEqual({ notBefore: 1_210_000, probeOnly: true });
+    await controls.recordSuccess('mangaupdates', 1_210_100);
+    await expect(controls.reserve('mangaupdates', 1_216_000, 6_000)).resolves.toEqual({ notBefore: 1_216_000, probeOnly: false });
   });
 
   it('returns 503 for a new key after the global active-request ceiling while preserving replays', async () => {

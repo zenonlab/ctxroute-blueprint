@@ -6294,10 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR174 deployed CI36630273811 Worker ac42031a-82d0-4d8d-963d-bc8c6c7cf3ab; hit_title preserved.",
-            "PR175 commit78032d1 fixes unrelated long-title final-page poison;235 discovery tests and real page38 complete; no admission/replay.",
-            "CI36631395616 stopped on new npm audit Undici7.29.0 advisory, not product tests. Official Cloudflare vitest-plugin1.3.2/Wrangler4.143.1 brings Miniflare5.20260926.1-alpha/Undici7.29.1; failed override experiment removed.",
-            "Updated tooling: npm audit0, npm ls valid,219 Worker tests, npm run verify, E2E11pass1skip, Archify showcase9/9 pass; Worker config, migrations and permissions unchanged."
+            "Correctif sonde partagée validé localement : bail D1 avant HTTP, dix minutes/Retry-After, huit secondes/8 Kio, checkpoint et données VERIFIED conservés, aucun réarmement historique.",
+            "npm run verify réussi; 248 tests public-discovery et 220 Worker; E2E Web 11 réussis/1 ignoré; Archify dataflow et discovery-recovery showcase verts; git diff --check propre.",
+            "Pas encore déployé. Pagination coûteuse du lot009 indépendante; neuf clés intactes. Chrome 1.0.49 ZIP SHA inchangé 53db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b."
           ]
         },
         {
@@ -6316,9 +6315,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "PR173 deployed via CI36626795362; Worker c25963f5-6c26-45d5-9dfc-2685a6cb12b4.",
-            "L84rnV sent one of the last two batch008 keys; stopped at 329 correlated D1 reads, 18 provider calls, zero accepted results. Nine original keys now consumed; no replay.",
-            "Fresh preflight: two READY, 8 reads/0 writes; failed initial read then OAuth SELECT1 succeeded. One remaining key not submitted."
+            "Lot008 : six Library et quatre Review terminales vérifiées; anciens dépassements de coût conservés, pas de certification rétroactive.",
+            "Lot009 ck71Of : un POST, 329 lectures D1, 18 appels, arrêt observateur; neuf clés non soumises, aucun rejeu.",
+            "Lecture lookup indexée du 30 septembre : première clé NOT_FOUND, zéro admission. Reçu privé build/recovery/batch009-first-readonly-20260930.json; pas de nouvelle preuve Library ni de coût conforme."
           ]
         },
         {
@@ -6337,10 +6336,10 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Nouveau Chrome headless postdéploiement: qBDa7Q,1195s,ZIP1.0.49 SHA25653db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b,exportDownloads1522sources,profil neuf.",
-            "Résultat1045résolues+50Review+53exclusions+374attentes,859œuvres; zéro erreur interne, zéro projection résolue manquante. Redémarrages service-worker/navigateur vérifiés.",
-            "1650lecturesHTTP,0POST/refresh/fournisseur navigateur;142mutations bloquées par banc,18soumissions distinctes capturées. NETWORK11/ADMISSION_WAIT1 ne prouvent pas une panne distante.",
-            "Rapport privé0600 build/installed-review/tobirink-installed-review-qBDa7Q.report.json, verdict incomplete. Même bilan queUoC9cZ; aucune reprisehistorique ni convergence prétendue. L’audit antérieur identifiait362sources=307FAILED et12sources=11négatifs expirés."
+            "Fresh Chrome headless ScAMsw,1196s,Downloads1522 sources,ZIP1.0.49 SHA25653db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b.",
+            "Measured1052 resolved+54 Review+53 excluded+363 waiting,865 works;zero internal errors,zero missing projected works;both restarts preserved.",
+            "Compared qBDa7Q:7 more resolved,4 more Review,11 fewer waiting. No extrapolation from batch identities to duplicate sources.",
+            "1642 HTTP reads,0 forwarded POST/refresh/browser provider calls;142 blocked mutations,18 captured submissions. Read-only test does not prove remaining historical recovery;verdict incomplete."
           ]
         },
         {

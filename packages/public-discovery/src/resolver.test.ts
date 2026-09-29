@@ -182,7 +182,7 @@ describe('standalone provider resolver', () => {
       reserve: vi.fn(async (_provider, at, interval) => {
         const reservedAt = Math.max(at, nextAllowedAt);
         nextAllowedAt = reservedAt + interval;
-        return reservedAt;
+        return { notBefore: reservedAt, probeOnly: false };
       }),
     };
     const wait = vi.fn(async (delay: number) => { now += delay; });

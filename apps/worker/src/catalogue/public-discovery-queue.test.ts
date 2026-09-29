@@ -466,7 +466,7 @@ describe('public discovery queue trigger', () => {
       await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(request.key.fingerprint).run();
     }
   });
-  it('consumes eight transient attempts then durably waits one day without another admission', async () => {
+  it('switches from three transient attempts to shared ten-minute probes without another admission', async () => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-01T00:00:00.000Z'));
@@ -481,20 +481,26 @@ describe('public discovery queue trigger', () => {
     try {
       await adapter.request({ key: discoveryKey, query: { discoveryTitles: ['Synthetic unavailable work'], sourceTitles: ['Synthetic unavailable work'], mediaKind: 'UNKNOWN' }, requestDigest: 'd'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
       for (let passage = 1; passage <= 8; passage += 1) {
+        const callsBefore = provider.mock.calls.length;
         const report = await processPublicDiscoveryQueue(bindings, discoveryKey, true, undefined, continuationToken);
+        if (passage > 3) {
+          expect(provider.mock.calls.length - callsBefore).toBeLessThanOrEqual(5);
+          expect(JSON.stringify(provider.mock.calls.slice(callsBefore)).toLowerCase()).not.toContain('synthetic');
+        }
         const signal = queue.send.mock.calls.at(-1)![0];
         if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
         continuationToken = signal.continuationToken;
         expect(report).toMatchObject({ claimed: 1, deferred: 1, failed: 0, published: 0 });
         expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
-          .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PENDING', attempts: passage === 8 ? 0 : passage });
-        const delay = passage === 8 ? 86_400_000 : 60_000 * 2 ** (passage - 1);
+          .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PENDING', attempts: Math.min(passage, 3) });
+        const delay = passage > 3 ? 600_000 : 60_000 * 2 ** (passage - 1);
         expect(queue.send.mock.calls.at(-1)![1]).toMatchObject({ delaySeconds: delay / 1_000 });
         vi.setSystemTime(Date.now() + delay - 1);
         expect(await processPublicDiscoveryQueue(bindings, discoveryKey, false, undefined, continuationToken)).toMatchObject({ claimed: 0 });
         vi.setSystemTime(Date.now() + 1 + Math.max(0, 16 * 60_000 - delay));
       }
-      expect(provider).toHaveBeenCalledTimes(8 * 5);
+      expect(provider.mock.calls.length).toBeGreaterThan(3 * 5);
+      expect(provider.mock.calls.length).toBeLessThanOrEqual(8 * 5);
       expect(await processPublicDiscoveryQueue(bindings, discoveryKey, true, undefined, continuationToken))
         .toMatchObject({ claimed: 1, deferred: 1, failed: 0 });
     } finally {
@@ -556,7 +562,7 @@ describe('public discovery queue trigger', () => {
     }
   });
 
-  it('keeps VERIFIED data while eight transient refresh failures enter daily cooldown', async () => {
+  it('keeps VERIFIED data through failed probes and automatically resumes a recovered refresh', async () => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-04T00:00:00.000Z'));
@@ -592,7 +598,14 @@ describe('public discovery queue trigger', () => {
       }
       expect(provider).toHaveBeenCalledTimes(8);
       expect(await env.PUBLIC_DB.prepare('SELECT state, refresh_state AS refreshState, refresh_attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
-        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'VERIFIED', refreshState: 'PENDING', attempts: 0 });
+        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'VERIFIED', refreshState: 'PENDING', attempts: 3 });
+      provider.mockImplementation(async () => Response.json({ data: { __typename: 'Query' } }));
+      expect(await processPublicDiscoveryQueue(bindings, discoveryKey, true, undefined, continuationToken))
+        .toMatchObject({ claimed: 1, deferred: 1, published: 0, failed: 0 });
+      const recoveredSignal = queue.send.mock.calls.at(-1)![0];
+      if (recoveredSignal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
+      continuationToken = recoveredSignal.continuationToken;
+      vi.setSystemTime(Date.now() + 3_000);
       provider.mockImplementation(async () => Response.json({ data: { Media: {
         id: 905030, type: 'ANIME', format: 'TV', genres: [], synonyms: [], siteUrl: 'https://anilist.co/anime/905030',
         title: { romaji: 'Synthetic preserved failed refresh', english: null, native: null },
@@ -964,10 +977,10 @@ describe('public discovery queue trigger', () => {
 
   it('does not extend a D1 provider reservation beyond the request window', async () => {
     const controls = new D1ProviderRuntimeControl(env.PUBLIC_DB);
-    expect(await controls.reserve('anilist', 10_000, 3_000)).toBe(10_000);
-    expect(await controls.reserve('anilist', 10_000, 3_000)).toBe(18_000);
+    expect(await controls.reserve('anilist', 10_000, 3_000)).toEqual({ notBefore: 10_000, probeOnly: false });
+    expect(await controls.reserve('anilist', 10_000, 3_000)).toEqual({ notBefore: 18_000, probeOnly: false });
     const before = await env.PUBLIC_DB.prepare('SELECT next_allowed_at AS nextAllowed, active_until AS activeUntil FROM public_discovery_provider_runtime WHERE provider = ?1').bind('anilist').first();
-    expect(await controls.reserve('anilist', 10_000, 3_000)).toBe(26_000);
+    await expect(controls.reserve('anilist', 10_000, 3_000)).rejects.toMatchObject({ retryAt: 26_000 });
     const after = await env.PUBLIC_DB.prepare('SELECT next_allowed_at AS nextAllowed, active_until AS activeUntil FROM public_discovery_provider_runtime WHERE provider = ?1').bind('anilist').first();
     expect(after).toEqual(before);
   });

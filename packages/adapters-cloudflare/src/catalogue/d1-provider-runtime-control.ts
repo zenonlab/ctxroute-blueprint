@@ -1,4 +1,5 @@
 import type { FavoriteProvider } from '@tobirink/public-discovery';
+import { FavoriteProviderRetryError } from '@tobirink/public-discovery';
 
 type SqlValue = null | number | string;
 interface Statement {
@@ -13,7 +14,7 @@ export class D1ProviderRuntimeControl {
   constructor(
     private readonly database: ProviderRuntimeD1Database,
     private readonly failureThreshold = 3,
-    private readonly circuitOpenMilliseconds = 15 * 60_000,
+    private readonly circuitOpenMilliseconds = 10 * 60_000,
     private readonly requestTimeoutMilliseconds = 8_000,
   ) {
     if (!Number.isSafeInteger(failureThreshold) || failureThreshold < 1 || failureThreshold > 20) throw new RangeError('provider-failure-threshold-out-of-range');
@@ -21,25 +22,27 @@ export class D1ProviderRuntimeControl {
     if (!Number.isSafeInteger(requestTimeoutMilliseconds) || requestTimeoutMilliseconds < 1_000 || requestTimeoutMilliseconds > 60_000) throw new RangeError('provider-request-timeout-out-of-range');
   }
 
-  async reserve(provider: FavoriteProvider, now: number, minimumIntervalMs: number): Promise<number> {
+  async reserve(provider: FavoriteProvider, now: number, minimumIntervalMs: number): Promise<{ readonly notBefore: number; readonly probeOnly: boolean }> {
     if (!Number.isSafeInteger(now) || now < 0 || !Number.isSafeInteger(minimumIntervalMs) || minimumIntervalMs < 1) {
       throw new TypeError('invalid-provider-runtime-reservation');
     }
     const row = await this.database.prepare(`UPDATE public_discovery_provider_runtime SET
       next_allowed_at = MAX(next_allowed_at, active_until, ?2) + ?3,
       active_until = MAX(next_allowed_at, active_until, ?2) + ?4,
+      circuit_open_until = CASE WHEN circuit_open_until > 0 THEN ?2 + ?6 ELSE 0 END,
       updated_at = ?5
       WHERE provider = ?1 AND circuit_open_until <= ?2
+        AND (circuit_open_until = 0 OR active_until <= ?2)
         AND MAX(next_allowed_at, active_until, ?2) - ?2 <= ?4
-      RETURNING active_until - ?4 AS notBefore`)
-      .bind(provider, now, minimumIntervalMs, this.requestTimeoutMilliseconds, new Date(now).toISOString())
-      .first<{ notBefore: number }>();
-    if (row) return row.notBefore;
+      RETURNING active_until - ?4 AS notBefore, circuit_open_until AS circuitOpenUntil`)
+      .bind(provider, now, minimumIntervalMs, this.requestTimeoutMilliseconds, new Date(now).toISOString(), this.circuitOpenMilliseconds)
+      .first<{ notBefore: number; circuitOpenUntil: number }>();
+    if (row) return { notBefore: row.notBefore, probeOnly: row.circuitOpenUntil > 0 };
     const deferred = await this.database.prepare(`SELECT MAX(next_allowed_at, active_until, circuit_open_until, ?2) AS notBefore
       FROM public_discovery_provider_runtime WHERE provider = ?1`)
       .bind(provider, now).first<{ notBefore: number }>();
     if (!deferred) throw new Error('provider-runtime-state-missing');
-    return deferred.notBefore;
+    throw new FavoriteProviderRetryError('Provider reservation is deferred.', deferred.notBefore);
   }
 
   async recordSuccess(provider: FavoriteProvider, now: number): Promise<void> {
