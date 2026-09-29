@@ -1,5 +1,15 @@
 # Cloudflare operations gate
 
+## Dépendance de validation — Undici
+
+L'audit du run `36631395616` bloque la livraison sur Undici 7.29.0,
+dépendance de Miniflare. Vitest Cloudflare 1.3.2 et Wrangler 4.143.1
+apportent Miniflare 5.20260926.1-alpha avec Undici 7.29.1, correctif des
+plages signalées. L'override non appliqué dans le workspace est abandonné.
+Valider `npm audit`, les suites Worker et `npm run verify`;
+ne pas utiliser `npm audit fix --force` ou désactiver la gate. Le rollback
+restaure manifeste et verrou ensemble; il réintroduirait l'alerte de sécurité.
+
 ## Pilote du 29 septembre — preuve partielle conservée
 
 La PR 173 est déployée par le run protégé `36626795362`, Worker

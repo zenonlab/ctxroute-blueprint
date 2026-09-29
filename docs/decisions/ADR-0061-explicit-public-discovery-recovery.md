@@ -380,12 +380,20 @@ La récupération est observable et réversible au niveau applicatif : désactiv
 
 ## Validation
 
+La validation de la candidate conserve l'audit des dépendances bloquant.
+L'alerte Undici apparue dans le run `36631395616` est corrigée par un
+passage à Vitest Cloudflare 1.3.2 et Wrangler 4.143.1, épinglant Miniflare
+5.20260926.1-alpha et Undici 7.29.1. L'override transitoire non appliqué par
+npm dans ce workspace n'est pas conservé. Aucun paramètre Worker, droit ou
+schéma D1 n'est changé. Audit et suites complètes doivent
+passer après installation, sans `audit fix --force` ni désactivation de gate.
+
 La recherche MangaUpdates conserve aussi `hit_title` comme alias fourni par
 le résultat de recherche : les records réels omettent `associated`, présent
 dans le détail. L'ignorer éliminait des correspondances traduites avant leur
 hydratation. Cet alias ne remplace ni l'identité ni le contrôle du détail
-hydraté. Un alias mal formé échoue au schéma; un alias trop long conserve
-le statut incomplet. Les curseurs et les budgets restent inchangés.
+hydraté. Un alias mal formé échoue au schéma; un alias trop long pouvant
+correspondre conserve le statut incomplet. Les curseurs et les budgets restent inchangés.
 Le rollback retire cette projection sans mutation D1.
 
 Une dernière page MangaUpdates contenant un titre de plus de 200 caractères
