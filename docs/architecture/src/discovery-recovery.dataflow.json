@@ -22,7 +22,7 @@
     { "id": "rearm", "type": "backend", "label": "Lot scellé v3", "sublabel": "1–10 identités · média connu", "stage": 2, "row": 2, "width": 150, "tag": "un POST par clé" },
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "alias · index imposé" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "claim(1) · expiration ciblée" },
-    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "anime + manga · 90 s", "stage": 3, "row": 2, "tag": "budget → curseur" },
+    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "≤ 2 recherches réussies", "stage": 3, "row": 2, "tag": "budget → curseur" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · ID lié contrôlé", "stage": 4, "row": 1, "width": 150, "tag": "pas de preuve Library" }
   ],
   "flows": [
@@ -36,7 +36,7 @@
     { "from": "collector", "to": "result", "label": "publication atomique", "classification": "garde unique · catalogue · clôture du jeton", "variant": "emphasis", "labelDx": 100 }
   ],
   "cards": [
-    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Réservation durable commune au pilote et au CLI", "MangaUpdates en panne : secours MangaDex par ID lié hydraté", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Curseur 25→100 après 4 pages, sans saut ni POST", "UNKNOWN : deux lanes reprises ; CLI exige reparse", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
+    { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Réservation durable commune au pilote et au CLI", "MangaUpdates en panne : secours MangaDex par ID lié hydraté", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Deux recherches réussies puis curseur et continuation", "UNKNOWN : deux lanes reprises ; CLI exige reparse", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
     { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Jeton protégé du claim générique pendant 15 min sans progrès", "Réveil vide corrélé compté, sans preuve finale", "Tail Wrangler ou WebSocket Cloudflare, prêt ≤ 75 s avant admission", "Coûts et cause Queue fermée · zéro 429/Queue · D1 cumulé ≤ 300", "Coûts scellés · lectures closes et drainées · redémarrage local"] }
   ]
 }

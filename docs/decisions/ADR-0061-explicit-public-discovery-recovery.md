@@ -159,6 +159,14 @@ les deux preuves et l'ambiguïté inter-lanes après reprise. Une lane anime en
 erreur n'est jamais déclarée complète. Le CLI opératoire exige encore un
 reparse du média avant toute reprise réelle d'une clé `UNKNOWN`.
 
+Le collecteur limite également à deux les recherches fournisseur réussies par
+invocation lorsque aucune erreur fournisseur n'est survenue. Il rend alors la
+main avec le même curseur durable et une continuation, sans consommer d'essai
+ni répéter les pages déjà inspectées. Les erreurs fournisseur conservent leur
+traitement et leur budget de tentatives existants : cette borne ne les convertit
+pas en résultat métier et ne garantit pas à elle seule l'absence de dépassement
+CPU dans un parcours mêlant erreurs et recherches.
+
 Le banc installé utilise le même scope et la même réservation permanente que
 le CLI. Au-delà de deux admissions, un scope est obligatoire; le pilote scellé
 exige exactement une source par clé et un budget explicite égal à la taille du

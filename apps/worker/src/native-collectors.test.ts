@@ -99,18 +99,20 @@ describe('native collector queue', () => {
     };
     const input = { attempt: 1, key: { fingerprint: 'a'.repeat(64), mediaKind: 'MANGA' as const, parserVersion: 'parser-v1', siteRulesVersion: 'rules-v1' },
       query: { discoveryTitles: titles, mediaKind: 'MANGA' as const, sourceTitles: titles }, requestDigest: 'b'.repeat(64), schemaVersion: 3 as const };
-    const first = createBudgetedDiscoveryResolver(providers, () => callsInInvocation * 4, () => 1);
     let checkpoint;
-    try { await first.resolve(input); }
-    catch (error) {
-      if (!(error instanceof PublicDiscoverySearchContinuationError)) throw error;
-      checkpoint = error.searchProgress;
+    let result;
+    for (let passage = 0; passage < 6; passage += 1) {
+      callsInInvocation = 0;
+      const resolver = createBudgetedDiscoveryResolver(providers, () => callsInInvocation * 4, () => 1);
+      try { result = await resolver.resolve({ ...input, searchProgress: checkpoint }); }
+      catch (error) {
+        if (!(error instanceof PublicDiscoverySearchContinuationError)) throw error;
+        checkpoint = error.searchProgress;
+      }
+      expect(callsInInvocation).toBe(2);
+      if (passage === 0) expect(checkpoint).toMatchObject({ provider: 'mangadex', titleIndex: 2, cursor: '1' });
     }
-    expect(checkpoint).toMatchObject({ provider: 'mangaupdates', titleIndex: 1, cursor: '1' });
-    expect(callsInInvocation).toBe(9);
-    callsInInvocation = 0;
-    const second = createBudgetedDiscoveryResolver(providers, () => callsInInvocation * 4, () => 1);
-    await expect(second.resolve({ ...input, searchProgress: checkpoint })).resolves.toEqual({ reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' });
+    expect(result).toEqual({ reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' });
     expect(searched).toHaveLength(12);
     expect(new Set(searched).size).toBe(12);
   });

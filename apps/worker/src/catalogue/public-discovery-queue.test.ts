@@ -133,12 +133,12 @@ describe('public discovery queue trigger', () => {
     try {
       await adapter.request({ ...submission('c', title), key: discoveryKey, requestDigest: 'f'.repeat(64) }, new Date().toISOString());
       expect(await processPublicDiscoveryQueue(bindings, discoveryKey, true, correlationId))
-        .toMatchObject({ claimed: 1, deferred: 1, published: 0, continuationScheduled: true });
-      expect(pages).toEqual([1, 2, 3, 4]);
+        .toMatchObject({ claimed: 1, deferred: 1, published: 0, continuationScheduled: true, metrics: { providerRequests: 2 } });
+      expect(pages).toEqual([1, 2]);
       const checkpoint = await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
         .bind(discoveryKey.fingerprint).first<{ state: string; attempts: number; progress: string }>();
       expect(checkpoint).toMatchObject({ state: 'PENDING', attempts: 0 });
-      expect(JSON.parse(checkpoint!.progress)).toEqual({ candidates: [], cursor: '5', provider: 'anilist', titleIndex: 0, version: 1 });
+      expect(JSON.parse(checkpoint!.progress)).toEqual({ candidates: [], cursor: '3', provider: 'anilist', titleIndex: 0, version: 1 });
       let signal = queue.send.mock.calls[0]![0];
       if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
       expect(signal.correlationId).toBe(correlationId);
@@ -157,7 +157,18 @@ describe('public discovery queue trigger', () => {
         vi.setSystemTime(Date.now() + 120_000);
       }
       expect(await processPublicDiscoveryQueue(bindings, undefined, true, signal.correlationId, signal.continuationToken))
-        .toMatchObject({ claimed: 1, deferred: 0, published: 1 });
+        .toMatchObject({ claimed: 1, deferred: 1, published: 0, metrics: { providerRequests: 2 } });
+      expect(pages).toEqual([1, 2, 3, 4]);
+      const next = await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+        .bind(discoveryKey.fingerprint).first<{ state: string; attempts: number; progress: string }>();
+      expect(next).toMatchObject({ state: 'PENDING', attempts: 0 });
+      expect(JSON.parse(next!.progress)).toEqual({ candidates: [], cursor: '5', provider: 'anilist', titleIndex: 0, version: 1 });
+      signal = queue.send.mock.calls.at(-1)![0];
+      if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
+      expect(signal.correlationId).toBe(correlationId);
+      vi.setSystemTime(Date.now() + 2_000);
+      expect(await processPublicDiscoveryQueue(bindings, undefined, true, signal.correlationId, signal.continuationToken))
+        .toMatchObject({ claimed: 1, deferred: 0, published: 1, metrics: { providerRequests: 2 } });
       expect(pages).toEqual([1, 2, 3, 4, 5]);
       expect(provider).toHaveBeenCalledTimes(6);
       await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'VERIFIED' });
@@ -190,8 +201,10 @@ describe('public discovery queue trigger', () => {
     };
     try {
       await adapter.request({ key: discoveryKey, query: { discoveryTitles: titles, mediaKind: 'MANGA', sourceTitles: titles }, requestDigest, schemaVersion: 3 }, new Date().toISOString());
-      for (const claimToken of ['a'.repeat(48), 'b'.repeat(48)]) {
+      let published = false;
+      for (let passage = 0; passage < 8 && !published; passage += 1) {
         callsInInvocation = 0;
+        const claimToken = String.fromCharCode(97 + passage).repeat(48);
         const claimTokenHash = await tokenDigest(claimToken);
         const claimed = await adapter.claimBatch({ claimToken, tokenDigest: claimTokenHash, key: discoveryKey,
           now: new Date().toISOString(), leaseUntil: new Date(Date.now() + 15 * 60_000).toISOString(), limit: 1 });
@@ -204,15 +217,20 @@ describe('public discovery queue trigger', () => {
           limit: 1, nonce: () => crypto.randomUUID(), now: () => new Date().toISOString(),
           resolver: createBudgetedDiscoveryResolver(providers, () => callsInInvocation * 4, () => 1),
         });
-        if (claimToken.startsWith('a')) {
+        expect(callsInInvocation).toBeLessThanOrEqual(2);
+        if (report.deferred === 1) {
           expect(report).toMatchObject({ claimed: 1, deferred: 1, failed: 0, published: 0 });
           const checkpoint = await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
             .bind(discoveryKey.fingerprint).first<{ state: string; attempts: number; progress: string }>();
           expect(checkpoint).toMatchObject({ state: 'PENDING', attempts: 0 });
-          expect(JSON.parse(checkpoint!.progress)).toMatchObject({ provider: 'mangaupdates', titleIndex: 1, cursor: '1' });
+          expect(JSON.parse(checkpoint!.progress)).toMatchObject({ cursor: '1', version: 1 });
           vi.setSystemTime(Date.now() + 2_000);
-        } else expect(report).toMatchObject({ claimed: 1, deferred: 0, failed: 0, published: 1 });
+        } else {
+          expect(report).toMatchObject({ claimed: 1, deferred: 0, failed: 0, published: 1 });
+          published = true;
+        }
       }
+      expect(published).toBe(true);
       expect(searched).toHaveLength(12);
       expect(new Set(searched).size).toBe(12);
       await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'NOT_FOUND' });
@@ -242,9 +260,11 @@ describe('public discovery queue trigger', () => {
     try {
       await adapter.request({ key: discoveryKey, query: { discoveryTitles: titles, mediaKind: 'UNKNOWN', sourceTitles: titles },
         requestDigest: 'e'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
-      for (const tokenPrefix of ['a', 'b', 'c']) {
+      let published = false;
+      let sawAnimeCheckpoint = false;
+      for (let passage = 0; passage < 12 && !published; passage += 1) {
         callsInInvocation = 0;
-        const claimToken = tokenPrefix.repeat(48);
+        const claimToken = String.fromCharCode(97 + passage).repeat(48);
         const claimTokenHash = await tokenDigest(claimToken);
         const claimed = await adapter.claimBatch({ claimToken, tokenDigest: claimTokenHash, key: discoveryKey,
           now: new Date().toISOString(), leaseUntil: new Date(Date.now() + 15 * 60_000).toISOString(), limit: 1 });
@@ -258,15 +278,22 @@ describe('public discovery queue trigger', () => {
           resolver: createBudgetedDiscoveryResolver(providers, () => callsInInvocation * 4, () => 1),
         });
         expect(report.failed).toBe(0);
-        if (tokenPrefix !== 'c') {
+        expect(callsInInvocation).toBeLessThanOrEqual(2);
+        if (report.deferred === 1) {
           expect(report).toMatchObject({ claimed: 1, deferred: 1, published: 0 });
           const checkpoint = await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
             .bind(discoveryKey.fingerprint).first<{ state: string; attempts: number; progress: string }>();
           expect(checkpoint).toMatchObject({ state: 'PENDING', attempts: 0 });
-          expect(JSON.parse(checkpoint!.progress)).toMatchObject({ animeLane: { state: 'NOT_FOUND' } });
+          const progress: { animeLane?: { state: string } } = JSON.parse(checkpoint!.progress);
+          if (progress.animeLane?.state === 'NOT_FOUND') sawAnimeCheckpoint = true;
           vi.setSystemTime(Date.now() + 2_000);
-        } else expect(report).toMatchObject({ claimed: 1, deferred: 0, published: 1 });
+        } else {
+          expect(report).toMatchObject({ claimed: 1, deferred: 0, published: 1 });
+          published = true;
+        }
       }
+      expect(published).toBe(true);
+      expect(sawAnimeCheckpoint).toBe(true);
       expect(searched).toHaveLength(20);
       expect(new Set(searched).size).toBe(20);
       await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'NOT_FOUND' });

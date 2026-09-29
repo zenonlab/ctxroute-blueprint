@@ -6626,6 +6626,44 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-discovery-cpu-bounded-continuation",
+      "title": "Borner le CPU de chaque collecte Discovery",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "budget",
+          "title": "Limiter les recherches par invocation",
+          "status": "DONE",
+          "acceptance": [
+            "Au plus deux recherches fournisseur par invocation avant continuation durable",
+            "Checkpoint évite répétition et conserve résultat final",
+            "Cadence et 503 restent distingués; claim(1), Queue1/1 et aucun réarmement inchangés"
+          ],
+          "files": [
+            "apps/worker/src/native-collectors.ts",
+            "apps/worker/src/catalogue/public-discovery-queue.test.ts",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/architecture/src/discovery-recovery.dataflow.json",
+            "docs/operations/cloudflare.md"
+          ],
+          "commands": [
+            "npm test --workspace @tobirink/worker",
+            "npm run verify",
+            "npm run archify:validate -- discovery-recovery.dataflow",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Worker targeted suites 44/44 and 23/23 pass; full npm run verify passes with Worker 212/212.",
+            "Archify architecture/dataflow/discovery-recovery showcase pass; git diff --check passes.",
+            "Successful searches are capped at two per invocation with durable checkpoint and unchanged provider-failure attempts; production effectiveness remains to observe."
+          ]
+        }
+      ]
     }
   ]
 }

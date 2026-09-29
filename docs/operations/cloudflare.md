@@ -1908,3 +1908,21 @@ du banc, mais reçoit une lecture `MISS` synthétique corrélée après une fen�
 plus longue. Le banc autorise donc au plus 24 sondes espacées de 2,5 secondes
 avant le bouton (délai de garde 75 secondes), puis échoue fermé sans POST si
 le tail reste absent. Ces lectures de démarrage restent hors budget par clé.
+
+### Diagnostic CPU Queue — 2026-09-29
+
+Le lot `batch-004` a consommé sept admissions avant un HTTP 503 et un signal
+de continuation non envoyé ; les trois autres clés n'ont pas été admises.
+Les sept réservations demeurent consommées et ne doivent pas être rejouées.
+Les métriques Queue montrent zéro message en attente et deux messages en DLQ.
+Trois invocations Queue corrélées dans Observability ont l'outcome
+`exceededCpu` malgré une durée murale distincte : un simple accroissement du
+délai d'observation ou un cron ne répare donc pas cette limite CPU. Le cron
+`*/10 * * * *` est bien installé ; le claim et le consommateur restent à 1/1.
+
+La candidate borne désormais à deux recherches fournisseur réussies par
+invocation sans erreur fournisseur, puis persiste le curseur et émet une
+continuation sans nouvel essai. Les échecs fournisseur gardent leur traitement
+existant. Cette mesure ne vaut pas preuve de convergence : vérifier après
+déploiement les outcomes CPU, la continuation corrélée, le résultat D1 et sa
+projection Library avant tout élargissement des admissions.

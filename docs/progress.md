@@ -449,3 +449,7 @@
 ## Récupérer une identité exacte via référence fournisseur liée — DONE
 
 - [x] **Ajouter un secours lié et vérifié** — DONE _(evidence: Resolver 93/93 et Worker Queue 44/44: secours MangaUpdates→MangaDex seulement après échec consommé; cadence sans appel supplémentaire., npm run verify, Archify architecture/dataflow, git diff --check verts; aucun D1 ni archive publique muté.)_
+
+## Borner le CPU de chaque collecte Discovery — DONE
+
+- [x] **Limiter les recherches par invocation** — DONE _(evidence: Worker targeted suites 44/44 and 23/23 pass; full npm run verify passes with Worker 212/212., Archify architecture/dataflow/discovery-recovery showcase pass; git diff --check passes., Successful searches are capped at two per invocation with durable checkpoint and unchanged provider-failure attempts; production effectiveness remains to observe.)_
