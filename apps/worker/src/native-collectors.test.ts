@@ -117,6 +117,20 @@ describe('native collector queue', () => {
     expect(new Set(searched).size).toBe(12);
   });
 
+  it('keeps the two-successful-search budget after an earlier provider failure', async () => {
+    const fallbackSearch = vi.fn(async () => ({ candidates: [], complete: true, digest: 'empty', provider: 'kitsu-manga' as const, truncated: false }));
+    const unavailable = { hydrate: async () => undefined, search: async () => { throw new Error('HTTP 503'); } };
+    const providers: PublicDiscoveryProviderPorts = { anilist: unavailable, mangaupdates: unavailable, mangadex: unavailable,
+      'kitsu-anime': unavailable, 'kitsu-manga': { ...unavailable, search: fallbackSearch } };
+    const resolver = createBudgetedDiscoveryResolver(providers, () => 0, () => 1);
+    await expect(resolver.resolve({ attempt: 1,
+      key: { fingerprint: 'a'.repeat(64), mediaKind: 'MANGA', parserVersion: 'parser-v1', siteRulesVersion: 'rules-v1' },
+      query: { discoveryTitles: ['Alpha', 'Beta', 'Gamma'], mediaKind: 'MANGA', sourceTitles: ['Alpha'] },
+      requestDigest: 'b'.repeat(64), schemaVersion: 3,
+    })).rejects.toMatchObject({ searchProgress: { provider: 'kitsu-manga', titleIndex: 2, retryProviders: ['mangadex'] } });
+    expect(fallbackSearch).toHaveBeenCalledTimes(2);
+  });
+
   it('routes an operational recovery signal without invoking collectors or resetting requests', async () => {
     const item = message({ type: 'agenda-recovery', version: 1 });
     const processors = { agenda: vi.fn(), discovery: vi.fn(), recovery: vi.fn(async () => undefined) };
@@ -186,6 +200,20 @@ describe('native collector queue', () => {
     expect(discovery).toHaveBeenCalledExactlyOnceWith(correlationId, continuationToken);
     expect(JSON.parse(String(info.mock.calls[0]?.[0]))).toMatchObject({ correlationId, task: 'discovery' });
     expect(item.ack).toHaveBeenCalledOnce();
+  });
+
+  it('preserves the admission correlation when Queue processing throws', async () => {
+    const correlationId = '00000000-0000-4000-8000-000000000019';
+    const continuationToken = 'b'.repeat(43);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const item = message({ continuationToken, correlationId, type: 'public-discovery-ready', version: 1 });
+    await handleNativeCollectorQueue([item], { agenda: vi.fn(), discovery: async () => { throw new Error('private upstream failure'); } });
+    expect(item.retry).toHaveBeenCalledOnce();
+    const costs = info.mock.calls.map(([entry]) => JSON.parse(String(entry))).filter(entry => entry.type === 'worker.cost');
+    expect(costs).toHaveLength(1);
+    expect(costs[0]).toMatchObject({ correlationId, result: 'failed', task: 'discovery' });
+    expect(JSON.stringify([...info.mock.calls, ...warn.mock.calls])).not.toContain('private upstream failure');
   });
 
   it('runs only the first signal group and forwards the others before acknowledging them', async () => {

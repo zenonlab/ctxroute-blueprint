@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { publicDiscoveryCandidateSchema } from '@tobirink/public-discovery';
+import { createPublicDiscoveryResolver, publicDiscoveryCandidateSchema } from '@tobirink/public-discovery';
 import { createLibrary, createProviderCandidateEnvelope, createSourceEvidence, createWork, libraryId, workId } from '@tobirink/domain';
 import type { DurableTask, FavoriteResolutionClaim, FavoriteResolutionOutboxPort } from '../tasks';
 import { blockTask, claimTask, isTaskAvailable, retryTask } from '../tasks';
@@ -57,6 +57,49 @@ async function fixture(input = favorite, adapters: Parameters<typeof importFavor
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it.each(['linked', 'direct', 'missing-link', 'wrong-link', 'missing-reference', 'wrong-direct', 'wrong-provider'] as const)('projects resolver identity evidence into Library: %s', async (mode) => {
+    const exact = { provider: 'mangaupdates' as const, externalId: '12345' };
+    const manga = { ...exact, mediaKind: 'MANGA' as const, preSerialization: false, titles: ['Target'] };
+    const linked = { ...manga, provider: 'mangadex' as const, externalId: '12345678-1234-4234-8234-123456789abc', linkedReferences: [exact] };
+    const { storage, outbox } = await fixture({ ...favorite, folderPath: ['Manga'], title: 'Target', url: 'https://www.mangaupdates.com/series/12345' }, [{
+      id: 'test-mangaupdates', origins: ['https://www.mangaupdates.com'],
+      analyze: (input, url) => createSourceEvidence({ aliases: [], diagnostics: [], explicitProviderReference: exact, key: input.sourceKey, mediaKind: 'MANGA', origin: url.origin, path: url.pathname, proofs: ['CATEGORY_PATH'], sourceAdapter: 'test-mangaupdates', strategy: 'exact-origin', title: input.title }),
+    }]);
+    const serverHydrate = vi.fn(async () => { if (mode === 'direct') return manga; throw new Error('HTTP 503'); });
+    const resolver = createPublicDiscoveryResolver({
+      anilist: { ...unusedSearch, ...unusedHydration }, 'kitsu-anime': { ...unusedSearch, ...unusedHydration }, 'kitsu-manga': { ...unusedSearch, ...unusedHydration },
+      mangaupdates: { ...unusedSearch, hydrate: serverHydrate },
+      mangadex: { hydrate: async () => linked, search: async () => ({ candidates: [linked], complete: true, digest: 'linked-fixture', provider: 'mangadex', truncated: false }) },
+    });
+    const browserSearch = vi.fn(unusedSearch.search);
+    const browserHydrate = vi.fn(unusedHydration.hydrate);
+    const result = await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts({ search: browserSearch }), hydration: hydrationPorts({ hydrate: browserHydrate }),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'linked-public',
+      publicDiscovery: { resolveOrRequest: async (key, query) => {
+        const resolved = await resolver.resolve({ attempt: 1, key, query, requestDigest: 'b'.repeat(64), schemaVersion: 3 });
+        if (resolved.state !== 'VERIFIED') throw new Error('Expected verified resolver result');
+        const profile = resolved.profile;
+        if (mode === 'wrong-direct') return { ...resolved, verifiedAt: now, profile: { ...profile, candidate: { ...manga, externalId: '54321' } } };
+        if (mode === 'wrong-provider') return { ...resolved, verifiedAt: now, profile: { ...profile, candidate: { ...linked, provider: 'kitsu-manga', externalId: '42' } } };
+        if (mode === 'missing-link') return { ...resolved, verifiedAt: now, profile: { ...profile, candidate: { ...profile.candidate, linkedReferences: [] } } };
+        if (mode === 'wrong-link') return { ...resolved, verifiedAt: now, profile: { ...profile, candidate: { ...profile.candidate, linkedReferences: [{ ...exact, externalId: '54321' }] } } };
+        if (mode === 'missing-reference') return { ...resolved, verifiedAt: now, profile: { ...profile, references: [{ provider: linked.provider, externalId: linked.externalId }] } };
+        return { ...resolved, verifiedAt: now };
+      } },
+    });
+    const accepted = mode === 'direct' || mode === 'linked';
+    expect(result).toMatchObject({ completed: accepted ? 1 : 0, retried: accepted ? 0 : 1 });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    expect(source?.resolution).toEqual(accepted ? { kind: 'RESOLVED' } : { kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' });
+    expect(source?.reviewId).toBeUndefined();
+    expect(await storage.listWorks({ limit: 10 })).toHaveLength(accepted ? 1 : 0);
+    expect((await storage.getLibrary(libraryId('library_primary')))?.workIds ?? []).toEqual(accepted ? [source?.matchedWorkId] : []);
+    expect(serverHydrate).toHaveBeenCalledOnce();
+    expect(browserSearch).not.toHaveBeenCalled();
+    expect(browserHydrate).not.toHaveBeenCalled();
+  });
+
   it('commits all 32 public provider metadata values without provider access or recovery admission', async () => {
     const { storage, outbox, task } = await fixture({ ...favorite, folderPath: ['Manga'], title: 'Synthetic manga', url: 'https://reader.example/manga/synthetic-manga' });
     const titles = ['Synthetic manga', ...Array.from({ length: 31 }, (_, index) => `Alias ${index}`)];

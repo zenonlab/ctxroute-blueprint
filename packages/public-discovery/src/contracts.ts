@@ -96,6 +96,8 @@ export const publicDiscoveryTerminalResolutionSchema = z.discriminatedUnion('sta
 ]);
 
 export const publicDiscoverySearchProgressSchema = z.strictObject({
+  retryProviders: z.array(publicDiscoveryProviderSchema).min(1).max(4)
+    .refine((providers) => new Set(providers).size === providers.length, 'duplicate-retry-provider').optional(),
   animeLane: z.strictObject({
     candidates: z.array(publicDiscoveryCandidateSchema).max(10),
     references: z.array(publicDiscoveryReferenceV3Schema).max(10),

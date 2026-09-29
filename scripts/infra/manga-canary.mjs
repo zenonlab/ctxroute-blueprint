@@ -117,21 +117,59 @@ const expectationSchema = z.discriminatedUnion('task', [
     status: z.literal(202), task: z.literal('discovery') }),
   z.strictObject({ status: z.literal(200), task: z.literal('discovery-lookup') }),
 ]);
+const costFailureEvidenceSchema = z.strictObject({
+  acceptedResults: countSchema,
+  admissionD1RowsRead: countSchema,
+  collectorD1RowsRead: countSchema,
+  collectorEvents: countSchema.max(observerEnvelopeLimit),
+  d1RowsRead: countSchema,
+  d1RowsWritten: countSchema,
+  providers: z.array(z.enum(['anilist', 'kitsu', 'mangadex', 'mangaupdates', 'mixed', 'none'])).max(5),
+  providerRequests: countSchema,
+  queueFailures: countSchema,
+  queueSends: countSchema,
+  retries: countSchema,
+  results: z.array(z.enum(['backoff', 'changed', 'deduplicated', 'failed', 'unchanged'])).max(observerEnvelopeLimit),
+});
 
 export function createCostObservation({ allowProviderContinuation = false } = {}) {
   const records = new Map();
   const expected = new Map();
   const matched = new Map();
+  const deferredContinuationCosts = new Map();
   const decoder = new StringDecoder('utf8');
   let bytes = 0;
   let envelopes = 0;
+  let deferredContinuationCount = 0;
   let frame = '';
   let depth = 0;
   let quoted = false;
   let escaped = false;
   let failure;
-  function fail(reason) { failure ??= observerError(reason); throw failure; }
+  let failureEvidence;
+  function fail(reason, evidence) {
+    if (failure === undefined) {
+      failure = observerError(reason);
+      const parsed = costFailureEvidenceSchema.safeParse(evidence);
+      if (parsed.success) failureEvidence = parsed.data;
+    }
+    throw failure;
+  }
   function check() { if (failure) throw failure; }
+  function deferContinuation(cost) {
+    if (deferredContinuationCount >= observerEnvelopeLimit) fail('correlation-limit');
+    const continuations = deferredContinuationCosts.get(cost.correlationId) ?? [];
+    continuations.push(cost);
+    deferredContinuationCosts.set(cost.correlationId, continuations);
+    deferredContinuationCount += 1;
+  }
+  function attachDeferredContinuations(requestId, record) {
+    const continuations = deferredContinuationCosts.get(requestId);
+    if (continuations === undefined) return;
+    record.costs.push(...continuations);
+    deferredContinuationCosts.delete(requestId);
+    deferredContinuationCount -= continuations.length;
+  }
   function validate(requestId) {
     const expectation = expected.get(requestId);
     const record = records.get(requestId);
@@ -141,7 +179,7 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
     if (record.request.status !== expectation.status || record.httpStatus !== expectation.status
       || record.httpTask !== expectation.task) fail('request-mismatch');
     const selected = record.costs.filter(cost => cost.task === expectation.task);
-    if (selected.length === 0) fail('ambiguous-cost');
+    if (selected.length === 0 && (!allowProviderContinuation || expectation.task !== 'discovery')) fail('ambiguous-cost');
     for (const cost of record.costs) {
       if (cost.d1RowsRead === undefined || cost.d1RowsWritten === undefined) fail('invalid-cost');
       if (cost.providerHttpErrors > 0 || cost.providerNetworkErrors > 0) fail('provider-error');
@@ -182,7 +220,20 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
     if (terminals.length > 1) fail('ambiguous-cost');
     const summary = Object.fromEntries(counts.map(key => [key, [admission, ...selected].reduce((total, cost) => total + (cost[key] ?? 0), 0)]));
     if (Object.values(summary).some(value => !Number.isSafeInteger(value))) fail('count-limit');
-    if (summary.d1RowsRead > 300) fail('d1-budget');
+    if (summary.d1RowsRead > 300) fail('d1-budget', {
+      acceptedResults: summary.acceptedResults,
+      admissionD1RowsRead: admission.d1RowsRead,
+      collectorD1RowsRead: selected.reduce((total, cost) => total + cost.d1RowsRead, 0),
+      collectorEvents: selected.length,
+      d1RowsRead: summary.d1RowsRead,
+      d1RowsWritten: summary.d1RowsWritten,
+      providers: [...new Set(selected.map(cost => cost.provider))],
+      providerRequests: summary.providerRequests,
+      queueFailures: summary.queueFailures,
+      queueSends: summary.queueSends,
+      retries: summary.retries,
+      results: selected.map(cost => cost.result),
+    });
     if (terminals.length === 0) return;
     const terminal = terminals[0];
     if (terminal.provider === 'none'
@@ -223,14 +274,21 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
       else costs.push(parsed.data);
     }
     if (requests.length === 0) {
-      const continuations = costs.filter(cost => cost.task === 'discovery' && cost.correlationId !== undefined && expected.has(cost.correlationId));
+      const continuations = costs.filter(cost => cost.task === 'discovery' && cost.correlationId !== undefined
+        && (expected.has(cost.correlationId) || records.has(cost.correlationId)));
       if (continuations.length > 1) fail('ambiguous-cost');
       const continuation = continuations[0];
       if (continuation !== undefined) {
         const record = records.get(continuation.correlationId);
-        if (!record) fail('request-mismatch');
-        record.costs.push(continuation);
-        validate(continuation.correlationId);
+        if (record) {
+          record.costs.push(continuation);
+          validate(continuation.correlationId);
+        } else if (allowProviderContinuation) deferContinuation(continuation);
+        else fail('request-mismatch');
+      } else if (allowProviderContinuation) {
+        for (const continuation of costs.filter(cost => cost.task === 'discovery' && cost.correlationId !== undefined)) {
+          deferContinuation(continuation);
+        }
       }
       return;
     }
@@ -255,7 +313,9 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
         records.set(requestId, { error: 'duplicate-request' });
       } else {
         if (records.size >= observerEnvelopeLimit) fail('correlation-limit');
-        records.set(requestId, { request: parsedRequest.data, costs, error, httpTask, httpStatus: envelope.event?.response?.status });
+        const record = { request: parsedRequest.data, costs, error, httpTask, httpStatus: envelope.event?.response?.status };
+        records.set(requestId, record);
+        attachDeferredContinuations(requestId, record);
       }
       validate(requestId);
     }
@@ -280,6 +340,7 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
     }
   }
   return {
+    failureEvidence: () => failureEvidence,
     check,
     track(requestId, expectation) {
       check();
@@ -289,6 +350,8 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
       if (expected.has(requestId)) fail('duplicate-request');
       if (expected.size >= observerReadinessAttempts + fixtures.length) fail('correlation-limit');
       expected.set(requestId, parsedExpectation.data);
+      const record = records.get(requestId);
+      if (record) attachDeferredContinuations(requestId, record);
       validate(requestId);
     },
     read(requestId) { check(); const value = matched.get(requestId); return value ? { ...value } : undefined; },
@@ -299,7 +362,16 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
       if (bytes > observerByteLimit) fail('byte-limit');
       scan(decoder.write(data));
     },
-    finish() { check(); scan(decoder.end()); if (depth !== 0) fail('truncated'); },
+    finish() {
+      check();
+      scan(decoder.end());
+      if (depth !== 0) fail('truncated');
+      if ([...expected.keys()].some(requestId => deferredContinuationCosts.has(requestId) && !records.has(requestId))) fail('request-mismatch');
+      for (const [requestId, expectation] of expected) {
+        const record = records.get(requestId);
+        if (expectation.task === 'discovery' && record && !record.costs.some(cost => cost.task === 'discovery')) fail('ambiguous-cost');
+      }
+    },
     snapshot() {
       const totals = { observedEvents: 0, ...Object.fromEntries(counts.map(key => [key, 0])),
         results: { backoff: 0, changed: 0, deduplicated: 0, failed: 0, unchanged: 0 } };
@@ -368,7 +440,7 @@ function startWebSocketCostObserver({ allowProviderContinuation, tailUrl, webSoc
     observation.finish();
   }
   return { failed, check, track: (requestId, expectation) => { check(); observation.track(requestId, expectation); },
-    read: requestId => { check(); return observation.read(requestId); }, snapshot: observation.snapshot,
+    read: requestId => { check(); return observation.read(requestId); }, failureEvidence: observation.failureEvidence, snapshot: observation.snapshot,
     close: () => { closePromise ??= close(); return closePromise; } };
 }
 
@@ -435,7 +507,7 @@ export function startCostObserver({ allowProviderContinuation = false, spawnProc
   }
   function check() { if (failure) throw failure; observation.check(); }
   return { failed, check, track: (requestId, expectation) => { check(); observation.track(requestId, expectation); },
-    read: requestId => { check(); return observation.read(requestId); }, snapshot: observation.snapshot,
+    read: requestId => { check(); return observation.read(requestId); }, failureEvidence: observation.failureEvidence, snapshot: observation.snapshot,
     close: () => { closePromise ??= close(); return closePromise; } };
 }
 

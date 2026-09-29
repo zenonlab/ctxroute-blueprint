@@ -336,6 +336,46 @@ describe('standalone provider resolver', () => {
     await expect(createPublicDiscoveryResolver(ports).resolve(request('MANGA'))).rejects.toThrow('HTTP 503');
   });
 
+  it.each(['verified', 'empty', 'recovered', 'cleared', 'deferred'] as const)('resumes paginated fallback after a primary failure: %s', async (outcome) => {
+    const target = candidate('kitsu-manga', 'MANGA', '42', 'Target');
+    const ports = providers({ 'kitsu-manga': target });
+    ports.mangadex.search.mockRejectedValue(new Error('HTTP 503'));
+    const pages: string[] = [];
+    ports['kitsu-manga'].search.mockImplementation(async ({ cursor }) => {
+      pages.push(cursor);
+      if (cursor === '5') return { candidates: outcome === 'verified' ? [target] : [], complete: true, digest: 'fallback-page', provider: 'kitsu-manga', truncated: false };
+      return { candidates: [], complete: false, digest: 'fallback-page', provider: 'kitsu-manga', truncated: true, nextCursor: String(Number(cursor) + 1) };
+    });
+    let checkpoint;
+    try { await createPublicDiscoveryResolver(ports).resolve(request('MANGA')); }
+    catch (error) {
+      expect(error).toBeInstanceOf(PublicDiscoverySearchContinuationError);
+      if (!(error instanceof PublicDiscoverySearchContinuationError)) throw error;
+      checkpoint = error.searchProgress;
+    }
+    expect(checkpoint).toMatchObject({ provider: 'kitsu-manga', cursor: '5', retryProviders: ['mangadex'] });
+    if (outcome === 'recovered' || outcome === 'cleared') {
+      const recovered = candidate('mangadex', 'MANGA', '12345678-1234-4234-8234-123456789abc', 'Target');
+      ports.mangadex.search.mockResolvedValue({ candidates: outcome === 'recovered' ? [recovered] : [], complete: true, digest: 'recovered', provider: 'mangadex', truncated: false });
+      ports.mangadex.hydrate.mockResolvedValue(recovered);
+    }
+    if (outcome === 'deferred') ports.mangadex.search.mockRejectedValue(new FavoriteProviderRetryError('cadence', Date.now() + 120_000));
+    const resumed = createPublicDiscoveryResolver(ports).resolve({ ...request('MANGA'), searchProgress: checkpoint });
+    if (outcome === 'empty') await expect(resumed).rejects.toThrow('HTTP 503');
+    else if (outcome === 'deferred') await expect(resumed).rejects.toBeInstanceOf(FavoriteProviderRetryError);
+    else await expect(resumed).resolves.toMatchObject({ state: outcome === 'cleared' ? 'NOT_FOUND' : 'VERIFIED' });
+    expect(pages).toEqual(outcome === 'recovered' ? ['1', '2', '3', '4'] : ['1', '2', '3', '4', '5']);
+    expect(ports.mangadex.search).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([['anilist'], ['kitsu-manga'], ['mangaupdates'], ['mangadex', 'mangadex']] as const)('rejects invalid retry-provider checkpoints %j', async (...retryProviders) => {
+    const ports = providers();
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...request('MANGA'), searchProgress: {
+      candidates: [], cursor: '5', provider: 'kitsu-manga', retryProviders, titleIndex: 0, version: 1,
+    } })).rejects.toThrow('provider-search-progress-lane-mismatch');
+    expect(ports.mangadex.search).not.toHaveBeenCalled();
+  });
+
   it('stops repeated cursors rather than claiming the provider was exhausted', async () => {
     const ports = providers();
     ports.anilist.search.mockResolvedValue({ candidates: [], complete: false, digest: 'partial', nextCursor: '2', provider: 'anilist', truncated: true });

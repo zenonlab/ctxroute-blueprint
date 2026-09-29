@@ -62,14 +62,21 @@ const failureCodeSchema = z.enum([
 const failureSchema = z.strictObject({ code: failureCodeSchema, schemaVersion: z.literal(1) });
 const correlationFailureCodes = new Set([
   'discovery-canary-observer-accepted-results', 'discovery-canary-observer-ambiguous-cost',
-  'discovery-canary-observer-byte-limit', 'discovery-canary-observer-correlation-limit',
+  'discovery-canary-observer-byte-limit', 'discovery-canary-observer-cleanup-failed',
+  'discovery-canary-observer-correlation-limit', 'discovery-canary-observer-count-limit',
   'discovery-canary-observer-d1-budget', 'discovery-canary-observer-duplicate-request',
-  'discovery-canary-observer-exception', 'discovery-canary-observer-failed-result',
-  'discovery-canary-observer-http-429', 'discovery-canary-observer-invalid-cost',
-  'discovery-canary-observer-no-provider-calls', 'discovery-canary-observer-outcome',
-  'discovery-canary-observer-provider-429', 'discovery-canary-observer-provider-error',
-  'discovery-canary-observer-provider-mismatch', 'discovery-canary-observer-queue-failure',
+  'discovery-canary-observer-exception', 'discovery-canary-observer-exited',
+  'discovery-canary-observer-failed', 'discovery-canary-observer-failed-result',
+  'discovery-canary-observer-http-429', 'discovery-canary-observer-invalid-budget',
+  'discovery-canary-observer-invalid-cost', 'discovery-canary-observer-invalid-frame',
+  'discovery-canary-observer-invalid-request-id', 'discovery-canary-observer-invalid-tail-url',
+  'discovery-canary-observer-missing-correlated-cost',
+  'discovery-canary-observer-no-provider-calls', 'discovery-canary-observer-not-ready',
+  'discovery-canary-observer-outcome', 'discovery-canary-observer-provider-429',
+  'discovery-canary-observer-provider-error', 'discovery-canary-observer-provider-mismatch',
+  'discovery-canary-observer-queue-failure', 'discovery-canary-observer-readiness-probe',
   'discovery-canary-observer-request-mismatch', 'discovery-canary-observer-truncated',
+  'discovery-canary-observer-depth-limit', 'discovery-canary-observer-unsupported-platform',
   'discovery-recovery-cost-missing', 'discovery-recovery-http-429',
 ]);
 const headerSchema = z.record(z.string(), z.string());
@@ -204,6 +211,7 @@ class InstalledReviewNetworkGuard {
     this.captured = new Set(capturedSubmissions.map(({ key }) => digestKey(key)));
     this.failure = sealedFailure?.code;
     this.inFlight = new Set();
+    this.mutationTail = Promise.resolve();
     this.readPhaseClosed = false;
     this.reservation = Promise.resolve();
     this.counts = {
@@ -267,6 +275,15 @@ class InstalledReviewNetworkGuard {
 
   async drain() {
     while (this.inFlight.size > 0) await Promise.allSettled(this.inFlight);
+  }
+
+  async serializeMutation(operation) {
+    const previous = this.mutationTail;
+    let release;
+    this.mutationTail = new Promise((resolve) => { release = resolve; });
+    await previous;
+    try { return await operation(); }
+    finally { release(); }
   }
 
   closeReadPhase() {
@@ -354,6 +371,7 @@ class InstalledReviewNetworkGuard {
       await this.abort(route, 'mutation-scope-rejected');
       return;
     }
+    await this.serializeMutation(async () => {
     const reservation = await this.exclusively(async () => {
       if (this.failure !== undefined) return 'guard-failed';
       const currentMutations = this.counts.forwardedRequests + this.counts.forwardedRefreshes;
@@ -385,9 +403,16 @@ class InstalledReviewNetworkGuard {
     }
     try {
       const response = await route.fetch({ maxRedirects: 0, maxRetries: 0, timeout: 45_000 });
-      if (scopedEntry !== undefined && okMutation.has(response.status())) await this.options.onAdmission?.(submission, response);
+      if (scopedEntry !== undefined && okMutation.has(response.status())) {
+        try { await this.options.onAdmission?.(submission, response); }
+        catch {
+          await this.abort(route, 'correlation-failed');
+          return;
+        }
+      }
       await this.acceptResponse(route, response, okMutation, 'mutation-status-rejected');
     } catch { await this.abort(route, 'mutation-network-failed'); }
+    });
   }
 
   async handleDiscoveryRead(route, request, url) {
@@ -519,20 +544,23 @@ export async function createInstalledRecoveryObservation({ onFailure, recordAdmi
   const admissions = [];
   let failure;
   let failureCode;
-  const fail = error => {
+  let failureEvidence;
+  const fail = async error => {
     failure ??= error;
     const code = safeFailureCode(error);
     failureCode ??= correlationFailureCodes.has(code) ? code : 'discovery-recovery-failed';
+    failureEvidence ??= observer.failureEvidence?.();
     controller.abort();
-    void onFailure();
+    await onFailure();
   };
-  void observer.failed.catch(fail);
+  void observer.failed.catch(error => { void fail(error); });
   const readinessTimer = setTimeout(() => controller.abort(), 75_000);
   try { await ready(observer, controller.signal); }
   catch (error) { await observer.close(); throw error; }
   finally { clearTimeout(readinessTimer); }
   return {
     failureCode: () => failureCode,
+    failureEvidence: () => failureEvidence,
     async onAdmission(submission, response) {
       assert.equal(failure, undefined, 'Recovery observer failed.');
       const requestId = response.headers()['x-tobirink-request-id'];
@@ -548,7 +576,18 @@ export async function createInstalledRecoveryObservation({ onFailure, recordAdmi
       admissions.push(requestId);
       const signal = globalThis.AbortSignal.any([controller.signal, globalThis.AbortSignal.timeout(12 * 60_000)]);
       const sharedObserver = { check: () => observer.check(), read: id => observer.read(id), close: async () => undefined };
-      tasks.push(complete({ observer: sharedObserver, key: submission.key, admission: { payload, requestId }, signal }).catch(fail));
+      const task = complete({ observer: sharedObserver, key: submission.key, admission: { payload, requestId }, signal })
+        .then(async () => {
+          const cost = observer.read(requestId);
+          assert.ok(cost && cost.providerRequests >= 1 && cost.acceptedResults >= 1 && cost.provider429s === 0
+            && cost.providerHttpErrors === 0 && cost.providerNetworkErrors === 0 && cost.queueFailures === 0
+            && cost.d1RowsRead <= 300, 'Recovery correlated cost policy failed.');
+          await recordCost?.({ requestId, cost });
+          return { providerRequests: cost.providerRequests, d1RowsRead: cost.d1RowsRead, d1RowsWritten: cost.d1RowsWritten };
+        })
+        .catch(async error => { await fail(error); throw error; });
+      tasks.push(task);
+      await task;
     },
     async finish(expected) {
       await Promise.all(tasks);
@@ -556,15 +595,8 @@ export async function createInstalledRecoveryObservation({ onFailure, recordAdmi
       observer.check();
       assert.equal(failure, undefined, 'Recovery correlation failed.');
       assert.equal(admissions.length, expected, 'Every scoped admission requires correlated evidence.');
-      return Promise.all(admissions.map(async requestId => {
-        const cost = observer.read(requestId);
-        assert.ok(cost && cost.providerRequests >= 1 && cost.acceptedResults >= 1 && cost.provider429s === 0
-          && cost.providerHttpErrors === 0 && cost.providerNetworkErrors === 0 && cost.queueFailures === 0
-          && cost.d1RowsRead <= 300, 'Recovery correlated cost policy failed.');
-        await recordCost?.({ requestId, cost });
-        return { providerRequests: cost.providerRequests, d1RowsRead: cost.d1RowsRead, d1RowsWritten: cost.d1RowsWritten };
-      }));
+      return Promise.all(tasks);
     },
-    async close() { controller.abort(); await observer.close(); await Promise.all(tasks); },
+    async close() { controller.abort(); await observer.close(); await Promise.allSettled(tasks); },
   };
 }

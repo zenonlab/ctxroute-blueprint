@@ -1941,6 +1941,41 @@ Trois invocations Queue corrélées dans Observability ont l'outcome
 délai d'observation ou un cron ne répare donc pas cette limite CPU. Le cron
 `*/10 * * * *` est bien installé ; le claim et le consommateur restent à 1/1.
 
+Le pilote autorisé `batch-007` a créé une seule admission puis s’est arrêté
+sur `discovery-canary-observer-request-mismatch`; les neuf autres clés n’ont
+pas été envoyées et la réservation de la première clé reste consommée. Une
+lecture D1 indexée ultérieure a observé `NOT_FOUND` après deux claims, sans
+écriture. Aucun certificat de coût corrélé ni preuve de projection Library
+n’est disponible pour cette admission. Le reçu ne contient pas l’enveloppe
+Tail brute; l’inversion d’ordre Queue/HTTP est donc un scénario reproduit par
+test, pas une cause empirique attribuée à cette enveloppe. La candidate garde
+maintenant le coût Queue corrélé dans un tampon borné jusqu’à la trace HTTP
+correspondante, sans certifier le coût seul. Aucun rejeu de la clé consommée.
+
+L’audit suivant a reproduit une seconde asymétrie du banc : une trace HTTP
+d’admission valide reçue avant le coût Queue échouait immédiatement avec
+`ambiguous-cost`. Ce cas est désormais attendu en mode reprise, sans certificat
+avant les deux preuves du même UUID. Les six permutations en-tête/HTTP/Queue
+passent; coût absent ou étranger, admission invalide et dépassement D1 restent
+refusés. Cette régression locale n’attribue pas rétroactivement la cause du
+pilote `batch-007` et ne déclenche aucune reprise distante.
+
+Le 29 septembre, un test hors ligne du runtime 1.0.48 a exporté puis restauré
+une copie historique fermée contenant 1 522 sources et 821 œuvres, toutes
+avec `hydration.publicDiscovery`. L’export chiffré mesure 4 065 652 octets;
+une mauvaise phrase secrète est refusée sans modifier le snapshot. Le snapshot
+décrypté est strictement identique après restauration puis après deux
+redémarrages Chromium. Le reçu privé est
+`build/audits/private-roundtrip-MfRl2O/report.json` (0600, hors Git).
+Le build de test conserve le background SHA-256
+`3cf4872e87e5942764c840094a763db2866960ac8e86e8ca8b1beeea07c701e9`,
+mais son manifeste épingle uniquement pour ce test l’identité de la copie
+IndexedDB. L’ancienne extension temporaire ayant perdu son manifeste, les
+premiers essais incomplets restent conservés. Cette preuve ne certifie ni
+l’archive publique exacte, ni une mise à jour en place, ni l’état actuel du
+profil personnel. Aucune admission de production ni modification du profil
+d’origine n’a été effectuée.
+
 La candidate borne désormais à deux recherches fournisseur réussies par
 invocation sans erreur fournisseur, puis persiste le curseur et émet une
 continuation sans nouvel essai. Les échecs fournisseur gardent leur traitement
@@ -1978,3 +2013,107 @@ expiration ; la nouvelle admission normale requise est bloquée par le budget
 zéro POST du test. Ce code local n'établit donc pas une panne réseau du Worker.
 La source n'est pas admise dans cette mesure et reste à vérifier dans un
 parcours autorisé distinct.
+
+Un pilote ultérieur, autorisé sur dix identités MANGA, a été stoppé par
+`discovery-canary-observer-d1-budget` après le transfert des dix admissions.
+L'observateur a constaté plus de 300 lignes D1 cumulées pour une corrélation ;
+les états terminaux et la projection Library de ce lot ne sont pas certifiés.
+Les reçus d'origine ne conservent pas la ventilation du coût. Le banc ajoute
+désormais au rapport privé un agrégat borné (lectures/écritures D1, événements,
+fournisseurs/résultats, appels et reprises), sans identifiant, titre, URL ou
+exception brute. Le plafond de 300 ne change pas. Ne pas rejouer les clés ni
+lancer un nouveau lot avant d'avoir exploité cette ventilation sur un pilote
+distinctement autorisé.
+
+La candidate locale du banc sérialise maintenant les admissions : elle
+réserve durablement une clé, attend son résultat terminal et sa corrélation D1
+≤ 300, écrit le reçu privé, puis seulement ouvre la clé suivante. Le premier
+échec bloque les POST en attente. Cela réduit l’impact d’un dépassement, mais
+ne démontre pas sa cause Worker ; les clés batch-006 restent consommées et ne
+sont pas rejouées. Aucune nouvelle demande n’est partie après ce constat.
+
+Une requête d’audit Logs limitée aux dix identifiants exacts et à cinq minutes
+a néanmoins scanné 1 777 948 lignes (146 946 150 octets), car ce filtre n’est
+pas indexé pour borner le scan. Elle était en `dry` et n’a pas modifié le
+Worker, D1 ou la Queue. Ne pas répéter cette recherche ni lancer d’analytics
+historiques sans filtre pris en charge et coût de lecture borné.
+
+Un diagnostic local antérieur, distinct de batch-006 et explicitement marqué
+non certifiant, contient un événement `discovery` `failed` après un appel
+MangaDex, zéro résultat accepté et 66 lignes D1; la Queue le classe
+`collector-internal`. Il ne suffit pas à attribuer la panne au fournisseur ni
+à expliquer le dépassement batch-006. L’audit a trouvé que la branche
+d’exception du consommateur n’incluait pas l’UUID dans son événement de coût.
+La candidate Worker le conserve maintenant, avec une régression ciblée; aucun
+nouveau pilote ni déploiement n’en découle.
+
+### Audit local du fallback et import headless du 29 septembre 2026
+
+Une régression intégrée reproduit un résultat resolver `VERIFIED` MangaDex,
+lié à l’identité MangaUpdates demandée, rejeté par le runner local avec
+`HYDRATION_REFERENCE_MISMATCH`. Le correctif conserve l’égalité directe et
+accepte ce secours seulement avec l’identifiant exact dans le candidat hydraté
+et les références publiques. Les cinq variantes de preuve incorrecte restent
+techniques, sans création de Work, de Library ou de Review. Les 67 tests du
+runner et les 483 tests application passent, ainsi que `npm run verify`,
+Archify `discovery-recovery.dataflow` (9/9) et les E2E Web (11 réussis,
+1 ignoré). L’audit npm conserve quatre vulnérabilités modérées.
+
+Le profil headless neuf `tobirink-installed-review-UoC9cZ` importe exclusivement
+les 1 522 sources de l’export Downloads. Après 1 195 secondes : 1 045 sources
+résolues, 50 Review, 53 exclusions et 374 attentes. Les 859 œuvres distinctes
+résolues sont projetées : zéro œuvre manquante et zéro erreur interne.
+Le service worker et le navigateur redémarrent sans perte des données vérifiées.
+Il s’agit du build local 1.0.48, non d’une archive publique certifiée : SHA-256
+du background `1f8f14f5e8ddf65481713008624673563cf007a1a39501f17f6863d5ea77d5fe`.
+
+Le banc effectue 1 652 lectures HTTP, aucun POST d’admission transmis, aucun
+refresh et aucun appel fournisseur navigateur. Ses 142 tentatives de mutation
+sont bloquées; 18 demandes distinctes sont conservées en privé. Le verdict est
+`incomplete`, pas un succès de convergence. Le rapport privé est sous
+`build/installed-review/`, et le profil original de cet essai est conservé.
+
+L’audit d’une copie hors ligne corrèle les 11 `NETWORK` et l’`ADMISSION_WAIT`
+aux admissions bloquées par le banc : ces compteurs ne prouvent pas une panne
+réseau fournisseur. Les lectures D1 exactes couvrent les 318 identités uniques
+des 374 sources restantes (318 lignes lues, zéro écriture). Elles établissent
+que 362 sources correspondent à 307 identités `FAILED/ATTEMPT_LIMIT`, et que
+les 12 autres correspondent à 11 résultats négatifs expirés. Une vérification
+séparée de l’expiration lit 11 lignes, sans écriture. Ces derniers attendent
+l’admission normale, pas le réarmement d’un échec.
+
+Les preuves privées sont dans `build/audits/fallback-local-lFhZHE/`, en mode
+0600. Le plan SQL vérifié utilise les recherches sur la clé complète, sans
+scan; les lots de lecture sont bornés à dix résultats. Deux essais de requête
+composée ont été refusés (`too many terms in compound SELECT` confirmé pour
+le second), puis remplacés par des conditions OR indexées. Le probe de
+connexion, le contrôle unitaire (une ligne) et EXPLAIN sont distincts des
+318 lectures de campagne. Aucun réarmement, déploiement ou téléchargement
+public n’a été effectué. Le défaut de projection corrigé ne suffit pas à
+expliquer l’historique fournisseur des 307 identités épuisées.
+
+### Défaut serveur reproduit : perte du curseur du fallback
+
+Le resolver abandonnait `PublicDiscoverySearchContinuationError` lorsqu’un
+fournisseur précédent avait échoué. Une réponse HTTP 503 de MangaDex suivie
+de quatre pages Kitsu réussies mais incomplètes remontait donc seulement le
+503 : la page 5 contenant une correspondance n’était jamais atteinte lors
+d’une nouvelle tentative. La régression échoue avant correction, puis vérifie
+la séquence de pages 1, 2, 3, 4, 5 sans répétition après correction.
+
+Le checkpoint conserve maintenant les fournisseurs précédents à revérifier
+dans `retryProviders`. Leur récupération est prise en compte, leur panne
+persistante interdit un faux `NOT_FOUND`, et une continuation sans avancée
+ne rembourse pas artificiellement l’échec. Les tests couvrent aussi la
+cadence, les listes incohérentes et la lecture des checkpoints antérieurs.
+Ce résultat est une reproduction locale avec réponses simulées : il ne
+prouve pas que cette seule cause explique les 307 identités historiques.
+Aucun réarmement, changement du plafond de tentatives ou cron n’est ajouté.
+
+La borne Worker de deux recherches réussies était également conditionnée à
+l’absence de panne antérieure. Une seconde régression reproduit ce contournement;
+la borne est maintenant inconditionnelle, le checkpoint conservant la suite
+du fallback. Les 70 tests Worker/Queue ciblés et 205 tests Discovery passent.
+Le test D1 conserve le curseur et `retryProviders` entre claims; le scénario
+de panne persistante reste borné à huit échecs, avec au plus 50 appels D1
+par invocation. Ces correctifs serveur restent locaux jusqu’au déploiement.

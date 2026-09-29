@@ -6,6 +6,7 @@ scope:
   - apps/extension/runtime/favorite-resolution-continuation.ts
   - apps/extension/runtime/favorite-resolution-runtime.ts
   - apps/worker/src/index.ts
+  - apps/worker/src/native-collectors.ts
   - apps/worker/wrangler.jsonc
   - apps/extension/runtime/use-resolution-status.ts
   - packages/application/src/favorites/public-discovery-resolution.ts
@@ -14,6 +15,8 @@ scope:
   - packages/application/src/public-discovery/public-discovery-contract.ts
   - packages/adapters-browser/src/catalogue/http-public-discovery-adapter.ts
   - scripts/infra/discovery-recovery-batch.mjs
+  - apps/extension/scripts/installed-review.mjs
+  - apps/extension/scripts/installed-review-network.mjs
   - docs/architecture/src/real-favorite-resolution.dataflow.json
 review: on-change
 revised: true
@@ -33,20 +36,55 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ## Décision
 
+Une pagination de secours qui avance après une panne conserve son curseur et
+une liste bornée `retryProviders` des fournisseurs antérieurs à revérifier.
+La reprise revérifie ces fournisseurs avant de continuer à la page enregistrée;
+un échec antérieur ne suffit plus à effacer le travail réussi du secours.
+La borne Worker de deux recherches réussies s’applique aussi après une panne,
+avec continuation durable plutôt que désactivation du budget pendant le secours.
+Une continuation sans avancée après panne reste un échec consommé, et un
+secours vide ne devient jamais `NOT_FOUND` tant qu’une lane reste indisponible.
+Les checkpoints v1 sans ce champ restent lisibles. Les checkpoints comportant
+des fournisseurs étrangers à la lane, dupliqués ou postérieurs au curseur
+sont refusés. Cette correction n’autorise aucun réarmement de demandes FAILED.
+Le déploiement doit conserver le lecteur de `retryProviders` tant que des
+checkpoints le contiennent : revenir à un ancien binaire strict qui ignore ce
+champ n’est pas un rollback compatible. Aucun checkpoint n’est effacé pour
+contourner cette contrainte. Le média UNKNOWN garde son refus de conclure si
+la lane anime demeure indisponible; cette correction ne supprime pas cette garde.
+
+La projection locale d’un résultat `VERIFIED` accepte le secours MangaUpdates
+vers MangaDex uniquement si l’identifiant MangaUpdates demandé apparaît à la
+fois dans les `linkedReferences` du candidat hydraté et dans les références de
+la fiche publique. Le changement de fournisseur principal n’est alors pas un
+`HYDRATION_REFERENCE_MISMATCH`. Sans cette double preuve exacte, le rejet
+technique reste inchangé. Un test intégré du resolver jusqu’à Work et Library
+couvre le secours, l’identité directe et les preuves absentes ou divergentes,
+sans accès fournisseur depuis le navigateur ni conversion artificielle en Review.
+
 Après admission, `PENDING` est observé sans second POST, y compris après
 expiration de `retryAt` ou redémarrage. Une échéance passée est bornée à une
 minute pour éviter une boucle locale. `MISS` conserve l'admission normale;
 `UNAVAILABLE` conserve la confirmation explicite de reprise.
 
 Le banc installé ne redémarre ni le service worker ni le navigateur pendant
-les admissions du pilote scellé. Il attend la projection locale et la preuve
-corrélée, persiste les coûts validés par UUID dans des reçus privés exclusifs,
+les admissions du pilote scellé. Il sérialise les POST : la réservation durable
+précède chaque envoi et l'observation attend, pour cette seule clé, l'état
+terminal, le coût corrélé (au plus 300 lignes D1 cumulées) et son reçu privé
+avant d'ouvrir la suivante. Tout échec arrête les POST suivants ; les clés déjà
+réservées restent consommées. Il persiste les coûts validés par UUID,
 ferme l'admission des nouvelles lectures, met l'analyse en pause par
 l'interface, puis draine les routes avant les tests locaux de conservation.
 Les lectures déjà engagées conservent leur caractère fatal en cas d'erreur;
 la fermeture ne relâche aucune garde de mutation. Un échec d'écriture du reçu
 de coût interdit la certification. Une interruption garde la réservation, même sans
 réponse d'admission reçue : une lecture de contrôle n'autorise jamais un renvoi.
+
+Le Worker conserve aussi l’UUID d’admission dans l’événement de coût émis par
+la branche d’exception du consommateur Queue. Le reçu inclut ainsi le coût D1
+mesuré avant l’erreur au lieu de devenir une continuation orpheline. Cette
+corrélation améliore le diagnostic; elle ne transforme ni l’échec en succès
+ni la relance Queue en résultat terminal.
 
 L’extension expose une action utilisateur explicite, visible uniquement lorsqu’un compteur `providerPaused` est présent. Cette action :
 
@@ -115,6 +153,20 @@ erreur Queue ou dépassement des 300 lectures D1 cumulées interdisent le
 certificat et l’admission suivante. Avant de persister `TERMINAL`, le runner
 ferme et draine l’observateur, vérifie encore son état et relit le coût final.
 Une erreur tardive ou un coût final invalide empêche donc le reçu terminal.
+Les événements Tail de l’admission HTTP et de son travail Queue peuvent arriver
+dans un ordre différent de leur exécution. En mode reprise, un coût Queue portant
+un UUID attendu mais reçu avant la trace HTTP est conservé dans un tampon borné
+par le budget d’enveloppes; il reste non certifié jusqu’à l’arrivée de la trace
+HTTP `POST` correspondante. Le tampon est joint uniquement à ce même UUID, puis
+les statuts, la route, les compteurs et le coût terminal sont validés ensemble.
+Un coût sans trace HTTP correspondante n’est jamais certifié et échoue à la
+clôture; doublons et dépassements restent des erreurs fermées.
+Inversement, une admission HTTP valide sans coût collecteur reste en attente
+en mode reprise : son budget et ses champs sont contrôlés immédiatement, mais
+elle ne devient certifiable qu’après le coût Queue du même UUID. Si celui-ci
+manque encore à la clôture, la preuve échoue. Les six ordres d’arrivée entre
+l’en-tête de réponse, la trace HTTP et le coût Queue sont couverts par régression;
+le comportement strict des canaris de livraison reste inchangé.
 Cette évolution ne change ni `claim(1)`, ni Queue 1/1, ni les règles de
 réarmement ou d’arrêt.
 
@@ -251,7 +303,10 @@ Le rollback de cette qualification ne réarme ni ne supprime aucune ligne.
 Si l'observateur du profil installé échoue, son rapport privé conserve
 uniquement un code de cause issu d'une allowlist fermée ; un message inconnu
 devient `discovery-recovery-failed`. Le résumé ne publie jamais l'exception
-brute. Ce diagnostic n'autorise ni rejeu d'une clé réservée ni certification
+brute. Pour `discovery-canary-observer-d1-budget`, il conserve aussi les
+compteurs D1 agrégés par corrélation, le nombre d'événements et les noms fermés
+de fournisseurs/résultats. Aucun identifiant, titre, URL ou payload n'est
+ajouté. Ce diagnostic n'autorise ni rejeu d'une clé réservée ni certification
 rétroactive d'un pilote interrompu.
 
 La récupération est observable et réversible au niveau applicatif : désactiver le contrôle empêche toute nouvelle action, sans supprimer ni réécrire les données existantes. Une reprise de centaines d’entrées prend volontairement du temps afin de respecter la cadence publique ; les réponses `PENDING` restent dans la file et sont réconciliées ultérieurement.

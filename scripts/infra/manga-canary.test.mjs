@@ -187,6 +187,14 @@ function envelope(requestId, events = [cost(), admissionCost()], overrides = {})
     exceptions: [], ...overrides };
 }
 
+function admissionEnvelope(requestId) {
+  const value = envelope(requestId, [admissionCost()]);
+  value.event.request.url = 'https://tobirink.com/v3/catalogue/discoveries/requests';
+  value.event.response.status = 202;
+  value.logs[0].message[value.logs[0].message.length - 1] = JSON.stringify(requestEvent(requestId));
+  return value;
+}
+
 function queueEnvelope(correlationId, events = [cost({ correlationId })], overrides = {}) {
   return { outcome: 'ok', event: { queue: 'tobirink-public-discovery', batchSize: 1 },
     logs: [{ message: events.map(row => JSON.stringify(row)) }], exceptions: [], ...overrides };
@@ -419,6 +427,98 @@ test('Queue continuation cannot certify another or missing admission', () => {
   assert.throws(() => overBudget.push(frame(queueEnvelope(requestId, [
     cost({ correlationId: requestId, d1RowsRead: 51 }),
   ]))), /d1-budget/u);
+  assert.deepEqual(overBudget.failureEvidence(), {
+    acceptedResults: 1,
+    admissionD1RowsRead: 30,
+    collectorD1RowsRead: 271,
+    collectorEvents: 2,
+    d1RowsRead: 301,
+    d1RowsWritten: 8,
+    providers: ['anilist'],
+    providerRequests: 2,
+    queueFailures: 0,
+    queueSends: 1,
+    retries: 0,
+    results: ['failed', 'changed'],
+  });
+  assert.doesNotMatch(JSON.stringify(overBudget.failureEvidence()), /fingerprint|requestId|title|url/iu);
+});
+
+test('recovery correlation buffers Queue costs until the matching admission envelope arrives', () => {
+  for (const trackBeforeQueue of [true, false]) {
+    const requestId = identity(1);
+    const observation = createCostObservation({ allowProviderContinuation: true });
+    if (trackBeforeQueue) observation.track(requestId, { ...expectation, provider: 'any' });
+    observation.push(frame(queueEnvelope(requestId, [cost({ correlationId: requestId })])));
+    assert.equal(observation.read(requestId), undefined);
+    if (!trackBeforeQueue) observation.track(requestId, { ...expectation, provider: 'any' });
+    observation.push(frame(admissionEnvelope(requestId)));
+    const proof = observation.read(requestId);
+    assert.equal(proof.providerRequests, 1);
+    assert.equal(proof.acceptedResults, 1);
+    assert.equal(proof.d1RowsRead, 15);
+  }
+});
+
+test('a deferred Queue cost without its matching HTTP admission remains uncertified', () => {
+  const requestId = identity(1);
+  const observation = createCostObservation({ allowProviderContinuation: true });
+  observation.track(requestId, { ...expectation, provider: 'any' });
+  observation.push(frame(queueEnvelope(requestId, [cost({ correlationId: requestId })])));
+  assert.equal(observation.read(requestId), undefined);
+  assert.throws(() => observation.finish(), /request-mismatch/u);
+});
+
+test('recovery evidence is independent of header, HTTP and Queue arrival order', () => {
+  for (const order of [
+    ['track', 'http', 'queue'], ['track', 'queue', 'http'],
+    ['http', 'track', 'queue'], ['http', 'queue', 'track'],
+    ['queue', 'track', 'http'], ['queue', 'http', 'track'],
+  ]) {
+    const requestId = identity(1);
+    const observation = createCostObservation({ allowProviderContinuation: true });
+    const receive = {
+      track: () => observation.track(requestId, { ...expectation, provider: 'any' }),
+      http: () => observation.push(frame(admissionEnvelope(requestId))),
+      queue: () => observation.push(frame(queueEnvelope(requestId))),
+    };
+    for (const [index, event] of [...order].entries()) {
+      receive[event]();
+      if (index < 2) assert.equal(observation.read(requestId), undefined, order.join(','));
+    }
+    assert.equal(observation.read(requestId).d1RowsRead, 15, order.join(','));
+    assert.equal(observation.read(requestId).providerRequests, 1, order.join(','));
+    observation.finish();
+  }
+});
+
+test('an admission without its own Queue result cannot certify recovery', () => {
+  const requestId = identity(1);
+  const observation = createCostObservation({ allowProviderContinuation: true });
+  observation.track(requestId, { ...expectation, provider: 'any' });
+  observation.push(frame(admissionEnvelope(requestId)));
+  observation.push(frame(queueEnvelope(identity(2))));
+  assert.equal(observation.read(requestId), undefined);
+  assert.throws(() => observation.finish(), /ambiguous-cost/u);
+});
+
+test('waiting for Queue never relaxes admission validation or its D1 budget', () => {
+  for (const [changes, reason] of [
+    [{ d1RowsRead: 301 }, 'd1-budget'],
+    [{ d1RowsWritten: undefined }, 'invalid-cost'],
+    [{ providerRequests: 1 }, 'invalid-cost'],
+    [{ result: 'failed' }, 'invalid-cost'],
+  ]) {
+    const requestId = identity(1);
+    const observation = createCostObservation({ allowProviderContinuation: true });
+    observation.track(requestId, { ...expectation, provider: 'any' });
+    const value = admissionEnvelope(requestId);
+    value.logs[0].message[1] = JSON.stringify(admissionCost(changes));
+    assert.throws(() => observation.push(frame(value)), new RegExp(reason, 'u'));
+  }
+  const strict = createCostObservation();
+  strict.track(identity(1), expectation);
+  assert.throws(() => strict.push(frame(admissionEnvelope(identity(1)))), /ambiguous-cost/u);
 });
 
 test('request headers cannot reuse readiness or earlier admission proof', () => {

@@ -44,6 +44,9 @@ describe('public discovery request minimization', () => {
   it('reads old search checkpoints and rejects an incomplete anime lane', () => {
     const base = { candidates: [], cursor: '1', provider: 'mangaupdates', titleIndex: 0, version: 1 };
     expect(publicDiscoverySearchProgressSchema.parse(base)).toEqual(base);
+    expect(publicDiscoverySearchProgressSchema.parse({ ...base, retryProviders: ['mangadex'] }).retryProviders).toEqual(['mangadex']);
+    expect(publicDiscoverySearchProgressSchema.safeParse({ ...base, retryProviders: ['mangadex', 'mangadex'] }).success).toBe(false);
+    expect(publicDiscoverySearchProgressSchema.safeParse({ ...base, retryProviders: [] }).success).toBe(false);
     expect(publicDiscoverySearchProgressSchema.safeParse({ ...base, animeLane: { candidates: [], references: [], state: 'MATCH' } }).success).toBe(false);
     expect(publicDiscoverySearchProgressSchema.safeParse({ ...base, animeLane: { candidates: [], references: [], state: 'NOT_FOUND' } }).success).toBe(true);
   });

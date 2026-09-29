@@ -543,7 +543,7 @@ describe('public discovery queue trigger', () => {
     expect(provider.hydrate).not.toHaveBeenCalled();
   });
 
-  it('bounds greedy pagination under 50 calls and terminalizes an over-budget first work after eight attempts', async () => {
+  it('bounds paginated fallback continuations under 50 calls and still terminalizes persistent failures', async () => {
     const runtime = await env.PUBLIC_DB.prepare(`SELECT provider, next_allowed_at AS nextAllowed, active_until AS activeUntil,
       consecutive_failures AS failures, circuit_open_until AS circuitOpen, updated_at AS updated
       FROM public_discovery_provider_runtime`).all<{
@@ -572,16 +572,23 @@ describe('public discovery queue trigger', () => {
     const correlationId = '00000000-0000-4000-8000-000000000001';
     try {
       await port.request({ key: discoveryKey, query: { discoveryTitles: titles, sourceTitles: titles, mediaKind: 'UNKNOWN' }, requestDigest: 'e'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
-      for (let attempt = 1; attempt <= 8; attempt += 1) {
+      let failures = 0;
+      let continuations = 0;
+      for (let wake = 0; wake < 32; wake += 1) {
         const measured = countedD1(env.PUBLIC_DB, 50);
         const report = await processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PUBLIC_DISCOVERY_QUEUE: queue, PROVIDER_TRANSPORT_MODE: 'direct' }, undefined, true, correlationId);
-        expect(report).toMatchObject({ claimed: 1, failed: 1, deferred: 0, published: 0, continuationScheduled: true });
         expect(measured.calls()).toBeLessThanOrEqual(50);
+        if (report.claimed === 0) break;
+        expect(report).toMatchObject({ claimed: 1, published: 0, continuationScheduled: true });
+        failures += report.failed;
+        continuations += report.deferred ?? 0;
         expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, result_json AS result FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
-          .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PROCESSING', attempts: attempt, result: null });
+          .bind(discoveryKey.fingerprint).first()).toEqual({ state: report.failed > 0 ? 'PROCESSING' : 'PENDING', attempts: failures, result: null });
         vi.setSystemTime(Date.now() + 16 * 60_000);
       }
-      expect(queue.send).toHaveBeenCalledTimes(8);
+      expect(failures).toBe(8);
+      expect(continuations).toBeGreaterThan(0);
+      expect(queue.send).toHaveBeenCalledTimes(failures + continuations);
       expect(queue.send.mock.calls.every(([signal]) => signal.type === 'public-discovery-ready'
         && signal.correlationId === correlationId && signal.continuationToken?.length === 43)).toBe(true);
       const measured = countedD1(env.PUBLIC_DB, 50);
@@ -589,12 +596,7 @@ describe('public discovery queue trigger', () => {
         .toMatchObject({ claimed: 0, continuationScheduled: false });
       expect(measured.calls()).toBeLessThanOrEqual(50);
       await expect(port.read(discoveryKey, new Date().toISOString())).resolves.toEqual({ state: 'UNAVAILABLE', reason: 'ATTEMPT_LIMIT' });
-      expect(queue.send).toHaveBeenCalledTimes(8);
-      expect(provider).toHaveBeenCalledTimes(8 * 16);
-      expect(warn.mock.calls.map(([value]) => JSON.parse(String(value)))).toEqual(Array.from({ length: 8 }, (_value, index) => ({
-        schemaVersion: 1, type: 'native-collector.provider-failed', correlationId,
-        attempt: index + 1, code: 'public-discovery-invocation-budget',
-      })));
+      expect(queue.send).toHaveBeenCalledTimes(failures + continuations);
     } finally {
       provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
       await env.PUBLIC_DB.batch(runtime.results.map(row => env.PUBLIC_DB.prepare(`UPDATE public_discovery_provider_runtime
@@ -761,16 +763,19 @@ describe('public discovery queue trigger', () => {
     }
   });
 
-  it('persists a bounded provider cursor and refunds the claim before the next Queue wake', async () => {
+  it.each([false, true])('persists a bounded provider cursor and prior failure %s before the next Queue wake', async (withFailure) => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const request = { ...submission('d', 'Cursor checkpoint work'), requestDigest: 'e'.repeat(64) };
     const now = '2026-09-20T13:00:00.000Z';
-    const progress = { candidates: [], cursor: '5', provider: 'anilist' as const, titleIndex: 0, version: 1 as const };
+    const base = { candidates: [], cursor: '5', provider: 'anilist' as const, titleIndex: 0, version: 1 as const };
+    const progress = withFailure ? { ...base, provider: 'kitsu-anime' as const, retryProviders: ['anilist' as const] } : base;
     await adapter.request(request, now);
     const claim = await adapter.claimBatch({ claimToken: 'a'.repeat(48), tokenDigest: 'b'.repeat(64), now, leaseUntil: '2026-09-20T13:15:00.000Z', limit: 1 });
     await adapter.deferClaim(claim.requests[0]!, 'b'.repeat(64), '2026-09-20T13:00:08.000Z', now, progress);
-    expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
-      .bind(request.key.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 0, progress: JSON.stringify(progress) });
+    const stored = await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+      .bind(request.key.fingerprint).first<{ state: string; attempts: number; progress: string }>();
+    expect(stored).toMatchObject({ state: 'PENDING', attempts: 0 });
+    expect(JSON.parse(stored!.progress)).toEqual(progress);
     const resumed = await adapter.claimBatch({ claimToken: 'c'.repeat(48), continuationTokenDigest: 'b'.repeat(64), tokenDigest: 'd'.repeat(64), now: '2026-09-20T13:00:08.000Z', leaseUntil: '2026-09-20T13:15:08.000Z', limit: 1 });
     expect(resumed.requests).toHaveLength(1);
     expect(resumed.requests[0]).toMatchObject({ attempt: 1, searchProgress: progress });
