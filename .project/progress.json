@@ -6324,7 +6324,7 @@
         {
           "id": "converge",
           "title": "Faire converger toutes les sources",
-          "status": "TODO",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "1522 sources expliquées, aucun blocage technique",
             "Confirmation distincte des reprises épuisées"
@@ -6337,8 +6337,9 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Dernière réconciliation complète: 1522=1042 résolues+47 Review+53 exclusions+380 retryable, Library837, zéro erreur interne; données préservées.",
-            "Le blocage CI Cloudflare est levé; convergence encore conditionnée par un pilote bouton corrélé et des confirmations exactes par lot."
+            "Fresh isolated Chrome 1.0.48 exact 1,522-source profile after 895s+120s: 1,049 resolved, 56 Review, 53 exclusions, 363 provider-paused and one NETWORK; zero internal errors/missing projections, restart preservation, zero forwarded mutations.",
+            "The sole NETWORK source is unchanged from the prior profile; its old D1 NOT_FOUND has expired and the public GET now returns MISS. The zero-POST harness blocks its required normal admission, so this observation is not proof of a Worker network outage.",
+            "363 provider-paused sources collapse to 311 keys: 310 covered by existing private campaign; the remaining MANGA key is already reserved and remains FAILED/ATTEMPT_LIMIT. D1 indexed campaign read: 202 known unreserved FAILED, 30 reserved (20 VERIFIED, 7 NOT_FOUND, 1 AMBIGUOUS, 2 FAILED), 106 UNKNOWN deferred."
           ]
         },
         {
