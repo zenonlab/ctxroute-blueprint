@@ -8,9 +8,29 @@ import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { assertMangaProvidersRegistered, assertRecoveryProvidersRegistered, awaitObserverReady, awaitRecoveryCompletion, buildScopedQuery, parseRecoveryArguments, reserveRecoveryPost,
-  safeFailureCode, selectRemainingCandidates, validateBatch, validateCandidateRow, validateScopedBatch, validateSourceScope } from './discovery-recovery-batch.mjs';
+  recoveryD1Invocation, safeFailureCode, selectRemainingCandidates, validateBatch, validateCandidateRow, validateScopedBatch, validateSourceScope } from './discovery-recovery-batch.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
+
+test('local OAuth D1 preflight avoids repository credentials and preserves query bounds', () => {
+  const invocation = recoveryD1Invocation('SELECT 1', { localOAuth: true, inheritedEnvironment: {
+    CLOUDFLARE_API_TOKEN: 'restricted-token', CLOUDFLARE_API_KEY: 'legacy-key', CLOUDFLARE_EMAIL: 'legacy-email',
+    WRANGLER_OUTPUT_FILE_PATH: '/private/output',
+  } });
+  assert.equal(invocation.command, process.execPath);
+  assert.deepEqual(invocation.args, [fileURLToPath(new URL('../../node_modules/wrangler/bin/wrangler.js', import.meta.url)),
+    'd1', 'execute', 'PUBLIC_DB', '--remote', '--config',
+    fileURLToPath(new URL('../../apps/worker/wrangler.jsonc', import.meta.url)), '--json', '--command', 'SELECT 1']);
+  assert.equal(invocation.options.cwd, tmpdir());
+  assert.equal(invocation.options.timeout, 45_000);
+  assert.equal(invocation.options.env.CLOUDFLARE_API_TOKEN, undefined);
+  assert.equal(invocation.options.env.CLOUDFLARE_API_KEY, undefined);
+  assert.equal(invocation.options.env.CLOUDFLARE_EMAIL, undefined);
+  assert.equal(invocation.options.env.WRANGLER_OUTPUT_FILE_PATH, undefined);
+  const defaultInvocation = recoveryD1Invocation('SELECT 1', { localOAuth: false, inheritedEnvironment: {} });
+  assert.equal(defaultInvocation.command, 'npm');
+  assert.equal(defaultInvocation.args.at(-1), 'SELECT 1');
+});
 
 function row(index, mediaKind = index % 2 === 0 ? 'MANGA' : 'MANHWA') {
   const submission = {
