@@ -1911,6 +1911,15 @@ le tail reste absent. Ces lectures de démarrage restent hors budget par clé.
 
 ### Diagnostic CPU Queue — 2026-09-29
 
+Le prévol Tail du banc installé échoue avant toute admission quand Wrangler
+hérite du jeton IP-restreint de `.env` (`9109`). La session OAuth Wrangler
+locale existante peut être sélectionnée explicitement avec
+`TOBIRINK_WORKER_TAIL_OAUTH=1` : le processus enfant part d'un répertoire
+temporaire, reçoit le chemin absolu de la configuration Worker et n'hérite
+pas des variables de jeton API Cloudflare. Le mode par défaut et les bornes
+de corrélation restent inchangés. Vérifier une lecture `MISS` corrélée avant
+le clic ; aucun POST n'est autorisé si l'observateur n'est pas prêt.
+
 Le lot `batch-004` a consommé sept admissions avant un HTTP 503 et un signal
 de continuation non envoyé ; les trois autres clés n'ont pas été admises.
 Les sept réservations demeurent consommées et ne doivent pas être rejouées.

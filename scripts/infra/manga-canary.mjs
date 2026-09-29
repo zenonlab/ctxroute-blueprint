@@ -1,9 +1,10 @@
 /* global AbortSignal, fetch */
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { StringDecoder } from 'node:string_decoder';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import WebSocket from 'ws';
 
@@ -373,18 +374,29 @@ function startWebSocketCostObserver({ allowProviderContinuation, tailUrl, webSoc
 
 export function startCostObserver({ allowProviderContinuation = false, spawnProcess = spawn,
   killProcess = process.kill.bind(process), platform = process.platform,
-  tailUrl = process.env.TOBIRINK_WORKER_TAIL_URL, webSocketFactory = (url, protocol) => new WebSocket(url, protocol, { headers: { 'User-Agent': 'wrangler/4.129.0' } }) } = {}) {
+  tailUrl = process.env.TOBIRINK_WORKER_TAIL_URL, localOAuth = process.env.TOBIRINK_WORKER_TAIL_OAUTH === '1',
+  environment = process.env, webSocketFactory = (url, protocol) => new WebSocket(url, protocol, { headers: { 'User-Agent': 'wrangler/4.129.0' } }) } = {}) {
   if (tailUrl !== undefined) return startWebSocketCostObserver({ allowProviderContinuation, tailUrl, webSocketFactory });
   // The CI observer owns a POSIX process group so npm's Wrangler descendants cannot outlive it.
   if (platform === 'win32') throw observerError('unsupported-platform');
-  const env = { ...process.env, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_SANITIZE: 'true', WRANGLER_SEND_METRICS: 'false',
+  const env = { ...environment, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_SANITIZE: 'true', WRANGLER_SEND_METRICS: 'false',
     WRANGLER_SEND_ERROR_REPORTS: 'false', WRANGLER_LOG: 'warn', FORCE_COLOR: '0', npm_config_logs_max: '0' };
   delete env.WRANGLER_OUTPUT_FILE_PATH;
   delete env.WRANGLER_OUTPUT_FILE_DIRECTORY;
+  if (localOAuth) {
+    delete env.CLOUDFLARE_API_TOKEN;
+    delete env.CLOUDFLARE_API_KEY;
+    delete env.CLOUDFLARE_EMAIL;
+  }
+  const command = localOAuth ? process.execPath : 'npm';
+  const args = localOAuth
+    ? [fileURLToPath(new URL('../../node_modules/wrangler/bin/wrangler.js', import.meta.url)), 'tail', 'tobirink-public-api',
+      '--config', fileURLToPath(new URL('../../apps/worker/wrangler.jsonc', import.meta.url)), '--format', 'json']
+    : ['exec', '--no', '--', 'wrangler', 'tail', 'tobirink-public-api', '--config', 'apps/worker/wrangler.jsonc', '--format', 'json'];
+  const cwd = localOAuth ? tmpdir() : new URL('../../', import.meta.url);
   let child;
   try {
-    child = spawnProcess('npm', ['exec', '--no', '--', 'wrangler', 'tail', 'tobirink-public-api', '--config', 'apps/worker/wrangler.jsonc',
-      '--format', 'json'], { cwd: new URL('../../', import.meta.url), env, detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
+    child = spawnProcess(command, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
   } catch { throw observerError('failed'); }
   const groupId = child.pid;
   const observation = createCostObservation({ allowProviderContinuation });

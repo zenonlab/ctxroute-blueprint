@@ -2,8 +2,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
 import { setImmediate as yieldEventLoop } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 import { canaryFailureCode, createCostObservation, runDiscoveryCanaries, runObservedDiscoveryCanaries, startCostObserver } from './manga-canary.mjs';
 
 function fixtureFetcher({ initial = 'MISS', admission = 'PENDING', terminal = 'VERIFIED', admissionStatus = 202, wrongReference = false } = {}) {
@@ -600,6 +602,25 @@ test('tail is unfiltered, disables raw disk output and terminates only its own g
   assert.equal(options.env.WRANGLER_OUTPUT_FILE_PATH, undefined);
   assert.equal(options.env.WRANGLER_OUTPUT_FILE_DIRECTORY, undefined);
   await observer.close();
+  await observer.close();
+  assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
+});
+
+test('local OAuth tail avoids repository credentials and keeps correlated process cleanup', async () => {
+  const fake = fakeTail();
+  const observer = startCostObserver({ ...fake, localOAuth: true, environment: {
+    CLOUDFLARE_API_TOKEN: 'restricted-token', CLOUDFLARE_API_KEY: 'legacy-key', CLOUDFLARE_EMAIL: 'legacy-email',
+  } });
+  const [command, args, options] = fake.launches[0];
+  assert.equal(command, process.execPath);
+  assert.deepEqual(args, [fileURLToPath(new URL('../../node_modules/wrangler/bin/wrangler.js', import.meta.url)),
+    'tail', 'tobirink-public-api', '--config', fileURLToPath(new URL('../../apps/worker/wrangler.jsonc', import.meta.url)),
+    '--format', 'json']);
+  assert.equal(options.cwd, tmpdir());
+  assert.equal(options.env.CLOUDFLARE_API_TOKEN, undefined);
+  assert.equal(options.env.CLOUDFLARE_API_KEY, undefined);
+  assert.equal(options.env.CLOUDFLARE_EMAIL, undefined);
+  assert.equal(options.detached, true);
   await observer.close();
   assert.deepEqual(fake.kills, [[-12345, 'SIGTERM']]);
 });
