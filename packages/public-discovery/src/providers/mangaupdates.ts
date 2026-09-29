@@ -72,14 +72,20 @@ function candidate(series: MangaUpdatesSeries): ProviderCandidate {
 }
 
 export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCandidatePort, FavoriteProviderHydrationPort {
-  constructor(private readonly fetcher: FavoriteProviderFetch = fetch.bind(globalThis), private readonly gate = new FavoriteProviderRateGate('mangaupdates')) {}
+  constructor(private readonly fetcher: FavoriteProviderFetch = fetch.bind(globalThis), private readonly gate = new FavoriteProviderRateGate('mangaupdates'), private readonly selectiveSearch = true) {}
 
   async search(input: FavoriteProviderSearchQuery) {
     const query = assertFavoriteProviderSearchQuery(input);
     if (query.provider !== 'mangaupdates') throw new TypeError('MangaUpdates adapter requires provider mangaupdates.');
-    const page = Math.floor((favoriteProviderPage(query.cursor) - 1) * legacyPageSize / mangaUpdatesPageSize) + 1;
+    const selective = query.cursor?.startsWith('mu2:') === true
+      || this.selectiveSearch && (query.cursor === undefined || query.cursor === '1');
+    const page = selective ? favoriteProviderPage(query.cursor?.startsWith('mu2:') ? query.cursor.slice(4) : undefined)
+      : Math.floor((favoriteProviderPage(query.cursor) - 1) * legacyPageSize / mangaUpdatesPageSize) + 1;
+    const title = query.titles[0]!;
+    const words = [...title.matchAll(/[\p{L}\p{N}]{5,}/gu)].map(match => match[0]).filter(word => /\p{L}/u.test(word));
+    const search = selective && words.length > 0 ? words.join(' ') : title;
     const response = await this.gate.run(favoriteProviderPolicy.mangaupdates.minimumIntervalMs, () => readFavoriteProviderJson(this.fetcher, `${seriesEndpoint}/search`, {
-      body: JSON.stringify({ page, perpage: mangaUpdatesPageSize, search: query.titles[0] }),
+      body: JSON.stringify({ page, perpage: mangaUpdatesPageSize, search }),
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       method: 'POST',
     }, mangaUpdatesSearchSchema));
@@ -107,7 +113,8 @@ export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCand
     const upstreamTruncated = response.value.total_hits > page * mangaUpdatesPageSize;
     const truncated = upstreamTruncated || oversized;
     const envelope = { candidates, complete: !truncated, digest: response.digest, provider: 'mangaupdates' as const, truncated };
-    return createProviderCandidateEnvelope(upstreamTruncated ? { ...envelope, nextCursor: String(page * mangaUpdatesPageSize / legacyPageSize + 1) } : envelope);
+    const nextCursor = selective ? `mu2:${page + 1}` : String(page * mangaUpdatesPageSize / legacyPageSize + 1);
+    return createProviderCandidateEnvelope(upstreamTruncated ? { ...envelope, nextCursor } : envelope);
   }
 
   async hydrate(reference: FavoriteProviderReference) {

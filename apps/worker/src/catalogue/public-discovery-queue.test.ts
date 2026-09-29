@@ -107,6 +107,56 @@ describe('public discovery queue trigger', () => {
     }
   });
 
+  it('persists selective MangaUpdates pages and publishes through a correlated continuation', async () => {
+    const restoreRuntime = await preserveProviderRuntime();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-14T00:00:00.000Z'));
+    const discoveryKey = { ...key('c'), fingerprint: 'c14'.padStart(64, '0'), mediaKind: 'MANGA' as const };
+    const title = 'The Wandering Scholar';
+    const record = { series_id: 13579, title, type: 'Manga', associated: [], categories: [], genres: [] };
+    const pages: number[] = [];
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      vi.setSystemTime(Date.now() + 10_000);
+      if (String(input).endsWith('/13579')) return Response.json(record);
+      expect(String(input)).toBe('https://api.mangaupdates.com/v1/series/search');
+      const body: { page: number; search: string } = JSON.parse(String(init?.body));
+      expect(body.search).toBe('Wandering Scholar');
+      pages.push(body.page);
+      return Response.json({ results: body.page === 4 ? [{ record }] : [], total_hits: 301 });
+    });
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = { metrics: async () => metrics, send: vi.fn(async (_signal: NativeCollectorSignal) => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    const bindings = { ...env, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: queue };
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const correlationId = '00000000-0000-4000-8000-000000000014';
+    try {
+      await adapter.request({ ...submission('c', title), key: discoveryKey,
+        query: { discoveryTitles: [title], sourceTitles: [title], mediaKind: 'MANGA' }, requestDigest: 'f'.repeat(64),
+      }, new Date().toISOString());
+      await env.PUBLIC_DB.prepare('UPDATE public_discovery_requests_v3 SET search_progress_json = ?1 WHERE fingerprint = ?2')
+        .bind(JSON.stringify({ candidates: [], cursor: '1', provider: 'mangaupdates', titleIndex: 0, version: 1 }), discoveryKey.fingerprint).run();
+      const first = await processPublicDiscoveryQueue(bindings, discoveryKey, true, correlationId);
+      expect(first).toMatchObject({ claimed: 1, deferred: 1, published: 0, metrics: { providerRequests: 2 } });
+      const checkpoint = await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts, search_progress_json AS progress FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
+        .bind(discoveryKey.fingerprint).first<{ state: string; attempts: number; progress: string }>();
+      expect(checkpoint).toMatchObject({ state: 'PENDING', attempts: 0 });
+      expect(JSON.parse(checkpoint!.progress)).toMatchObject({ cursor: 'mu2:3', provider: 'mangaupdates' });
+      const signal = queue.send.mock.calls[0]![0];
+      if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
+      expect(signal.correlationId).toBe(correlationId);
+      vi.setSystemTime(Date.now() + 10_000);
+      const second = await processPublicDiscoveryQueue(bindings, undefined, true, signal.correlationId, signal.continuationToken);
+      expect(second).toMatchObject({ claimed: 1, failed: 0, published: 1, metrics: { providerRequests: 3 } });
+      expect(pages).toEqual([1, 2, 3, 4]);
+      expect(first.metrics!.rowsRead + second.metrics!.rowsRead).toBeLessThanOrEqual(300);
+      await expect(adapter.read(discoveryKey, new Date().toISOString())).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { displayTitle: title } } });
+    } finally {
+      provider.mockRestore();
+      vi.useRealTimers();
+      await restoreRuntime();
+    }
+  });
+
   it.each([false, true])('carries the fourth-page checkpoint through the Worker gateway with later cadence deferral %s', async (laterDeferral) => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });
