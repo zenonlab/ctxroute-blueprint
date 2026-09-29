@@ -57,7 +57,7 @@
       "id": "resolver",
       "type": "backend",
       "label": "Resolver public",
-      "sublabel": "recherche bornée 90 s",
+      "sublabel": "≤2 recherches OK",
       "tag": "résultat terminal",
       "row": 1,
       "col": 2
@@ -102,7 +102,7 @@
     {
       "dot": "amber",
       "title": "Certification restante",
-      "items": ["Terminal puis preuve corrélée sous 60 s (borne 12 min)", "Arrêt sur 429, Queue, absence fournisseur ou budget D1", "Aucun FAILED réarmé sans confirmation"]
+      "items": ["Terminal D1 puis projection Library et redémarrages", "Arrêt sur 429, Queue, absence fournisseur ou budget D1", "Aucun FAILED réarmé sans confirmation"]
     }
   ]
 }

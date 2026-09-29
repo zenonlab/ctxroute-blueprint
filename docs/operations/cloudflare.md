@@ -1911,6 +1911,15 @@ le tail reste absent. Ces lectures de démarrage restent hors budget par clé.
 
 ### Diagnostic CPU Queue — 2026-09-29
 
+Le prévol Tail du banc installé échoue avant toute admission quand Wrangler
+hérite du jeton IP-restreint de `.env` (`9109`). La session OAuth Wrangler
+locale existante peut être sélectionnée explicitement avec
+`TOBIRINK_WORKER_TAIL_OAUTH=1` : le processus enfant part d'un répertoire
+temporaire, reçoit le chemin absolu de la configuration Worker et n'hérite
+pas des variables de jeton API Cloudflare. Le mode par défaut et les bornes
+de corrélation restent inchangés. Vérifier une lecture `MISS` corrélée avant
+le clic ; aucun POST n'est autorisé si l'observateur n'est pas prêt.
+
 Le lot `batch-004` a consommé sept admissions avant un HTTP 503 et un signal
 de continuation non envoyé ; les trois autres clés n'ont pas été admises.
 Les sept réservations demeurent consommées et ne doivent pas être rejouées.
@@ -1926,3 +1935,34 @@ continuation sans nouvel essai. Les échecs fournisseur gardent leur traitement
 existant. Cette mesure ne vaut pas preuve de convergence : vérifier après
 déploiement les outcomes CPU, la continuation corrélée, le résultat D1 et sa
 projection Library avant tout élargissement des admissions.
+
+### Réconciliation du profil neuf — 2026-09-29
+
+Le commit `7bb9a99` est fusionné par la PR #166 ; la CI principale
+`36504673528` a déployé le seul Worker prévu et vérifié les sondes publiques.
+Les canaris de livraison et la promotion des archives restent désactivés.
+La relecture indexée des 232 clés connues du manifeste de campagne lit 232
+lignes sans écriture : 202 `FAILED` non réservées ; parmi les 30 réservées,
+20 `VERIFIED`, sept `NOT_FOUND`, une `AMBIGUOUS` et deux `FAILED`. Les 106
+identités `UNKNOWN` du manifeste attendent toujours un reparse distinct.
+
+Un profil Chrome isolé neuf, importé depuis l'export Downloads exact avec
+zéro admission autorisée, observe les 1 522 sources. Après 895 secondes puis
+une reprise locale de 120 secondes sur le même profil, il compte 1 049
+résolues, 56 Review, 53 exclusions et 364 reprises : 363
+`PROVIDER_UNAVAILABLE` et une `NETWORK`. Aucune erreur interne, projection
+Library manquante ou tentative fournisseur depuis l'extension ; les données
+survivent au redémarrage du service worker et du navigateur. Les 363 sources
+épuisées représentent 311 identités : 310 sont couvertes par la campagne
+privée existante ; la dernière est une MANGA déjà réservée et encore
+`FAILED/ATTEMPT_LIMIT`, donc non rejouable. Ce contrôle sans mutation ne
+certifie ni le parcours d'admission normal d'un nouvel utilisateur ni la
+résolution des 363 sources. La borne CPU déployée attend encore une preuve
+réelle de continuation sans `exceededCpu`.
+
+La source `NETWORK` est la même que dans le profil précédent. Son résultat D1
+était `NOT_FOUND`, mais le GET public indexé répond maintenant `MISS` après
+expiration ; la nouvelle admission normale requise est bloquée par le budget
+zéro POST du test. Ce code local n'établit donc pas une panne réseau du Worker.
+La source n'est pas admise dans cette mesure et reste à vérifier dans un
+parcours autorisé distinct.

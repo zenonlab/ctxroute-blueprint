@@ -174,6 +174,11 @@ lot, sans refresh. Le POST dispose de 45 secondes. L'observateur démarre avant
 le chargement du profil et le clic explicite, puis suit chaque UUID d'admission.
 Quand le jeton Wrangler local ne peut pas ouvrir Tail, l'opérateur peut fournir
 une URL de session Tail Cloudflare éphémère par `TOBIRINK_WORKER_TAIL_URL`.
+Si la session OAuth Wrangler locale existante possède déjà l'accès Tail,
+`TOBIRINK_WORKER_TAIL_OAUTH=1` lance Wrangler depuis le répertoire temporaire
+avec une configuration absolue, sans hériter des variables de jeton API
+Cloudflare. Ce mode explicite ne modifie aucun secret ni permission et garde
+la même corrélation, les mêmes bornes et le même arrêt avant admission.
 Le transport WebSocket impose `wss`, l'hôte Tail officiel et le sous-protocole
 `trace-v1`. Le client `ws` direct utilise la trame attendue par Tail et
 termine la connexion si Cloudflare ne confirme pas sa fermeture après deux
