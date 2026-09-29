@@ -2166,3 +2166,29 @@ Les lectures peuvent reprendre après redémarrage sans remettre leur budget
 de contrôle retrouve les cinq œuvres dans Library après les redémarrages
 service-worker et navigateur, sans nouveau POST. Cela ne remplace pas la preuve
 corrélée manquante de la cinquième admission du pilote arrêté.
+
+### Continuations ciblées et coût de la file active
+
+Le contrôle suivant du lot 008 a transmis une seule nouvelle admission avant
+un dépassement : 326 lectures D1 cumulées, dont 20 d'admission et 306 sur sept
+passages collecteur, 14 appels fournisseur et aucune erreur Queue. La demande
+a ensuite terminé en `NOT_FOUND`; le contrôle installé en lecture seule retrouve
+cinq œuvres résolues, une Review et quatre demandes non envoyées, avec les deux
+redémarrages préservés. Le résultat terminal ne transforme pas ce dépassement en
+certificat de coût, et aucune des six clés consommées ne doit être rejouée.
+
+La régression locale avec 128 demandes actives étrangères mesure 810 lectures
+pour une continuation ciblée et ses échéances avant correction. La migration
+additive `0029_public_discovery_continuation_index.sql` et les chemins SQL
+ciblés ramènent ce scénario sous 60 lectures, contrôle de rejeu compris.
+L'index partiel exclut les jetons NULL. Il ajoute une écriture au claim de la
+fixture : 4 au lieu de 3; le refresh identique passe de 11 à 12, les lectures
+et admissions identiques restent à zéro écriture. Cette contrepartie est
+conservée explicitement dans la régression de coûts.
+Les sélections restent atomiques : jeton, clé complète, état, échéance et limite
+sont contrôlés avant le claim. Les continuations expirées ne nettoient que leur
+jeton; le réveil générique garde le nettoyage global borné et les priorités.
+Déployer l'index avant le Worker par la CI protégée. Pour un rollback, conserver
+l'index et les données puis revenir au Worker précédent. Les lectures gagnées
+ne prouvent pas que toute recherche longue respecte le plafond cumulé de 300;
+une nouvelle preuve réelle reste nécessaire après déploiement.
