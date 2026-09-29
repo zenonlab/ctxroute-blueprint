@@ -353,7 +353,12 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
       return 'completed';
     }
     const discoveredCandidate = parseDiscoveredCandidate(discovery.profile.candidate);
-    if (reference !== undefined && (discoveredCandidate.provider !== reference.provider || discoveredCandidate.externalId !== reference.externalId)) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+    if (reference !== undefined && (discoveredCandidate.provider !== reference.provider || discoveredCandidate.externalId !== reference.externalId)) {
+      const linkedIdentity = reference.provider === 'mangaupdates' && discoveredCandidate.provider === 'mangadex'
+        && discoveredCandidate.linkedReferences?.some((linked) => linked.provider === reference.provider && linked.externalId === reference.externalId)
+        && discovery.profile.references.some((linked) => linked.provider === reference.provider && linked.externalId === reference.externalId);
+      if (!linkedIdentity) throw new Error('HYDRATION_REFERENCE_MISMATCH');
+    }
     if (hasExactBlockedProviderTaxonomy(discoveredCandidate)) {
       await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'UNSUPPORTED', reason: 'BLOCKED_CONTENT_TAXONOMY' }, 'unsupported:blocked-content-taxonomy');
       return 'completed';

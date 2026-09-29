@@ -124,6 +124,71 @@ describe('sealed installed admissions', () => {
     expect(extra.fetch).not.toHaveBeenCalled();
   });
 
+  it('waits for each correlation before forwarding the next admission and stops on failure', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'tobirink-sequential-recovery-'));
+    const recoveryReceiptDirectory = pathToFileURL(directory + '/');
+    let releaseFirst;
+    let firstObserved;
+    const firstAdmissionObserved = new Promise(resolve => { firstObserved = resolve; });
+    const firstAdmissionGate = new Promise(resolve => { releaseFirst = resolve; });
+    const onFailure = vi.fn(async () => undefined);
+    const onAdmission = vi.fn(async (_submission, response) => {
+      if (response.status() === 202 && onAdmission.mock.calls.length === 1) {
+        firstObserved();
+        await firstAdmissionGate;
+        throw new Error('correlation-failed');
+      }
+    });
+    const { instance } = await guard({ sourceScope: sourceScope(), recoveryReceiptDirectory,
+      mutationBudget: 10, online: true, onAdmission, onFailure });
+    const first = request(submission(1));
+    const second = request(submission(2));
+    const firstHandling = instance.handle(first);
+    await firstAdmissionObserved;
+    const secondHandling = instance.handle(second);
+    await new Promise(resolve => { setTimeout(resolve, 0); });
+    expect(first.fetch).toHaveBeenCalledOnce();
+    expect(second.fetch).not.toHaveBeenCalled();
+    expect(instance.snapshot()).toMatchObject({ forwardedRequests: 1, receipts: 1 });
+    releaseFirst();
+    await Promise.all([firstHandling, secondHandling]);
+    expect(first.abort).toHaveBeenCalledOnce();
+    expect(second.fetch).not.toHaveBeenCalled();
+    expect(instance.snapshot()).toMatchObject({ failure: 'correlation-failed', forwardedRequests: 1, receipts: 1 });
+    expect(onAdmission).toHaveBeenCalledOnce();
+    expect(onFailure).toHaveBeenCalledOnce();
+  });
+
+  it('forwards a queued admission only after the preceding correlation succeeds', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'tobirink-correlation-gate-'));
+    const recoveryReceiptDirectory = pathToFileURL(directory + '/');
+    let releaseFirst;
+    let firstObserved;
+    const firstAdmissionObserved = new Promise(resolve => { firstObserved = resolve; });
+    const firstAdmissionGate = new Promise(resolve => { releaseFirst = resolve; });
+    const onAdmission = vi.fn(async () => {
+      if (onAdmission.mock.calls.length === 1) {
+        firstObserved();
+        await firstAdmissionGate;
+      }
+    });
+    const { instance } = await guard({ sourceScope: sourceScope(), recoveryReceiptDirectory,
+      mutationBudget: 10, online: true, onAdmission });
+    const first = request(submission(1));
+    const second = request(submission(2));
+    const firstHandling = instance.handle(first);
+    await firstAdmissionObserved;
+    const secondHandling = instance.handle(second);
+    await new Promise(resolve => { setTimeout(resolve, 0); });
+    expect(second.fetch).not.toHaveBeenCalled();
+    releaseFirst();
+    await Promise.all([firstHandling, secondHandling]);
+    expect(first.fetch).toHaveBeenCalledOnce();
+    expect(second.fetch).toHaveBeenCalledOnce();
+    expect(instance.snapshot()).toMatchObject({ failure: undefined, forwardedRequests: 2, receipts: 2 });
+    expect(onAdmission).toHaveBeenCalledTimes(2);
+  });
+
   it('rejects wrong complete keys and payload drift before reserving or forwarding', async () => {
     for (const body of [submission(11), { ...submission(1), key: { ...key(1), parserVersion: 'other' } },
       { ...submission(1), query: { ...query, discoveryTitles: ['Changed'] } }]) {
@@ -183,28 +248,31 @@ describe('installed recovery correlation', () => {
     return { observation, response, observer, ready, complete, recordCost };
   }
 
-  it('starts observation before admission and drains before certifying final costs', async () => {
+  it('starts observation before admission and checkpoints its cost before the next admission', async () => {
     const context = await fixture();
     expect(context.ready).toHaveBeenCalledOnce();
     expect(context.complete).not.toHaveBeenCalled();
     await context.observation.onAdmission({ key: key() }, context.response);
+    expect(context.complete).toHaveBeenCalledOnce();
+    expect(context.recordCost).toHaveBeenCalledWith({ requestId, cost: context.observer.read(requestId) });
     expect(context.observer.track).toHaveBeenCalledWith(requestId, { provider: 'any', status: 202, task: 'discovery' });
     expect(await context.observation.finish(1)).toEqual([{ providerRequests: 1, d1RowsRead: 200, d1RowsWritten: 20 }]);
     expect(context.observer.close).toHaveBeenCalledOnce();
-    expect(context.recordCost).toHaveBeenCalledWith({ requestId, cost: context.observer.read(requestId) });
     await context.observation.close();
   });
 
   it('rejects certification when the durable cost checkpoint fails', async () => {
     const context = await fixture();
     context.recordCost.mockRejectedValue(new Error('checkpoint-failed'));
-    await context.observation.onAdmission({ key: key() }, context.response);
-    await expect(context.observation.finish(1)).rejects.toThrow('checkpoint-failed');
+    await expect(context.observation.onAdmission({ key: key() }, context.response)).rejects.toThrow('checkpoint-failed');
+    expect(context.observation.failureCode()).toBe('discovery-recovery-failed');
     await context.observation.close();
   });
 
   it.each([
     ['discovery-canary-observer-d1-budget', 'discovery-canary-observer-d1-budget'],
+    ['discovery-canary-observer-invalid-frame', 'discovery-canary-observer-invalid-frame'],
+    ['discovery-canary-observer-count-limit', 'discovery-canary-observer-count-limit'],
     ['private-title', 'discovery-recovery-failed'],
     ['discovery-canary-observer-private-title', 'discovery-recovery-failed'],
   ])('records a safe correlation failure for %s', async (message, expected) => {
@@ -220,6 +288,22 @@ describe('installed recovery correlation', () => {
     await observation.close();
   });
 
+  it('retains only validated aggregate evidence for a D1 budget failure', async () => {
+    const evidence = { acceptedResults: 0, admissionD1RowsRead: 30, collectorD1RowsRead: 271,
+      collectorEvents: 2, d1RowsRead: 301, d1RowsWritten: 6, providers: ['anilist'],
+      providerRequests: 2, queueFailures: 0, queueSends: 1, retries: 0, results: ['failed', 'changed'] };
+    let rejectFailure;
+    const failed = new Promise((_resolve, reject) => { rejectFailure = reject; });
+    const observer = { failed, check: vi.fn(), close: vi.fn(async () => undefined), track: vi.fn(), read: vi.fn(), failureEvidence: () => evidence };
+    const observation = await createInstalledRecoveryObservation({ start: () => observer, ready: async () => undefined,
+      complete: vi.fn(), onFailure: vi.fn() });
+    rejectFailure(new Error('discovery-canary-observer-d1-budget'));
+    await vi.waitFor(() => expect(observation.failureCode()).toBe('discovery-canary-observer-d1-budget'));
+    expect(observation.failureEvidence()).toEqual(evidence);
+    expect(JSON.stringify(observation.failureEvidence())).not.toMatch(/fingerprint|requestId|title|url/iu);
+    await observation.close();
+  });
+
   it('rejects missing, duplicate or incomplete admission correlations', async () => {
     const context = await fixture();
     await expect(context.observation.onAdmission({ key: key() }, { ...context.response, headers: () => ({}) })).rejects.toThrow();
@@ -232,8 +316,7 @@ describe('installed recovery correlation', () => {
   it('rejects provider-free, over-budget and late-error observations', async () => {
     for (const cost of [{ providerRequests: 0 }, { d1RowsRead: 301 }, { provider429s: 1 }, { queueFailures: 1 }]) {
       const context = await fixture(cost);
-      await context.observation.onAdmission({ key: key() }, context.response);
-      await expect(context.observation.finish(1)).rejects.toThrow('cost policy');
+      await expect(context.observation.onAdmission({ key: key() }, context.response)).rejects.toThrow('cost policy');
       expect(context.recordCost).not.toHaveBeenCalled();
       await context.observation.close();
     }

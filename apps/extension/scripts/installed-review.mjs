@@ -523,10 +523,11 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
     await networkGuard?.drain();
     const networkEvidence = networkGuard?.snapshot();
     const correlationFailureCode = recoveryObservation?.failureCode();
+    const correlationFailureEvidence = recoveryObservation?.failureEvidence();
     const verdict = installedFailureVerdict(error, expired, deadline, Date.now(), networkEvidence?.failure, closeFailure);
     if (session !== undefined) {
-      await writeFile(join(descriptorRoot, session.token + '.report.json'), JSON.stringify({ schemaVersion: 2, verdict, dataOrigin, stage, network: networkEvidence, correlationFailureCode, observations }, null, 2) + '\n', { mode: 0o600 });
-      log({ event: 'installed-result', verdict, stage, session: session.token, network: networkEvidence, correlationFailureCode, error: error instanceof assert.AssertionError ? 'assertion-failed' : 'stage-unavailable' });
+      await writeFile(join(descriptorRoot, session.token + '.report.json'), JSON.stringify({ schemaVersion: 2, verdict, dataOrigin, stage, network: networkEvidence, correlationFailureCode, correlationFailureEvidence, observations }, null, 2) + '\n', { mode: 0o600 });
+      log({ event: 'installed-result', verdict, stage, session: session.token, network: networkEvidence, correlationFailureCode, correlationFailureEvidence, error: error instanceof assert.AssertionError ? 'assertion-failed' : 'stage-unavailable' });
     } else log({ event: 'installed-result', verdict, stage, error: 'input-unavailable' });
     return verdict === 'incomplete' ? 2 : 1;
   } finally {

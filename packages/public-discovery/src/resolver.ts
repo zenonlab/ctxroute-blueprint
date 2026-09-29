@@ -202,7 +202,12 @@ async function searchLane(
   let unavailable: Error | undefined;
   const startIndex = progress === undefined ? 0 : order.indexOf(progress.provider);
   if (startIndex < 0) throw new Error('provider-search-progress-lane-mismatch');
-  for (const provider of order.slice(startIndex)) {
+  const retryProviders = progress?.retryProviders ?? [];
+  if (new Set(retryProviders).size !== retryProviders.length || retryProviders.some((provider) => order.indexOf(provider) < 0 || order.indexOf(provider) >= startIndex)) {
+    throw new Error('provider-search-progress-lane-mismatch');
+  }
+  const failedProviders: ResolutionProvider[] = [];
+  for (const provider of order.filter((provider, index) => index >= startIndex || retryProviders.includes(provider))) {
     let result: LaneDecision;
     try {
       result = await searchProvider(provider, providers[provider], titles, query, deadline, provider === progress?.provider ? progress : undefined, allowBudgetContinuation);
@@ -210,12 +215,18 @@ async function searchLane(
       if (!(error instanceof Error)) throw error;
       if (isProviderInvariantError(error)) throw error;
       if (error instanceof PublicDiscoverySearchContinuationError) {
-        if (unavailable !== undefined) throw unavailable;
+        if (unavailable !== undefined) {
+          const prior = provider === progress?.provider ? progress : undefined;
+          const advanced = error.searchProgress.cursor !== (prior?.cursor ?? '1') || error.searchProgress.titleIndex !== (prior?.titleIndex ?? 0);
+          if (!advanced) throw unavailable;
+          throw new PublicDiscoverySearchContinuationError({ ...error.searchProgress, retryProviders: failedProviders }, error.retryAt);
+        }
         throw error;
       }
       // Bounded incomplete searches consume an attempt; do not turn them into
       // cadence-only deferrals that could restart page one without limit.
       unavailable = retainProviderFailure(unavailable, error);
+      failedProviders.push(provider);
       continue;
     }
     inspected.push(...result.candidates);

@@ -162,13 +162,12 @@ export function createBudgetedDiscoveryResolver(
       const diagnosed = new Set<keyof PublicDiscoveryProviderPorts>();
       let completedProviderCalls = 0;
       let completedSearches = 0;
-      let providerFailureOccurred = false;
       const operation = async <T>(action: 'search' | 'hydrate', run: () => Promise<T>): Promise<T> => {
         if (scope.closed) throw new Error('public-discovery-resolution-closed');
         // Publication (7) also covers this claim's alternative defer (2).
         // Reserve two for each OTHER claim, plus nextPendingAt (1).
         const otherClaims = Math.max(0, claimedCount() - completed - 1);
-        if (exhausted || (action === 'search' && !providerFailureOccurred && completedSearches >= 2)
+        if (exhausted || (action === 'search' && completedSearches >= 2)
           || usedCalls() + outstanding + 4 + (action === 'search' ? 4 : 0) + 7 + 2 * otherClaims + 1 > 50) {
           scope.exceeded = true;
           exhausted = true;
@@ -186,7 +185,6 @@ export function createBudgetedDiscoveryResolver(
       const observe = async <T>(providerName: keyof PublicDiscoveryProviderPorts, action: 'search' | 'hydrate', run: () => Promise<T>): Promise<T> => {
         try { return await run(); }
         catch (error) {
-          if (!(error instanceof FavoriteProviderRetryError)) providerFailureOccurred = true;
           const code = providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined);
           if (!diagnosed.has(providerName) && (code.startsWith('provider-response-invalid') || code.startsWith('provider-runtime-') || code === 'provider-timeout' || code === 'provider-unavailable')) {
             diagnosed.add(providerName);
@@ -585,7 +583,7 @@ export async function handleNativeCollectorQueue(
       messageType: 'public-discovery-ready', retryDelaySeconds,
     });
     leader.retry({ delaySeconds: retryDelaySeconds });
-    emitCollectorCost('discovery', error instanceof PublicDiscoveryProcessingError ? error.metrics : emptyCollectorCost('failed'), startedAt, leader.attempts);
+    emitCollectorCost('discovery', error instanceof PublicDiscoveryProcessingError ? error.metrics : emptyCollectorCost('failed'), startedAt, leader.attempts, correlationId);
     for (const duplicate of duplicates) duplicate.ack();
   }
 }
