@@ -2,7 +2,7 @@ import { applyD1Migrations, env } from 'cloudflare:test';
 import { D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import { favoriteTitlePreparationVersion } from '@tobirink/application';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { processPublicDiscoveryQueue } from '../native-collectors';
+import { processPublicDiscoveryQueue, type NativeCollectorSignal } from '../native-collectors';
 import { instrumentD1 } from '../operational-metrics';
 
 const now = '2026-09-23T12:00:00.000Z';
@@ -54,6 +54,52 @@ async function claimedPublication(id: number, titles: string[]) {
 }
 
 describe('public discovery indexed query cost', () => {
+  it('keeps a twenty-page manga search within the cumulative read budget', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-10T12:00:00.000Z'));
+    const measured = instrumentD1(env.PUBLIC_DB);
+    const adapter = new D1PublicDiscoveryV3Adapter(measured.database);
+    const key = { fingerprint: fingerprint(200080), mediaKind: 'MANGA' as const, parserVersion: '5', siteRulesVersion: '3' };
+    const signals: Extract<NativeCollectorSignal, { type: 'public-discovery-ready' }>[] = [];
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = { metrics: async () => metrics, sendBatch: vi.fn(async () => ({ metadata: { metrics } })), send: vi.fn(async (signal: NativeCollectorSignal) => {
+      if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-test-signal');
+      signals.push(signal);
+      return { metadata: { metrics } };
+    }) };
+    const pages: number[] = [];
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      vi.setSystemTime(Date.now() + 10_000);
+      const url = String(input);
+      if (url.startsWith('https://api.mangadex.org/')) return Response.json({ result: 'ok', response: 'collection', data: [], limit: 20, offset: 0, total: 0 });
+      if (url.startsWith('https://kitsu.io/')) return Response.json({ data: [], links: { next: null }, meta: { count: 0 } });
+      if (!url.endsWith('/v1/series/search')) throw new Error('unexpected-test-provider');
+      const request = JSON.parse(String(init?.body));
+      pages.push(request.page);
+      return Response.json({ total_hits: 2000, results: Array.from({ length: 100 }, (_, index) => ({
+        record: { series_id: (request.page - 1) * 100 + index + 1, title: 'Entirely unrelated result', type: 'Manga' },
+      })) });
+    });
+    const costs: number[] = [];
+    try {
+      await adapter.request({ key, query: { discoveryTitles: ['Synthetic pagination target'], sourceTitles: ['Synthetic pagination target'], mediaKind: 'MANGA' }, requestDigest: 'd'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
+      for (let invocation = 0; invocation < 12; invocation += 1) {
+        const before = measured.snapshot().rowsRead;
+        const report = await processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: queue }, key, true, undefined, signals.at(-1)?.continuationToken);
+        costs.push(measured.snapshot().rowsRead - before);
+        expect(report.failed).toBe(0);
+        if (report.published === 1) break;
+        expect(report.deferred).toBe(1);
+        vi.setSystemTime(Date.now() + 60_000);
+      }
+      expect(pages).toEqual(Array.from({ length: 20 }, (_, index) => index + 1));
+      const cost = measured.snapshot();
+      console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'twenty-page-search', invocations: costs, ...cost }));
+      expect(cost.rowsRead).toBeLessThanOrEqual(300);
+      await expect(adapter.read(key, new Date().toISOString())).resolves.toMatchObject({ state: 'NOT_FOUND' });
+    } finally { provider.mockRestore(); vi.useRealTimers(); }
+  });
+
   it.each(['token', 'key'] as const)('bounds a %s claim independently of unrelated active requests', async (selection) => {
     await env.PUBLIC_DB.prepare(`WITH RECURSIVE fixture(n) AS (
         SELECT 1 UNION ALL SELECT n + 1 FROM fixture WHERE n < 128
