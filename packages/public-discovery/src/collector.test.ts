@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FavoriteProviderRetryError, publicDiscoveryProviderSchema, runPublicDiscoveryBatch, type PublicDiscoveryClaimBatch, type PublicDiscoveryResultBatch } from '.';
 import { createPublicDiscoveryResolver } from './resolver';
+import { FavoriteProviderHttpError } from './provider-http';
 
 const key = {
   fingerprint: 'a'.repeat(64), mediaKind: 'ANIME' as const,
@@ -17,6 +18,59 @@ const claims: PublicDiscoveryClaimBatch = {
 };
 
 describe('runPublicDiscoveryBatch', () => {
+  it.each([new TypeError('fetch failed'), new DOMException('aborted', 'AbortError'), new DOMException('timeout', 'TimeoutError')])('retries a recognized transport failure: %s', async (failure) => {
+    const retryTransient = vi.fn();
+    const report = await runPublicDiscoveryBatch({
+      gateway: { claim: async () => claims, defer: vi.fn(), publish: vi.fn(), retryTransient },
+      limit: 1, nonce: () => crypto.randomUUID(), now: () => '2026-09-29T12:00:00.000Z',
+      resolver: { resolve: async () => { throw failure; } },
+    });
+    expect(report).toMatchObject({ deferred: 1, failed: 0, published: 0 });
+    expect(retryTransient).toHaveBeenCalledOnce();
+  });
+  it.each([400, 401, 403, 404, 422])('does not automatically cycle permanent HTTP %i failures', async (status) => {
+    const retryTransient = vi.fn();
+    const publish = vi.fn();
+    const report = await runPublicDiscoveryBatch({
+      gateway: { claim: async () => claims, defer: vi.fn(), retryTransient, publish },
+      limit: 1, nonce: () => crypto.randomUUID(), now: () => '2026-09-29T12:00:00.000Z',
+      resolver: { resolve: async () => { throw new FavoriteProviderHttpError(status); } },
+    });
+    expect(report).toMatchObject({ failed: 1, deferred: 0, published: 0 });
+    expect(retryTransient).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it('does not report a retry when its durable reservation fails', async () => {
+    await expect(runPublicDiscoveryBatch({
+      gateway: { claim: async () => claims, defer: vi.fn(), publish: vi.fn(), retryTransient: async () => { throw new Error('claim-lost'); } },
+      limit: 1, nonce: () => crypto.randomUUID(), now: () => '2026-09-29T12:00:00.000Z',
+      resolver: { resolve: async () => { throw new FavoriteProviderHttpError(503); } },
+    })).rejects.toThrow('claim-lost');
+  });
+  it.each([true, false])('does not hide a permanent provider failure behind a temporary fallback (%s)', async (permanentFirst) => {
+    const permanent = { search: vi.fn(async () => { throw new FavoriteProviderHttpError(401); }), hydrate: vi.fn() };
+    const temporary = { search: vi.fn(async () => { throw new FavoriteProviderHttpError(503); }), hydrate: vi.fn() };
+    const retryTransient = vi.fn();
+    const report = await runPublicDiscoveryBatch({
+      gateway: { claim: async () => claims, defer: vi.fn(), publish: vi.fn(), retryTransient },
+      limit: 1, nonce: () => crypto.randomUUID(), now: () => '2026-09-29T12:00:00.000Z',
+      resolver: createPublicDiscoveryResolver({ anilist: permanentFirst ? permanent : temporary, 'kitsu-anime': permanentFirst ? temporary : permanent, mangaupdates: temporary, mangadex: temporary, 'kitsu-manga': temporary }),
+    });
+    expect(report).toMatchObject({ failed: 1, deferred: 0 });
+    expect(retryTransient).not.toHaveBeenCalled();
+  });
+  it.each([408, 425, 500, 502, 503, 504])('automatically schedules consumed HTTP %i failures without Review', async (status) => {
+    const retryTransient = vi.fn(async () => undefined);
+    const publish = vi.fn();
+    const report = await runPublicDiscoveryBatch({
+      gateway: { claim: async () => claims, defer: async () => undefined, retryTransient, publish },
+      limit: 1, nonce: () => crypto.randomUUID(), now: () => '2026-09-29T12:00:00.000Z',
+      resolver: { resolve: async () => { throw new FavoriteProviderHttpError(status); } },
+    });
+    expect(report).toMatchObject({ deferred: 1, failed: 0, published: 0 });
+    expect(retryTransient).toHaveBeenCalledExactlyOnceWith(claims.requests[0], '2026-09-29T12:00:00.000Z');
+    expect(publish).not.toHaveBeenCalled();
+  });
   it('publishes the first verified result before resolving the next request', async () => {
     const order: string[] = [];
     await runPublicDiscoveryBatch({

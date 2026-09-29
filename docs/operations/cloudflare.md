@@ -2117,3 +2117,23 @@ du fallback. Les 70 tests Worker/Queue ciblés et 205 tests Discovery passent.
 Le test D1 conserve le curseur et `retryProviders` entre claims; le scénario
 de panne persistante reste borné à huit échecs, avec au plus 50 appels D1
 par invocation. Ces correctifs serveur restent locaux jusqu’au déploiement.
+
+### Reprises autonomes des nouvelles pannes transitoires
+
+La révision d’ADR-0061 distingue les erreurs temporaires reconnues des
+échecs historiques sans cause enregistrée. Les erreurs réseau reconnues et
+HTTP 408, 425, 500, 502, 503 et 504 conservent leur tentative consommée,
+mais retournent atomiquement en attente avec une échéance persistée.
+Les délais vont de 60 secondes à 64 minutes ; après la huitième tentative,
+un repos de 24 heures précède un nouveau cycle. Le circuit fournisseur peut
+encore différer un appel. Une tentative peut contacter plusieurs fournisseurs.
+
+La Queue porte la continuation, sans nouveau POST du navigateur ni nouveau
+cron. Les contrôles de clé, digest, jeton et bail restent obligatoires.
+Les données VERIFIED restent lisibles pendant une actualisation en attente.
+Une erreur permanente ne devient ni Review ni panne temporaire à cause
+d’un fallback en 503. Les anciens FAILED ne sont pas modifiés par cette règle.
+Cette politique ne garantit pas la disponibilité du fournisseur ; surveiller
+les erreurs permanentes, les envois Queue échoués et les coûts par cycle.
+Le retour arrière conserve les lignes PENDING et leurs échéances ; aucune
+migration ou suppression de données n’est nécessaire.

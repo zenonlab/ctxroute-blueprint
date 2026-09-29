@@ -36,6 +36,28 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ## Décision
 
+### Révision du 29 septembre : pannes transitoires autonomes
+
+La reprise manuelle systématique n’est plus le contrat des nouvelles pannes
+transitoires constatées pendant une collecte. Les réponses HTTP 408, 425,
+500, 502, 503 et 504, les interruptions et échecs réseau reconnus programment
+une nouvelle échéance serveur, sans POST du navigateur. Chaque échec consommé
+reste compté : backoff exponentiel à partir de 60 secondes; après le huitième,
+repos de 24 heures avant un nouveau cycle. Le checkpoint et l’identité sont
+conservés. Le renouvellement atomique exige le même digest, compteur, jeton
+et un bail encore valide; il ne cible jamais une ligne FAILED historique.
+Le réveil Queue utilise directement cette échéance (maximum 24 heures), sans
+ajouter un cron ni multiplier les réveils vides toutes les quinze minutes.
+
+Le circuit fournisseur partagé reste actif. Une erreur d’authentification,
+de schéma, de configuration ou d’identité n’est pas une indisponibilité
+temporaire; elle ne bénéficie pas de ce recyclage et ne devient pas Review.
+La cadence et HTTP 429 gardent leur chemin de report existant. Les résultats
+introuvables et ambigus restent des décisions fonctionnelles distinctes.
+Cette règle remplace l’arrêt manuel après huit pannes transitoires connues,
+pas les protections des anciens FAILED dont la cause est inconnue. Aucun
+nouveau schéma D1 n’est requis; le rollback conserve PENDING et retry_at.
+
 Une pagination de secours qui avance après une panne conserve son curseur et
 une liste bornée `retryProviders` des fournisseurs antérieurs à revérifier.
 La reprise revérifie ces fournisseurs avant de continuer à la page enregistrée;

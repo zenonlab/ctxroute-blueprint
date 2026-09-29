@@ -442,23 +442,33 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   }
 
   async deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string, searchProgress?: PublicDiscoverySearchProgress): Promise<void> {
+    await this.rescheduleClaim(request, tokenDigest, retryAt, now, false, searchProgress);
+  }
+
+  async retryTransientClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, now: string): Promise<void> {
+    if (!Number.isInteger(request.attempt) || request.attempt < 1 || request.attempt > 8) throw new TypeError('invalid-public-discovery-retry-attempt');
+    const delay = request.attempt >= 8 ? 86_400_000 : 60_000 * 2 ** (request.attempt - 1);
+    await this.rescheduleClaim(request, tokenDigest, futureIso(now, delay), now, true, request.searchProgress);
+  }
+
+  private async rescheduleClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string, consumed: boolean, searchProgress?: PublicDiscoverySearchProgress): Promise<void> {
     if (!Number.isFinite(Date.parse(retryAt)) || retryAt <= now) throw new TypeError('invalid-public-discovery-defer-time');
     const result = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
-      state = 'PENDING', attempt_count = attempt_count - 1,
+      state = 'PENDING', attempt_count = CASE WHEN ?11 = 0 THEN attempt_count - 1 WHEN attempt_count >= 8 THEN 0 ELSE attempt_count END,
       lease_until = NULL, retry_at = ?8, updated_at = ?9, search_progress_json = ?10
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
         AND request_digest = ?5 AND claim_token_hash = ?6 AND attempt_count = ?7
-        AND state = 'PROCESSING' RETURNING fingerprint`)
+        AND state = 'PROCESSING' AND (?11 = 0 OR lease_until > ?9) RETURNING fingerprint`)
       .bind(...keyValues(request.key), request.requestDigest, tokenDigest, request.attempt, retryAt, now,
-        searchProgress === undefined ? null : JSON.stringify(publicDiscoverySearchProgressSchema.parse(searchProgress))).first();
+        searchProgress === undefined ? null : JSON.stringify(publicDiscoverySearchProgressSchema.parse(searchProgress)), consumed ? 1 : 0).first();
     if (result) return;
     const refresh = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
-      refresh_state = 'PENDING', refresh_attempt_count = refresh_attempt_count - 1,
+      refresh_state = 'PENDING', refresh_attempt_count = CASE WHEN ?10 = 0 THEN refresh_attempt_count - 1 WHEN refresh_attempt_count >= 8 THEN 0 ELSE refresh_attempt_count END,
       lease_until = NULL, retry_at = ?8, updated_at = ?9
       WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
         AND request_digest = ?5 AND claim_token_hash = ?6 AND refresh_attempt_count = ?7
-        AND state = 'VERIFIED' AND refresh_state = 'PROCESSING' RETURNING fingerprint`)
-      .bind(...keyValues(request.key), request.requestDigest, tokenDigest, request.attempt, retryAt, now).first();
+        AND state = 'VERIFIED' AND refresh_state = 'PROCESSING' AND (?10 = 0 OR lease_until > ?9) RETURNING fingerprint`)
+      .bind(...keyValues(request.key), request.requestDigest, tokenDigest, request.attempt, retryAt, now, consumed ? 1 : 0).first();
     if (!refresh) throw new Error('public-discovery-defer-claim-lost');
   }
 

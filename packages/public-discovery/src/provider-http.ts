@@ -9,6 +9,11 @@ export interface FavoriteProviderJson<TValue> { readonly digest: string; readonl
 export class FavoriteProviderHttpError extends Error {
   constructor(readonly status: number) { super(`Favorite provider request failed with HTTP ${status}.`); }
 }
+export function isAutomaticProviderRetry(error: Error): boolean {
+  if (error instanceof FavoriteProviderHttpError) return [408, 425, 500, 502, 503, 504].includes(error.status);
+  return error.name === 'AbortError' || error.name === 'TimeoutError'
+    || /^(?:fetch failed|failed to fetch|network error|network request failed)$/iu.test(error.message);
+}
 export interface FavoriteProviderRuntimeControlPort {
   recordFailure(provider: FavoriteProvider, now: number, retryAt?: number): Promise<void>;
   recordSuccess(provider: FavoriteProvider, now: number): Promise<void>;

@@ -416,26 +416,37 @@ describe('public discovery queue trigger', () => {
       await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(request.key.fingerprint).run();
     }
   });
-  it('spends eight unavailable-provider attempts across fresh consumers, then stops without rearming FAILED', async () => {
+  it('consumes eight transient attempts then durably waits one day without another admission', async () => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-01T00:00:00.000Z'));
     const discoveryKey = { ...key('a'), fingerprint: 'a503'.padStart(64, '0'), mediaKind: 'UNKNOWN' as const };
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = { metrics: async () => metrics, send: vi.fn(async (_signal: NativeCollectorSignal, _options?: QueueSendOptions) => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    const bindings = { ...env, PROVIDER_TRANSPORT_MODE: 'direct' as const, PUBLIC_DISCOVERY_QUEUE: queue };
+    let continuationToken: string | undefined;
     const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({}, { status: 503 }));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     try {
       await adapter.request({ key: discoveryKey, query: { discoveryTitles: ['Synthetic unavailable work'], sourceTitles: ['Synthetic unavailable work'], mediaKind: 'UNKNOWN' }, requestDigest: 'd'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
-      for (let passage = 1; passage <= 10; passage += 1) {
-        const report = await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, discoveryKey, false);
-        expect(report).toMatchObject({ claimed: passage <= 8 ? 1 : 0, deferred: 0, failed: passage <= 8 ? 1 : 0, published: 0 });
+      for (let passage = 1; passage <= 8; passage += 1) {
+        const report = await processPublicDiscoveryQueue(bindings, discoveryKey, true, undefined, continuationToken);
+        const signal = queue.send.mock.calls.at(-1)![0];
+        if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
+        continuationToken = signal.continuationToken;
+        expect(report).toMatchObject({ claimed: 1, deferred: 1, failed: 0, published: 0 });
         expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
-          .bind(discoveryKey.fingerprint).first()).toEqual({ state: passage <= 8 ? 'PROCESSING' : 'FAILED', attempts: Math.min(passage, 8) });
-        vi.setSystemTime(Date.now() + 16 * 60_000);
+          .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PENDING', attempts: passage === 8 ? 0 : passage });
+        const delay = passage === 8 ? 86_400_000 : 60_000 * 2 ** (passage - 1);
+        expect(queue.send.mock.calls.at(-1)![1]).toMatchObject({ delaySeconds: delay / 1_000 });
+        vi.setSystemTime(Date.now() + delay - 1);
+        expect(await processPublicDiscoveryQueue(bindings, discoveryKey, false, undefined, continuationToken)).toMatchObject({ claimed: 0 });
+        vi.setSystemTime(Date.now() + 1 + Math.max(0, 16 * 60_000 - delay));
       }
       expect(provider).toHaveBeenCalledTimes(8 * 5);
-      await expect(new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB).read(discoveryKey, new Date().toISOString()))
-        .resolves.toEqual({ state: 'UNAVAILABLE', reason: 'ATTEMPT_LIMIT' });
+      expect(await processPublicDiscoveryQueue(bindings, discoveryKey, true, undefined, continuationToken))
+        .toMatchObject({ claimed: 1, deferred: 1, failed: 0 });
     } finally {
       provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
       await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
@@ -456,10 +467,10 @@ describe('public discovery queue trigger', () => {
         .bind(Date.now() + 120_000).run();
       await adapter.request({ ...submission('b', 'Synthetic mixed failure'), key: discoveryKey, requestDigest: 'e'.repeat(64) }, new Date().toISOString());
       expect(await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, discoveryKey, false))
-        .toMatchObject({ claimed: 1, deferred: 0, failed: 1, published: 0 });
+        .toMatchObject({ claimed: 1, deferred: 1, failed: 0, published: 0 });
       expect(provider).toHaveBeenCalledTimes(1);
       expect(await env.PUBLIC_DB.prepare('SELECT state, attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
-        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PROCESSING', attempts: 1 });
+        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'PENDING', attempts: 1 });
     } finally {
       provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
       await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
@@ -495,16 +506,20 @@ describe('public discovery queue trigger', () => {
     }
   });
 
-  it('keeps VERIFIED data after exhausting eight failed refresh attempts', async () => {
+  it('keeps VERIFIED data while eight transient refresh failures enter daily cooldown', async () => {
     const restoreRuntime = await preserveProviderRuntime();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-04T00:00:00.000Z'));
     const discoveryKey = { ...key('d'), fingerprint: 'd503'.padStart(64, '0') };
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = { metrics: async () => metrics, send: vi.fn(async (_signal: NativeCollectorSignal, _options?: QueueSendOptions) => ({ metadata: { metrics } })), sendBatch: vi.fn(async () => ({ metadata: { metrics } })) };
+    const bindings = { ...env, PROVIDER_TRANSPORT_MODE: 'direct' as const, PUBLIC_DISCOVERY_QUEUE: queue };
+    let continuationToken: string | undefined;
     const initialAt = '2026-09-01T00:00:00.000Z';
     const requestDigest = 'a'.repeat(64);
     const profile = {
-      workId: 'work_preserved_failed_refresh',
+      workId: `work_${(await tokenDigest('anilist:905030')).slice(0, 48)}`,
       candidate: { displayTitle: 'Synthetic preserved failed refresh', externalId: '905030', mediaKind: 'ANIME' as const, preSerialization: false, provider: 'anilist' as const, titles: ['Synthetic preserved failed refresh'] },
       references: [{ externalId: '905030', provider: 'anilist' as const }],
     };
@@ -515,21 +530,52 @@ describe('public discovery queue trigger', () => {
       const claim = await adapter.claimBatch({ claimToken: 'a'.repeat(48), tokenDigest: 'b'.repeat(64), key: discoveryKey, now: initialAt, leaseUntil: '2026-09-01T00:15:00.000Z', limit: 1 });
       await adapter.publishBatch({ claimToken: claim.claimToken, nonce: crypto.randomUUID(), results: [{ key: discoveryKey, requestDigest, resolution: { state: 'VERIFIED', profile } }], schemaVersion: 3, verifiedAt: initialAt }, 'b'.repeat(64), 'c'.repeat(64), initialAt);
       expect((await adapter.requestRefresh(discoveryKey, new Date().toISOString())).outcome).toBe('created');
-      for (let passage = 1; passage <= 10; passage += 1) {
-        expect(await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct' }, discoveryKey, false))
-          .toMatchObject({ claimed: passage <= 8 ? 1 : 0, deferred: 0, failed: passage <= 8 ? 1 : 0, published: 0 });
+      for (let passage = 1; passage <= 8; passage += 1) {
+        expect(await processPublicDiscoveryQueue(bindings, discoveryKey, true, undefined, continuationToken))
+          .toMatchObject({ claimed: 1, deferred: 1, failed: 0, published: 0 });
+        const signal = queue.send.mock.calls.at(-1)![0];
+        if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-signal');
+        continuationToken = signal.continuationToken;
         await expect(new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB).read(discoveryKey, new Date().toISOString()))
           .resolves.toMatchObject({ state: 'VERIFIED', profile, verifiedAt: initialAt });
-        vi.setSystemTime(Date.now() + 16 * 60_000);
+        vi.setSystemTime(Date.now() + Math.max(16 * 60_000, passage === 8 ? 86_400_000 : 60_000 * 2 ** (passage - 1)));
       }
       expect(provider).toHaveBeenCalledTimes(8);
       expect(await env.PUBLIC_DB.prepare('SELECT state, refresh_state AS refreshState, refresh_attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
-        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'VERIFIED', refreshState: 'IDLE', attempts: 0 });
+        .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'VERIFIED', refreshState: 'PENDING', attempts: 0 });
+      provider.mockImplementation(async () => Response.json({ data: { Media: {
+        id: 905030, type: 'ANIME', format: 'TV', genres: [], synonyms: [], siteUrl: 'https://anilist.co/anime/905030',
+        title: { romaji: 'Synthetic preserved failed refresh', english: null, native: null },
+        coverImage: { extraLarge: null, large: null, medium: null },
+      } } }));
+      expect(await processPublicDiscoveryQueue(bindings, discoveryKey, true, undefined, continuationToken))
+        .toMatchObject({ claimed: 1, published: 1, failed: 0 });
+      expect(await adapter.read(discoveryKey, new Date().toISOString()))
+        .toMatchObject({ state: 'VERIFIED', profile: { candidate: { externalId: '905030' } } });
     } finally {
       provider.mockRestore(); warn.mockRestore(); vi.useRealTimers();
       await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
       await restoreRuntime();
     }
+  });
+
+  it('guards automatic retries by digest, token, attempt, lease and single consumption', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const request = { ...submission('e', 'Synthetic guarded retry'), key: { ...key('e'), fingerprint: 'a501'.padStart(64, '0') }, requestDigest: 'a'.repeat(64) };
+    const now = '2026-12-05T00:00:00.000Z';
+    const leaseUntil = '2026-12-05T00:15:00.000Z';
+    const tokenHash = 'b'.repeat(64);
+    await adapter.request(request, now);
+    const batch = await adapter.claimBatch({ claimToken: 'c'.repeat(43), tokenDigest: tokenHash, now, leaseUntil, key: request.key, limit: 1 });
+    const claimed = batch.requests[0]!;
+    await expect(adapter.retryTransientClaim(claimed, 'd'.repeat(64), now)).rejects.toThrow('claim-lost');
+    await expect(adapter.retryTransientClaim({ ...claimed, requestDigest: 'e'.repeat(64) }, tokenHash, now)).rejects.toThrow('claim-lost');
+    await expect(adapter.retryTransientClaim({ ...claimed, attempt: 9 }, tokenHash, now)).rejects.toThrow('invalid-public-discovery-retry-attempt');
+    await expect(adapter.retryTransientClaim(claimed, tokenHash, leaseUntil)).rejects.toThrow('claim-lost');
+    await adapter.retryTransientClaim(claimed, tokenHash, now);
+    await expect(adapter.retryTransientClaim(claimed, tokenHash, now)).rejects.toThrow('claim-lost');
+    expect(await adapter.nextPendingAt(tokenHash)).toBe('2026-12-05T00:01:00.000Z');
+    await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(request.key.fingerprint).run();
   });
 
   it('overrides a resolver-converted budget error and defers later claims without calling any provider', async () => {
