@@ -2,6 +2,12 @@
 
 ## Sonde fournisseur partagée
 
+Livrée par PR 176, commit `ceddb895b2ee549bb1dd203b7f18713f644a7027`,
+fusion `d67c561abbf464102670dae544c299591896a7b6`. CI branche `36641593619`
+et main `36642337584` vertes; Worker `6ad93a0f-bf98-4e13-acce-836ae731282b`.
+Vérification complète, 248 tests Discovery, 220 tests Worker et E2E Web
+11 réussis/1 ignoré. Contrôles publics réussis; aucune archive promue.
+
 Après ouverture du circuit, la continuation existante réserve une sonde après
 dix minutes, ou après le `Retry-After` s'il est plus long. D1 réserve la fenêtre
 avant l'appel : les concurrents ne font aucun HTTP et une interruption ne
