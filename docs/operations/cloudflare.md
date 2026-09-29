@@ -1,5 +1,29 @@
 # Cloudflare operations gate
 
+## Contrôle Chrome et déploiement du 30 septembre 2026
+
+La PR 177 est fusionnée en `1cf7d1746f4f631d9a0743316b76c791e8fdef97`.
+Le prévol `36644856050` et la CI main `36645627029` sont verts ; le Worker
+déployé est `fab70948-07fe-4a9b-8015-9bad43176e7f`. Les archives publiques et
+les admissions historiques ne sont pas modifiées par cette livraison.
+
+Le profil neuf `hqYS4D` utilise Google Chrome `154.0.8037.58`, sans copie de
+base privée, avec le ZIP Chrome 1.0.49 d'empreinte SHA-256
+`53db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b`.
+Après 1 195 secondes, les 1 522 sources Downloads sont comptabilisées :
+1 052 résolues, 55 Review, 53 exclusions et 362 attentes, pour 865 œuvres.
+Aucune erreur interne ni œuvre résolue absente de la projection ; les
+redémarrages du service worker et du navigateur sont vérifiés. Ce parcours
+ne teste pas la mise à jour d'une ancienne installation.
+
+Les 362 attentes portent les raisons locales `PROVIDER_UNAVAILABLE` (350),
+`NETWORK` (11) et `ADMISSION_WAIT` (1). Ces catégories ne prouvent pas une
+panne simultanée des fournisseurs. Le banc a transmis 1 640 lectures et
+zéro admission ; 142 tentatives de mutation ont été bloquées par son budget.
+Son verdict reste `incomplete`. La livraison Worker s'est déroulée pendant
+ce contrôle : ce reçu ne certifie ni un coût de reprise ni une version
+serveur unique. Le rapport privé est conservé sous `build/installed-review/`.
+
 ## Navigateur du banc installé
 
 `TOBIRINK_INSTALLED_BROWSER_CHANNEL=chrome` utilise Google Chrome installé,
