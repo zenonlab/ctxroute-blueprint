@@ -28,7 +28,7 @@ const mangaUpdatesSeriesSchema = z.object({
   type: nonEmptyString,
   url: z.preprocess((value) => value ?? undefined, z.url().optional()),
 }).passthrough();
-const mangaUpdatesResultSchema = z.object({ record: mangaUpdatesSeriesSchema }).passthrough();
+const mangaUpdatesResultSchema = z.object({ hit_title: nonEmptyString.nullish(), record: mangaUpdatesSeriesSchema }).passthrough();
 const mangaUpdatesSearchSchema = z.object({ results: z.array(mangaUpdatesResultSchema).max(mangaUpdatesPageSize), total_hits: z.number().int().nonnegative() }).passthrough();
 type MangaUpdatesSeries = z.infer<typeof mangaUpdatesSeriesSchema>;
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
@@ -89,13 +89,15 @@ export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCand
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       method: 'POST',
     }, mangaUpdatesSearchSchema));
-    const oversized = response.value.results.some((result) => {
-      const titles = [result.record.title, ...result.record.associated.map((item) => item.title)];
+    const records = response.value.results.map(({ record, hit_title: hitTitle }) => hitTitle == null ? record
+      : { ...record, associated: [{ title: hitTitle }, ...record.associated] });
+    const oversized = records.some((record) => {
+      const titles = [record.title, ...record.associated.map((item) => item.title)];
       return titles.some((title) => title.length > 200) || new Set(titles).size > 32;
     });
-    const inspected = response.value.results.flatMap((result) => {
-      const bounded = [result.record.title, ...result.record.associated.map((item) => item.title)].some((title) => title.length <= 200);
-      return bounded ? [candidate(result.record)] : [];
+    const inspected = records.flatMap((record) => {
+      const bounded = [record.title, ...record.associated.map((item) => item.title)].some((title) => title.length <= 200);
+      return bounded ? [candidate(record)] : [];
     });
     const matchQuery = query.explicitProviderReference === undefined ? { sourceTitles: query.titles } : { sourceTitles: query.titles, explicitProviderReference: query.explicitProviderReference };
     const references = new Set<string>();

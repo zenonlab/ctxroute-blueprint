@@ -6294,11 +6294,10 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR172/index0029 livrés; Workerd1b5057d. Nouveau défaut: rechercheMU avec motscourts10000hits malgré index, pagination281 et329lectures.",
-            "Correctif localMU sélectif: motsalphanumériques>=5 aveclettre, titrecomplet autoritaire; curseursmu2 réservésMU, numériqueslegacypréservés. Rollbackdésactivewriter,gardelecteur.",
-            "Preuve fournisseur réelle bornée:10000→382hits,4pages/4appels/19099ms,0admissionD1; contrôlepositif garde mêmeIDexact avant/après. Preuveprivée0600horsGit.",
-            "Régressionrouge puisverte; module228tests,Queue47dontcheckpointmu2:3/D1/corrélation/hydratation/VERIFIED<=300lectures. npmverify,E2E11pass1skip,Archifydataflow9sur9,diffcheckverts.",
-            "Correctif sélectif prêtàcommiter/pousser puisCIprotégée; aucun rearmement supplémentaire deshuit clés consommées."
+            "PR173 deployed via CI36626795362; installed L84rnV still fails 329-read budget. Selective search is insufficient; no certification claimed.",
+            "New reproduced defect: MangaUpdates search omits associated but returns hit_title. Adapter now retains provider alias; three regressions red then green, translated-hit hydration and wrong-ID regression included.",
+            "233 Public Discovery tests, npm run verify, Web E2E11 passed/1 skipped, typecheck and Archify dataflow showcase9/9 pass. Real provider translated-hit search+hydration returns one matching identity, zero D1 admissions.",
+            "No new replay, schema, budget, provider dependency or public archive; broad pagination remains unresolved."
           ]
         },
         {
@@ -6317,11 +6316,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Batch008:8POST réservés/transmis au total,aucun rejeu; état final6VERIFIED+2NOT_FOUND+2UNAVAILABLE(nonenvoyées).",
-            "Postdéploiementindex0029,8jEddo:2POST,1nouveauVERIFIED puis arrêt sursecond:329lectures(20admission+309collecteur),9continuations18appels,106écritures,0Queueerreur. Seuil300 conservé.",
-            "La seconde demande a continué sans nouveau POST:checkpointMUcurseur281(alias0,0candidat,0tentative consommée),puisNOT_FOUND. Index ciblé insuffisant pour certifier les longues paginations.",
-            "Contrôle final readonly ZyzRkC:10sources,6œuvresLibrary,2ReviewNOT_FOUND,2nonenvoyées,0PENDING/erreurinterne/projectionmanquante;8lectures0POST,redémarrages service-worker/navigateur préservés.",
-            "Pilote noncertifié:preuvescoût manquantes/échouées conservées. Pas de traitement des autres lots ni extrapolation au corpus1522."
+            "PR173 deployed via CI36626795362; Worker c25963f5-6c26-45d5-9dfc-2685a6cb12b4.",
+            "L84rnV sent one of the last two batch008 keys; stopped at 329 correlated D1 reads, 18 provider calls, zero accepted results. Nine original keys now consumed; no replay.",
+            "Fresh preflight: two READY, 8 reads/0 writes; failed initial read then OAuth SELECT1 succeeded. One remaining key not submitted."
           ]
         },
         {

@@ -4,6 +4,29 @@ import { MangaUpdatesFavoriteProviderAdapter, mangaUpdatesApiOrigin } from './ma
 const series = { associated: [{ title: 'Synthetic Alias' }], categories: [{ category: 'Fantasy' }], genres: [{ genre: 'Adventure' }], image: { url: { original: 'https://cdn.mangaupdates.com/image/i1.jpg', thumb: 'https://cdn.mangaupdates.com/image/i1-thumb.jpg' } }, latest_chapter: 84, series_id: 12345, status: 'Complete', title: 'Synthetic Series', type: 'Manhwa', url: 'https://www.mangaupdates.com/series/abc123/synthetic-series', year: 2020 };
 
 describe('MangaUpdatesFavoriteProviderAdapter', () => {
+  it('retains the provider search hit title when search records omit aliases', async () => {
+    const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({
+      results: [{ record: { ...series, title: 'Synthetic Original', associated: undefined }, hit_title: 'Synthetic Translation' }], total_hits: 1,
+    }));
+    const result = await adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Translation'] });
+    expect(result).toMatchObject({ complete: true, candidates: [{ externalId: '12345', titles: ['Synthetic Original', 'Synthetic Translation'] }] });
+  });
+
+  it('does not treat an unprojectable search hit title as an exhausted search', async () => {
+    const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({
+      results: [{ record: series, hit_title: 'A'.repeat(201) }], total_hits: 1,
+    }));
+    await expect(adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] }))
+      .resolves.toMatchObject({ complete: false, truncated: true });
+  });
+
+  it('rejects a malformed provider search hit title', async () => {
+    const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({
+      results: [{ record: series, hit_title: 123 }], total_hits: 1,
+    }));
+    await expect(adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] })).rejects.toThrow();
+  });
+
   it('uses discriminating words for discovery but verifies the complete source title', async () => {
     const bodies: unknown[] = [];
     const fetcher = vi.fn(async (_input: string, init: RequestInit) => {

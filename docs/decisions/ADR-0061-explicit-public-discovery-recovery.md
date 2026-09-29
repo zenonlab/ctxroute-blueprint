@@ -380,6 +380,14 @@ La récupération est observable et réversible au niveau applicatif : désactiv
 
 ## Validation
 
+La recherche MangaUpdates conserve aussi `hit_title` comme alias fourni par
+le résultat de recherche : les records réels omettent `associated`, présent
+dans le détail. L'ignorer éliminait des correspondances traduites avant leur
+hydratation. Cet alias ne remplace ni l'identité ni le contrôle du détail
+hydraté. Un alias mal formé échoue au schéma; un alias trop long conserve
+le statut incomplet. Les curseurs et les budgets restent inchangés.
+Le rollback retire cette projection sans mutation D1.
+
 - typecheck extension ;
 - régression reproduite avec le véritable `HttpPublicDiscoveryAdapter` : receiver préservé et requête HTTP réellement transmise ;
 - tests des clés et payloads communs, des indices synchronisés et de la prélecture groupée ;

@@ -160,6 +160,19 @@ describe('standalone provider resolver', () => {
     expect(ports.anilist.search).not.toHaveBeenCalled();
   });
 
+  it.each([12345, 67890])('hydrates a translated MangaUpdates hit without trusting a different identity: %s', async hydratedId => {
+    let now = 0;
+    const gate = new FavoriteProviderRateGate('mangaupdates', undefined, () => now, async delay => { now += delay; });
+    const fetcher = vi.fn(async (url: string) => url.endsWith('/search')
+      ? Response.json({ results: [{ record: { series_id: 12345, title: 'Original Title', type: 'Manga' }, hit_title: 'Target' }], total_hits: 10000 })
+      : Response.json({ series_id: hydratedId, title: 'Original Title', type: 'Manga', associated: [{ title: 'Target' }] }));
+    const ports = { ...providers(), mangaupdates: new MangaUpdatesFavoriteProviderAdapter(fetcher, gate) };
+    const result = createPublicDiscoveryResolver(ports).resolve(request('MANGA'));
+    if (hydratedId === 12345) await expect(result).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: { externalId: '12345' } } });
+    else await expect(result).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it('follows a real MangaUpdates search cursor before deciding the work is absent', async () => {
     let now = 0;
     let nextAllowedAt = 0;
