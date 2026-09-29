@@ -299,6 +299,23 @@ expirés. Le coût cumulé autorisé reste de 300 lectures : cette optimisation
 ne certifie ni les anciennes exécutions ni une recherche arbitrairement longue.
 Un rollback du Worker conserve l'index, sans supprimer de demande ou de résultat.
 
+La recherche MangaUpdates utilise désormais les mots alphanumériques d'au moins
+cinq caractères contenant une lettre, lorsqu'il en contient, pour éviter que les mots courts
+communs saturent la recherche disjonctive. Sans ces mots, la requête complète est
+conservée. Ce choix porte uniquement sur la découverte : correspondance,
+ambiguïté et hydratation restent vérifiées contre le titre complet original.
+Il ne supprime aucune clé, ne transforme pas un dépassement en `NOT_FOUND` et
+ne modifie ni le digest ni les autres fournisseurs.
+
+Le curseur `mu2:<page>` identifie cette stratégie, uniquement pour MangaUpdates.
+Les curseurs numériques historiques supérieurs à un conservent la recherche
+complète et leur position en tranches de vingt-cinq. Un départ en page un peut
+utiliser la nouvelle stratégie; ses continuations ne changent plus de requête.
+Un rollback désactive l'émission sélective mais conserve le lecteur `mu2` pour
+terminer les continuations déjà admises : revenir au Worker antérieur à ce
+lecteur rendrait ces checkpoints illisibles. Aucun nettoyage des checkpoints
+ou réarmement automatique n'est autorisé pour contourner cette compatibilité.
+
 La composition Worker transmet aussi le quatrième argument `searchProgress`
 de `gateway.defer` à `deferClaim`. Le curseur et les candidats bornés produits
 après quatre pages doivent traverser cette frontière avant le signal Queue.

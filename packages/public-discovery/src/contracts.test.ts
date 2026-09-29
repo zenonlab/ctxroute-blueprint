@@ -8,6 +8,17 @@ const query = {
 };
 
 describe('public discovery request minimization', () => {
+  it('accepts bounded selective cursors only for MangaUpdates', () => {
+    const base = { candidates: [], cursor: 'mu2:2', provider: 'mangaupdates', titleIndex: 0, version: 1 };
+    expect(publicDiscoverySearchProgressSchema.parse(base)).toEqual(base);
+    for (const provider of ['anilist', 'mangadex', 'kitsu-anime', 'kitsu-manga']) {
+      expect(publicDiscoverySearchProgressSchema.safeParse({ ...base, provider }).success).toBe(false);
+    }
+    for (const cursor of ['mu2:0', 'mu2:01', 'mu2:100000', 'mu2:-1', 'mu3:2']) {
+      expect(publicDiscoverySearchProgressSchema.safeParse({ ...base, cursor }).success).toBe(false);
+    }
+  });
+
   it.each(['discoveryTitles', 'sourceTitles'] as const)('rejects more than four %s', (field) => {
     expect(publicDiscoveryQuerySchema.safeParse({ ...query, [field]: ['One', 'Two', 'Three', 'Four', 'Five'] }).success).toBe(false);
   });

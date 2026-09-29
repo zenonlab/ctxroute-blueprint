@@ -4,6 +4,45 @@ import { MangaUpdatesFavoriteProviderAdapter, mangaUpdatesApiOrigin } from './ma
 const series = { associated: [{ title: 'Synthetic Alias' }], categories: [{ category: 'Fantasy' }], genres: [{ genre: 'Adventure' }], image: { url: { original: 'https://cdn.mangaupdates.com/image/i1.jpg', thumb: 'https://cdn.mangaupdates.com/image/i1-thumb.jpg' } }, latest_chapter: 84, series_id: 12345, status: 'Complete', title: 'Synthetic Series', type: 'Manhwa', url: 'https://www.mangaupdates.com/series/abc123/synthetic-series', year: 2020 };
 
 describe('MangaUpdatesFavoriteProviderAdapter', () => {
+  it('uses discriminating words for discovery but verifies the complete source title', async () => {
+    const bodies: unknown[] = [];
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)));
+      return Response.json({ results: [{ record: { ...series, title: 'The Wandering Scholar', associated: [] } }], total_hits: 101 });
+    });
+    const first = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ limit: 20, provider: 'mangaupdates', titles: ['The Wandering Scholar'] });
+    expect(bodies[0]).toMatchObject({ page: 1, search: 'Wandering Scholar' });
+    expect(first).toMatchObject({ candidates: [{ externalId: '12345' }], nextCursor: 'mu2:2' });
+    await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ cursor: 'mu2:2', limit: 20, provider: 'mangaupdates', titles: ['The Wandering Scholar'] });
+    expect(bodies[1]).toMatchObject({ page: 2, search: 'Wandering Scholar' });
+    const unrelated = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ limit: 20, provider: 'mangaupdates', titles: ['The Wandering Scholar 67890'] });
+    expect(unrelated.candidates).toEqual([]);
+  });
+
+  it.each(['86', 'All of Us', '王者天下'])('preserves a title without longer alphabetic words: %s', async title => {
+    const bodies: unknown[] = [];
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)));
+      return Response.json({ results: [], total_hits: 0 });
+    });
+    await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ limit: 20, provider: 'mangaupdates', titles: [title] });
+    expect(bodies[0]).toMatchObject({ search: title });
+  });
+
+  it('keeps selective checkpoints readable when new selective searches are disabled', async () => {
+    const bodies: unknown[] = [];
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)));
+      return Response.json({ results: [], total_hits: 301 });
+    });
+    const legacy = await new MangaUpdatesFavoriteProviderAdapter(fetcher, undefined, false).search({ limit: 20, provider: 'mangaupdates', titles: ['The Wandering Scholar'] });
+    expect(bodies[0]).toMatchObject({ page: 1, search: 'The Wandering Scholar' });
+    expect(legacy.nextCursor).toBe('5');
+    const resumed = await new MangaUpdatesFavoriteProviderAdapter(fetcher, undefined, false).search({ cursor: 'mu2:2', limit: 20, provider: 'mangaupdates', titles: ['The Wandering Scholar'] });
+    expect(bodies[1]).toMatchObject({ page: 2, search: 'Wandering Scholar' });
+    expect(resumed.nextCursor).toBe('mu2:3');
+  });
+
   it('retains an exact ID even when the title differs from the source slug', async () => {
     const adapter = new MangaUpdatesFavoriteProviderAdapter(async () => Response.json({ results: [{ record: series }], total_hits: 1 }));
     const result = await adapter.search({ limit: 20, provider: 'mangaupdates', titles: ['Unrelated Source Slug'], explicitProviderReference: { provider: 'mangaupdates', externalId: '12345' } });
@@ -91,12 +130,12 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
     let requestInit: RequestInit | undefined;
     const fetcher = vi.fn(async (_input: string, init: RequestInit) => {
       requestInit = init;
-      return Response.json({ results: [{ record: series }], total_hits: 10_000 });
+      return Response.json({ results: [{ record: { ...series, title: 'The Synthetic Series' } }], total_hits: 10_000 });
     });
 
-    const result = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ cursor: '81', limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] });
+    const result = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ cursor: '81', limit: 20, provider: 'mangaupdates', titles: ['The Synthetic Series'] });
 
-    expect(JSON.parse(String(requestInit?.body))).toMatchObject({ page: 21, perpage: 100 });
+    expect(JSON.parse(String(requestInit?.body))).toMatchObject({ page: 21, perpage: 100, search: 'The Synthetic Series' });
     expect(result).toMatchObject({ candidates: [{ externalId: '12345' }], complete: false, nextCursor: '85' });
   });
 
@@ -138,7 +177,7 @@ describe('MangaUpdatesFavoriteProviderAdapter', () => {
 
     const result = await new MangaUpdatesFavoriteProviderAdapter(fetcher).search({ limit: 20, provider: 'mangaupdates', titles: ['Synthetic Series'] });
 
-    expect(result).toMatchObject({ candidates: [], complete: false, nextCursor: '5', truncated: true });
+    expect(result).toMatchObject({ candidates: [], complete: false, nextCursor: 'mu2:2', truncated: true });
   });
 
   it('hydrates the exact series route and rejects a foreign reference', async () => {

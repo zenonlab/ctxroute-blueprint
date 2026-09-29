@@ -95,6 +95,11 @@ export const publicDiscoveryTerminalResolutionSchema = z.discriminatedUnion('sta
   }),
 ]);
 
+export function isPublicDiscoverySearchCursor(provider: string, cursor: string): boolean {
+  return /^[1-9]\d{0,4}$/u.test(cursor)
+    || provider === 'mangaupdates' && /^mu2:[1-9]\d{0,4}$/u.test(cursor);
+}
+
 export const publicDiscoverySearchProgressSchema = z.strictObject({
   retryProviders: z.array(publicDiscoveryProviderSchema).min(1).max(4)
     .refine((providers) => new Set(providers).size === providers.length, 'duplicate-retry-provider').optional(),
@@ -110,11 +115,11 @@ export const publicDiscoverySearchProgressSchema = z.strictObject({
     }
   }).optional(),
   candidates: z.array(publicDiscoveryCandidateSchema).max(25),
-  cursor: z.string().regex(/^[1-9]\d{0,4}$/u),
+  cursor: z.string().min(1).max(9),
   provider: publicDiscoveryProviderSchema,
   titleIndex: z.number().int().min(0).max(3),
   version: z.literal(1),
-});
+}).refine(progress => isPublicDiscoverySearchCursor(progress.provider, progress.cursor), 'invalid-provider-search-cursor');
 
 export const publicDiscoveryClaimedRequestSchema = publicDiscoveryRequestSchema.extend({
   attempt: z.number().int().positive(),

@@ -1,4 +1,4 @@
-import { publicDiscoveryCandidateSchema } from './contracts';
+import { isPublicDiscoverySearchCursor, publicDiscoveryCandidateSchema } from './contracts';
 import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoverySearchProgress, PublicDiscoveryTerminalResolution } from './contracts';
 import { favoriteProviderInspectionLimit, FavoriteProviderRetryError, inspectFavoriteTitleCandidates, isPublicDiscoveryCandidateCompatible } from './provider-kit';
 import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit';
@@ -135,7 +135,7 @@ async function searchProvider(
       }
       if (envelope.complete && !envelope.truncated && envelope.nextCursor === undefined) break;
       const next = envelope.nextCursor;
-      if (envelope.complete || next === undefined || !/^[1-9]\d{0,4}$/u.test(next) || seen.has(next)) {
+      if (envelope.complete || next === undefined || !isPublicDiscoverySearchCursor(provider, next) || seen.has(next)) {
         throw new IncompleteProviderSearchError('cursor');
       }
       if (page + 1 === searchPageLimit) {

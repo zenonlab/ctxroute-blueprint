@@ -2192,3 +2192,39 @@ Déployer l'index avant le Worker par la CI protégée. Pour un rollback, conser
 l'index et les données puis revenir au Worker précédent. Les lectures gagnées
 ne prouvent pas que toute recherche longue respecte le plafond cumulé de 300;
 une nouvelle preuve réelle reste nécessaire après déploiement.
+
+### Recherche MangaUpdates sélective et compatibilité des curseurs
+
+Après l'index `0029`, le pilote privé `8jEddo` a encore dépassé la borne avec
+329 lectures sur neuf continuations et dix-huit appels fournisseur. Une lecture
+ciblée a montré un curseur historique 281, soit la page 71 de cent résultats,
+sans candidat retenu ni tentative consommée. La demande a finalement terminé
+en `NOT_FOUND`; elle ne doit pas être soumise une seconde fois. Le contrôle
+installé `ZyzRkC` comptabilise six œuvres Library, deux Review et deux demandes
+non envoyées, sans erreur interne ni perte après redémarrages.
+
+La reproduction directe bornée confirme que les mots courts du titre saturent
+la recherche MangaUpdates à 10 000 hits. Supprimer uniquement le suffixe
+numérique ne la réduit pas; les mots discriminants la ramènent à 382 résultats.
+L'adaptateur corrigé termine ces quatre pages en quatre appels et 19,1 secondes,
+sans admission D1. Cette preuve fournisseur n'est pas un certificat du pilote.
+Un contrôle positif sur une œuvre publique connue retrouve la même référence
+exacte dans la première page avec les deux stratégies; aucune identité n'est
+choisie sur le seul mot de recherche.
+Les mots alphanumériques de cinq caractères ou plus contenant une lettre sont
+utilisés pour la recherche; s'il n'y en a aucun, le titre reste inchangé. Le
+titre complet reste l'entrée de la correspondance, pas la chaîne raccourcie.
+
+Les nouvelles pages portent `mu2:<page>`, limité à cinq chiffres et réservé à
+MangaUpdates. Les anciennes pages numériques poursuivent la requête complète
+et le décalage historique sans sauter de résultats. Le test Worker vérifie
+pages 1–4, checkpoint `mu2:3` dans D1, zéro tentative consommée pendant le
+différé, continuation corrélée, hydratation puis résultat `VERIFIED`.
+
+Pour revenir à l'émission précédente, désactiver le troisième argument
+`selectiveSearch` de `MangaUpdatesFavoriteProviderAdapter` dans la composition
+ou son défaut, puis livrer par la CI protégée. Conserver impérativement le
+lecteur des curseurs `mu2` : les continuations déjà créées restent sélectives
+même quand les nouveaux départs ne le sont plus. Ne pas redéployer un Worker
+antérieur à ce lecteur et ne supprimer aucun checkpoint pour faire passer le
+rollback. Les bornes 300 lectures et douze minutes ne changent pas.
