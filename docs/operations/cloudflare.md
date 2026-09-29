@@ -1,5 +1,15 @@
 # Cloudflare operations gate
 
+## Dépendance de validation — Undici
+
+L'audit du run `36631395616` bloque la livraison sur Undici 7.29.0,
+dépendance de Miniflare. Vitest Cloudflare 1.3.2 et Wrangler 4.143.1
+apportent Miniflare 5.20260926.1-alpha avec Undici 7.29.1, correctif des
+plages signalées. L'override non appliqué dans le workspace est abandonné.
+Valider `npm audit`, les suites Worker et `npm run verify`;
+ne pas utiliser `npm audit fix --force` ou désactiver la gate. Le rollback
+restaure manifeste et verrou ensemble; il réintroduirait l'alerte de sécurité.
+
 ## Pilote du 29 septembre — preuve partielle conservée
 
 La PR 173 est déployée par le run protégé `36626795362`, Worker
@@ -14,6 +24,15 @@ Le diagnostic distingue deux défauts : une recherche multi-mots reste large
 alors que les records de recherche n'incluent pas `associated`. Conserver
 cet alias corrige une perte de preuve; cela ne prouve pas que ce titre
 particulier sera résolu, ni que toute pagination respecte déjà le budget.
+
+L'observation suivante de la même corrélation révèle `provider-search-cursor`
+à la tentative 2. Le checkpoint conservé est `mu2:37`; la page finale 38
+répond avec 78 records dont un titre canonique trop long. Le garde global
+transformait cette dernière page en résultat incomplet sans curseur suivant,
+puis le resolver refusait cette incohérence. La correction distingue un titre
+omis sans correspondance d'une omission potentiellement pertinente avec le
+comparateur existant. Elle ne relève pas la borne de certification : le
+dépassement historique de 329 lectures reste un échec conservé.
 
 Tobirink does not expose Wrangler as a release command. Every provider change
 starts from the repository-owned gate, while the extension and Worker runtime

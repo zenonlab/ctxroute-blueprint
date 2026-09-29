@@ -207,6 +207,19 @@ describe('standalone provider resolver', () => {
     expect(ports['kitsu-manga'].search).toHaveBeenCalledOnce();
   });
 
+  it('finishes a resumed final MangaUpdates page with an unrelated overlong title', async () => {
+    const fetcher = vi.fn(async () => Response.json({
+      results: [{ record: { series_id: 12345, title: 'A'.repeat(201), type: 'Manga' } }], total_hits: 3778,
+    }));
+    const ports = { ...providers(), mangaupdates: new MangaUpdatesFavoriteProviderAdapter(fetcher) };
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...request('MANGA'),
+      searchProgress: { provider: 'mangaupdates', cursor: 'mu2:38', titleIndex: 0, candidates: [], version: 1 },
+    })).resolves.toMatchObject({ state: 'NOT_FOUND' });
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(ports.mangadex.search).not.toHaveBeenCalled();
+    expect(ports['kitsu-manga'].search).not.toHaveBeenCalled();
+  });
+
   it('does not publish NOT_FOUND when every manga provider returns an incomplete page', async () => {
     const ports = providers();
     for (const provider of ['mangaupdates', 'mangadex', 'kitsu-manga'] as const) {

@@ -6294,10 +6294,10 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR173 deployed via CI36626795362; installed L84rnV still fails 329-read budget. Selective search is insufficient; no certification claimed.",
-            "New reproduced defect: MangaUpdates search omits associated but returns hit_title. Adapter now retains provider alias; three regressions red then green, translated-hit hydration and wrong-ID regression included.",
-            "233 Public Discovery tests, npm run verify, Web E2E11 passed/1 skipped, typecheck and Archify dataflow showcase9/9 pass. Real provider translated-hit search+hydration returns one matching identity, zero D1 admissions.",
-            "No new replay, schema, budget, provider dependency or public archive; broad pagination remains unresolved."
+            "PR174 deployed CI36630273811 Worker ac42031a-82d0-4d8d-963d-bc8c6c7cf3ab; hit_title preserved.",
+            "PR175 commit78032d1 fixes unrelated long-title final-page poison;235 discovery tests and real page38 complete; no admission/replay.",
+            "CI36631395616 stopped on new npm audit Undici7.29.0 advisory, not product tests. Official Cloudflare vitest-plugin1.3.2/Wrangler4.143.1 brings Miniflare5.20260926.1-alpha/Undici7.29.1; failed override experiment removed.",
+            "Updated tooling: npm audit0, npm ls valid,219 Worker tests, npm run verify, E2E11pass1skip, Archify showcase9/9 pass; Worker config, migrations and permissions unchanged."
           ]
         },
         {

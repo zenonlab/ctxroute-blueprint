@@ -91,15 +91,20 @@ export class MangaUpdatesFavoriteProviderAdapter implements FavoriteProviderCand
     }, mangaUpdatesSearchSchema));
     const records = response.value.results.map(({ record, hit_title: hitTitle }) => hitTitle == null ? record
       : { ...record, associated: [{ title: hitTitle }, ...record.associated] });
+    const matchQuery = query.explicitProviderReference === undefined ? { sourceTitles: query.titles } : { sourceTitles: query.titles, explicitProviderReference: query.explicitProviderReference };
     const oversized = records.some((record) => {
       const titles = [record.title, ...record.associated.map((item) => item.title)];
-      return titles.some((title) => title.length > 200) || new Set(titles).size > 32;
+      if (new Set(titles).size > 32) return true;
+      const omitted = titles.filter(title => title.length > 200);
+      return omitted.length > 0 && inspectFavoriteTitleCandidates(matchQuery, [{
+        externalId: record.series_id, mediaKind: mediaKind(record.type), preSerialization: /novel/iu.test(record.type),
+        provider: 'mangaupdates', titles: omitted,
+      }]).candidateReferences.length > 0;
     });
     const inspected = records.flatMap((record) => {
       const bounded = [record.title, ...record.associated.map((item) => item.title)].some((title) => title.length <= 200);
       return bounded ? [candidate(record)] : [];
     });
-    const matchQuery = query.explicitProviderReference === undefined ? { sourceTitles: query.titles } : { sourceTitles: query.titles, explicitProviderReference: query.explicitProviderReference };
     const references = new Set<string>();
     let bestLevel = matchLevels.length;
     for (let offset = 0; offset < inspected.length; offset += favoriteProviderInspectionLimit) {
