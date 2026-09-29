@@ -6315,10 +6315,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Batch-003 historique: dix réservations et dix POST via le bouton, neuf Library et une attente; verdict correlation-failed, clés consommées sans rejeu.",
-            "Worker corrigé déployé par CI main 36473535402; batch-004 privé disjoint prévolé avec Wrangler OAuth: dix MANGA éligibles, 16 lectures D1, zéro écriture et zéro réservation.",
-            "Wrangler OAuth reconnecté via session Choukky: 29 permissions avant/après, ancien profil sauvegardé mode 0600, whoami et D1 lisibles avec injection mémoire; .env inchangé.",
-            "Pilot batch-004: 7 admissions, 6 VERIFIED, 1 PENDING checkpoint, 3 untouched; Queue continuation unsent; no replay."
+            "Observateur Tail OAuth local explicite: 53 tests ciblés et suite infra verts; lecture MISS synthétique corrélée en production, zéro admission.",
+            "Commit 74bfeef; PR #167; npm run verify, Archify showcase, E2E et CI protégée 36509729357 verts.",
+            "Le lot batch-005 reste sans autorisation immédiate; aucune reprise du lot effectuée."
           ]
         },
         {
