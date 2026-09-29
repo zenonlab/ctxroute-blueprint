@@ -6336,9 +6336,9 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Fresh isolated Chrome 1.0.48 exact 1,522-source profile after 895s+120s: 1,049 resolved, 56 Review, 53 exclusions, 363 provider-paused and one NETWORK; zero internal errors/missing projections, restart preservation, zero forwarded mutations.",
-            "The sole NETWORK source is unchanged from the prior profile; its old D1 NOT_FOUND has expired and the public GET now returns MISS. The zero-POST harness blocks its required normal admission, so this observation is not proof of a Worker network outage.",
-            "363 provider-paused sources collapse to 311 keys: 310 covered by existing private campaign; the remaining MANGA key is already reserved and remains FAILED/ATTEMPT_LIMIT. D1 indexed campaign read: 202 known unreserved FAILED, 30 reserved (20 VERIFIED, 7 NOT_FOUND, 1 AMBIGUOUS, 2 FAILED), 106 UNKNOWN deferred."
+            "Prévol D1 réel de batch-005 via OAuth local: 10 FAILED/ATTEMPT_LIMIT (9 MANGA, 1 MANHWA), 3 runtimes READY, 16 lectures indexées, 0 écriture.",
+            "Mode OAuth explicite du CLI testé; test:infra, npm run verify et Archify showcase verts.",
+            "Aucun POST ni réarmement batch-005 sans confirmation immédiate du lot exact."
           ]
         },
         {

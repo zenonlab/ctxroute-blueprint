@@ -2,9 +2,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdir, open, readFile, rename, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import { startCostObserver } from './manga-canary.mjs';
 
@@ -271,21 +272,31 @@ function receiptPath(batchId) {
   return new URL(`discovery-recovery-batch-${batchId}.json`, receiptDirectory);
 }
 
-function sanitizedEnvironment() {
-  const environment = { ...process.env, FORCE_COLOR: '0', WRANGLER_LOG_SANITIZE: 'true',
+export function recoveryD1Invocation(sql, { localOAuth = process.env.TOBIRINK_RECOVERY_WRANGLER_OAUTH === '1',
+  inheritedEnvironment = process.env } = {}) {
+  const environment = { ...inheritedEnvironment, FORCE_COLOR: '0', WRANGLER_LOG_SANITIZE: 'true',
     WRANGLER_SEND_ERROR_REPORTS: 'false', WRANGLER_SEND_METRICS: 'false', WRANGLER_WRITE_LOGS: 'false',
     npm_config_logs_max: '0' };
   delete environment.WRANGLER_OUTPUT_FILE_DIRECTORY;
   delete environment.WRANGLER_OUTPUT_FILE_PATH;
-  return environment;
+  if (localOAuth) {
+    delete environment.CLOUDFLARE_API_TOKEN;
+    delete environment.CLOUDFLARE_API_KEY;
+    delete environment.CLOUDFLARE_EMAIL;
+  }
+  const command = localOAuth ? process.execPath : 'npm';
+  const args = localOAuth
+    ? [fileURLToPath(new URL('../../node_modules/wrangler/bin/wrangler.js', import.meta.url)), 'd1', 'execute', 'PUBLIC_DB', '--remote',
+      '--config', fileURLToPath(new URL('../../apps/worker/wrangler.jsonc', import.meta.url)), '--json', '--command', sql]
+    : ['exec', '--no', '--', 'wrangler', 'd1', 'execute', 'PUBLIC_DB', '--remote', '--config',
+      'apps/worker/wrangler.jsonc', '--json', '--command', sql];
+  return { command, args, options: { cwd: localOAuth ? tmpdir() : new URL('../../', import.meta.url),
+    encoding: 'utf8', env: environment, maxBuffer: maxResponseBytes, timeout: 45_000 } };
 }
 
 function queryRows(command) {
-  const child = spawnSync('npm', ['exec', '--no', '--', 'wrangler', 'd1', 'execute', 'PUBLIC_DB', '--remote',
-    '--config', 'apps/worker/wrangler.jsonc', '--json', '--command', command], {
-    cwd: new URL('../../', import.meta.url), encoding: 'utf8', env: sanitizedEnvironment(), maxBuffer: maxResponseBytes,
-    timeout: 45_000,
-  });
+  const invocation = recoveryD1Invocation(command);
+  const child = spawnSync(invocation.command, invocation.args, invocation.options);
   if (child.error || child.status !== 0 || child.signal != null) throw recoveryError('d1-query-failed');
   let output;
   try { output = JSON.parse(child.stdout); } catch { throw recoveryError('d1-query-invalid'); }

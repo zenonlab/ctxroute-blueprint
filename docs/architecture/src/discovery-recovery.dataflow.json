@@ -15,7 +15,7 @@
     { "label": "Résultat" }
   ],
   "nodes": [
-    { "id": "snapshot", "type": "database", "label": "Export D1 frais", "sublabel": "intégrité · SHA-256", "stage": 0, "row": 0, "tag": "lecture seule" },
+    { "id": "snapshot", "type": "database", "label": "Export D1 frais", "sublabel": "OAuth local · SHA-256", "stage": 0, "row": 0, "tag": "lecture seule" },
     { "id": "inventory", "type": "backend", "label": "Inventaire agrégé", "sublabel": "FAILED/ATTEMPT_LIMIT", "stage": 0, "row": 2, "tag": "sans titres ni clés" },
     { "id": "canaries", "type": "backend", "label": "Canaris neufs", "sublabel": "HTTP · Queue · Tail corrélé", "stage": 1, "row": 0, "width": 150, "tag": "VERIFIED requis" },
     { "id": "approval", "type": "security", "label": "Confirmation ciblée", "sublabel": "lot · seuils · arrêt", "stage": 1, "row": 2, "tag": "avant écriture" },

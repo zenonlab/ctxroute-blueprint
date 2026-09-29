@@ -1534,6 +1534,13 @@ converti, supprimé ou réutilisé automatiquement.
 
 Depuis la racine du dépôt, après création et vérification privée du scope :
 
+Si le jeton API hérité est limité à une ancienne IP mais que la session OAuth
+Wrangler locale possède déjà l'accès D1, ajouter
+`TOBIRINK_RECOVERY_WRANGLER_OAUTH=1` à ces commandes. Ce mode explicite lance
+Wrangler hors de `.env` avec le chemin absolu de la configuration Worker et
+supprime uniquement les variables de jeton API de l'environnement enfant.
+Il ne modifie ni jeton, ni restriction IP, ni permission.
+
 ```sh
 node scripts/infra/discovery-recovery-batch.mjs --preflight --scope "$SCOPE_FILE"
 node scripts/infra/discovery-recovery-batch.mjs --prepare "$BATCH_ID" --scope "$SCOPE_FILE"
@@ -1919,6 +1926,11 @@ temporaire, reçoit le chemin absolu de la configuration Worker et n'hérite
 pas des variables de jeton API Cloudflare. Le mode par défaut et les bornes
 de corrélation restent inchangés. Vérifier une lecture `MISS` corrélée avant
 le clic ; aucun POST n'est autorisé si l'observateur n'est pas prêt.
+
+Le prévol D1 de `batch-005` avec l'OAuth local explicite retrouve dix clés
+`FAILED/ATTEMPT_LIMIT` non réservées (neuf MANGA, un MANHWA), les trois
+fournisseurs manga prêts, 16 lignes lues et zéro écrite. Ce résultat ne
+constitue ni une admission ni la confirmation immédiate requise pour ce lot.
 
 Le lot `batch-004` a consommé sept admissions avant un HTTP 503 et un signal
 de continuation non envoyé ; les trois autres clés n'ont pas été admises.

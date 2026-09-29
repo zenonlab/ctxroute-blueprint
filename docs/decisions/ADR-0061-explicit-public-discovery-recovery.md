@@ -179,6 +179,9 @@ Si la session OAuth Wrangler locale existante possède déjà l'accès Tail,
 avec une configuration absolue, sans hériter des variables de jeton API
 Cloudflare. Ce mode explicite ne modifie aucun secret ni permission et garde
 la même corrélation, les mêmes bornes et le même arrêt avant admission.
+Le prévol D1 et la préparation de lot peuvent utiliser la même session locale
+par `TOBIRINK_RECOVERY_WRANGLER_OAUTH=1` ; la requête reste indexée, bornée et
+en lecture seule, sans modifier le contrat de confirmation des POST.
 Le transport WebSocket impose `wss`, l'hôte Tail officiel et le sous-protocole
 `trace-v1`. Le client `ws` direct utilise la trame attendue par Tail et
 termine la connexion si Cloudflare ne confirme pas sa fermeture après deux
