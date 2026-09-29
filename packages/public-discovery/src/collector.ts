@@ -13,10 +13,12 @@ import {
 } from './contracts';
 import { FavoriteProviderRetryError } from './provider-kit';
 import { PublicDiscoverySearchContinuationError } from './resolver';
+import { isAutomaticProviderRetry } from './provider-http';
 
 export interface PublicDiscoveryGatewayPort {
   claim(limit: number): Promise<PublicDiscoveryClaimBatch>;
   defer(request: PublicDiscoveryClaimedRequest, retryAt: string, now: string, searchProgress?: PublicDiscoverySearchProgress): Promise<void>;
+  retryTransient?(request: PublicDiscoveryClaimedRequest, now: string): Promise<void>;
   publish(batch: PublicDiscoveryResultBatch): Promise<PublicDiscoveryReceipt>;
 }
 export interface PublicDiscoveryResolverPort {
@@ -50,6 +52,9 @@ export async function runPublicDiscoveryBatch(input: PublicDiscoveryBatchInput):
         const retryAt = new Date(Math.max(error.retryAt, Date.parse(now) + 1_000)).toISOString();
         if (error instanceof PublicDiscoverySearchContinuationError) await input.gateway.defer(request, retryAt, now, error.searchProgress);
         else await input.gateway.defer(request, retryAt, now);
+        deferred += 1;
+      } else if (input.gateway.retryTransient !== undefined && error instanceof Error && isAutomaticProviderRetry(error)) {
+        await input.gateway.retryTransient(request, input.now());
         deferred += 1;
       } else failed += 1;
       continue;

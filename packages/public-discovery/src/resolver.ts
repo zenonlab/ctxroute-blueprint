@@ -6,7 +6,7 @@ import { AniListFavoriteProviderAdapter } from './providers/anilist';
 import { KitsuFavoriteProviderAdapter } from './providers/kitsu';
 import { MangaDexFavoriteProviderAdapter } from './providers/mangadex';
 import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates';
-import { FavoriteProviderHttpError, FavoriteProviderRateGate } from './provider-http';
+import { FavoriteProviderHttpError, FavoriteProviderRateGate, isAutomaticProviderRetry } from './provider-http';
 import type { FavoriteProviderFetch, FavoriteProviderRuntimeControlPort } from './provider-http';
 
 export type PublicDiscoveryProviderPorts = Readonly<Record<ResolutionProvider, FavoriteProviderPort>>;
@@ -178,6 +178,8 @@ function isTransientProviderError(error: Error): boolean {
 function retainProviderFailure(current: Error | undefined, incoming: Error): Error {
   if (current instanceof IncompleteProviderSearchError) return current;
   if (incoming instanceof IncompleteProviderSearchError) return incoming;
+  if (current !== undefined && !(current instanceof FavoriteProviderRetryError)
+    && !isAutomaticProviderRetry(current) && isAutomaticProviderRetry(incoming)) return current;
   if (incoming instanceof FavoriteProviderRetryError) {
     if (current !== undefined && !(current instanceof FavoriteProviderRetryError)) return current;
     if (current instanceof FavoriteProviderRetryError && current.retryAt > incoming.retryAt) return current;

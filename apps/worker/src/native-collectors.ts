@@ -328,6 +328,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
         return claimed;
       },
       defer: (request, retryAt, now, searchProgress) => port.deferClaim(request, activeTokenDigest, retryAt, now, searchProgress ?? request.searchProgress),
+      retryTransient: (request, now) => port.retryTransientClaim(request, activeTokenDigest, now),
       publish: async (batch: PublicDiscoveryResultBatch) => {
         const receipt = await port.publishBatch(batch, await digest(activeToken), await digest(JSON.stringify(batch.results)), new Date().toISOString());
         acceptedResults += receipt.published;
@@ -372,7 +373,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   if (globalContinuationRequired) continuations.push({ dueAt: genericPendingAt!, signal: { type: 'public-discovery-ready', version: 1 } });
   for (const continuation of continuations) {
     if (!scheduleContinuation) break;
-    const delaySeconds = Math.min(900, Math.max(1, Math.ceil((Date.parse(continuation.dueAt) - Date.now()) / 1_000)));
+    const delaySeconds = Math.min(86_400, Math.max(1, Math.ceil((Date.parse(continuation.dueAt) - Date.now()) / 1_000)));
     try {
       await queue.send(continuation.signal, { contentType: 'json', delaySeconds });
       continuationScheduled = true;
