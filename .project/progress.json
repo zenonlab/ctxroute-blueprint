@@ -6590,6 +6590,42 @@
           ]
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "goal-public-discovery-linked-exact-fallback",
+      "title": "Récupérer une identité exacte via référence fournisseur liée",
+      "status": "DONE",
+      "executionMode": "collaborative",
+      "modeOffered": false,
+      "steps": [
+        {
+          "id": "fallback",
+          "title": "Ajouter un secours lié et vérifié",
+          "status": "DONE",
+          "acceptance": [
+            "Aucun match seulement par titre ne remplace une identité exacte indisponible",
+            "Une référence liée identique et hydratée publie VERIFIED",
+            "Les erreurs sans secours sûr restent techniques et sans Review"
+          ],
+          "files": [
+            "packages/public-discovery/src/resolver.ts",
+            "packages/public-discovery/src/resolver.test.ts",
+            "docs/decisions/ADR-0061-explicit-public-discovery-recovery.md",
+            "docs/architecture/src/discovery-recovery.dataflow.json"
+          ],
+          "commands": [
+            "npm run test --workspace @tobirink/public-discovery",
+            "npm run archify:validate -- discovery-recovery.dataflow",
+            "npm run verify",
+            "git diff --check"
+          ],
+          "evidence": [
+            "Resolver 93/93 et Worker Queue 44/44: secours MangaUpdates→MangaDex seulement après échec consommé; cadence sans appel supplémentaire.",
+            "npm run verify, Archify architecture/dataflow, git diff --check verts; aucun D1 ni archive publique muté."
+          ]
+        }
+      ]
     }
   ]
 }

@@ -129,6 +129,18 @@ Un envoi Queue de continuation refusé émet aussi un événement structuré
 reste absent. L'échec interdit toujours le certificat et n'autorise aucun
 second POST de la même clé.
 
+Quand l'hydratation d'une référence MangaUpdates explicite échoue après un
+appel fournisseur, le resolver peut consulter MangaDex dans son budget existant.
+Un différé de cadence ou de quota ne lance aucun autre fournisseur. Il ne
+publie un secours que si le candidat recherché et sa fiche hydratée portent
+tous deux exactement la référence
+initiale comme ID lié, avec titre et média compatibles. Un simple titre
+semblable, un lien absent ou une identité hydratée différente conserve
+l'échec technique initial : ni Review ni NOT_FOUND ne sont fabriqués.
+Les autres références exactes conservent leur comportement actuel, faute de
+lien croisé fourni par leurs adaptateurs. Cette règle ne réarme aucune demande
+`FAILED` et ne modifie pas les limites d'admission, de tentative ou de cadence.
+
 Si la recherche a identifié un candidat portant un ID lié d'un autre
 fournisseur, un échec transitoire de l'hydratation primaire essaie cet ID exact
 avant une nouvelle recherche par titre. L'identité retournée doit correspondre

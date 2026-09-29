@@ -517,6 +517,83 @@ describe('standalone provider resolver', () => {
     expect(ports.mangadex.hydrate).toHaveBeenCalledOnce();
   });
 
+  it('recovers an unavailable exact MangaUpdates identity only through a hydrated linked MangaDex identity', async () => {
+    const exact = { provider: 'mangaupdates' as const, externalId: '12345' };
+    const linked = { ...candidate('mangadex', 'MANGA', '12345678-1234-4234-8234-123456789abc', 'Target'), linkedReferences: [exact] };
+    const ports = providers({ mangadex: linked });
+    ports.mangaupdates.hydrate.mockRejectedValueOnce(new Error('HTTP 503'));
+    const input = request('MANGA');
+    await expect(createPublicDiscoveryResolver(ports).resolve({
+      ...input, query: { ...input.query, explicitProviderReference: exact },
+    })).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: linked, references: [
+      { provider: 'mangadex', externalId: linked.externalId }, exact,
+    ] } });
+    expect(ports.mangadex.search).toHaveBeenCalledOnce();
+    expect(ports.mangadex.hydrate).toHaveBeenCalledOnce();
+    expect(ports.mangaupdates.search).not.toHaveBeenCalled();
+  });
+
+  it.each(['unlinked-search', 'unlinked-hydration', 'wrong-title'] as const)(
+    'keeps an unavailable exact identity technical when the fallback is %s', async (failure) => {
+      const exact = { provider: 'mangaupdates' as const, externalId: '12345' };
+      const linked = { ...candidate('mangadex', 'MANGA', '12345678-1234-4234-8234-123456789abc',
+        failure === 'wrong-title' ? 'Different work' : 'Target'), linkedReferences: [exact] };
+      const ports = providers({ mangadex: failure === 'unlinked-search' ? { ...linked, linkedReferences: [] } : linked });
+      ports.mangaupdates.hydrate.mockRejectedValueOnce(new Error('HTTP 503'));
+      if (failure === 'unlinked-hydration') ports.mangadex.hydrate.mockResolvedValueOnce({ ...linked, linkedReferences: [] });
+      const input = request('MANGA');
+      await expect(createPublicDiscoveryResolver(ports).resolve({
+        ...input, query: { ...input.query, explicitProviderReference: exact },
+      })).rejects.toThrow('HTTP 503');
+    },
+  );
+
+  it.each(['unlinked', 'linked-wrong-title'] as const)(
+    'continues past an %s title match to a linked identity on the next page', async (firstPage) => {
+    const exact = { provider: 'mangaupdates' as const, externalId: '12345' };
+    const unrelated = { ...candidate('mangadex', 'MANGA', '12345678-1234-4234-8234-123456789abc',
+      firstPage === 'unlinked' ? 'Target' : 'Different work'),
+    };
+    const linked = { ...candidate('mangadex', 'MANGA', '22345678-1234-4234-8234-123456789abc', 'Target'), linkedReferences: [exact] };
+    const ports = providers({ mangadex: linked });
+    ports.mangaupdates.hydrate.mockRejectedValueOnce(new Error('HTTP 503'));
+    ports.mangadex.search.mockResolvedValueOnce({ candidates: [firstPage === 'unlinked' ? unrelated : { ...unrelated, linkedReferences: [exact] }], complete: false, digest: 'page-one',
+      nextCursor: '2', provider: 'mangadex', truncated: true }).mockResolvedValueOnce({ candidates: [linked],
+      complete: true, digest: 'page-two', provider: 'mangadex', truncated: false });
+    const input = request('MANGA');
+    await expect(createPublicDiscoveryResolver(ports).resolve({
+      ...input, query: { ...input.query, explicitProviderReference: exact },
+    })).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: linked } });
+    expect(ports.mangadex.search).toHaveBeenCalledTimes(2);
+    expect(ports.mangadex.search.mock.calls[1]?.[0]).toMatchObject({ cursor: '2' });
+    },
+  );
+
+  it('keeps an UNKNOWN explicit MangaUpdates reference in the manga lane', async () => {
+    const exact = { provider: 'mangaupdates' as const, externalId: '12345' };
+    const linked = { ...candidate('mangadex', 'MANGA', '12345678-1234-4234-8234-123456789abc', 'Target'), linkedReferences: [exact] };
+    const ports = providers({ mangadex: linked });
+    ports.mangaupdates.hydrate.mockRejectedValueOnce(new Error('HTTP 503'));
+    const input = request('UNKNOWN');
+    await expect(createPublicDiscoveryResolver(ports).resolve({
+      ...input, query: { ...input.query, explicitProviderReference: exact },
+    })).resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: linked } });
+    expect(ports.mangadex.search).toHaveBeenCalledOnce();
+    expect(ports.anilist.search).not.toHaveBeenCalled();
+  });
+
+  it('does not launch fallback searches for an exact provider cadence deferral', async () => {
+    const exact = { provider: 'mangaupdates' as const, externalId: '12345' };
+    const ports = providers();
+    const deferred = new FavoriteProviderRetryError('cadence', Date.now() + 60_000);
+    ports.mangaupdates.hydrate.mockRejectedValueOnce(deferred);
+    const input = request('MANGA');
+    await expect(createPublicDiscoveryResolver(ports).resolve({
+      ...input, query: { ...input.query, explicitProviderReference: exact },
+    })).rejects.toBe(deferred);
+    expect(ports.mangadex.search).not.toHaveBeenCalled();
+  });
+
   it('preserves exact same-work references without relation exploration', async () => {
     const exact = {
       ...candidate('anilist', 'ANIME', '154587', 'Shared Title'),

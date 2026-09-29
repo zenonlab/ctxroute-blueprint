@@ -88,6 +88,11 @@ function matchCandidates(candidates: readonly ProviderCandidate[], query: Favori
   return { candidates, references: evidence.candidateReferences, state: evidence.candidateReferences.length === 1 ? 'MATCH' : 'AMBIGUOUS' };
 }
 
+function matchesLinkedReference(candidate: ProviderCandidate, reference: PublicDiscoveryReferenceV3, query: FavoriteTitleMatchQuery): boolean {
+  return candidate.linkedReferences?.some((item) => item.provider === reference.provider && item.externalId === reference.externalId) === true
+    && matchCandidates([candidate], query, true)?.state === 'MATCH';
+}
+
 async function searchProvider(
   provider: ResolutionProvider,
   port: FavoriteProviderPort,
@@ -96,6 +101,7 @@ async function searchProvider(
   deadline: number,
   progress?: PublicDiscoverySearchProgress,
   allowBudgetContinuation = false,
+  requiredLinkedReference?: PublicDiscoveryReferenceV3,
 ): Promise<LaneDecision> {
   if (progress !== undefined && progress.provider !== provider) throw new Error('provider-search-progress-provider-mismatch');
   const uniqueTitles = [...new Set(titles)].slice(0, 4);
@@ -120,7 +126,8 @@ async function searchProvider(
       // An exact identity may be accepted without exhausting every fuzzy result.
       // Inspect each page before retaining candidates, so a later exact match is not sliced away.
       const early = matchCandidates(envelope.candidates, matchQuery, false);
-      if (early) return early;
+      if (early && (requiredLinkedReference === undefined || early.candidates.some((candidate) =>
+        matchesLinkedReference(candidate, requiredLinkedReference, matchQuery)))) return early;
       for (const candidate of envelope.candidates) {
         if (inspectFavoriteTitleCandidates(matchQuery, [candidate]).candidateReferences.length === 0) continue;
         candidates.set(candidateKey(candidate), candidate);
@@ -339,6 +346,46 @@ async function hydrateReference(
   return verified(candidate);
 }
 
+async function hydrateExplicitWithLinkedFallback(
+  providers: PublicDiscoveryProviderPorts,
+  request: PublicDiscoveryClaimedRequest,
+  reference: PublicDiscoveryReferenceV3,
+): Promise<PublicDiscoveryTerminalResolution> {
+  const deadline = Date.now() + searchDurationMilliseconds;
+  let primaryFailure: Error;
+  try { return await hydrateReference(providers, reference, 'exact-provider-identity-not-found'); }
+  catch (error) {
+    if (!(error instanceof Error) || reference.provider !== 'mangaupdates'
+      || error instanceof FavoriteProviderRetryError || !isTransientProviderError(error)
+      || isProviderInvariantError(error)) throw error;
+    primaryFailure = error;
+  }
+  const titles = request.query.discoveryTitles.slice(0, 4);
+  const query = matchQueryFor(request, titles);
+  for (const provider of ['mangadex'] as const) {
+    let lane: LaneDecision;
+    try { lane = await searchProvider(provider, providers[provider], titles, query, deadline, undefined, false, reference); }
+    catch (error) {
+      if (!(error instanceof Error) || isProviderInvariantError(error)) throw error;
+      continue;
+    }
+    const linked = lane.candidates.filter((candidate) => matchesLinkedReference(candidate, reference, query));
+    if (linked.length !== 1) continue;
+    const candidate = linked[0];
+    if (candidate === undefined) continue;
+    try {
+      const resolution = await hydrateReference(providers, { provider: candidate.provider, externalId: candidate.externalId },
+        'matched-provider-identity-not-found', candidate, query);
+      if (resolution.state !== 'VERIFIED' || !resolution.profile.candidate.linkedReferences?.some((item) =>
+        item.provider === reference.provider && item.externalId === reference.externalId)) continue;
+      if (matchCandidates([resolution.profile.candidate], query, true)?.state === 'MATCH') return resolution;
+    } catch (error) {
+      if (!(error instanceof Error) || isProviderInvariantError(error)) throw error;
+    }
+  }
+  throw primaryFailure;
+}
+
 async function hydrateWithTransientFallback(
   providers: PublicDiscoveryProviderPorts,
   request: PublicDiscoveryClaimedRequest,
@@ -401,7 +448,7 @@ export function createPublicDiscoveryResolver(providers: PublicDiscoveryProvider
   return {
     async resolve(request: PublicDiscoveryClaimedRequest): Promise<PublicDiscoveryTerminalResolution> {
       const explicit = request.query.explicitProviderReference;
-      if (explicit !== undefined) return hydrateReference(providers, explicit, 'exact-provider-identity-not-found');
+      if (explicit !== undefined) return hydrateExplicitWithLinkedFallback(providers, request, explicit);
       const deadline = Date.now() + searchDurationMilliseconds;
       const selected = selectMatch(await searchApplicableLanes(providers, request, deadline));
       return selected.kind === 'terminal'
