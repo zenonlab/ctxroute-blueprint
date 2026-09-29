@@ -117,7 +117,7 @@ const expectationSchema = z.discriminatedUnion('task', [
     status: z.literal(202), task: z.literal('discovery') }),
   z.strictObject({ status: z.literal(200), task: z.literal('discovery-lookup') }),
 ]);
-const costFailureEvidenceSchema = z.strictObject({
+const costFailureEvidenceSchema = z.union([z.strictObject({
   acceptedResults: countSchema,
   admissionD1RowsRead: countSchema,
   collectorD1RowsRead: countSchema,
@@ -130,9 +130,18 @@ const costFailureEvidenceSchema = z.strictObject({
   queueSends: countSchema,
   retries: countSchema,
   results: z.array(z.enum(['backoff', 'changed', 'deduplicated', 'failed', 'unchanged'])).max(observerEnvelopeLimit),
-});
+}), z.strictObject({
+  kind: z.enum(['envelopes', 'tracked', 'bytes', 'records', 'continuations', 'key-events']),
+  observed: countSchema,
+  limit: countSchema,
+})]);
 
-export function createCostObservation({ allowProviderContinuation = false } = {}) {
+export function createCostObservation({ allowProviderContinuation = false, recoveryBatchSize } = {}) {
+  if (recoveryBatchSize !== undefined && (!allowProviderContinuation || !Number.isInteger(recoveryBatchSize)
+    || recoveryBatchSize < 1 || recoveryBatchSize > 10)) throw observerError('invalid-budget');
+  const envelopeLimit = recoveryBatchSize === undefined ? observerEnvelopeLimit : 24 + observerEnvelopeLimit * recoveryBatchSize;
+  const trackedLimit = recoveryBatchSize === undefined ? observerReadinessAttempts + fixtures.length : 24 + recoveryBatchSize;
+  const byteLimit = observerByteLimit * (recoveryBatchSize ?? 1);
   const records = new Map();
   const expected = new Map();
   const matched = new Map();
@@ -156,9 +165,13 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
     throw failure;
   }
   function check() { if (failure) throw failure; }
+  function failLimit(kind, observed, limit) {
+    fail(kind === 'bytes' ? 'byte-limit' : 'correlation-limit', { kind, observed, limit });
+  }
   function deferContinuation(cost) {
-    if (deferredContinuationCount >= observerEnvelopeLimit) fail('correlation-limit');
+    if (deferredContinuationCount >= envelopeLimit) failLimit('continuations', deferredContinuationCount + 1, envelopeLimit);
     const continuations = deferredContinuationCosts.get(cost.correlationId) ?? [];
+    if (continuations.length >= observerEnvelopeLimit) failLimit('key-events', continuations.length + 1, observerEnvelopeLimit);
     continuations.push(cost);
     deferredContinuationCosts.set(cost.correlationId, continuations);
     deferredContinuationCount += 1;
@@ -179,6 +192,7 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
     if (record.request.status !== expectation.status || record.httpStatus !== expectation.status
       || record.httpTask !== expectation.task) fail('request-mismatch');
     const selected = record.costs.filter(cost => cost.task === expectation.task);
+    if (selected.length > observerEnvelopeLimit) failLimit('key-events', selected.length, observerEnvelopeLimit);
     if (selected.length === 0 && (!allowProviderContinuation || expectation.task !== 'discovery')) fail('ambiguous-cost');
     for (const cost of record.costs) {
       if (cost.d1RowsRead === undefined || cost.d1RowsWritten === undefined) fail('invalid-cost');
@@ -246,7 +260,7 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
     let envelope;
     try { envelope = JSON.parse(frame); } catch { fail('invalid-frame'); }
     envelopes += 1;
-    if (envelopes > observerEnvelopeLimit) fail('correlation-limit');
+    if (envelopes > envelopeLimit) failLimit('envelopes', envelopes, envelopeLimit);
     if (envelope?.outcome !== 'ok') fail('outcome');
     if (!Array.isArray(envelope.exceptions) || envelope.exceptions.length !== 0) fail('exception');
     if (envelope.truncated === true) fail('truncated');
@@ -312,7 +326,7 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
       if (records.has(requestId)) {
         records.set(requestId, { error: 'duplicate-request' });
       } else {
-        if (records.size >= observerEnvelopeLimit) fail('correlation-limit');
+        if (records.size >= envelopeLimit) failLimit('records', records.size + 1, envelopeLimit);
         const record = { request: parsedRequest.data, costs, error, httpTask, httpStatus: envelope.event?.response?.status };
         records.set(requestId, record);
         attachDeferredContinuations(requestId, record);
@@ -348,7 +362,7 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
       const parsedExpectation = expectationSchema.safeParse(expectation);
       if (!parsedExpectation.success) fail('request-mismatch');
       if (expected.has(requestId)) fail('duplicate-request');
-      if (expected.size >= observerReadinessAttempts + fixtures.length) fail('correlation-limit');
+      if (expected.size >= trackedLimit) failLimit('tracked', expected.size + 1, trackedLimit);
       expected.set(requestId, parsedExpectation.data);
       const record = records.get(requestId);
       if (record) attachDeferredContinuations(requestId, record);
@@ -359,7 +373,7 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
       check();
       const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       bytes += data.length;
-      if (bytes > observerByteLimit) fail('byte-limit');
+      if (bytes > byteLimit) failLimit('bytes', bytes, byteLimit);
       scan(decoder.write(data));
     },
     finish() {
@@ -390,13 +404,13 @@ export function createCostObservation({ allowProviderContinuation = false } = {}
   };
 }
 
-function startWebSocketCostObserver({ allowProviderContinuation, tailUrl, webSocketFactory }) {
+function startWebSocketCostObserver({ allowProviderContinuation, recoveryBatchSize, tailUrl, webSocketFactory }) {
   let url;
   try { url = new URL(tailUrl); }
   catch { throw observerError('invalid-tail-url'); }
   if (url.protocol !== 'wss:' || url.hostname !== 'tail.developers.workers.dev'
     || url.username !== '' || url.password !== '') throw observerError('invalid-tail-url');
-  const observation = createCostObservation({ allowProviderContinuation });
+  const observation = createCostObservation({ allowProviderContinuation, recoveryBatchSize });
   let socket;
   try { socket = webSocketFactory(tailUrl, 'trace-v1'); }
   catch { throw observerError('failed'); }
@@ -444,11 +458,12 @@ function startWebSocketCostObserver({ allowProviderContinuation, tailUrl, webSoc
     close: () => { closePromise ??= close(); return closePromise; } };
 }
 
-export function startCostObserver({ allowProviderContinuation = false, spawnProcess = spawn,
+export function startCostObserver({ allowProviderContinuation = false, recoveryBatchSize, spawnProcess = spawn,
   killProcess = process.kill.bind(process), platform = process.platform,
   tailUrl = process.env.TOBIRINK_WORKER_TAIL_URL, localOAuth = process.env.TOBIRINK_WORKER_TAIL_OAUTH === '1',
   environment = process.env, webSocketFactory = (url, protocol) => new WebSocket(url, protocol, { headers: { 'User-Agent': 'wrangler/4.129.0' } }) } = {}) {
-  if (tailUrl !== undefined) return startWebSocketCostObserver({ allowProviderContinuation, tailUrl, webSocketFactory });
+  if (tailUrl !== undefined) return startWebSocketCostObserver({ allowProviderContinuation, recoveryBatchSize, tailUrl, webSocketFactory });
+  const observation = createCostObservation({ allowProviderContinuation, recoveryBatchSize });
   // The CI observer owns a POSIX process group so npm's Wrangler descendants cannot outlive it.
   if (platform === 'win32') throw observerError('unsupported-platform');
   const env = { ...environment, WRANGLER_WRITE_LOGS: 'false', WRANGLER_LOG_SANITIZE: 'true', WRANGLER_SEND_METRICS: 'false',
@@ -471,7 +486,6 @@ export function startCostObserver({ allowProviderContinuation = false, spawnProc
     child = spawnProcess(command, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'ignore'] });
   } catch { throw observerError('failed'); }
   const groupId = child.pid;
-  const observation = createCostObservation({ allowProviderContinuation });
   let stopping = false;
   let exited = false;
   let closePromise;

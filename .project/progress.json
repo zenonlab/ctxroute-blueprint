@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,10 +6294,10 @@
             "git diff --check"
           ],
           "evidence": [
-            "Politique autonome locale: réseau reconnu/408/425/500/502/503/504, tentatives consommées, backoff puis repos24h après huit; pas de cron/migration/réarmement historique.",
-            "Worker254 tests dont Queue46: reprise après huit pannes, données VERIFIED conservées, digest/jeton/bail/rejeu protégés. Discovery222; npm run verify réussi; typechecks et git diff --check propres.",
-            "E2E Web11 réussis/1 ignoré après packaging1.0.49; premier essai sans ZIP échoué puis corrigé par packaging. Archify discovery-recovery showcase9/9. ADR0061/runbook actualisés.",
-            "Changement non déployé/non publié; preuve locale simulée distincte du corpus réel. Les307 identités FAILED historiques restent inchangées; convergence et certification non acquises."
+            "Correctif7c83a14870ca259b85401d159218b789067f2bc5 livré par PR170; fusion main468d813e5593294731028e0b195f913de49605a0.",
+            "CI branche36608816641 et production36609594690 réussies; Worker396a1898-7ded-41ce-b11e-6b270f089fed. Aucune migration, quatre probes200, ni canari ni publication archives.",
+            "verify/Worker254/Discovery222 verts; E2E11pass1skip; Queue46 dont reprise après huit pannes, données conservées et gardes de claim. Archify discovery-recovery showcase9/9 et diff propre.",
+            "Candidate extension1.0.49 construite et testée par CI; téléchargements publics inchangés. Cette livraison ne certifie pas les307 identités historiques ni la convergence réelle."
           ]
         },
         {
@@ -6316,9 +6316,11 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Batch007 consommé non rejoué. Batch008 prévol frais:10 candidats8MANGA/2MANHWA, fournisseurs READY,16lectures/0écriture.",
-            "Scope build/recovery/remaining-campaign-20260928/batch-008.json, sceau c9f1468ad008c24bb7762459c3d8f54b71e40cb123b7061e5079a601ccd950d8; aucun POST.",
-            "Candidate corrigée à faire passer en CI avant pilote; confirmation immédiate du lot requise avant réarmement."
+            "Autorisation batch008 exécutée via vrai bouton dansOvKBcG; arrêt après5POST surdiscovery-canary-observer-correlation-limit. Les5clésconsommées ne sont pas rejouées;5restent non envoyées.",
+            "4reçus fournisseur complets:2à3appels/clé,83à85lecturesD1,1résultataccepté/clé. Lecturepublique postarrêt:5VERIFIED/5UNAVAILABLE; coût final du5e non certifié.",
+            "Défaut du banc reproduit: limites2canaris inadaptées24prévols+10reprises. Correctifborné au lot1..10,128événements/clé300D1/clé conservés;64tests canari+63tests installéverts.",
+            "Second défaut reproduit2fois: fermetureChrome avec lectureen vol; drainageavantrestart corrigé. ProfilreadonlykWeaYC:5œuvresLibrary,115s,8lectures,0POST/erreur/projectionmanquante, redémarragespréservés.",
+            "npm run verify réussi,E2E11pass1skip,Archifydataflowvalidé,diffpropre. PreuvesprivéesOvKBcG/Dm00FS/78YKgl/kWeaYCpréservées. Pilote10noncertifié, aucune expansion."
           ]
         },
         {
@@ -6337,9 +6339,10 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Headless neuf UoC9cZ, 1195 s: 1522 sources =1045 résolues+50 Review+53 exclusions+374 attentes; 859 œuvres, zéro erreur interne/projection manquante; redémarrages préservés.",
-            "Audit D1 indexé des374 restantes: 318 identités,318 lignes lues/0écriture. 362 sources=307 FAILED/ATTEMPT_LIMIT;12 sources=11 négatifs expirés, admissions bloquées intentionnellement par test zéro POST.",
-            "Preuves privées build/installed-review/ et build/audits/fallback-local-lFhZHE/. Aucun réarmement; convergence non acquise."
+            "Nouveau Chrome headless postdéploiement: qBDa7Q,1195s,ZIP1.0.49 SHA25653db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b,exportDownloads1522sources,profil neuf.",
+            "Résultat1045résolues+50Review+53exclusions+374attentes,859œuvres; zéro erreur interne, zéro projection résolue manquante. Redémarrages service-worker/navigateur vérifiés.",
+            "1650lecturesHTTP,0POST/refresh/fournisseur navigateur;142mutations bloquées par banc,18soumissions distinctes capturées. NETWORK11/ADMISSION_WAIT1 ne prouvent pas une panne distante.",
+            "Rapport privé0600 build/installed-review/tobirink-installed-review-qBDa7Q.report.json, verdict incomplete. Même bilan queUoC9cZ; aucune reprisehistorique ni convergence prétendue. L’audit antérieur identifiait362sources=307FAILED et12sources=11négatifs expirés."
           ]
         },
         {

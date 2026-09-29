@@ -2137,3 +2137,32 @@ Cette politique ne garantit pas la disponibilité du fournisseur ; surveiller
 les erreurs permanentes, les envois Queue échoués et les coûts par cycle.
 Le retour arrière conserve les lignes PENDING et leurs échéances ; aucune
 migration ou suppression de données n’est nécessaire.
+
+### Pilote arrêté par la borne globale du banc
+
+Le pilote du 29 septembre s’est arrêté après cinq admissions avec
+`discovery-canary-observer-correlation-limit`. Quatre reçus complets attestent
+un résultat accepté, deux à trois appels fournisseur et 83 à 85 lectures D1
+par clé. La lecture distante ultérieure trouve les cinq clés admises VERIFIED
+et les cinq clés non envoyées UNAVAILABLE. Aucun POST n’est répété; le cinquième
+résultat ne reçoit pas rétroactivement un certificat de coût manquant.
+
+L’observateur gardait les bornes de deux canaris (14 identifiants suivis,
+128 enveloppes globales), alors que la reprise autorise 24 lectures de prévol
+et dix admissions. La régression reproduit ce défaut sans production.
+Le mode reprise porte désormais la taille scellée du lot (1 à 10) jusqu’au
+Tail OAuth ou WebSocket; le CLI, qui observe une clé à la fois, transmet 1.
+Les limites globales sont calculées au lot, pas supprimées. Une clé conserve
+128 événements collecteur et 300 lectures D1 maximum; les erreurs tardives,
+429, fournisseurs et Queue restent bloquantes. Un dépassement indique désormais
+le type de limite et ses compteurs, sans identité ni contenu privé.
+
+Le contrôle de récupération en lecture seule a aussi reproduit deux fois
+`read-network-failed` lors du redémarrage navigateur : le banc fermait le
+contexte avec une lecture engagée. Il ferme maintenant l’admission de lectures,
+draine et contrôle les erreurs avant les redémarrages et la fermeture finale.
+Les lectures peuvent reprendre après redémarrage sans remettre leur budget
+à zéro; une phase déjà close pour certification reste close. Le profil neuf
+de contrôle retrouve les cinq œuvres dans Library après les redémarrages
+service-worker et navigateur, sans nouveau POST. Cela ne remplace pas la preuve
+corrélée manquante de la cinquième admission du pilote arrêté.

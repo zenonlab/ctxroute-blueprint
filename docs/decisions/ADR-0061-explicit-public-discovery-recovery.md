@@ -36,6 +36,24 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ## Décision
 
+### Observateur dimensionné au lot scellé
+
+Le pilote installé conserve un observateur pour le lot entier, contrairement
+au CLI qui observe une clé à la fois. Il transmet donc explicitement une
+taille de lot de 1 à 10 : au plus 24 identifiants de prévol et un identifiant
+d’admission par clé, un plafond global de 128 enveloppes multiplié par le nombre
+de clés plus 24 de prévol, et un plafond global de 1 Mio multiplié par ce nombre.
+Une clé ne peut jamais accumuler plus de 128 événements collecteur ni dépasser
+300 lectures D1 corrélées. Les douze minutes par clé et le contrôle des erreurs
+tardives restent inchangés. Les canaris gardent leurs limites originales.
+Le plafond historique de 14 identifiants et 128 enveloppes globales n’était
+pas adapté au banc de dix reprises; des régressions couvrent les lots de 1,
+5 et 10 après les 24 prévols permis. Aucun résultat historique n’est rejoué.
+Avant les redémarrages de mesure et la fermeture finale, le banc ferme
+l’admission de lectures et attend les lectures déjà engagées. Il ne classe
+pas sa propre fermeture comme une panne réseau. Une erreur réelle pendant
+ce drainage reste fatale; rouvrir les lectures ne remet aucun compteur à zéro.
+
 ### Révision du 29 septembre : pannes transitoires autonomes
 
 La reprise manuelle systématique n’est plus le contrat des nouvelles pannes
