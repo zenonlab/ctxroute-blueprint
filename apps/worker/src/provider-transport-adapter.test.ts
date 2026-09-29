@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { probeFavoriteProvider } from '../../../packages/public-discovery/src/provider-health';
 import {
   createProviderTransportAdapter,
   DirectProviderTransportAdapter,
@@ -10,6 +11,40 @@ import {
 const anilist = 'https://graphql.anilist.co';
 
 describe('provider transport adapter gate', () => {
+  it.each([
+    ['anilist', { data: { __typename: 'Query' } }],
+    ['mangaupdates', { total_hits: 0, results: [] }],
+    ['mangadex', { result: 'ok', response: 'collection', data: [] }],
+    ['kitsu-anime', { data: [{ id: '1', type: 'anime', attributes: { slug: 'fixture' } }] }],
+    ['kitsu-manga', { data: [{ id: '1', type: 'manga', attributes: { slug: 'fixture' } }] }],
+  ] as const)('allows the actual bounded %s recovery probe through transport', async (provider, payload) => {
+    const fetcher = vi.fn(async () => Response.json(payload));
+    const transport = createProviderTransportAdapter({}, { fetcher });
+    await probeFavoriteProvider(provider, (url, init) => transport.fetch(url, init));
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['anime?include=mappings&fields[mappings]=externalSite,externalId', true],
+    ['anime/46474?include=mappings&fields[mappings]=externalSite,externalId', true],
+    ['anime?include=characters&fields[mappings]=externalSite,externalId', false],
+    ['anime?include=mappings&include=characters&fields[mappings]=externalSite,externalId', false],
+    ['anime?include=mappings&fields[mappings]=item', false],
+    ['anime?fields[mappings]=externalSite,externalId', false],
+    ['manga?include=mappings&fields[mappings]=externalSite,externalId', false],
+  ])('bounds Kitsu mapping parameters: %s', (path, allowed) => {
+    expect(isAllowedProviderTarget(`https://kitsu.io/api/edge/${path}`, 'GET')).toBe(allowed);
+  });
+
+  it.each([
+    'limit=2&ids[]=00000000-0000-4000-8000-000000000000',
+    'limit=1&ids[]=12345678-1234-4234-8234-123456789abc',
+    'limit=1&ids[]=00000000-0000-4000-8000-000000000000&title=private',
+    'limit=1&ids[]=00000000-0000-4000-8000-000000000000&ids[]=00000000-0000-4000-8000-000000000000',
+  ])('does not widen MangaDex ID access for %s', query => {
+    expect(isAllowedProviderTarget(`https://api.mangadex.org/manga?${query}`, 'GET')).toBe(false);
+  });
+
   it('selects the isolated direct adapter by default', async () => {
     let requestInit: RequestInit | undefined;
     const fetcher = vi.fn(async (_input: string, init: RequestInit) => { requestInit = init; return Response.json({ ok: true }); });

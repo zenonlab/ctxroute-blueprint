@@ -192,7 +192,7 @@ test('the packaged Chrome extension imports, resolves, bridges and survives offl
   }
 });
 
-test('packaged extension preserves a pending manhwa across worker and browser restarts before mocked verification', async ({ browserName }) => {
+for (const mediaKind of ['MANHWA', 'ANIME'] as const) test(`packaged extension preserves pending ${mediaKind} across restarts before mocked verification`, async ({ browserName }) => {
   test.setTimeout(240_000);
   expect(browserName).toBe('chromium');
   const repository = resolve(import.meta.dirname, '../../..');
@@ -202,7 +202,11 @@ test('packaged extension preserves a pending manhwa across worker and browser re
   const profilePath = mkdtempSync(resolve(tmpdir(), 'tobirink-pending-profile-'));
   execFileSync('unzip', ['-q', archive, '-d', extensionPath]);
   const title = 'Synthetic Continuation River';
-  const bookmarkUrl = 'https://manhwaz.com/webtoon/synthetic-continuation-river/chapter-7';
+  const bookmarkUrl = mediaKind === 'ANIME' ? 'https://anilist.co/anime/154587/synthetic-continuation-river' : 'https://manhwaz.com/webtoon/synthetic-continuation-river/chapter-7';
+  const provider = mediaKind === 'ANIME' ? 'kitsu-anime' : 'mangaupdates';
+  const externalId = mediaKind === 'ANIME' ? '46474' : '12345';
+  const linkedReferences = mediaKind === 'ANIME' ? [{ provider: 'anilist', externalId: '154587' }] : [];
+  const pendingDetail = `${mediaKind === 'ANIME' ? 'Anime' : 'Manhwa'} (source) · Traitement distant en cours`;
   const servedStates: string[] = [];
   const forbiddenRequests: string[] = [];
   let admissions = 0;
@@ -221,8 +225,8 @@ test('packaged extension preserves a pending manhwa across worker and browser re
     return {
       state: 'VERIFIED', verifiedAt: new Date().toISOString(), nextRefreshAt: new Date(Date.now() + 86_400_000).toISOString(),
       profile: {
-        candidate: { displayTitle: title, externalId: '12345', mediaKind: 'MANHWA', preSerialization: false, provider: 'mangaupdates', titles: [title] },
-        references: [{ externalId: '12345', provider: 'mangaupdates' }], workId: 'work_synthetic-continuation-river',
+        candidate: { displayTitle: title, externalId, mediaKind, preSerialization: false, provider, titles: [title], linkedReferences },
+        references: [{ externalId, provider }, ...linkedReferences], workId: 'work_synthetic-continuation-river',
       },
     };
   };
@@ -247,8 +251,9 @@ test('packaged extension preserves a pending manhwa across worker and browser re
       }
       if (url.pathname === '/v3/catalogue/discoveries/requests' && request.method() === 'POST') {
         const submission = request.postDataJSON();
-        expect(submission.query.mediaKind).toBe('MANHWA');
-        expect(submission.key.mediaKind).toBe('MANHWA');
+        expect(submission.query.mediaKind).toBe(mediaKind);
+        expect(submission.key.mediaKind).toBe(mediaKind);
+        if (mediaKind === 'ANIME') expect(submission.query.explicitProviderReference).toEqual(linkedReferences[0]);
         expect(submission.query).not.toHaveProperty('url');
         admissions += 1;
         if (admissions === 1) admittedAt = Date.now();
@@ -266,7 +271,7 @@ test('packaged extension preserves a pending manhwa across worker and browser re
         return;
       }
       if (url.pathname === '/v3/catalogue/discoveries' && request.method() === 'GET') {
-        expect(url.searchParams.get('mediaKind')).toBe('MANHWA');
+        expect(url.searchParams.get('mediaKind')).toBe(mediaKind);
         const state = discoveryState();
         servedStates.push(state.state);
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state) });
@@ -276,11 +281,11 @@ test('packaged extension preserves a pending manhwa across worker and browser re
     });
     return opened;
   };
-  const readState = async (surface: Page) => surface.evaluate(async (url) => ({
+  const readState = async (surface: Page) => surface.evaluate(async ({ url, mediaKind }) => ({
     bookmarks: await chrome.bookmarks.search({ url }),
-    catalogue: await chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, facets: { type: { MANHWA: 'include' } }, sort: 'TITLE_ASC' }),
+    catalogue: await chrome.runtime.sendMessage({ type: 'library.catalogue.read', version: 1, facets: { type: { [mediaKind]: 'include' } }, sort: 'TITLE_ASC' }),
     status: await chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 }),
-  }), bookmarkUrl);
+  }), { url: bookmarkUrl, mediaKind });
   try {
     context = await launch();
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
@@ -295,9 +300,9 @@ test('packaged extension preserves a pending manhwa across worker and browser re
     await expect.poll(async () => (await readState(options!)).status.counts?.publicDiscoveryPending, { timeout: 30_000 }).toBe(1);
     const pending = await readState(options);
     expect(pending.status.counts).toMatchObject({ observed: 1, resolved: 0, retryable: 1 });
-    expect(pending.catalogue.snapshot).toMatchObject({ total: 1, items: [{ state: 'retryable', detail: 'Manhwa (source) · Traitement distant en cours' }] });
+    expect(pending.catalogue.snapshot).toMatchObject({ total: 1, items: [{ state: 'retryable', detail: pendingDetail }] });
     expect(pending.bookmarks).toMatchObject([{ id: bookmark.id, title, url: bookmarkUrl }]);
-    await expect(page.getByText('Manhwa (source) · Traitement distant en cours')).toBeVisible();
+    await expect(page.getByText(pendingDetail)).toBeVisible();
 
     expect(await restartInstalledReviewWorker(context, options, extensionId)).toBe(true);
     const afterWorker = await readState(options);
@@ -323,7 +328,7 @@ test('packaged extension preserves a pending manhwa across worker and browser re
     providerCompleted = true;
     await expect.poll(async () => (await readState(options!)).status.counts?.resolved, { timeout: 100_000, intervals: [500, 1_000, 2_000] }).toBe(1);
     const verified = await readState(options);
-    expect(verified.catalogue.snapshot).toMatchObject({ total: 1, items: [{ id: 'work_synthetic-continuation-river', state: 'ready', title, source: 'mangaupdates' }] });
+    expect(verified.catalogue.snapshot).toMatchObject({ total: 1, items: [{ id: 'work_synthetic-continuation-river', state: 'ready', title, source: provider }] });
     expect(verified.bookmarks).toEqual(pending.bookmarks);
     expect(verified.status.counts).toMatchObject({ observed: 1, resolved: 1, processing: 0, retryable: 0 });
     expect(servedStates).toEqual(expect.arrayContaining(['MISS', 'PENDING', 'VERIFIED']));

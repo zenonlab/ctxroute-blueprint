@@ -596,7 +596,9 @@ describe('public discovery queue trigger', () => {
           .resolves.toMatchObject({ state: 'VERIFIED', profile, verifiedAt: initialAt });
         vi.setSystemTime(Date.now() + Math.max(16 * 60_000, passage === 8 ? 86_400_000 : 60_000 * 2 ** (passage - 1)));
       }
-      expect(provider).toHaveBeenCalledTimes(8);
+      expect(provider).toHaveBeenCalledTimes(11);
+      expect(provider.mock.calls.filter(([url]) => String(url).startsWith('https://graphql.anilist.co'))).toHaveLength(8);
+      expect(provider.mock.calls.filter(([url]) => String(url).startsWith('https://kitsu.io/api/edge/anime'))).toHaveLength(3);
       expect(await env.PUBLIC_DB.prepare('SELECT state, refresh_state AS refreshState, refresh_attempt_count AS attempts FROM public_discovery_requests_v3 WHERE fingerprint = ?1')
         .bind(discoveryKey.fingerprint).first()).toEqual({ state: 'VERIFIED', refreshState: 'PENDING', attempts: 3 });
       provider.mockImplementation(async () => Response.json({ data: { __typename: 'Query' } }));

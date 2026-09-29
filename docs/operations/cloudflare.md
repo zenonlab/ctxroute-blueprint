@@ -1,5 +1,31 @@
 # Cloudflare operations gate
 
+## Secours exact AniList via Kitsu
+
+La candidate 1.0.50 consomme les mappings `anilist/anime` inclus et liés au
+média Kitsu, sans appel de mapping séparé. Une erreur transitoire d'hydratation
+AniList peut utiliser le candidat Kitsu seulement si recherche, hydratation
+et fiche publique conservent l'identifiant exact demandé. La projection
+Library contrôle les deux preuves ; le même titre seul ne suffit pas.
+Le contrôle public sur Kitsu anime 46474 a confirmé le lien AniList 154587 ;
+ce témoin n'est ni un favori privé ni une preuve de convergence du backlog.
+La source du contrat est le [modèle Mapping Kitsu](https://github.com/hummingbird-me/kitsu-server/blob/the-future/app/models/mapping.rb).
+La publication des archives reste séparée du correctif Worker. Conserver
+1.0.49 et ses preuves ; elles ne certifient pas le nouveau parcours.
+
+Validation locale : 262 tests Discovery, 490 application, 237 Worker,
+`npm run verify` complet et E2E Web 12 réussis / 1 ignoré. L'E2E ajouté charge
+le ZIP, importe une URL AniList exacte, observe `PENDING`, redémarre le worker
+et le navigateur, puis projette une réponse Kitsu liée simulée dans Library
+et la conserve hors ligne. Il ne prouve pas une reprise réelle en production.
+Deux constructions indépendantes reproduisent les archives 1.0.50 : Chrome
+319 716 octets, SHA-256 `bd88a511d8b474d0d751b489328c21a3e2898e2a929543e692da12c617fba8db` ;
+Firefox non signé 319 757 octets, SHA-256
+`c1256a0b5855256e11f56f592e5c2ab88cf8b88e7f6c72923300c24f70deeddb`.
+La sonde MangaDex était refusée avant réseau par la liste des paramètres
+autorisés. Les cinq sondes sont maintenant testées via le transport Worker,
+et seule la requête MangaDex fixe (UUID vide, limit 1) est ajoutée.
+
 ## Contrôle Chrome et déploiement du 30 septembre 2026
 
 La PR 177 est fusionnée en `1cf7d1746f4f631d9a0743316b76c791e8fdef97`.

@@ -6294,9 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR177 fusionnée main1cf7d1746f4f631d9a0743316b76c791e8fdef97; prévol36644856050 et CI main36645627029 success; Worker fab70948-07fe-4a9b-8015-9bad43176e7f.",
-            "Claim exact réduit le scénario20pages de308 à253 lectures sans relever300 ni modifier pagination;248 tests Discovery,221 Worker et Archify showcase9/9 verts. Verify/E2E verts dans CI exacte.",
-            "Sondes fournisseur partagées10min déjà déployées; aucun réarmement historique ni publication d'archive. Les362 attentes du profil complet empêchent de déclarer la candidate certifiée."
+            "Candidate1.0.50 locale: mappings Kitsu anime liés par relationship; secours exact AniList jusqu'à Library, double preuve exigée. Trois régressions rouges puis vertes (adaptateur,resolver,projection).",
+            "Sonde MangaDex refusée par transport reproduite puis corrigée; cinq sondes passent le transport, paramètres hors scope refusés.262 Discovery,490 application,237 Worker,verify complet,E2E12/1skip,Archify verts.",
+            "Archives indépendantes reproductibles Chrome bd88a511 et Firefox non signé c1256a0b; deux GET publics Kitsu confirment même ID en recherche/hydratation. Aucun déploiement de ce correctif ni publication d'archive;362 attentes non débloquées."
           ]
         },
         {
@@ -6315,9 +6315,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Lot008 : six Library et quatre Review terminales vérifiées; anciens dépassements de coût conservés, pas de certification rétroactive.",
-            "Lot009 ck71Of : un POST, 329 lectures D1, 18 appels, arrêt observateur; neuf clés non soumises, aucun rejeu.",
-            "Lecture lookup indexée du 30 septembre : première clé NOT_FOUND, zéro admission. Reçu privé build/recovery/batch009-first-readonly-20260930.json; pas de nouvelle preuve Library ni de coût conforme."
+            "Lot008 terminal6Library+4Review, anciennes preuves de dépassement conservées. Lot009: première clé consommée NOT_FOUND, neuf clés intactes.",
+            "Scope privé restant batch-009-remaining-20260930.json scellé9dc1b7709e6bd7758a8a4f084dd23b978588fb55bfdcad52ec51a59250fb2a10;5MANGA,1ANIME,3MANHWA.",
+            "Prévol19 lectures D1,0écriture,9FAILED éligibles,cinq runtimesREADY. Confirmation immédiate demandée; aucun POST ni réservation nouvelle."
           ]
         },
         {

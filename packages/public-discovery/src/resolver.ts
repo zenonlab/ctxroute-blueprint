@@ -369,14 +369,15 @@ async function hydrateExplicitWithLinkedFallback(
   let primaryFailure: Error;
   try { return await hydrateReference(providers, reference, 'exact-provider-identity-not-found'); }
   catch (error) {
-    if (!(error instanceof Error) || reference.provider !== 'mangaupdates'
+    if (!(error instanceof Error) || !['mangaupdates', 'anilist'].includes(reference.provider)
       || error instanceof FavoriteProviderRetryError || !isTransientProviderError(error)
       || isProviderInvariantError(error)) throw error;
     primaryFailure = error;
   }
   const titles = request.query.discoveryTitles.slice(0, 4);
   const query = matchQueryFor(request, titles);
-  for (const provider of ['mangadex'] as const) {
+  const fallbackProviders = reference.provider === 'anilist' ? ['kitsu-anime'] as const : ['mangadex'] as const;
+  for (const provider of fallbackProviders) {
     let lane: LaneDecision;
     try { lane = await searchProvider(provider, providers[provider], titles, query, deadline, undefined, false, reference); }
     catch (error) {
