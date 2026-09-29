@@ -26,11 +26,25 @@ revised: true
 
 Date : 2026-09-22
 
-Révisé : 2026-09-28
+Révisé : 2026-09-30
 
 Statut : accepté
 
 ## Contexte
+
+### Reprise après indisponibilité fournisseur
+
+Le circuit fournisseur réserve atomiquement une unique sonde de réouverture.
+Après dix minutes (ou un `Retry-After` plus long), une requête fixe sans titre
+utilisateur teste le transport existant, avec huit secondes et 8 Kio maximum.
+Les autres demandes restent différées, sans appel fournisseur. Une sonde
+réussie ferme le circuit puis rend la main à la continuation : elle ne lance
+pas une recherche dans la même opération. Une sonde échouée conserve le
+checkpoint, ne consomme aucune tentative métier et attend encore dix minutes.
+Le bail de sonde réserve cette fenêtre avant l'appel, même en cas d'interruption.
+Aucun cron, réarmement historique, accès navigateur ou schéma D1 n'est ajouté.
+Une sonde ne prouve pas la disponibilité de toutes les opérations et ne résout
+pas une recherche valide trop large. Le rollback porte sur le code uniquement.
 
 Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspondant à des demandes Public Discovery déjà arrivées à `FAILED/ATTEMPT_LIMIT`. Une reprise automatique depuis chaque lecture de statut pourrait réactiver une charge fournisseur sans contrôle et masquer la frontière entre attente, échec transitoire et mutation de production.
 

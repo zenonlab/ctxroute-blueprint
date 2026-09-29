@@ -3,6 +3,7 @@ import type { FavoriteProvider } from './provider-kit';
 import type { z } from 'zod';
 
 export const favoriteProviderResponseByteLimit = 512 * 1024;
+export const favoriteProviderProbeIntervalMs = 10 * 60_000;
 export type FavoriteProviderFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 export interface FavoriteProviderJson<TValue> { readonly digest: string; readonly value: TValue }
@@ -17,7 +18,7 @@ export function isAutomaticProviderRetry(error: Error): boolean {
 export interface FavoriteProviderRuntimeControlPort {
   recordFailure(provider: FavoriteProvider, now: number, retryAt?: number): Promise<void>;
   recordSuccess(provider: FavoriteProvider, now: number): Promise<void>;
-  reserve(provider: FavoriteProvider, now: number, minimumIntervalMs: number): Promise<number>;
+  reserve(provider: FavoriteProvider, now: number, minimumIntervalMs: number): Promise<{ readonly notBefore: number; readonly probeOnly: boolean }>;
 }
 
 export class FavoriteProviderRateGate {
@@ -29,6 +30,7 @@ export class FavoriteProviderRateGate {
     private readonly controls?: FavoriteProviderRuntimeControlPort,
     private readonly clock: () => number = Date.now,
     private readonly wait: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => { setTimeout(resolve, milliseconds); }),
+    private readonly probe?: () => Promise<void>,
   ) {}
 
   async run<TValue>(minimumIntervalMs: number, operation: () => Promise<TValue>): Promise<TValue> {
@@ -39,14 +41,28 @@ export class FavoriteProviderRateGate {
     let operationStarted = false;
     try {
       const now = this.clock();
-      const reservedAt = await this.controls?.reserve(this.provider, now, minimumIntervalMs)
-        ?? Math.max(this.nextAllowedAt, now);
-      const waitMs = Math.max(0, reservedAt - now);
+      const reservation = await this.controls?.reserve(this.provider, now, minimumIntervalMs)
+        ?? { notBefore: Math.max(this.nextAllowedAt, now), probeOnly: false };
+      const waitMs = Math.max(0, reservation.notBefore - now);
       if (waitMs > favoriteProviderPolicy.requestTimeoutMs) throw new FavoriteProviderRetryError('Provider cadence requires a later wake.', this.clock() + waitMs);
       if (waitMs > 0) await this.wait(waitMs);
       this.nextAllowedAt = this.clock() + minimumIntervalMs;
+      if (reservation.probeOnly) {
+        try {
+          if (!this.probe) throw new Error('Provider recovery probe is not configured.');
+          await this.probe();
+        } catch (error) {
+          const retryAt = Math.max(this.clock() + favoriteProviderProbeIntervalMs,
+            error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
+          await this.controls?.recordFailure(this.provider, this.clock(), retryAt);
+          throw new FavoriteProviderRetryError('Provider recovery probe requires a later wake.', retryAt);
+        }
+        await this.controls?.recordSuccess(this.provider, this.clock());
+        throw new FavoriteProviderRetryError('Provider recovered; resume the checkpoint on the next wake.', this.clock() + minimumIntervalMs);
+      }
       operationStarted = true;
       const value = await operation();
+      operationStarted = false;
       await this.controls?.recordSuccess(this.provider, this.clock());
       return value;
     } catch (error) {
@@ -58,7 +74,7 @@ export class FavoriteProviderRateGate {
   }
 }
 
-export async function readFavoriteProviderJson<TValue>(fetcher: FavoriteProviderFetch, url: string, init: RequestInit, schema: z.ZodType<TValue>): Promise<FavoriteProviderJson<TValue>> {
+export async function readFavoriteProviderJson<TValue>(fetcher: FavoriteProviderFetch, url: string, init: RequestInit, schema: z.ZodType<TValue>, byteLimit = favoriteProviderResponseByteLimit): Promise<FavoriteProviderJson<TValue>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), favoriteProviderPolicy.requestTimeoutMs);
   try {
@@ -73,7 +89,7 @@ export async function readFavoriteProviderJson<TValue>(fetcher: FavoriteProvider
     const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
     if (contentType !== undefined && contentType !== 'application/json' && !contentType.endsWith('+json')) throw new Error('Favorite provider response must be JSON.');
     const declaredLength = Number(response.headers.get('content-length'));
-    if (Number.isFinite(declaredLength) && declaredLength > favoriteProviderResponseByteLimit) throw new Error('Favorite provider response is too large.');
+    if (Number.isFinite(declaredLength) && declaredLength > byteLimit) throw new Error('Favorite provider response is too large.');
     const reader = response.body?.getReader();
     if (reader === undefined) throw new Error('Favorite provider response has no body.');
     const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false });
@@ -83,7 +99,7 @@ export async function readFavoriteProviderJson<TValue>(fetcher: FavoriteProvider
         const chunk = await reader.read();
         if (chunk.done) break;
         bytes += chunk.value.byteLength;
-        if (bytes > favoriteProviderResponseByteLimit) throw new Error('Favorite provider response is too large.');
+        if (bytes > byteLimit) throw new Error('Favorite provider response is too large.');
         text += decoder.decode(chunk.value, { stream: true });
       }
       text += decoder.decode();

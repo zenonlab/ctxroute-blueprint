@@ -6,8 +6,9 @@ import { AniListFavoriteProviderAdapter } from './providers/anilist';
 import { KitsuFavoriteProviderAdapter } from './providers/kitsu';
 import { MangaDexFavoriteProviderAdapter } from './providers/mangadex';
 import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates';
-import { FavoriteProviderHttpError, FavoriteProviderRateGate, isAutomaticProviderRetry } from './provider-http';
+import { FavoriteProviderHttpError, isAutomaticProviderRetry } from './provider-http';
 import type { FavoriteProviderFetch, FavoriteProviderRuntimeControlPort } from './provider-http';
+import { createRecoveryRateGate } from './provider-health';
 
 export type PublicDiscoveryProviderPorts = Readonly<Record<ResolutionProvider, FavoriteProviderPort>>;
 
@@ -16,11 +17,11 @@ export function createPublicDiscoveryProviders(
   controls?: FavoriteProviderRuntimeControlPort,
 ): PublicDiscoveryProviderPorts {
   return Object.freeze({
-    anilist: new AniListFavoriteProviderAdapter(fetcher, new FavoriteProviderRateGate('anilist', controls)),
-    mangaupdates: new MangaUpdatesFavoriteProviderAdapter(fetcher, new FavoriteProviderRateGate('mangaupdates', controls)),
-    mangadex: new MangaDexFavoriteProviderAdapter(fetcher, new FavoriteProviderRateGate('mangadex', controls)),
-    'kitsu-anime': new KitsuFavoriteProviderAdapter('kitsu-anime', fetcher, new FavoriteProviderRateGate('kitsu-anime', controls)),
-    'kitsu-manga': new KitsuFavoriteProviderAdapter('kitsu-manga', fetcher, new FavoriteProviderRateGate('kitsu-manga', controls)),
+    anilist: new AniListFavoriteProviderAdapter(fetcher, createRecoveryRateGate('anilist', fetcher, controls)),
+    mangaupdates: new MangaUpdatesFavoriteProviderAdapter(fetcher, createRecoveryRateGate('mangaupdates', fetcher, controls)),
+    mangadex: new MangaDexFavoriteProviderAdapter(fetcher, createRecoveryRateGate('mangadex', fetcher, controls)),
+    'kitsu-anime': new KitsuFavoriteProviderAdapter('kitsu-anime', fetcher, createRecoveryRateGate('kitsu-anime', fetcher, controls)),
+    'kitsu-manga': new KitsuFavoriteProviderAdapter('kitsu-manga', fetcher, createRecoveryRateGate('kitsu-manga', fetcher, controls)),
   });
 }
 

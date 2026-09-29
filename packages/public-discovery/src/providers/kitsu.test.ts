@@ -183,7 +183,7 @@ describe('KitsuFavoriteProviderAdapter', () => {
     const controls = {
       recordFailure: vi.fn(async () => undefined),
       recordSuccess: vi.fn(async () => undefined),
-      reserve: vi.fn(async () => 10_000),
+      reserve: vi.fn(async () => ({ notBefore: 10_000, probeOnly: false })),
     };
     const gate = new FavoriteProviderRateGate('kitsu-anime', controls, () => 10_000, async () => undefined);
     const invalid = { ...anime, attributes: { ...anime.attributes, canonicalTitle: 'x'.repeat(201) } };

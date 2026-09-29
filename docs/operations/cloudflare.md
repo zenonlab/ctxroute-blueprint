@@ -1,5 +1,23 @@
 # Cloudflare operations gate
 
+## Sonde fournisseur partagée
+
+Après ouverture du circuit, la continuation existante réserve une sonde après
+dix minutes, ou après le `Retry-After` s'il est plus long. D1 réserve la fenêtre
+avant l'appel : les concurrents ne font aucun HTTP et une interruption ne
+déclenche pas immédiatement une nouvelle sonde. Le contrôle utilise le transport
+fournisseur existant, une requête fixe sans données privées, huit secondes et
+8 Kio maximum. Après succès, la recherche reprend à son checkpoint lors du
+réveil suivant; après échec, elle reste différée sans tentative métier consommée.
+Il n'y a ni nouveau cron ni appel par favori pendant le circuit ouvert.
+Les sondes sont incluses dans les compteurs HTTP existants, sans résultat accepté.
+Une sonde positive ne garantit pas la disponibilité de chaque opération.
+Ce mécanisme ne corrige pas le coût d'une recherche paginée valide : le premier
+POST du lot 009 a atteint 329 lectures D1, et ses neuf autres clés ne sont pas
+soumises au titre d'une prétendue panne globale. Aucun rejeu de la clé consommée.
+Rollback : restaurer le code précédent sans modifier les données; conserver le
+lecteur de curseurs `mu2`. Aucun changement de schéma ou d'archive publique.
+
 ## Dépendance de validation — Undici
 
 L'audit du run `36631395616` bloque la livraison sur Undici 7.29.0,

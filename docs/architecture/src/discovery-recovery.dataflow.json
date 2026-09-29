@@ -22,7 +22,7 @@
     { "id": "rearm", "type": "backend", "label": "Lot scellé v3", "sublabel": "1–10 identités · média connu", "stage": 2, "row": 2, "width": 150, "tag": "un POST par clé" },
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "jeton indexé · clé exacte" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "claim(1) · expiration ciblée" },
-    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "omissions contrôlées", "stage": 3, "row": 2, "tag": "alias MU · curseur versionné" },
+    { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "sonde partagée · 10 min", "stage": 3, "row": 2, "tag": "bail D1 · curseur conservé" },
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · ID lié contrôlé", "stage": 4, "row": 1, "width": 150, "tag": "Library exige deux liens exacts" }
   ],
   "flows": [

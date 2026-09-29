@@ -6294,10 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR174 preserves MangaUpdates hit_title; PR175 fixes unrelated overlong titles poisoning final search pages. Regressions and real provider final-page check pass.",
-            "Security-blocking Undici7.29.0 resolved via official Cloudflare tooling update; npm audit0,235 discovery tests,219 Worker tests,full verify,E2E11pass1skip,Archify9/9 pass.",
-            "Protected branch CI36633121002 and main CI36633990299 pass; main09f4b0c4,Workerce2a7c5a-f2af-4a94-8756-13e572cfd58b deployed. No public archive promotion, no migration/permission change.",
-            "Batch008 now terminal6VERIFIED/4NOT_FOUND; global Downloads still363waiting and historical over-budget receipts remain. Full certification incomplete."
+            "Correctif sonde partagée validé localement : bail D1 avant HTTP, dix minutes/Retry-After, huit secondes/8 Kio, checkpoint et données VERIFIED conservés, aucun réarmement historique.",
+            "npm run verify réussi; 248 tests public-discovery et 220 Worker; E2E Web 11 réussis/1 ignoré; Archify dataflow et discovery-recovery showcase verts; git diff --check propre.",
+            "Pas encore déployé. Pagination coûteuse du lot009 indépendante; neuf clés intactes. Chrome 1.0.49 ZIP SHA inchangé 53db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b."
           ]
         },
         {
@@ -6316,10 +6315,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "All10 original batch008 keys consumed once, no replay. After PR175 deployment, ninth request resumed autonomously from checkpoint and became NOT_FOUND.",
-            "Last key j22d38:1 button POST,10 provider calls,201 correlated D1 reads/65 writes,NOT_FOUND projected Review; both restarts pass.",
-            "Read-only full batch Z7Uz2H:6 Library works/4 Review NOT_FOUND,zero pending/internal/missing projection;5 reads/0POST;two restarts preserved.",
-            "Historical cost failures326/329 reads and earlier incomplete cost receipts remain preserved; terminal convergence does not retroactively certify ten correlated costs."
+            "Lot008 : six Library et quatre Review terminales vérifiées; anciens dépassements de coût conservés, pas de certification rétroactive.",
+            "Lot009 ck71Of : un POST, 329 lectures D1, 18 appels, arrêt observateur; neuf clés non soumises, aucun rejeu.",
+            "Lecture lookup indexée du 30 septembre : première clé NOT_FOUND, zéro admission. Reçu privé build/recovery/batch009-first-readonly-20260930.json; pas de nouvelle preuve Library ni de coût conforme."
           ]
         },
         {
