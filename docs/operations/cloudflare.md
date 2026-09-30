@@ -2629,10 +2629,18 @@ Worker restent donc complémentaires. Les erreurs du parseur local avant
 admission et les échecs de claim sans demande acquise sont hors de ce journal.
 
 Ne pas fusionner ni déployer ce code avant validation du plan de migration
-D1 ciblé : la CI Worker ordinaire n'applique pas cette nouvelle colonne.
+D1 ciblé. Le workflow existant `deploy-production.yml` inclut déjà
+`d1-migrate:PUBLIC_DB` puis `worker-deploy`, avec les deux cibles explicitement
+autorisées par sa gate. L'affirmation précédente selon laquelle la CI
+n'appliquait pas la colonne était incorrecte. La branche vérifie et prépare
+le plan sans l'appliquer ; seul `main` l'applique, migration avant Worker.
+Le prévol doit montrer uniquement 0030 comme migration restante et le diff
+doit rester additif, sans réarmement ou transformation des demandes.
 Le rollback remet l'ancien Worker sans retirer la colonne ni ses preuves.
-La préparation et les tests locaux n'autorisent aucune migration distante,
-aucun réarmement historique, et ne certifient pas les 339 favoris.
+La préparation et les tests locaux ne déclenchent aucune mutation distante ;
+le déploiement passe par ce workflow protégé existant, jamais par une commande
+D1 directe. Il n'autorise aucun réarmement historique et ne certifie pas les
+339 favoris.
 
 Validation locale de 1.0.55 : `npm run verify` réussi, dont 256 tests Worker
 et 283 Public Discovery ; deux builds isolés identiques ; E2E Web/extension

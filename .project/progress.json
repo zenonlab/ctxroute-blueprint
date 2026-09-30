@@ -6294,6 +6294,7 @@
             "git diff --check"
           ],
           "evidence": [
+            "Intégration main359e430 sans changement produit ; runbook corrigé : CI existante migre D1 avant Worker. Verify et Archify verts ; prévol14:18UTC :0030 seule, SHA7c557dc4,0mutation. CI tip intégré à lancer, aucun réarmement.",
             "Console admin livrée localement : menu7vues hors ligne, snapshots privés indexés,10tests admin/170infra et npm run verify verts ; Archify architecture/recovery showcase9/9. Vrai scope339sources/287identités :9requêtes/601lignesD1/0écriture ;275FAILED=326sources. Migration0030 absente ; aucune reprise ni exception.",
             "Candidate1.0.55 diagnostic durable : verify vert (256Worker/283Discovery), builds isolés identiques, E2E13succès/1ignoré, Archify architecture/dataflow showcase9/9, diff-check vert. Migration0030 seule restante au prévol distant, non appliquée ; aucune reprise ni promotion.",
             "Kitsu couverture optionnelle :279testsDiscovery,verify complet,Archify verts ; rejeu réel20candidats identiques etcurseur14. PR184/359e430, CIbranche36714652375 etmain36715704557 vertes ; Worker8a4b9bbc déployé,sondesvertes,E2E13succès/1ignoré. ZIP1.0.54 inchangés. Aucun réarmement ni promotion.",
@@ -6302,8 +6303,7 @@
             "Candidate1.0.53 : Review saison non corroborée, Accept explicite pour les lecteurs récents ; projection legacy NOT_FOUND/season-unconfirmed uniquement, résultat D1 intact. Aucun état technique transformé, aucun changement de clé ou migration.",
             "Validation locale : verify vert,253testsWorker,493application,276Discovery,117adaptateurs navigateur ; infra160/160 ; audit0vulnérabilité ; Archify architecture/dataflow showcase9/9 ; E2E archive13succès/1ignoré ; diff-check vert.",
             "ChromeZIP319981octets SHA5b26d35372b362cfd1d8305b86e1aa8135cc365a66bdb70ebf17c4a8c9c8f7df ; FirefoxZIPnon signé320022octets SHA0ed8b6dd190e208e2ca92ab993c473517ad911b6932700738b544d9f11a05ca1. CIprotégée à exécuter ; ni téléchargement public ni réarmement supplémentaire.",
-            "Diagnostic AniList privé : quatreHTTP200, titre exact et ID présents, rejet par saison1 non corroborée. La saison est explicite dans titre/URL. Les réponses actuelles locales ne remplacent pas l'historique Worker.",
-            "CI 36706651107 verte sur 871c760 : E2E, verify, builds reproductibles et plan Cloudflare ; aucun déploiement de branche."
+            "Diagnostic AniList privé : quatreHTTP200, titre exact et ID présents, rejet par saison1 non corroborée. La saison est explicite dans titre/URL. Les réponses actuelles locales ne remplacent pas l'historique Worker."
           ]
         },
         {

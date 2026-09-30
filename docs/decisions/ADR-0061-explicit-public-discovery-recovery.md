@@ -103,8 +103,11 @@ absence locale reste explicite plutôt que d'inventer un commit. Un réveil
 sans corrélation en crée une, ensuite propagée aux continuations du même
 traitement. Un réveil générique ultérieur peut avoir une autre corrélation,
 mais chaque diagnostic conserve celle de son traitement.
-Le déploiement du code exige la migration préalable ; ce travail local ne
-l'applique pas à la production. Le rollback conserve la colonne et les preuves.
+Le déploiement du code exige la migration préalable. Le workflow protégé
+existant prévoit `d1-migrate:PUBLIC_DB` avant `worker-deploy` sur `main` ;
+la vérification de branche ne les applique pas. Le prévol confirme la seule
+migration additive 0030 avant cette livraison, sans mutation D1 directe ni
+réarmement historique. Le rollback conserve la colonne et les preuves.
 
 ### Pagination et métadonnées optionnelles
 
