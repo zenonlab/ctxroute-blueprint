@@ -6357,9 +6357,9 @@
             "npm run package:extension"
           ],
           "evidence": [
-            "Banc installé: nouveaux profils privés persistants, anciens temporaires conservés. Deux régressions rouges puis 69 tests verts; npm run verify et Archify architecture/dataflow verts, diff sans erreur.",
-            "Chrome154 Z8GbJc, corpus synthétique1532 hors ligne: deux redémarrages vérifiés, zéro requête transmise, première fenêtre240s incomplete. Reprise du même profil:1532 sources retrouvées sans réimport, fenêtre120s expirée en inventaire; pas de certification. Profils0700, reçus0600 et manifest préservés.",
-            "Dernier profil réel5ECSJP:1073résolus+55Review+53exclusions+341attentes; aucune nouvelle admission. Firefox signé durable indisponible; aucune promotion publique."
+            "Banc persistant d6c2e6a poussé; 101 tests ciblés runtime/continuation/banc verts et Archify architecture/dataflow verts. Aucun contrat produit modifié dans cette vérification.",
+            "Chrome154 Z8GbJc, même corpus synthétique1532 et même profil: fenêtres précédentes incomplètes conservées. Reprise finale offline-regression-passed à271s:1400retryable+132exclusions,0processing/erreur interne/projection manquante; deux redémarrages et redémarrage worker vérifiés,0requête distante transmise. Les reprises consomment plusieurs fenêtres, pas une certification de vitesse ni de résolution en ligne.",
+            "Dernière mesure réelle5ECSJP inchangée:1073résolus+55Review+53exclusions+341attentes. Aucun POST historique ni promotion publique; Firefox signé durable non certifié."
           ]
         },
         {
