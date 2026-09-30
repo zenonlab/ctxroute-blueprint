@@ -2531,9 +2531,82 @@ connexion, le contrôle unitaire (une ligne) et EXPLAIN sont distincts des
 public n’a été effectué. Le défaut de projection corrigé ne suffit pas à
 expliquer l’historique fournisseur des 307 identités épuisées.
 
-### Diagnostic durable — préparation locale, migration requise
+### Diagnostic durable — activation vérifiée le 30 septembre
 
-#### Console admin séparée, sans mutation
+La PR 185 est intégrée sur `main` (`49c3864c3ec9ec6535aadd7501c412cb97032384`).
+La CI protégée 36729661486 a appliqué la migration additive 0030 avant de
+déployer le Worker `fad747ea-8825-4e5c-b5d1-af6d0845c9e0` ; les sondes passent.
+Le snapshot privé `build/admin/discovery-w7jB2J/snapshot.json`, à 14:41 UTC,
+confirme la colonne : neuf requêtes, 601 lignes lues, zéro écriture.
+La comparaison avec le snapshot de 14:07 conserve exactement les états et
+champs historiques des 287 demandes. Aucun réarmement ni backfill n'a eu lieu.
+Les 275 demandes FAILED représentent 326 sources, pas 326 causes distinctes.
+Leurs journaux historiques restent absents ; l'activation ne les reconstitue pas.
+
+La candidate Chrome 1.0.55 exacte (SHA-256
+`286b9da2836d1d8d6e8c45cb354a5b8e3e780cd131e7e805f5fa0c7ece128e55`)
+passe l'export/restauration privé de 1 522 sources et 868 œuvres hydratées,
+le refus atomique d'une mauvaise phrase, la lecture hors ligne et deux
+redémarrages. Preuve : `build/audits/private-roundtrip-exact-155-r0C26f/report.json`.
+Ce résultat ne certifie ni la convergence, ni Firefox signé. Aucun fichier
+public n'est promu. Les prévols sans colonne décrits ci-dessous restent des
+preuves antérieures au déploiement, pas l'état courant.
+
+Le profil neuf Chrome `CIMtlx`, importé depuis Downloads, conserve ses
+1 522 sources après continuation sans réimport : 1 043 résolues, 54 Review,
+53 exclusions et 372 attentes. Preuve privée :
+`build/audits/chrome155-resume-N8lVQj/session.log`. Cette fenêtre de 175 secondes
+effectue 124 lectures HTTP, bloque les 36 mutations tentées et ne transmet
+aucune admission. Redémarrages vérifiés, zéro erreur interne et zéro projection
+manquante ; verdict `incomplete`. Les attentes du profil neuf ne remplacent
+pas le scope historique de 339 sources audité par la console. La différence
+reste à expliquer ; ce test sans admission ne prouve pas la reprise des FAILED.
+
+#### Journal backend et audit sans interface
+
+La migration candidate 0031 ajoute `public_discovery_failure_events`, distinct
+des demandes et de leur rétention. Le trigger archive le dernier diagnostic
+validé dans la même écriture D1. L'expiration d'une demande et la rotation de
+ses huit diagnostics ne suppriment plus les événements archivés. Il n'y a ni
+serveur admin, ni écran, ni clic requis pour leur collecte. La migration doit
+passer par la CI protégée ; sa présence locale ne prouve pas son déploiement.
+
+```bash
+npm run audit:discovery-failures -- --scope build/admin/scope-prive.json --request 1 --local-oauth true
+npm run audit:discovery-failures -- --scope build/admin/scope-prive.json --request 1 --after 100 --local-oauth true
+```
+
+Le numéro désigne une entrée du scope existant. Pour continuer, reprendre
+exactement `nextCursor` du reçu, pas un numéro supposé. Chaque invocation lit
+au plus 101 événements d'une seule clé complète, rend une page de cent et
+signale s'il reste une suite. Plafond : 404 lignes lues, zéro écriture. Le
+fichier JSON exclusif `0600` sous un dossier `0700` garde événements, digest,
+corrélations et causes fermées ; stdout ne contient que chemin et compteurs.
+L'absence de migration est un échec explicite, jamais une page vide réussie.
+Le script ne soumet aucune demande et ne classe pas une œuvre en Review.
+
+Une page vide signifie aucun événement archivé pour cette clé et ce curseur,
+pas absence d'erreur. Les causes anciennes absentes ne sont pas reconstruites.
+Les échecs avant claim et pendant une indisponibilité D1 exigent encore les
+logs Worker. Les événements ne sont pas le statut courant de la demande.
+Aucune purge automatique n'est ajoutée : suivre le volume D1 ; une politique
+de rétention/export séparée sera nécessaire avant une exploitation à grande
+échelle. Le rollback garde table et trigger, sans supprimer les preuves.
+
+Validation locale : cinq régressions couvrent 105 événements paginés,
+rotation, suppression d'une demande de test, panne atomique de l'archive,
+injection, curseur invalide et fichiers privés. Une régression SQLite vérifie
+les observations identiques répétées même lorsque le journal récent est plein.
+Le test de conservation D1 Worker conserve
+les neuf événements malgré la rotation à huit et l'expiration de la demande.
+`npm run verify` passe (256 Worker, 175 infra) ; le dataflow du journal passe
+les neuf contrôles showcase. Aucun déploiement de 0031 n'est revendiqué.
+L'audit distant de 15:16 UTC, `build/admin/discovery-B2PCTp/snapshot.json`,
+confirme encore 275 FAILED pour 326 sources, sans diagnostic historique retenu,
+sur 287 identités et 339 sources : neuf requêtes, 601 lignes lues, zéro écriture.
+Ce manque de preuves ne permet pas d'attribuer une cause aux 275 demandes.
+
+#### Outil historique de lecture des snapshots
 
 `npm run admin:discovery -- help` présente les commandes. Le script utilise
 le contrat TypeScript du produit via le support natif de Node ; les commandes

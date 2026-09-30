@@ -104,6 +104,14 @@ describe('public discovery queue trigger', () => {
     expect(row!.state).toBe('FAILED');
     await expect(adapter.recordFailure(request, digest, { ...diagnostic, observedAt: '2026-09-30T12:16:00.000Z' })).rejects.toThrow('diagnostic-claim-lost');
     expect(row!.diagnostics).not.toContain('Synthetic');
+    const events = await env.PUBLIC_DB.prepare(`SELECT diagnostic_json AS diagnostic FROM public_discovery_failure_events
+      WHERE fingerprint = ?1 ORDER BY event_id`).bind(discoveryKey.fingerprint).all<{ diagnostic: string }>();
+    expect(events.results).toHaveLength(9);
+    expect(JSON.parse(events.results[0]!.diagnostic)).toEqual(diagnostic);
+    await env.PUBLIC_DB.prepare('DELETE FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
+    expect(await adapter.readFailureDiagnostics(discoveryKey)).toBeUndefined();
+    expect((await env.PUBLIC_DB.prepare('SELECT event_id FROM public_discovery_failure_events WHERE fingerprint = ?1')
+      .bind(discoveryKey.fingerprint).all()).results).toHaveLength(9);
   });
 
   it('persists a real adapter HTTP failure with its provider and operation', async () => {

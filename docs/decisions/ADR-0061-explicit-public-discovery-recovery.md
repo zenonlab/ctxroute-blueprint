@@ -68,6 +68,26 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ### Diagnostic durable des défaillances techniques
 
+La migration 0031 complète le journal récent par une table backend indépendante
+`public_discovery_failure_events`. Un trigger copie le dernier diagnostic dans
+la même écriture SQLite ; si l'archivage échoue, la mise à jour récente échoue
+aussi. Aucun réseau, tâche différée ou menu n'est nécessaire pour cette capture.
+La table n'a pas de clé étrangère vers les demandes : expiration, réarmement et
+rotation des huit entrées ne détruisent plus ces nouvelles preuves. Elle ne
+reconstitue pas les événements antérieurs à son activation. Le contrat fermé
+0030 continue d'exclure payloads, titres et URLs. Une panne D1 reste hors de
+cette garantie ; les logs Worker sont complémentaires.
+
+Le script `discovery-failure-audit.mjs` lit une clé complète d'un scope privé,
+par pages indexées de cent événements avec curseur monotone. Il retourne du
+JSON sans interaction et sans mutation. Un événement n'est ni une demande
+FAILED distincte ni une preuve que la panne persiste. Il n'y a pas de purge
+automatique : surveiller le stockage avant toute politique d'archivage/purge
+séparée. Une écriture de diagnostic ajoute une ligne et son index ; les bornes
+de lectures de la collecte restent inchangées et les écritures réelles restent
+comptabilisées. Le rollback conserve table et trigger tant que le journal 0030
+est écrit ; revenir au Worker antérieur ne détruit aucune preuve.
+
 La console opératoire séparée `admin:discovery` inspecte un scope privé de
 clés complètes, sans SQL libre, admission ou réarmement. Un snapshot effectue
 des lectures indexées par groupes de quarante identités, au plus deux mille,
@@ -96,8 +116,10 @@ prétend pas que cette réservation a réussi. Les reports ordinaires de cadence
 et de budget ne sont pas des défaillances. Les erreurs de publication restent
 propagées. Si D1 est indisponible, aucune persistance n'est garantie ; l'échec
 d'écriture remonte au traitement Queue plutôt que de prétendre avoir enregistré
-un diagnostic. Le journal suit la rétention de sa demande et ne constitue pas
-un historique illimité. Il ne remplace pas les métriques agrégées ADR-0053.
+un diagnostic. Le journal récent suit la rétention de sa demande ; l'archive
+0031 en est indépendante après activation. Aucun des deux ne garantit les
+événements survenus pendant une panne D1. Ils ne remplacent pas les métriques
+agrégées ADR-0053.
 Le binding natif `WORKER_VERSION` fournit l'UUID de version Worker ; son
 absence locale reste explicite plutôt que d'inventer un commit. Un réveil
 sans corrélation en crée une, ensuite propagée aux continuations du même

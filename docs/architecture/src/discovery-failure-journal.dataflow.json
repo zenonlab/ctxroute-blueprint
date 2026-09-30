@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": { "title": "Preuves backend des défaillances", "output": "discovery-failure-journal.dataflow.html", "quality_profile": "showcase" },
+  "stages": [{ "label": "Collecte" }, { "label": "Persistance" }, { "label": "Audit" }],
+  "nodes": [
+    { "id": "failure", "type": "backend", "label": "Collecteur Worker", "sublabel": "cause fermée · corrélation", "stage": 0, "row": 0 },
+    { "id": "recent", "type": "database", "label": "Demande D1", "sublabel": "huit diagnostics récents", "stage": 1, "row": 0 },
+    { "id": "archive", "type": "database", "label": "Journal indépendant", "sublabel": "événements sans payload", "stage": 1, "row": 2 },
+    { "id": "audit", "type": "backend", "label": "Script sans interface", "sublabel": "clé complète · pagination", "stage": 2, "row": 2, "width": 150 }
+  ],
+  "flows": [
+    { "from": "failure", "to": "recent", "label": "claim valide", "classification": "bail · digest · tentative", "variant": "security", "labelDy": 53 },
+    { "from": "recent", "to": "archive", "label": "copie atomique", "classification": "trigger dans la même écriture", "variant": "emphasis", "labelDy": 80 },
+    { "from": "archive", "to": "audit", "label": "lecture indexée", "classification": "JSON privé · aucune admission", "variant": "default", "labelDy": 53 }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Preuves conservées", "items": ["Le journal survit à la rétention des demandes", "Échec de l’archive : aucune écriture partielle", "Aucun serveur admin ni interface utilisateur"] },
+    { "dot": "amber", "title": "Limites explicites", "items": ["Pas de reconstruction des erreurs historiques absentes", "Panne D1 : logs externes encore nécessaires", "Pas de purge automatique ni de réarmement implicite"] }
+  ]
+}
