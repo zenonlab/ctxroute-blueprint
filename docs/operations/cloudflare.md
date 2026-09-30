@@ -77,6 +77,11 @@ Archify architecture et dataflow passent en showcase 9/9. Ces résultats ne
 certifient ni le backlog réel ni Firefox signé. La CI protégée et la preuve
 installée en production restent des étapes séparées.
 
+La PR #182 est intégrée au commit `aa5077f`. La CI main `36708752668`
+valide les tests, builds reproductibles, plan Cloudflare et probes publics.
+Le Worker `de9b407f-7d86-4b48-b8e6-51211e52c41b` est déployé ; aucune archive
+publique n'est promue et aucun ancien échec D1 n'est réarmé par cette livraison.
+
 Le premier profil réel 1.0.53 `Pmkmwx` s'arrête à l'installation avec
 `discovery-read-rejected`, avant toute lecture ou admission transmise : le
 garde du banc n'autorisait que `Accept: application/json`. Son échec scellé
@@ -94,6 +99,30 @@ Un contrôle de l'archive Chrome 1.0.51 reçoit la projection ancienne simulée 
 une source en Review, aucune œuvre créée, données conservées après deux
 redémarrages du navigateur réel. Ce contrôle ne contacte aucun fournisseur
 et ne vaut pas preuve d'une résolution en production.
+
+## Candidate 1.0.54 — association synchronisée multi-fournisseur
+
+Une réponse synchronisée `FOUND` peut porter plusieurs IDs de la même œuvre.
+La préparation publique l'ignorait lorsque leur nombre dépassait un, alors
+que le snapshot et son schéma autorisent cette association. Quatre régressions
+reproduisent ce défaut pour ANIME, MANGA, MANHWA et MANHUA. La correction
+réutilise le sélecteur existant, indépendamment de l'ordre des références,
+pour la demande normale et la reprise. Une véritable ambiguïté, un fournisseur
+incompatible ou dupliqué et un fingerprint différent restent refusés.
+Cette correction ne constitue pas la cause démontrée du pilote saisonnier :
+aucune association synchronisée disponible n'y a été prouvée. Elle ne réarme
+pas les anciennes demandes D1 et ne remplace pas la candidate 1.0.53 déjà testée.
+
+Validation locale : 497 tests applicatifs et `npm run verify` verts,
+Archify showcase 9/9, deux builds isolés identiques, E2E 13 succès et un test
+ignoré. Le premier lancement E2E a été refusé avant les tests car la CI locale
+occupait le port 4173 ; après libération naturelle, la suite complète passe.
+Chrome : 319987 octets, SHA-256
+`58867826da4f578029e4575b1afbcfb19bcf7bec16f64411e9465da1510421ab`.
+Firefox ZIP non signé : 320028 octets, SHA-256
+`d19051288c5f743ed88a1a323ac1c60bdc47af36e467b4a02de3dd13156e5977`.
+Ces tests ne certifient pas la convergence distante ni une installation Firefox
+durable. L'archive réelle précédente et ses observations restent conservées.
 
 ## Emplacement du banc installé
 

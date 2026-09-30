@@ -10,6 +10,30 @@ const observation = createFavoriteObservation({ bookmarkId: input.sourceKey, fol
 const artifact = parseFavoriteObservation(observation, extractFavoriteSourceEvidence(input));
 
 describe('public favorite discovery request', () => {
+  it.each(['ANIME', 'MANGA', 'MANHWA', 'MANHUA'] as const)('reuses one synchronized %s identity with multiple provider references', async (mediaKind) => {
+    const parsed = { ...artifact, mediaKind };
+    const key = await favoriteIdentityKey(parsed);
+    const primary = mediaKind === 'ANIME'
+      ? { provider: 'anilist' as const, externalId: '123' }
+      : { provider: 'mangaupdates' as const, externalId: '456' };
+    const secondary = mediaKind === 'ANIME'
+      ? { provider: 'kitsu-anime' as const, externalId: '789' }
+      : { provider: 'anilist' as const, externalId: '123' };
+    for (const references of [[secondary, primary], [primary, secondary]]) {
+      const lookup = async () => [{ kind: 'FOUND' as const, fingerprint: key.fingerprint, mediaKind, references }];
+      const prepared = await preparePublicFavoriteDiscoveryIdentity(parsed, { lookup });
+      expect(prepared).toEqual({ key: await favoriteManualIdentityKey(parsed, primary), reference: primary });
+      const resolveOrRequest = vi.fn(async () => ({ state: 'MISS' as const }));
+      const requestRecovery = vi.fn(async () => ({ state: 'MISS' as const }));
+      const port = { resolveOrRequest, requestRecovery };
+      const options = { explicitProviderReference: prepared.reference! };
+      await requestPublicFavoriteDiscovery(port, prepared.key, parsed, options);
+      await requestPublicFavoriteDiscoveryRecovery(port, prepared.key, parsed, options);
+      expect(resolveOrRequest).toHaveBeenCalledExactlyOnceWith(prepared.key, expect.objectContaining({ explicitProviderReference: primary }));
+      expect(requestRecovery.mock.calls).toEqual(resolveOrRequest.mock.calls);
+    }
+  });
+
   it.each(['MANGA', 'MANHWA', 'MANHUA'] as const)('reuses a typed compatible sync hint for a %s source without changing its key contract', async (mediaKind) => {
     const comic = { ...artifact, mediaKind };
     const key = await favoriteIdentityKey(comic);
@@ -65,7 +89,12 @@ describe('public favorite discovery request', () => {
       async () => { throw new Error('offline'); },
       async () => [{ kind: 'FOUND' as const, fingerprint: 'f'.repeat(64), mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: '123' }] }],
       async () => [{ kind: 'FOUND' as const, fingerprint: key.fingerprint, mediaKind: 'MANGA' as const, references: [{ provider: 'mangaupdates' as const, externalId: '123' }] }],
-      async () => [{ kind: 'FOUND' as const, fingerprint: key.fingerprint, mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: '123' }, { provider: 'kitsu-anime' as const, externalId: '123' }] }],
+      async () => [{ kind: 'AMBIGUOUS' as const, fingerprint: key.fingerprint, identities: [
+        { mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: '123' }] },
+        { mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: '456' }] },
+      ] }],
+      async () => [{ kind: 'FOUND' as const, fingerprint: key.fingerprint, mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: '123' }, { provider: 'anilist' as const, externalId: '456' }] }],
+      async () => [{ kind: 'FOUND' as const, fingerprint: key.fingerprint, mediaKind: 'ANIME' as const, references: [{ provider: 'anilist' as const, externalId: '123' }, { provider: 'mangaupdates' as const, externalId: '456' }] }],
     ]) await expect(preparePublicFavoriteDiscoveryIdentity(artifact, { lookup })).resolves.toEqual({ key, reference: undefined });
   });
 

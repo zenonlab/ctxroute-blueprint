@@ -28,7 +28,7 @@ export async function preparePublicFavoriteDiscoveryIdentity(artifact: FavoriteP
       const results = await synchronized.lookup([syncKey]);
       const parsed = favoriteIdentityLookupResultSchema.safeParse(results.length === 1 ? results[0] : undefined);
       const result = parsed.success ? parsed.data : undefined;
-      if (result?.kind === 'FOUND' && result.fingerprint === syncKey.fingerprint && result.references.length === 1
+      if (result?.kind === 'FOUND' && result.fingerprint === syncKey.fingerprint
         && isFavoriteMediaKindCompatible(artifact.mediaKind, result.mediaKind)) reference = selectFavoriteIdentityReference(result.mediaKind, result.references);
     } catch { /* Sync is a hint; unavailable hints do not block local proof. */ }
   }
