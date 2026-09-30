@@ -169,6 +169,19 @@ paramètre. Son rejet initial par le transport est reproduit par une régression
 qui fait passer les cinq sondes dans le véritable adaptateur réseau Worker.
 Tester les sondes par `fetch` direct seul ne valide pas cette frontière.
 
+Les sondes Kitsu utilisent aussi le même `Accept: application/vnd.api+json`
+que leur adaptateur de recherche/hydratation, sans `Content-Type` sur le GET
+sans corps. Les deux appels réels avec l'ancien en-tête JSON commun ont
+répondu 406 ; changer uniquement ces en-têtes a donné 200 pour anime et manga.
+Un fournisseur disponible ne doit pas rester considéré en panne parce que
+notre propre sonde négocie le mauvais format. Les tests reproduisent ce
+refus à la frontière HTTP portable et via le transport Worker. La réponse
+reste limitée à un slug, 8 Kio et huit secondes ; la réservation partagée
+et les dix minutes entre sondes de panne ne changent pas. Ces observations
+réseau locales ne certifient pas l'egress Cloudflare ni une reprise historique.
+Le rollback rétablit les anciens en-têtes sans modifier de données, mais
+peut de nouveau empêcher la réouverture des circuits Kitsu.
+
 Après admission, `PENDING` est observé sans second POST, y compris après
 expiration de `retryAt` ou redémarrage. Une échéance passée est bornée à une
 minute pour éviter une boucle locale. `MISS` conserve l'admission normale;

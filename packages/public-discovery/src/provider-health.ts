@@ -25,7 +25,7 @@ export async function probeFavoriteProvider(provider: FavoriteProvider, fetcher:
   } else {
     const media = provider === 'kitsu-anime' ? 'anime' : 'manga';
     await readFavoriteProviderJson(fetcher, `https://kitsu.io/api/edge/${media}?page%5Blimit%5D=1&fields%5B${media}%5D=slug`, {
-      method: 'GET', headers,
+      method: 'GET', headers: { Accept: 'application/vnd.api+json', 'User-Agent': headers['User-Agent'] },
     }, z.object({ data: z.array(z.object({ id: z.string().min(1), type: z.literal(media), attributes: z.object({ slug: z.string().min(1) }) })).length(1) }), limit);
   }
 }

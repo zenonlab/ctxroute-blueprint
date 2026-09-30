@@ -1,5 +1,25 @@
 # Cloudflare operations gate
 
+## Sondes Kitsu et négociation JSON API
+
+Le contrôle réel du 30 septembre a donné 200 pour les petites sondes
+AniList, MangaUpdates et MangaDex, mais 406 pour les deux sondes Kitsu.
+Les cinq runtimes D1 étaient `READY` : ce statut de réservation ne prouve
+donc pas que chaque appel HTTP fonctionne. Les sondes Kitsu utilisaient
+`Accept: application/json`, contrairement à la recherche/hydratation Kitsu.
+Les mêmes deux sondes passent en 200 avec `Accept: application/vnd.api+json`
+et sans `Content-Type` sur leur GET sans corps. Après correction, les appels
+réels via `DirectProviderTransportAdapter` passent également, sans injection
+d'en-tête dans le banc. Il s'agit de l'egress local, pas d'une certification
+du réseau Cloudflare ; aucun favori privé ni mutation D1 n'est transmis.
+Les bornes restent huit secondes, 8 Kio, un slug et une réservation partagée
+par fournisseur, avec dix minutes entre sondes de panne. Retirer le correctif
+peut rétablir le faux échec Kitsu ; aucune donnée n'est supprimée au rollback.
+Deux régressions locales reproduisent 406 puis passent avec les bons en-têtes.
+Validation : 264 tests Discovery, 247 Worker, `npm run verify`, E2E Web
+12 réussis / 1 ignoré et Archify showcase passent. Les deux sondes réelles
+corrigées sont conservées dans un reçu privé ; zéro mutation D1.
+
 ## Identité canonique lors d'un secours lié
 
 La publication D1 doit conserver l'identifiant de l'œuvre déjà connue,

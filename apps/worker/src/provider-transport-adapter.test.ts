@@ -18,7 +18,14 @@ describe('provider transport adapter gate', () => {
     ['kitsu-anime', { data: [{ id: '1', type: 'anime', attributes: { slug: 'fixture' } }] }],
     ['kitsu-manga', { data: [{ id: '1', type: 'manga', attributes: { slug: 'fixture' } }] }],
   ] as const)('allows the actual bounded %s recovery probe through transport', async (provider, payload) => {
-    const fetcher = vi.fn(async () => Response.json(payload));
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+      if (provider.startsWith('kitsu-')) {
+        const headers = new Headers(init.headers);
+        if (headers.get('Accept') !== 'application/vnd.api+json') return new Response(null, { status: 406 });
+        if (headers.has('Content-Type')) return new Response(null, { status: 415 });
+      }
+      return Response.json(payload);
+    });
     const transport = createProviderTransportAdapter({}, { fetcher });
     await probeFavoriteProvider(provider, (url, init) => transport.fetch(url, init));
     expect(fetcher).toHaveBeenCalledOnce();

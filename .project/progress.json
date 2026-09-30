@@ -6294,9 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR180 fusionnée c6f023eb81f0521ae5c01278c608202c94f49b3e; prévol36653710370 et production36654388236 verts. Worker37cfd8ef-eba6-4a91-8749-ac1731bbd51e, sondes publiques vertes; archives publiques inchangées.",
-            "Publication canonique corrigée après deux pannes reproduites: secours AniList→Kitsu et MangaUpdates→MangaDex, retour du principal, nouvelle demande et rejeu conservent la même œuvre; six variantes invalides refusées sans fusion.",
-            "247 tests Worker,50 tests ciblés coût/atomicité, verify complet,typechecks,E2E12pass/1skip et Archify9/9 verts. Aucun POST historique; dernier profil réel1064résolues+55Review+53exclusions+350attentes, certification finale non acquise."
+            "PR180 déployée: Worker37cfd8ef-eba6-4a91-8749-ac1731bbd51e, CI36654388236 verte; identité canonique du secours conservée.",
+            "Nouvelle panne réelle reproduite: sondes Kitsu anime/manga406 avec Accept JSON commun; mêmes sondes200 avec JSON API. Correctif portable vérifié via transport Worker, deux régressions rouges puis vertes et deux appels réels200 sans injection ni D1.",
+            "264 tests Discovery,247 Worker, verify complet, E2E12pass/1skip, Archify9/9 verts. Préparation du déploiement du correctif de sonde; aucun réarmement historique ni publication d’archive."
           ]
         },
         {
