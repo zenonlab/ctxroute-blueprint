@@ -2631,6 +2631,12 @@ avant déploiement sur `npm audit` : Next.js 16.3.4 est concerné par
 GHSA-vcvr-r3jv-pc5j. La correction épingle Next.js 16.3.8 sans changer React,
 le rendu statique ni le contrôle de sécurité. Revalider build, E2E, audit et
 CI avant livraison ; aucune migration ni admission historique n'est ajoutée.
+La PR 188 livre cette mise à jour sur main `05bd2d454ecc3016b004be3846926168f871295e`.
+La CI de branche 36745071947 et la CI main 36746255205 passent ; audit zéro,
+E2E 13 succès/1 ignoré. Le Worker `baf19da7-b550-4ab2-abe4-1b430aefcc62`
+inclut aussi le correctif des diagnostics différés de la PR 187. Les sondes
+site, Library, téléchargement et gateway répondent 200. Canaris et publication
+d'extension sont ignorés ; aucune reprise historique n'a été exécutée.
 Les échecs avant claim et pendant une indisponibilité D1 exigent encore les
 logs Worker. Les événements ne sont pas le statut courant de la demande.
 Aucune purge automatique n'est ajoutée : suivre le volume D1 ; une politique
