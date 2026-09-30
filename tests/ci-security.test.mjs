@@ -51,6 +51,16 @@ test('Playwright Chromium is reused by the repository verification', () => {
   assert.ok(workflow.indexOf('- name: Install Playwright Chromium') < workflow.indexOf('- name: Verify repository'));
 });
 
+test('locked runtime patches are applied after scripts-disabled installation', () => {
+  const workflow = read('.github/workflows/deploy-production.yml');
+  const install = workflow.indexOf('- name: Install locked dependencies');
+  const patches = workflow.indexOf('- name: Apply locked runtime patches');
+  const verify = workflow.indexOf('- name: Verify repository');
+  assert.ok(install >= 0 && patches > install && verify > patches);
+  assert.match(workflow.slice(install, patches), /npm ci --ignore-scripts/u);
+  assert.match(workflow.slice(patches, verify), /npx patch-package --error-on-fail/u);
+});
+
 test('fresh production canaries require bounded provider observation', () => {
   const workflow = read('.github/workflows/deploy-production.yml');
   const canaryStep = workflow.split('- name: Run fresh bounded anime and manga canaries')[1]?.split('- name:')[0];

@@ -65,6 +65,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
 
+      - name: Apply locked runtime patches
+        run: npx patch-package --error-on-fail
+
       - name: Check extension publication preconditions
         run: node --input-type=module -e "import { assertExtensionPublicationContext } from './scripts/infra/cloudflare-driver.mjs'; assertExtensionPublicationContext();"
 
