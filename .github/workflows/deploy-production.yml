@@ -66,7 +66,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Apply locked runtime patches
-        run: npx patch-package --error-on-fail
+        run: npx patch-package ctxroute --error-on-fail
 
       - name: Check extension publication preconditions
         run: node --input-type=module -e "import { assertExtensionPublicationContext } from './scripts/infra/cloudflare-driver.mjs'; assertExtensionPublicationContext();"
