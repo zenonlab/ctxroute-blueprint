@@ -57,6 +57,15 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ## Décision
 
+### Libellés fondés sur l'état observé
+
+La candidate 1.0.51 ne déduit pas une panne fournisseur du compteur local
+`PROVIDER_UNAVAILABLE`. Les demandes sans résultat public, la limitation
+temporaire et les erreurs réseau sont présentées séparément. L'échéance du
+contrôleur annonce une vérification locale, jamais un réarmement serveur.
+Le compteur résolu indique des favoris identifiés, et non des œuvres uniques.
+Ces libellés ne changent ni les transitions ni les contrôles de reprise.
+
 ### Observateur dimensionné au lot scellé
 
 Le pilote installé conserve un observateur pour le lot entier, contrairement

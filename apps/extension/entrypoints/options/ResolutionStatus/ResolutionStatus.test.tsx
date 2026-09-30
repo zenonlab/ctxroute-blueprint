@@ -15,7 +15,8 @@ describe('ResolutionStatus', () => {
     expect(html).toContain('Dont erreurs internes');
     expect(html).toContain('Dont attente du cache public');
     expect(html).toContain('Vérification des favoris encore présents');
-    expect(html).toContain('Prochaine reprise automatique');
+    expect(html).toContain('Prochaine vérification locale');
+    expect(html).not.toContain('Prochaine reprise automatique');
     expect(html).toContain('Reprendre maintenant');
     expect(html).not.toContain('panne fournisseur');
   });
@@ -51,8 +52,23 @@ describe('ResolutionStatus', () => {
 
   it('offers provider recovery without presenting it as an automatic retry', () => {
     const html = renderToStaticMarkup(<ResolutionStatus controller={{ paused: false, state: 'waiting-provider' }} counts={{ blocked: 0, observed: 336, processing: 0, resolved: 0, retryable: 336, review: 0, unsupported: 0, providerPaused: 336 }} diagnostics={{ enabled: false, events: [] }} inventory={{ status: 'complete' }} onControl={() => undefined} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
-    expect(html).toContain('Traitement fournisseur indisponible');
+    expect(html).toContain('Sans résultat public disponible');
     expect(html).toContain('Relancer les demandes épuisées');
-    expect(html).toContain('Attente de la réouverture des fournisseurs');
+    expect(html).toContain('Demandes publiques indisponibles');
+    expect(html).not.toContain('réouverture des fournisseurs');
+  });
+
+  it.each([
+    [{ admissionWaiting: 1, providerPaused: 2 }, 'Demandes publiques indisponibles'],
+    [{ rateLimited: 3 }, 'Limitation temporaire du service'],
+    [{ networkErrors: 3 }, 'Vérification après erreur réseau'],
+  ])('reports mixed waits without inventing provider health: %j', (reasons, label) => {
+    const html = renderToStaticMarkup(<ResolutionStatus controller={{ paused: false, state: 'waiting-provider' }} counts={{ blocked: 0, observed: 8, processing: 0, resolved: 5, retryable: 3, review: 0, unsupported: 0, ...reasons }} inventory={{ continuationAt: '2026-09-30T12:00:00.000Z', status: 'complete' }} onControl={() => undefined} onDiagnosticsToggle={() => undefined} onReconcile={() => undefined} onRefresh={() => undefined} state="ready" />);
+    expect(html).toContain(`<strong>${label}</strong>`);
+    expect(html).toContain('Favoris identifiés');
+    expect(html).not.toContain('Œuvres identifiées');
+    expect(html).not.toContain('réouverture des fournisseurs');
+    expect(html).not.toContain('Prochaine reprise automatique');
+    expect(html).not.toContain('Votre bibliothèque locale est à jour');
   });
 });

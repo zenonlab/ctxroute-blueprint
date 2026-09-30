@@ -27,6 +27,19 @@ accessibility requirements across the popup, product pages, and options view.
 
 ## Component boundaries
 
+Resolution status reports observed facts, not inferred provider health. A public
+request without an available result is distinct from rate limiting or a prior
+network error. Its local continuation time is a verification deadline, not a
+promise to rearm the server request. Resolved counters count favorite sources,
+not unique works. `ResolutionStatus` reuses `Surface`, `Button`, native `dl`,
+`time` and the live status region; its unavailable and rate-limited previews
+exercise mixed waits without changing controls, storage, or network behavior.
+The 1.0.51 audit reproduces five misleading-label assertions before correction;
+all nine status tests then pass. Synthetic desktop and 390 px previews retain
+legible counts without horizontal overflow, a named live status, native buttons
+and keyboard focus. Screenshots are kept under `build/audits/ui-status-20260930/`;
+this is a scoped status review, not a full accessibility certification.
+
 The React adapter has three reuse levels:
 
 1. Primitives implement generic interaction and contain no Tobirink domain

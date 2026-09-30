@@ -26,6 +26,24 @@ La sonde MangaDex était refusée avant réseau par la liste des paramètres
 autorisés. Les cinq sondes sont maintenant testées via le transport Worker,
 et seule la requête MangaDex fixe (UUID vide, limit 1) est ajoutée.
 
+La PR 178 est fusionnée en `38bec9649efccc37157646e11d06094b8f3c98c1`.
+Prévol `36648162826` et CI production `36648980711` verts, Worker
+`fdf771cf-88a9-42dc-9ee7-299656895c2e`. Trois lectures publiques supplémentaires
+via l'adaptateur de transport Worker confirment la sonde MangaDex et le même
+lien Kitsu en recherche puis hydratation ; zéro mutation D1.
+
+Le profil Google Chrome headless neuf `ashUmQ` importe les 1 522 sources
+Downloads avec 1.0.49 puis passe à 1.0.50 sans désinstallation. Le reçu
+confirme la mise à jour et les deux redémarrages. À 1 195 secondes : 1 064
+sources résolues, 55 Review, 53 exclusions et 350 attentes, avec 865 œuvres,
+zéro erreur interne et zéro projection manquante. Les attentes se répartissent
+en 338 `PROVIDER_UNAVAILABLE`, 11 `NETWORK` et 1 `ADMISSION_WAIT`.
+1 671 lectures, 139 mutations bloquées, zéro admission transmise : verdict
+`incomplete`. Le Worker a changé pendant ce contrôle ; ni le gain de douze
+sources sur `hqYS4D` ni ce reçu ne constituent une preuve de reprise réelle.
+Les anciennes archives et les deux profils sont conservés. Aucun pointeur
+public ni fichier publié n'a été remplacé.
+
 ## Contrôle Chrome et déploiement du 30 septembre 2026
 
 La PR 177 est fusionnée en `1cf7d1746f4f631d9a0743316b76c791e8fdef97`.

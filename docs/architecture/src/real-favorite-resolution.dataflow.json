@@ -23,7 +23,7 @@
         "id": "retry-and-review",
         "label": "Reprise et Review",
         "focus": ["privateStore", "publicWorker", "publicD1", "review", "diagnostics"],
-        "note": "PENDING est relu sans réadmission, même après échéance ou redémarrage; seul MISS admet automatiquement."
+        "note": "PENDING est relu sans réadmission; MISS admet. L'interface distingue vérification locale, demande indisponible et panne réseau."
       }
     ]
   },
