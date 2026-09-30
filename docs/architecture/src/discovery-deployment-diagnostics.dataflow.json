@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Diagnostic du prévol de déploiement R2",
+    "output": "discovery-deployment-diagnostics.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 500]
+  },
+  "stages": [
+    { "label": "CI protégée" },
+    { "label": "Prévol" },
+    { "label": "API Cloudflare" },
+    { "label": "Plan scellé" }
+  ],
+  "nodes": [
+    { "id": "ci", "type": "cloud", "label": "GitHub Actions", "sublabel": "branche principale", "stage": 0, "row": 0, "width": 150 },
+    { "id": "driver", "type": "backend", "label": "Driver Cloudflare", "sublabel": "inventaire R2 en lecture", "stage": 1, "row": 0, "width": 160 },
+    { "id": "r2api", "type": "external", "label": "API Cloudflare", "sublabel": "inventaire de buckets", "stage": 2, "row": 0, "width": 150 },
+    { "id": "plan", "type": "security", "label": "Garde du plan", "sublabel": "Apply bloqué si erreur", "stage": 3, "row": 0, "width": 150 }
+  ],
+  "flows": [
+    { "from": "ci", "to": "driver", "label": "jeton", "classification": "secret hors sortie", "variant": "security", "labelAt": [205, 90] },
+    { "from": "driver", "to": "r2api", "label": "GET", "classification": "lecture seule", "variant": "default", "labelAt": [425, 90] },
+    { "from": "r2api", "to": "plan", "label": "HTTP + codes", "classification": "numériques seulement · sans corps", "variant": "security", "labelAt": [638, 90] }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Diagnostic exploitable", "items": ["Le statut HTTP et jusqu’à trois codes Cloudflare sont conservés", "Les messages, corps de réponse et jetons restent exclus", "Les erreurs de prévol arrêtent le plan avant toute mutation"] },
+    { "dot": "amber", "title": "Périmètre", "items": ["L’inventaire R2 est distinct des traces d’échec fournisseur", "Une erreur révèle la catégorie API, pas une cause inventée", "Aucun accès ou scope de jeton n’est modifié automatiquement"] }
+  ]
+}

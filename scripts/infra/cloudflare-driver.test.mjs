@@ -219,6 +219,29 @@ async function test_private_audit_bucket_provisioning_and_retention_are_scoped()
   ]);
 }
 
+async function test_r2_inventory_failure_exposes_only_http_status_and_numeric_cloudflare_codes() {
+  const auditConfig = { ...config, r2: [...config.r2, { binding: 'DISCOVERY_AUDIT_BUCKET', name: 'private-audit' }] };
+  const driver = createCloudflareDriver({
+    config: auditConfig,
+    workerDirectory: '/worker',
+    apiToken: 'test-token',
+    run: async args => args[0] === 'whoami' ? '{"accounts":[]}' : '',
+    r2Fetch: async () => Response.json({
+      success: false,
+      errors: [{ code: 10000, message: 'private detail and bearer test-token' }, { code: 'not-numeric', message: 'ignored' }, { code: 10001 }],
+    }, { status: 403 }),
+  });
+  const actions = driver.resolveOperations(['r2-bucket-ensure:private-audit']);
+  await assert.rejects(
+    () => driver.inspect('account-1', actions),
+    error => {
+      assert.equal(error.message, 'r2-bucket-inventory-response:403:10000,10001');
+      assert.doesNotMatch(error.message, /private detail|bearer|test-token/u);
+      return true;
+    },
+  );
+}
+
 async function test_inspect_read_only_resources() {
   const calls = [];
   const run = async args => {
@@ -634,6 +657,7 @@ function test_reject_invalid_r2_identifiers() {
 
 test('the driver derives operation targets from configuration', test_derive_operation_targets);
 test('private audit bucket provisioning and retention are scoped', test_private_audit_bucket_provisioning_and_retention_are_scoped);
+test('R2 inventory failure exposes only HTTP status and numeric Cloudflare codes', test_r2_inventory_failure_exposes_only_http_status_and_numeric_cloudflare_codes);
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('worker-only inspection excludes unrelated D1, R2 and Queue reads', test_worker_inspection_does_not_require_unrelated_storage_permissions);
 test('worker inspection omits volatile deployment status', test_worker_inspection_omits_volatile_deployment_status);

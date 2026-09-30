@@ -192,8 +192,14 @@ async function listAuthenticatedR2Buckets(accountId, fetcher, apiToken) {
     try {
       response = await fetcher(url, { headers: { Authorization: `Bearer ${apiToken}` }, method: 'GET', redirect: 'error', signal: globalThis.AbortSignal.timeout(15_000) });
     } catch { throw new Error('r2-bucket-inventory-network'); }
-    const payload = r2BucketPageSchema.safeParse(await response.json().catch(() => undefined));
-    if (response.status !== 200 || !payload.success) throw new Error('r2-bucket-inventory-response');
+    const body = await response.json().catch(() => undefined);
+    const payload = r2BucketPageSchema.safeParse(body);
+    if (response.status !== 200 || !payload.success) {
+      const codes = Array.isArray(body?.errors)
+        ? body.errors.map(error => error?.code).filter(Number.isSafeInteger).slice(0, 3)
+        : [];
+      throw new Error(`r2-bucket-inventory-response:${response.status}:${codes.join(',') || 'none'}`);
+    }
     buckets.push(...payload.data.result);
     cursor = payload.data.result_info?.cursor ?? undefined;
     if (cursor === undefined || cursor.length === 0) return buckets;

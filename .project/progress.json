@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "DONE",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6348,7 +6348,8 @@
             "Cause initiale reproductible: CTXRoute 2.0.0 appelle process.exit(0) après console.log; pipe stdout tronqué à environ 64 Ko. Patch-package corrige les deux injecteurs; tests lifecycle 2/2, régression 100 Ko et sortie Claude valide.",
             "npm run verify local passe: validation/coverage, typechecks, toutes les suites workspace, tests infra, builds Chrome/Firefox, npm audit sans vulnérabilité, intégration et Archify.",
             "CI branche 36770620595: le correctif CTXRoute manquait car npm ci --ignore-scripts saute les scripts; correction versionnée avec étape explicite. Run 36772261520 révèle un patch Miniflare périmé ciblant 5.20260903.0-alpha alors que le lockfile installe 5.20260926.1-alpha; l’étape est ensuite bornée au seul patch CTXRoute requis.",
-            "CI branche 36773062837 sur SHA 352f7ee: patches, builds isolés, E2E et npm run verify passent; validation du jeton et diagnostics D1 réussissent. Plan Cloudflare échoue avant application avec r2-bucket-inventory-response; Apply, probes, canaris et publication sont skipped. Aucune mutation distante D1/R2/Queue n’a eu lieu."
+            "CI branche 36773062837 sur SHA 352f7ee: patches, builds isolés, E2E et npm run verify passent; validation du jeton et diagnostics D1 réussissent. Plan Cloudflare échoue avant application avec r2-bucket-inventory-response; Apply, probes, canaris et publication sont skipped. Aucune mutation distante D1/R2/Queue n’a eu lieu.",
+            "CI 36775870995, HEAD 1b0b6dd : E2E, verify, token et D1 passent; plan échoue avant apply (r2-bucket-inventory-response). Aucun apply/canari/publication ni écriture distante; statut HTTP Cloudflare non exposé."
           ]
         },
         {
