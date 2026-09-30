@@ -2562,9 +2562,40 @@ manquante ; verdict `incomplete`. Les attentes du profil neuf ne remplacent
 pas le scope historique de 339 sources audité par la console. La différence
 reste à expliquer ; ce test sans admission ne prouve pas la reprise des FAILED.
 
+La continuation suivante du même profil explique cet écart sans changement
+produit. La comparaison privée `profile-comparison-l92g1T` identifie exactement
+33 sources anciennement résolues, encore en attente dans le profil neuf :
+artefacts sémantiques identiques et mêmes 868 œuvres. Le matcher existant
+retrouve pour chacune la même œuvre dans les deux caches, sans exception.
+La reprise `build/audits/chrome155-reconcile-VS414j/session.log` atteint
+1 076 résolues, 54 Review, 53 exclusions et 339 attentes en 175 secondes,
+avec 329 lectures HTTP, 25 mutations bloquées et zéro admission transmise.
+Inventaire complet, zéro erreur interne et zéro projection manquante.
+Une seconde comparaison hors réseau, `profile-comparison-ntjHVk`, confirme
+zéro différence de catégorie de résolution parmi les 1 522 sources.
+Les profils originaux ne sont pas modifiés par les comparaisons ; seuls des
+clones isolés sont inspectés. Les 339 attentes historiques restent présentes.
+
 #### Journal backend et audit sans interface
 
-La migration candidate 0031 ajoute `public_discovery_failure_events`, distinct
+Activation vérifiée : PR 186, commit `d0a0f8822953405cc53f7cb5e90251df6c583c31`,
+CI de branche 36736596341 et CI main 36737757612 réussies. La CI applique
+0031 avant le Worker `acb80d53-5083-4b8e-a5c6-dbad7cbaa1f9` et les sondes
+publiques passent. Aucun canari frais ni publication d'archive n'est exécuté.
+La liste distante ne contient plus de migration en attente ; le trigger
+distant correspond exactement à la migration versionnée. Cette lecture des
+métadonnées coûte 111 lignes, zéro écriture, et reste distincte du coût des
+lectures d'une demande.
+
+Le script sans interface a réellement lu une clé historique en production :
+`build/audits/failure-events-uxPnn3/page.json`, une ligne lue, zéro écriture,
+zéro événement. Cela prouve la disponibilité de l'archive et de son index,
+pas l'existence d'un diagnostic historique ni la capture d'un nouvel échec
+fournisseur réel. Le prévol des cinq clés non soumises de batch-009 trouve
+cinq candidats éligibles, zéro réservation et trois runtimes prêts ; onze
+lignes D1 lues, zéro écriture. Aucun nouveau POST n'a été autorisé ou émis.
+
+La migration 0031 ajoute `public_discovery_failure_events`, distinct
 des demandes et de leur rétention. Le trigger archive le dernier diagnostic
 validé dans la même écriture D1. L'expiration d'une demande et la rotation de
 ses huit diagnostics ne suppriment plus les événements archivés. Il n'y a ni
@@ -2593,14 +2624,17 @@ Aucune purge automatique n'est ajoutée : suivre le volume D1 ; une politique
 de rétention/export séparée sera nécessaire avant une exploitation à grande
 échelle. Le rollback garde table et trigger, sans supprimer les preuves.
 
-Validation locale : cinq régressions couvrent 105 événements paginés,
+Validation locale et CI : cinq régressions couvrent 105 événements paginés,
 rotation, suppression d'une demande de test, panne atomique de l'archive,
 injection, curseur invalide et fichiers privés. Une régression SQLite vérifie
 les observations identiques répétées même lorsque le journal récent est plein.
 Le test de conservation D1 Worker conserve
 les neuf événements malgré la rotation à huit et l'expiration de la demande.
 `npm run verify` passe (256 Worker, 175 infra) ; le dataflow du journal passe
-les neuf contrôles showcase. Aucun déploiement de 0031 n'est revendiqué.
+les neuf contrôles showcase. Le cadrage du diagramme est ensuite corrigé
+localement : contrôle visuel sans débordement aux quatre tailles desktop,
+captures claire/sombre inspectées. Cette correction graphique n'est pas
+incluse dans le commit de déploiement cité ci-dessus ; le viewer reste anglais.
 L'audit distant de 15:16 UTC, `build/admin/discovery-B2PCTp/snapshot.json`,
 confirme encore 275 FAILED pour 326 sources, sans diagnostic historique retenu,
 sur 287 identités et 339 sources : neuf requêtes, 601 lignes lues, zéro écriture.
