@@ -44,7 +44,7 @@ export const favoriteProviderPolicy = Object.freeze({
 });
 
 export class FavoriteProviderRetryError extends Error {
-  constructor(message: string, readonly retryAt: number) { super(message); }
+  constructor(message: string, readonly retryAt: number, readonly failure?: Error) { super(message); }
 }
 
 export function assertFavoriteProviderSearchQuery(query: FavoriteProviderSearchQuery): FavoriteProviderSearchQuery {

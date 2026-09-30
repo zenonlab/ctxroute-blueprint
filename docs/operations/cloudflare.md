@@ -2618,6 +2618,14 @@ Le script ne soumet aucune demande et ne classe pas une œuvre en Review.
 
 Une page vide signifie aucun événement archivé pour cette clé et ce curseur,
 pas absence d'erreur. Les causes anciennes absentes ne sont pas reconstruites.
+L'audit du 30 septembre a reproduit une lacune du collecteur : HTTP 429 et
+sonde échouée étaient exclus comme les simples reports de cadence. Le correctif
+local conserve la cause technique avant le report, sans changer le délai ni
+réarmer une demande. Deux régressions ont échoué avant correction puis passé ;
+le test Worker vérifie également la copie exacte du diagnostic dans l'archive
+D1, et le test du script relit et compare l'événement JSON complet sur disque.
+Ces réponses HTTP sont simulées : cette preuve locale ne remplace pas une
+observation fournisseur en production et n'explique pas les anciens FAILED.
 Les échecs avant claim et pendant une indisponibilité D1 exigent encore les
 logs Worker. Les événements ne sont pas le statut courant de la demande.
 Aucune purge automatique n'est ajoutée : suivre le volume D1 ; une politique

@@ -68,6 +68,14 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ### Diagnostic durable des défaillances techniques
 
+Les reports après HTTP 429 et sonde de réouverture échouée conservent la cause
+technique dans l'erreur interne. Le collecteur journalise cette cause fermée
+avant le report, avec la décision `retry-requested` ; il ne persiste pas le
+message brut. Les reports de cadence, de budget et de sonde réussie sans panne
+ne créent pas de diagnostic. Délais, checkpoints et tentatives restent inchangés.
+Ce correctif ne reconstruit aucune observation historique absente et ne prouve
+pas la capture des erreurs d'un fallback finalement résolu avec succès.
+
 La migration 0031 complète le journal récent par une table backend indépendante
 `public_discovery_failure_events`. Un trigger copie le dernier diagnostic dans
 la même écriture SQLite ; si l'archivage échoue, la mise à jour récente échoue

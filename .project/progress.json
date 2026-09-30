@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "DONE",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,16 +6294,16 @@
             "git diff --check"
           ],
           "evidence": [
+            "Correctif local non déployé: HTTP429 et sonde échouée conservés avant report, régressions rouges puis vertes; Discovery285, Queue/D1 50, audit JSON5.",
+            "npm run verify vert; E2E Web terminé code0; Archify architecture/dataflow showcase9/9 et diff-check verts. Logs /tmp/tobirink-deferred-*.",
+            "Aucune reprise historique ni mutation production; les causes absentes historiquement restent inconnues.",
             "PR186/maind0a0f882, CIbranche36736596341 etmain36737757612 vertes :0031 appliquée,Workeracb80d53,sondesOK,aucun canari/promotion. 175infra/256Worker,verify,E2E13succès/1ignoré. Trigger distant identique ;auditJSON live1ligne/0écriture ;Chrome1.0.55SHA286b9da2 inchangé. Diagramme corrigé localement9/9 +visual4tailles.",
             "Archive backend0031 : régression rouge8/10 diagnostics identiques corrigée10/10 ;5tests audit,175infra,256Worker et verify verts. E2E13succès/1ignoré ; Archify journal9/9. Prévol distant :0031 seule,0mutation. Livraison par CI protégée en préparation,aucun réarmement.",
             "Infra backend locale0031 : archive indépendante atomique, audit JSON sans interface, pagination100 ;4régressions/174infra/256Worker,verify et E2E13succès/1ignoré verts,Archify journal9/9. Migration non déployée ; aucune reprise. Audit distant15:16UTC B2PCTp :275FAILED/326sources sans journal historique,9requêtes601lignes0écriture.",
             "PR185/main49c3864 : CI36729661486 verte, migration0030 appliquée avant Workerfad747ea ; snapshot14:41 confirme colonne,287demandes historiques inchangées,0réarmement. Admin10tests et Archify architecture revérifiés verts.",
             "Intégration main359e430 sans changement produit ; runbook corrigé : CI existante migre D1 avant Worker. Verify et Archify verts ; prévol14:18UTC :0030 seule, SHA7c557dc4,0mutation. CI tip intégré à lancer, aucun réarmement.",
             "Console admin livrée localement : menu7vues hors ligne, snapshots privés indexés,10tests admin/170infra et npm run verify verts ; Archify architecture/recovery showcase9/9. Vrai scope339sources/287identités :9requêtes/601lignesD1/0écriture ;275FAILED=326sources. Migration0030 absente ; aucune reprise ni exception.",
-            "Candidate1.0.55 diagnostic durable : verify vert (256Worker/283Discovery), builds isolés identiques, E2E13succès/1ignoré, Archify architecture/dataflow showcase9/9, diff-check vert. Migration0030 seule restante au prévol distant, non appliquée ; aucune reprise ni promotion.",
-            "Kitsu couverture optionnelle :279testsDiscovery,verify complet,Archify verts ; rejeu réel20candidats identiques etcurseur14. PR184/359e430, CIbranche36714652375 etmain36715704557 vertes ; Worker8a4b9bbc déployé,sondesvertes,E2E13succès/1ignoré. ZIP1.0.54 inchangés. Aucun réarmement ni promotion.",
-            "Candidate1.0.54 : sync FOUND multi-ID corrigé, 4 régressions rouges puis497 tests application verts ; verify vert, E2E13succès/1ignoré, builds isolés identiques, Archify showcase9/9.",
-            "PR183 commit21df65c, CI main36710218213 verte avec déploiement Worker et probes. Archives candidates conservées, aucun téléchargement public avancé."
+            "Candidate1.0.55 diagnostic durable : verify vert (256Worker/283Discovery), builds isolés identiques, E2E13succès/1ignoré, Archify architecture/dataflow showcase9/9, diff-check vert. Migration0030 seule restante au prévol distant, non appliquée ; aucune reprise ni promotion."
           ]
         },
         {

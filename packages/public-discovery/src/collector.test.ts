@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FavoriteProviderRetryError, publicDiscoveryProviderSchema, runPublicDiscoveryBatch, type PublicDiscoveryClaimBatch, type PublicDiscoveryResultBatch } from '.';
 import { createPublicDiscoveryResolver } from './resolver';
-import { FavoriteProviderHttpError } from './provider-http';
+import { FavoriteProviderHttpError, FavoriteProviderRateGate, readFavoriteProviderJson } from './provider-http';
+import { z } from 'zod';
 
 const key = {
   fingerprint: 'a'.repeat(64), mediaKind: 'ANIME' as const,
@@ -18,6 +19,27 @@ const claims: PublicDiscoveryClaimBatch = {
 };
 
 describe('runPublicDiscoveryBatch', () => {
+  it.each(['http-429', 'failed-probe'])('records the actual provider failure before deferring %s', async (scenario) => {
+    const order: string[] = [];
+    const recordFailure = vi.fn(async () => { order.push('record'); });
+    const operation = vi.fn();
+    const resolve = async () => {
+      if (scenario === 'http-429') await readFavoriteProviderJson(async () => new Response(null, { status: 429, headers: { 'retry-after': '60' } }), 'https://provider.example/test', {}, z.object({}));
+      else await new FavoriteProviderRateGate('anilist', {
+        reserve: async () => ({ notBefore: 0, probeOnly: true }),
+        recordFailure: async () => undefined, recordSuccess: async () => undefined,
+      }, () => 0, async () => undefined, async () => { throw new FavoriteProviderHttpError(503); }).run(3_000, operation);
+      throw new Error('expected-provider-failure');
+    };
+    const report = await runPublicDiscoveryBatch({
+      gateway: { claim: async () => claims, publish: vi.fn(), recordFailure, defer: async () => { order.push('defer'); } },
+      limit: 1, nonce: () => crypto.randomUUID(), now: () => '2026-09-30T12:00:00.000Z', resolver: { resolve },
+    });
+    expect(order).toEqual(['record', 'defer']);
+    expect(recordFailure).toHaveBeenCalledWith(claims.requests[0], expect.objectContaining({ failure: expect.objectContaining({ status: scenario === 'http-429' ? 429 : 503 }) }), 'retry-requested', '2026-09-30T12:00:00.000Z');
+    expect(report).toMatchObject({ deferred: 1, failed: 0, published: 0 });
+    expect(operation).not.toHaveBeenCalled();
+  });
   it('records the failure before requesting an automatic retry', async () => {
     const order: string[] = [];
     const failure = new FavoriteProviderHttpError(503);
