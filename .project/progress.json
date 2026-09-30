@@ -6315,9 +6315,10 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Lot008 terminal6Library+4Review, anciennes preuves de dépassement conservées. Lot009 première clé consommée NOT_FOUND, neuf clés intactes, jamais rejouées.",
-            "Scope batch-009-remaining-20260930.json, sceau9dc1b7709e6bd7758a8a4f084dd23b978588fb55bfdcad52ec51a59250fb2a10:5MANGA,1ANIME,3MANHWA;0réservation vérifiée.",
-            "Prévol après déploiement PR181:9FAILED éligibles,5runtimesREADY,19lecturesD1,0écriture. Confirmation immédiate demandée pour9POST maximum; aucune admission effectuée."
+            "Scope neuf confirmé immédiatement, prévol19lectures0écriture et0réservation; vrai bouton Chrome154 ZIP1.0.51 dans profil persistantqxl4zA, observateur prêt avant envoi.",
+            "Arrêt technique après4POST:3Library vérifiées, coûts corrélés148/85/89lecturesD1,6/2/2appels fournisseurs,1résultat accepté chacun; quatrième demande318lecturesD1(20admission+298collector),18appels,9continuations,0résultat accepté. Cinq clés non envoyées,4réservations conservées,aucun rejeu.",
+            "Deux lectures D1 indexées après arrêt:1ligne chacune,0écriture; quatrième PROCESSING tentative1, progressionKitsu-anime titre1 curseur12. Diagnostic local fournisseur:HTTP200,276résultats sur cet alias; première variante5candidats,match exact unique sans contrainte saison mais0avec saison1 faute de preuve. Aucune règle d'identité affaiblie,aucun résultat transformé artificiellement enReview.",
+            "Les deux réponses d'autorisation concernent le même lot, pas deux exécutions. Autorisation arrêtée au premier échec; aucun élargissement ni réemploi des quatre clés. Le pilote n'est pas certifié."
           ]
         },
         {
