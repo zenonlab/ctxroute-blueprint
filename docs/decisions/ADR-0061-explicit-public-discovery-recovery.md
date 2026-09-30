@@ -460,6 +460,29 @@ La récupération est observable et réversible au niveau applicatif : désactiv
 
 ## Validation
 
+### Candidate : saison non corroborée
+
+Une saison demandée n'est jamais déduite de l'absence de saison chez le
+fournisseur. Après les recherches principales, la dernière lane anime peut
+terminer en Review `UNCONFIRMED_SEASON` si une page complète contient un titre
+exact compatible dont la saison est absente. Un numéro contradictoire, un
+résultat approximatif, une page tronquée ou une panne antérieure ne suffisent
+pas. Le transport public conserve `AMBIGUOUS`, avec le motif fermé
+`season-unconfirmed` autorisant une référence unique ; les autres ambiguïtés
+exigent toujours deux identités distinctes. Le stockage local distingue ce
+motif de l'ambiguïté entre œuvres et conserve le candidat pour la décision humaine.
+
+Cette évolution nécessite une nouvelle candidate extension avant toute
+activation Worker. Les anciens lecteurs stricts ne lisent pas ce nouveau motif.
+La simple publication de la candidate 1.0.52 ne suffit donc pas : la
+distribution manuelle ne met pas à jour tous les clients installés. Tant que
+la compatibilité du transport avec ces clients n'est pas établie et testée,
+cette modification reste hors du déploiement automatique de `main`.
+Les exports v1 à v5 existants restent lisibles ; un export contenant le nouveau
+motif exige le nouveau lecteur. Aucun déploiement ni réarmement ne découle de
+cette préparation. Le rollback doit conserver les lecteurs du nouveau motif
+tant que des données l'utilisent ; il ne supprime aucune Review ni aucun résultat.
+
 Les nouveaux profils du banc installé résident sous
 `build/installed-review/profiles/`, hors du temporaire système et hors Git.
 Le répertoire parent et chaque profil sont créés en mode `0700`. La reprise
@@ -472,6 +495,11 @@ identifié le processus responsable. Le rollback conserve les nouveaux profils
 sur disque, mais un ancien banc doit être remis à niveau pour les reprendre.
 
 La validation de la candidate conserve l'audit des dépendances bloquant.
+Le verrou de développement `brace-expansion` passe de 5.0.9 à 5.0.12 pour
+corriger les alertes qui bloquent `npm run verify`, sans modifier les plages
+des dépendances parentes ni ajouter d'override. Ce correctif ne change aucun
+contrat produit, paramètre Worker ou droit Cloudflare ; son rollback est
+limité au verrou et réintroduirait la vulnérabilité.
 L'alerte Undici apparue dans le run `36631395616` est corrigée par un
 passage à Vitest Cloudflare 1.3.2 et Wrangler 4.143.1, épinglant Miniflare
 5.20260926.1-alpha et Undici 7.29.1. L'override transitoire non appliqué par

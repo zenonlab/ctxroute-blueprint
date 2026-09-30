@@ -1,6 +1,6 @@
 import { isPublicDiscoverySearchCursor, publicDiscoveryCandidateSchema } from './contracts';
 import type { PublicDiscoveryClaimedRequest, PublicDiscoveryReferenceV3, PublicDiscoverySearchProgress, PublicDiscoveryTerminalResolution } from './contracts';
-import { favoriteProviderInspectionLimit, FavoriteProviderRetryError, inspectFavoriteTitleCandidates, isPublicDiscoveryCandidateCompatible } from './provider-kit';
+import { favoriteProviderInspectionLimit, FavoriteProviderRetryError, inspectFavoriteTitleCandidates, inspectUnconfirmedSeasonCandidates, isPublicDiscoveryCandidateCompatible } from './provider-kit';
 import type { FavoriteProviderPort, FavoriteTitleMatchQuery, ProviderCandidate, ResolutionProvider } from './provider-kit';
 import { AniListFavoriteProviderAdapter } from './providers/anilist';
 import { KitsuFavoriteProviderAdapter } from './providers/kitsu';
@@ -26,6 +26,7 @@ export function createPublicDiscoveryProviders(
 }
 
 interface LaneDecision {
+  readonly reason?: 'season-unconfirmed';
   readonly candidates: readonly ProviderCandidate[];
   readonly references: readonly PublicDiscoveryReferenceV3[];
   readonly state: 'MATCH' | 'AMBIGUOUS' | 'NOT_FOUND';
@@ -103,6 +104,7 @@ async function searchProvider(
   progress?: PublicDiscoverySearchProgress,
   allowBudgetContinuation = false,
   requiredLinkedReference?: PublicDiscoveryReferenceV3,
+  allowUnconfirmedSeason = false,
 ): Promise<LaneDecision> {
   if (progress !== undefined && progress.provider !== provider) throw new Error('provider-search-progress-provider-mismatch');
   const uniqueTitles = [...new Set(titles)].slice(0, 4);
@@ -129,6 +131,10 @@ async function searchProvider(
       const early = matchCandidates(envelope.candidates, matchQuery, false);
       if (early && (requiredLinkedReference === undefined || early.candidates.some((candidate) =>
         matchesLinkedReference(candidate, requiredLinkedReference, matchQuery)))) return early;
+      if (allowUnconfirmedSeason && envelope.complete && !envelope.truncated && envelope.nextCursor === undefined) {
+        const references = inspectUnconfirmedSeasonCandidates(matchQuery, envelope.candidates);
+        if (references.length > 0) return { candidates: envelope.candidates, references, state: 'AMBIGUOUS', reason: 'season-unconfirmed' };
+      }
       for (const candidate of envelope.candidates) {
         if (inspectFavoriteTitleCandidates(matchQuery, [candidate]).candidateReferences.length === 0) continue;
         candidates.set(candidateKey(candidate), candidate);
@@ -200,6 +206,7 @@ async function searchLane(
   deadline: number,
   progress?: PublicDiscoverySearchProgress,
   allowBudgetContinuation = false,
+  allowUnconfirmedSeason = false,
 ): Promise<LaneDecision> {
   const inspected: ProviderCandidate[] = [];
   let unavailable: Error | undefined;
@@ -213,7 +220,8 @@ async function searchLane(
   for (const provider of order.filter((provider, index) => index >= startIndex || retryProviders.includes(provider))) {
     let result: LaneDecision;
     try {
-      result = await searchProvider(provider, providers[provider], titles, query, deadline, provider === progress?.provider ? progress : undefined, allowBudgetContinuation);
+      result = await searchProvider(provider, providers[provider], titles, query, deadline, provider === progress?.provider ? progress : undefined, allowBudgetContinuation,
+        undefined, allowUnconfirmedSeason && provider === 'kitsu-anime' && unavailable === undefined);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       if (isProviderInvariantError(error)) throw error;
@@ -282,7 +290,7 @@ async function searchApplicableLanes(providers: PublicDiscoveryProviderPorts, re
     return lanes;
   }
   const lanes = request.query.mediaKind === 'ANIME'
-    ? [await searchLane(providers, animeProviders, titles, query, deadline, request.searchProgress, true)]
+    ? [await searchLane(providers, animeProviders, titles, query, deadline, request.searchProgress, true, true)]
     : [await searchLane(providers, mangaSearchProviders, titles, query, deadline, request.searchProgress, true)];
   const unavailable = lanes.reduce<Error | undefined>((retained, lane) => lane.unavailable === undefined
     ? retained : retainProviderFailure(retained, lane.unavailable), undefined);
@@ -309,7 +317,8 @@ function selectMatch(lanes: readonly LaneDecision[]): SelectedMatch {
   if (credible.length === 0) return { kind: 'terminal', resolution: { reason: 'all-provider-lanes-exhausted', state: 'NOT_FOUND' } };
   if (credible.length > 1 || credible[0]?.state === 'AMBIGUOUS') {
     const values = credible.flatMap((lane) => lane.references);
-    return { kind: 'terminal', resolution: { candidates: values.slice(0, 10), reason: 'multiple-credible-provider-identities', state: 'AMBIGUOUS' } };
+    const reason = credible.length === 1 && credible[0]?.reason === 'season-unconfirmed' ? 'season-unconfirmed' : 'multiple-credible-provider-identities';
+    return { kind: 'terminal', resolution: { candidates: values.slice(0, 10), reason, state: 'AMBIGUOUS' } };
   }
   const lane = credible[0];
   const reference = lane?.references[0];

@@ -4,7 +4,7 @@ import { canonicalDateTime, invariant, nonNegativeNumber, requiredText } from '.
 
 export type FavoriteResolutionResult =
   | { readonly kind: 'RESOLVED' }
-  | { readonly kind: 'REVIEW_REQUIRED'; readonly reason: 'AMBIGUOUS' | 'NOT_FOUND' }
+  | { readonly kind: 'REVIEW_REQUIRED'; readonly reason: 'AMBIGUOUS' | 'NOT_FOUND' | 'UNCONFIRMED_SEASON' }
   | { readonly kind: 'UNSUPPORTED'; readonly reason: 'IDENTITY_MISSING' | 'DETACHED' | 'BLOCKED_CONTENT_TAXONOMY' }
   | { readonly kind: 'RETRYABLE'; readonly reason: 'PROVIDER_UNAVAILABLE' | 'INCOMPLETE_CANDIDATE_SET' | 'AUTOMATIC_ATTEMPT_LIMIT' | 'INTERNAL_FAILURE' | 'PUBLIC_DISCOVERY_PENDING' | 'ADMISSION_WAIT' | 'RATE_LIMITED' | 'NETWORK' | 'TIMEOUT' | 'SERVICE_UNAVAILABLE' | 'CONTRACT_CONFLICT' | 'INVALID_RESPONSE' };
 
@@ -44,7 +44,7 @@ function validateResolution(result: FavoriteResolutionResult): void {
   const allowed = result.kind === 'RESOLVED'
     ? Object.keys(result).length === 1
     : Object.keys(result).length === 2 && (
-      result.kind === 'REVIEW_REQUIRED' && ['AMBIGUOUS', 'NOT_FOUND'].includes(result.reason)
+      result.kind === 'REVIEW_REQUIRED' && ['AMBIGUOUS', 'NOT_FOUND', 'UNCONFIRMED_SEASON'].includes(result.reason)
       || result.kind === 'UNSUPPORTED' && ['IDENTITY_MISSING', 'DETACHED', 'BLOCKED_CONTENT_TAXONOMY'].includes(result.reason)
       || result.kind === 'RETRYABLE' && ['PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'PUBLIC_DISCOVERY_PENDING', 'ADMISSION_WAIT', 'RATE_LIMITED', 'NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE', 'CONTRACT_CONFLICT', 'INVALID_RESPONSE'].includes(result.reason)
     );

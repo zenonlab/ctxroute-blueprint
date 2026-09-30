@@ -108,7 +108,7 @@ const webAgendaReadRequestSchema = z.object({
 export const webReviewSnapshotSchema = z.object({
   providerReferences: z.array(favoritePublicReferenceSchema).max(10)
     .refine((references) => new Set(references.map((reference) => `${reference.provider}:${reference.externalId}`)).size === references.length).optional(),
-  reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']).optional(),
+  reason: z.enum(['AMBIGUOUS', 'NOT_FOUND', 'UNCONFIRMED_SEASON']).optional(),
   matchLevel: boundedText(100).optional(),
   provenance: boundedText(100).optional(),
   totalCandidates: z.number().int().min(0).max(1000).optional(),

@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "DONE",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,9 +6294,10 @@
             "git diff --check"
           ],
           "evidence": [
-            "Candidate1.0.51 privée et correctifs Worker préparés; publicDiscovery/export, scopes/digests/réservations/lots partiels couverts par verify complet. Archives et pointeur public inchangés; certification finale distincte.",
-            "Publication canonique corrigée PR180, puis sondes Kitsu406 reproduites et corrigées PR181: Accept JSON API, deux réponses réelles200 via transport depuis machine locale. 264 tests Discovery,247 Worker,E2E12pass/1skip et Archify9/9 verts.",
-            "PR181 merge64ee81c354e91e22211fb5cb50c8a7b3ca9829c7; prévol36657699600 et production36658421236 verts, Worker9f049850-ffe1-40fa-aabd-ff1532ba602b, sondes publiques vertes. Aucun réarmement historique; pilote,341attentes et Firefox restent à terminer."
+            "Candidate locale 1.0.52 : Review explicite UNCONFIRMED_SEASON uniquement sur titre exact compatible, saison absente, dernier fallback anime complet sans panne antérieure ; association humaine et export/restauration couverts.",
+            "npm run verify vert : 248 tests Worker, 493 application, 275 Discovery ; infra160/160 ; E2E Web13 succès/1 ignoré ; audit npm0 vulnérabilité après brace-expansion5.0.12 ; Archify architecture et dataflow showcase9/9, diff-check vert.",
+            "Aucun déploiement/promotion : ancienne extension refuse le résultat à référence unique. La distribution manuelle du nouveau client ne suffit pas ; compatibilité de transport à résoudre avant fusion main.",
+            "Pilote qxl4zA conservé : quatre POST réservés, trois résultats Library, arrêt quatrième à318lectures. Les quatre clés ne sont pas rejouées ; cinq autres non envoyées."
           ]
         },
         {

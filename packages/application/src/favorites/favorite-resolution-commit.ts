@@ -100,6 +100,7 @@ export async function persistFavoriteResolutionCompletion(
         if (source.presence !== 'observed') throw new Error('STALE_PRIVATE_REFERENCE');
         const comparableIdentities = new Set([...(compared?.candidates ?? []), ...(compared?.references ?? [])].map((candidate) => `${candidate.provider}:${candidate.externalId}`));
         if (resolution.reason === 'AMBIGUOUS' && (compared === undefined || (compared.totalCandidates ?? comparableIdentities.size) < 2 || comparableIdentities.size < 2)) throw new Error('AMBIGUOUS_REVIEW_REQUIRES_COMPARABLE_IDENTITIES');
+        if (resolution.reason === 'UNCONFIRMED_SEASON' && (record.artifact.mediaKind !== 'ANIME' || record.artifact.season === undefined || record.artifact.seasonEvidence?.conflict === true || comparableIdentities.size < 1)) throw new Error('UNCONFIRMED_SEASON_REQUIRES_CANDIDATE');
         const id = source.reviewId ?? reviewId(`review_${source.id.slice('source_'.length)}`);
         await session.putReview(createReview({ id, reason: resolution.reason, sourceLabel: source.url, status: 'pending', title: source.title }));
         const persisted = compared ?? { candidates: [], digest: `${record.artifact.semanticFingerprint}:${effect}`, provenance: effect, recordedAt: dependencies.now(), totalCandidates: 0 };

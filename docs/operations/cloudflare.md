@@ -1,5 +1,39 @@
 # Cloudflare operations gate
 
+## Pilote des neuf reprises du 30 septembre et candidate 1.0.52
+
+Après confirmation du scope privé scellé, le profil Chrome `qxl4zA` a envoyé
+quatre POST avec réservation préalable : trois résultats sont projetés dans
+Library, puis l'observateur s'arrête au premier dépassement technique. La
+quatrième corrélation totalise 318 lectures D1 (20 admission, 298 collecte),
+103 écritures et 18 appels fournisseur sur neuf événements de collecte,
+sans résultat accepté au moment de l'arrêt. Les cinq autres clés ne sont
+pas envoyées. Les quatre réservations restent consommées ; cet arrêt ne
+prouve pas l'annulation du traitement serveur et n'autorise aucun rejeu.
+
+La lecture ciblée après arrêt observe la recherche Kitsu anime à l'alias 2,
+page 12. Le diagnostic fournisseur local reçoit HTTP 200 : un alias élargi
+retourne 276 résultats, tandis que le premier alias contient un titre exact
+sans preuve de saison. Le contrôle strict avec saison demandée le rejette.
+Ce défaut est une recherche trop longue sans conclusion métier adaptée,
+pas la preuve d'une panne actuelle de tous les fournisseurs.
+
+La candidate 1.0.52 propose une Review `UNCONFIRMED_SEASON` uniquement sur
+preuve exacte et page complète du dernier fallback anime, après la recherche
+principale, sans panne antérieure. Aucun Work n'est créé automatiquement.
+Les régressions couvrent les saisons contradictoires, pages incomplètes,
+pannes, média inconnu, restauration privée et association humaine après
+redémarrage. La fixture Worker reste sous 300 lectures cumulées ; elle
+n'est pas une nouvelle preuve de production. Les E2E de l'archive passent
+avec 13 succès et un test ignoré, sur réponses fournisseur simulées.
+
+Cette candidate n'est ni déployée ni promue : les anciennes extensions
+refusent le nouveau résultat à référence unique. Une distribution manuelle
+du nouveau client seule ne corrige pas cette incompatibilité. Résoudre et
+tester ce contrat avant fusion sur `main`, puis obtenir une nouvelle preuve
+réelle sans réutiliser les clés consommées. Les archives publiques et
+résultats D1 précédents restent conservés.
+
 ## Emplacement du banc installé
 
 Les nouveaux profils isolés et leur extension décompressée sont conservés sous

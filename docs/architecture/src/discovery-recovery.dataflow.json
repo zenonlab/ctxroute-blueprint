@@ -23,7 +23,7 @@
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "clé directe · jeton indexé" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "claim(1) · expiration ciblée" },
     { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "sonde partagée · 10 min", "stage": 3, "row": 2, "tag": "bail D1 · curseur conservé" },
-    { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · ID lié contrôlé", "stage": 4, "row": 1, "width": 150, "tag": "Library exige deux liens exacts" }
+    { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "Library ou Review motivée", "stage": 4, "row": 1, "width": 150, "tag": "Saison absente ≠ identité prouvée" }
   ],
   "flows": [
     { "from": "snapshot", "to": "canaries", "label": "base de comparaison", "classification": "lecture seule", "variant": "default", "labelDy": 53 },

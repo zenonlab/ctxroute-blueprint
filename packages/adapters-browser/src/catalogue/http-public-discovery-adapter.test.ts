@@ -10,6 +10,13 @@ const key: PublicDiscoveryKey = {
 const query = { discoveryTitles: ['Frieren'], mediaKind: 'ANIME' as const, sourceTitles: ['Sousou no Frieren'] };
 
 describe('HttpPublicDiscoveryAdapter', () => {
+  it.each(['season-unconfirmed', 'multiple-identities'])('validates a single Review reference against its reason: %s', async (reason) => {
+    const state = { state: 'AMBIGUOUS', reason, candidates: [{ provider: 'kitsu-anime', externalId: '42' }], verifiedAt: '2026-09-30T12:00:00.000Z' };
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', async () => Response.json(state));
+    if (reason === 'season-unconfirmed') await expect(adapter.resolveOrRequest(key, query)).resolves.toMatchObject(state);
+    else await expect(adapter.resolveOrRequest(key, query)).rejects.toThrow();
+  });
+
   afterEach(() => vi.useRealTimers());
   it('preserves the real adapter receiver through the application recovery use case', async () => {
     const storage = new MemoryStoragePort();

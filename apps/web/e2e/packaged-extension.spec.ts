@@ -352,7 +352,8 @@ for (const mediaKind of ['MANHWA', 'ANIME'] as const) test(`packaged extension p
   }
 });
 
-test('packaged Review verifies an ambiguous reference before committing a human association', async () => {
+for (const unconfirmedSeason of [false, true]) {
+test(`packaged Review verifies a ${unconfirmedSeason ? 'season-unconfirmed' : 'multiple-identity'} reference before committing a human association`, async () => {
   test.setTimeout(90_000);
   const repository = resolve(import.meta.dirname, '../../..');
   const version = JSON.parse(readFileSync(resolve(repository, 'apps/extension/package.json'), 'utf8')).version;
@@ -364,20 +365,24 @@ test('packaged Review verifies an ambiguous reference before committing a human 
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, '--host-resolver-rules=MAP * 127.0.0.1, EXCLUDE localhost'],
     channel: 'chromium', headless: true, viewport: { width: 390, height: 844 },
   });
-  const title = 'Synthetic Ambiguous River';
-  const references = [{ provider: 'mangaupdates', externalId: '123' }, { provider: 'mangaupdates', externalId: '456' }];
+  const title = unconfirmedSeason ? 'Synthetic Seasonal River' : 'Synthetic Ambiguous River';
+  const references = unconfirmedSeason ? [{ provider: 'kitsu-anime', externalId: '42' }]
+    : [{ provider: 'mangaupdates', externalId: '123' }, { provider: 'mangaupdates', externalId: '456' }];
+  const verifiedCandidate = unconfirmedSeason
+    ? { externalId: '42', mediaKind: 'ANIME', preSerialization: false, provider: 'kitsu-anime', titles: [title], season: 1, format: 'TV' }
+    : { externalId: '123', mediaKind: 'MANHWA', preSerialization: false, provider: 'mangaupdates', titles: [title] };
   const forbiddenRequests: string[] = [];
   let automaticFingerprint: string | undefined;
   let manualPosts = 0;
   let manualVerified = false;
   const stateFor = (fingerprint: string) => {
     automaticFingerprint ??= fingerprint;
-    if (fingerprint === automaticFingerprint) return { state: 'AMBIGUOUS', candidates: references, reason: 'comparable-identities', verifiedAt: new Date().toISOString() };
+    if (fingerprint === automaticFingerprint) return { state: 'AMBIGUOUS', candidates: references, reason: unconfirmedSeason ? 'season-unconfirmed' : 'comparable-identities', verifiedAt: new Date().toISOString() };
     if (manualPosts === 0) return { state: 'MISS' };
     if (!manualVerified) return { state: 'PENDING', retryAt: new Date(Date.now() + 60_000).toISOString() };
     return {
       state: 'VERIFIED', verifiedAt: new Date().toISOString(), nextRefreshAt: new Date(Date.now() + 86_400_000).toISOString(),
-      profile: { candidate: { externalId: '123', mediaKind: 'MANHWA', preSerialization: false, provider: 'mangaupdates', titles: [title] }, references: [references[0]], workId: 'work_synthetic_ambiguous' },
+      profile: { candidate: verifiedCandidate, references: [references[0]], workId: 'work_synthetic_ambiguous' },
     };
   };
   try {
@@ -409,7 +414,9 @@ test('packaged Review verifies an ambiguous reference before committing a human 
     });
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).host;
-    const bookmark = await worker.evaluate(async (input) => chrome.bookmarks.create(input), { title, url: 'https://manhwaz.com/webtoon/synthetic-ambiguous-river/chapter-7' });
+    const bookmark = await worker.evaluate(async (input) => chrome.bookmarks.create(input), unconfirmedSeason
+      ? { title: `${title} Saison 1`, url: 'https://reader.example/anime/synthetic-seasonal-river' }
+      : { title, url: 'https://manhwaz.com/webtoon/synthetic-ambiguous-river/chapter-7' });
     const options = await context.newPage();
     await options.goto(`chrome-extension://${extensionId}/options.html`);
     await options.getByRole('button', { name: /^(Commencer l’analyse|Reprendre maintenant|Vérifier à nouveau)$/u }).click();
@@ -431,9 +438,10 @@ test('packaged Review verifies an ambiguous reference before committing a human 
     await expect.poll(async () => (await readPrivate()).reviews.length, { timeout: 30_000 }).toBe(1);
     await page.reload();
     await page.getByRole('button', { name: 'Correspondances à vérifier', exact: true }).click();
-    const choice = page.getByRole('button', { name: 'Vérifier mangaupdates:123', exact: true });
+    const choice = page.getByRole('button', { name: unconfirmedSeason ? 'Vérifier kitsu-anime:42' : 'Vérifier mangaupdates:123', exact: true });
     await expect(choice).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Vérifier mangaupdates:456', exact: true })).toBeVisible();
+    if (unconfirmedSeason) await expect(page.getByText('Titre trouvé · saison à confirmer avant association')).toBeVisible();
+    else await expect(page.getByRole('button', { name: 'Vérifier mangaupdates:456', exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Identités fournisseur à vérifier' }).locator('img')).toHaveCount(0);
     expect((await readPrivate()).works).toEqual([]);
     expect(manualPosts).toBe(0);
@@ -450,7 +458,7 @@ test('packaged Review verifies an ambiguous reference before committing a human 
     await expect.poll(async () => (await readPrivate()).reviews[0]?.status).toBe('resolved');
     const resolved = await readPrivate();
     expect(resolved.reviews).toMatchObject([{ status: 'resolved', decisionOrigin: 'human' }]);
-    expect(resolved.works).toMatchObject([{ externalReferences: [{ provider: 'mangaupdates', externalId: '123' }], preferredTitle: title }]);
+    expect(resolved.works).toMatchObject([{ externalReferences: [references[0]], preferredTitle: title }]);
     expect(resolved.sources).toMatchObject([{ bookmarkId: bookmark.id, resolution: { kind: 'RESOLVED' } }]);
     await expect(page.getByRole('dialog', { name: 'Correspondances à vérifier', exact: true }).getByRole('heading', { name: 'Aucune correspondance à vérifier', exact: true })).toBeVisible();
     expect(manualPosts).toBe(1);
@@ -459,6 +467,7 @@ test('packaged Review verifies an ambiguous reference before committing a human 
     await context.close();
   }
 });
+}
 
 test('installed site Library sorts the full private catalogue promptly', async () => {
   test.setTimeout(150_000);

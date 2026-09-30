@@ -89,10 +89,12 @@ export const publicDiscoveryTerminalResolutionSchema = z.discriminatedUnion('sta
   z.strictObject({ profile: publicDiscoveryVerifiedProfileSchema, state: z.literal('VERIFIED') }),
   z.strictObject({ reason: z.string().trim().min(1).max(200), state: z.literal('NOT_FOUND') }),
   z.strictObject({
-    candidates: z.array(publicDiscoveryReferenceV3Schema).min(2).max(10),
+    candidates: z.array(publicDiscoveryReferenceV3Schema).min(1).max(10),
     reason: z.string().trim().min(1).max(200),
     state: z.literal('AMBIGUOUS'),
-  }),
+  }).refine(result => result.reason === 'season-unconfirmed'
+    ? result.candidates.every(candidate => candidate.provider === 'anilist' || candidate.provider === 'kitsu-anime')
+    : result.candidates.length >= 2, 'ambiguity-requires-comparable-identities'),
 ]);
 
 export function isPublicDiscoverySearchCursor(provider: string, cursor: string): boolean {

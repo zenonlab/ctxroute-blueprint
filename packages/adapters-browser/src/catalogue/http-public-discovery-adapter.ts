@@ -29,7 +29,7 @@ const stateSchema = z.discriminatedUnion('state', [
   z.strictObject({ reason: z.literal('ATTEMPT_LIMIT'), state: z.literal('UNAVAILABLE') }),
   z.strictObject({ nextRefreshAt: z.iso.datetime({ offset: false }), profile: publicDiscoveryTerminalResolutionSchema.options[0].shape.profile, state: z.literal('VERIFIED'), verifiedAt: z.iso.datetime({ offset: false }) }),
   z.strictObject({ reason: z.string().min(1).max(200), state: z.literal('NOT_FOUND'), verifiedAt: z.iso.datetime({ offset: false }) }),
-  z.strictObject({ candidates: publicDiscoveryTerminalResolutionSchema.options[2].shape.candidates, reason: z.string().min(1).max(200), state: z.literal('AMBIGUOUS'), verifiedAt: z.iso.datetime({ offset: false }) }),
+  publicDiscoveryTerminalResolutionSchema.options[2].safeExtend({ verifiedAt: z.iso.datetime({ offset: false }) }),
 ]);
 const lookupResultSchema = z.array(z.strictObject({ key: publicDiscoveryKeySchema, state: stateSchema })).min(1).max(50);
 

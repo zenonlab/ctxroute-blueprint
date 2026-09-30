@@ -26,7 +26,7 @@ export interface ReviewCandidate {
 
 export interface ReviewItem {
   providerReferences?: readonly { readonly provider: string; readonly externalId: string }[] | undefined;
-  reason?: 'AMBIGUOUS' | 'NOT_FOUND' | undefined;
+  reason?: 'AMBIGUOUS' | 'NOT_FOUND' | 'UNCONFIRMED_SEASON' | undefined;
   matchLevel?: string | undefined;
   provenance?: string | undefined;
   totalCandidates?: number | undefined;

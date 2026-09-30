@@ -9,6 +9,18 @@ const css = readFileSync(new URL('./ReviewResolver.module.css', import.meta.url)
 const preview = readFileSync(new URL('./ReviewResolver.preview.tsx', import.meta.url), 'utf8');
 
 describe('ReviewResolver', () => {
+  it('explains a season-only review without claiming the work was absent', () => {
+    const markup = renderToStaticMarkup(createElement(ReviewResolver, {
+      canNext: false, canPrevious: false,
+      item: { candidates: [], id: 'review_season', revision: 'season-v1', reason: 'UNCONFIRMED_SEASON', sourceLabel: 'Favori local', title: 'Synthetic season', providerReferences: [{ provider: 'kitsu-anime', externalId: '42' }] },
+      onNext: () => undefined, onPrevious: () => undefined, onRefresh: () => undefined, onRetry: () => undefined, onSubmitDecision: () => undefined,
+      state: 'ready',
+    }));
+    expect(markup).toContain('Titre trouvé · saison à confirmer avant association');
+    expect(markup).toContain('Vérifier kitsu-anime:42');
+    expect(markup).not.toContain('Aucune identité trouvée');
+  });
+
   it('renders reference-only choices as explicit verification buttons, never fake WorkCards', () => {
     const props = {
       canNext: false, canPrevious: false,

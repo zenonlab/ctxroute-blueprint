@@ -4,7 +4,7 @@ import { favoriteMatcherVersion } from './provider-matcher';
 
 export const favoriteResolutionResultSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('RESOLVED') }),
-  z.strictObject({ kind: z.literal('REVIEW_REQUIRED'), reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']) }),
+  z.strictObject({ kind: z.literal('REVIEW_REQUIRED'), reason: z.enum(['AMBIGUOUS', 'NOT_FOUND', 'UNCONFIRMED_SEASON']) }),
   z.strictObject({ kind: z.literal('UNSUPPORTED'), reason: z.enum(['IDENTITY_MISSING', 'DETACHED', 'BLOCKED_CONTENT_TAXONOMY']) }),
   z.strictObject({ kind: z.literal('RETRYABLE'), reason: z.enum(['PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'PUBLIC_DISCOVERY_PENDING', 'ADMISSION_WAIT', 'RATE_LIMITED', 'NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE', 'CONTRACT_CONFLICT', 'INVALID_RESPONSE']) }),
 ]);

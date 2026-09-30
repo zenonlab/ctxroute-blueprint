@@ -346,7 +346,8 @@ async function processClaimedTask(dependencies: FavoriteResolutionRunnerDependen
     if (discovery.state === 'AMBIGUOUS') {
       const references = discovery.candidates.map((reference) => favoritePublicReferenceSchema.parse(reference));
       const comparable = [...new Map(references.map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
-      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason: 'AMBIGUOUS' }, 'review:d1-ambiguous', undefined, {
+      const reason = discovery.reason === 'season-unconfirmed' ? 'UNCONFIRMED_SEASON' : 'AMBIGUOUS';
+      await persistFavoriteResolutionCompletion(dependencies, task, token, { kind: 'REVIEW_REQUIRED', reason }, 'review:d1-ambiguous', undefined, {
         candidates: [], references: comparable, digest: JSON.stringify([identityKey, discovery.verifiedAt, comparable]),
         provenance: 'public-discovery', totalCandidates: comparable.length, recordedAt: dependencies.now(),
       });
