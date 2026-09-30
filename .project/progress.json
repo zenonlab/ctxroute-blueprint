@@ -6335,11 +6335,9 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Cause initiale reproductible: CTXRoute 2.0.0 appelle process.exit(0) après console.log; pipe stdout tronqué à environ 64 Ko. Patch-package corrige les deux injecteurs; tests lifecycle 2/2, régression 100 Ko et sortie Claude valide.",
-            "npm run verify local passe: validation/coverage, typechecks, toutes les suites workspace, tests infra, builds Chrome/Firefox, npm audit sans vulnérabilité, intégration et Archify.",
-            "CI branche 36770620595: le correctif CTXRoute manquait car npm ci --ignore-scripts saute les scripts; correction versionnée avec étape explicite. Run 36772261520 révèle un patch Miniflare périmé ciblant 5.20260903.0-alpha alors que le lockfile installe 5.20260926.1-alpha; l’étape est ensuite bornée au seul patch CTXRoute requis.",
-            "CI branche 36773062837 sur SHA 352f7ee: patches, builds isolés, E2E et npm run verify passent; validation du jeton et diagnostics D1 réussissent. Plan Cloudflare échoue avant application avec r2-bucket-inventory-response; Apply, probes, canaris et publication sont skipped. Aucune mutation distante D1/R2/Queue n’a eu lieu.",
-            "CI 36775870995, HEAD 1b0b6dd : E2E, verify, token et D1 passent; plan échoue avant apply (r2-bucket-inventory-response). Aucun apply/canari/publication ni écriture distante; statut HTTP Cloudflare non exposé."
+            "Snapshot production D1 strictement en lecture seule : scope 287 identités/339 sources; 275 identités FAILED à attempt 8 couvrent 326 sources, sans diagnostic D1 conservé; états NOT_FOUND/AMBIGUOUS expirés : 12 identités/13 sources.",
+            "Journal append-only contrôlé sur les 275 identités FAILED : 275 requêtes indexées, 275 lignes lues, 0 événement, 0 écriture; aucun motif historique fournisseur ne peut être attribué. Répartition outbox actuelle FAILED : SENT 200 identités/245 sources, UNSENT 75/81; tous attempt 8, donc UNSENT seul ne prouve pas l’absence d’appels antérieurs. Une identité porte un checkpoint.",
+            "Le seul indice fournisseur précédemment corrélé est un curseur de recherche Kitsu incomplet; la reproduction de code existe, mais son lien avec le corps HTTP historique reste non prouvé. Le Worker et le bucket R2 privés sont maintenant déployés; ils capturent les prochains échecs, pas les anciens."
           ]
         },
         {
