@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,16 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR188 main05bd2d4, CIbranche36745071947 etmain36746255205 vertes; Next16.3.8 audit0, diagnostics429/sonde déployés Workerbaf19da7. Sondes publiques200; E2E13/1; aucun canari, rearmement ni publication extension.",
-            "Autorisation utilisateur: Next épinglé16.3.8, React inchangé; npm audit0, buildWeb, npm run verify et E2E13pass/1skip verts. Archify et diff-check verts; livraison CI à exécuter.",
-            "PR187 fusionnée fc27e73; CI branche36741723919 verte sur afbd163. CI main36742827051 arrêtée après tests à npm audit: Next16.3.4 GHSA-vcvr-r3jv-pc5j critique; étape déploiement skipped.",
-            "Audit local reproduit une vulnérabilité critique; aucune occurrence next/og ou ImageResponse dans apps/web sources. Aucun contournement sécurité ni mise à jour dépendance hors périmètre.",
-            "Correctif local non déployé: HTTP429 et sonde échouée conservés avant report, régressions rouges puis vertes; Discovery285, Queue/D1 50, audit JSON5.",
-            "npm run verify vert; E2E Web terminé code0; Archify architecture/dataflow showcase9/9 et diff-check verts. Logs /tmp/tobirink-deferred-*.",
-            "Aucune reprise historique ni mutation production; les causes absentes historiquement restent inconnues.",
-            "PR186/maind0a0f882, CIbranche36736596341 etmain36737757612 vertes :0031 appliquée,Workeracb80d53,sondesOK,aucun canari/promotion. 175infra/256Worker,verify,E2E13succès/1ignoré. Trigger distant identique ;auditJSON live1ligne/0écriture ;Chrome1.0.55SHA286b9da2 inchangé. Diagramme corrigé localement9/9 +visual4tailles.",
-            "Archive backend0031 : régression rouge8/10 diagnostics identiques corrigée10/10 ;5tests audit,175infra,256Worker et verify verts. E2E13succès/1ignoré ; Archify journal9/9. Prévol distant :0031 seule,0mutation. Livraison par CI protégée en préparation,aucun réarmement.",
-            "Infra backend locale0031 : archive indépendante atomique, audit JSON sans interface, pagination100 ;4régressions/174infra/256Worker,verify et E2E13succès/1ignoré verts,Archify journal9/9. Migration non déployée ; aucune reprise. Audit distant15:16UTC B2PCTp :275FAILED/326sources sans journal historique,9requêtes601lignes0écriture."
+            "Correctif du contrat R2 vérifié par CI 36781601415 (tests, E2E, npm run verify et plan Cloudflare en lecture seule) puis fusionné dans main par PR #189, commit 94e1739a9c5ab5f6c46dae229af7860dd186249e.",
+            "CI de production 36782709509 réussie : plan appliqué, bucket R2 privé créé, Worker tobirink-public-api déployé (version 5e223b54-443d-462c-86c5-8614d4ae4d16), sondes publiques et gateway HTTP 200; aucune migration D1, canari ou publication extension.",
+            "Régression cloudflare-driver.test.mjs 36/36, npm run verify, Archify dataflow/architecture et git diff --check réussis. Le défaut prouvé était l’enveloppe API R2 result.buckets, pas l’IP ni le jeton."
           ]
         },
         {
