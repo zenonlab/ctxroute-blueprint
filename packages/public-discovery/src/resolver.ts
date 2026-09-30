@@ -109,6 +109,7 @@ async function searchProvider(
   if (progress !== undefined && progress.provider !== provider) throw new Error('provider-search-progress-provider-mismatch');
   const uniqueTitles = [...new Set(titles)].slice(0, 4);
   const candidates = new Map((progress?.candidates ?? []).map((candidate) => [candidateKey(candidate), candidate]));
+  let projectionIncomplete = progress?.projectionIncomplete ?? false;
   for (let titleIndex = progress?.titleIndex ?? 0; titleIndex < uniqueTitles.length; titleIndex += 1) {
     const title = uniqueTitles[titleIndex];
     if (title === undefined) throw new Error('provider-search-progress-title-missing');
@@ -126,12 +127,13 @@ async function searchProvider(
       }
       if (envelope.provider !== provider) throw new Error('provider-envelope-mismatch');
       if (envelope.candidates.length > 20) throw new IncompleteProviderSearchError('candidate-page-limit');
+      projectionIncomplete ||= envelope.projectionIncomplete === true;
       // An exact identity may be accepted without exhausting every fuzzy result.
       // Inspect each page before retaining candidates, so a later exact match is not sliced away.
-      const early = matchCandidates(envelope.candidates, matchQuery, false);
+      const early = projectionIncomplete ? undefined : matchCandidates(envelope.candidates, matchQuery, false);
       if (early && (requiredLinkedReference === undefined || early.candidates.some((candidate) =>
         matchesLinkedReference(candidate, requiredLinkedReference, matchQuery)))) return early;
-      if (allowUnconfirmedSeason && envelope.complete && !envelope.truncated && envelope.nextCursor === undefined) {
+      if (!projectionIncomplete && allowUnconfirmedSeason && envelope.complete && !envelope.truncated && envelope.nextCursor === undefined) {
         const references = inspectUnconfirmedSeasonCandidates(matchQuery, envelope.candidates);
         if (references.length > 0) return { candidates: envelope.candidates, references, state: 'AMBIGUOUS', reason: 'season-unconfirmed' };
       }
@@ -142,18 +144,23 @@ async function searchProvider(
       }
       if (envelope.complete && !envelope.truncated && envelope.nextCursor === undefined) break;
       const next = envelope.nextCursor;
+      if (envelope.projectionIncomplete === true && (envelope.complete || !envelope.truncated)) {
+        throw new IncompleteProviderSearchError('projection');
+      }
       if (envelope.complete || next === undefined || !isPublicDiscoverySearchCursor(provider, next) || seen.has(next)) {
+        if (projectionIncomplete && next === undefined && envelope.complete === false) throw new IncompleteProviderSearchError('projection');
         throw new IncompleteProviderSearchError('cursor');
       }
       if (page + 1 === searchPageLimit) {
         throw new PublicDiscoverySearchContinuationError({
-          candidates: [...candidates.values()], cursor: next, provider, titleIndex, version: 1,
+          candidates: [...candidates.values()], cursor: next, projectionIncomplete: projectionIncomplete || undefined, provider, titleIndex, version: 1,
         });
       }
       seen.add(next);
       cursor = next;
     }
   }
+  if (projectionIncomplete) throw new IncompleteProviderSearchError('projection');
   const bounded = [...candidates.values()];
   const final = matchCandidates(bounded, matchQuery, true);
   if (!final) throw new Error('provider-matching-decision-missing');

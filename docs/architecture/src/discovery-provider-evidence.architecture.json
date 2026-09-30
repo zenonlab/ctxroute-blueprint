@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Preuve privée des appels fournisseur",
+    "quality_profile": "showcase",
+    "viewBox": [1120, 620],
+    "views": [
+      {
+        "id": "separation",
+        "label": "Stockage séparé",
+        "focus": ["worker", "d1", "r2"],
+        "note": "D1 conserve l’état et les causes; R2 conserve temporairement les échanges détaillés."
+      },
+      {
+        "id": "provider-call",
+        "label": "Appels fournisseur",
+        "focus": ["worker", "providers", "r2"],
+        "note": "Une panne intermédiaire reste inspectable même si un fallback résout le favori."
+      }
+    ]
+  },
+  "components": [
+    { "id": "providers", "type": "external", "label": "Fournisseurs", "sublabel": "AniList · Kitsu · MangaDex · MU", "pos": [45, 260], "size": [185, 76] },
+    { "id": "worker", "type": "backend", "label": "Collecteur Worker", "sublabel": "capture bornée avant publication", "pos": [340, 260], "size": [190, 76] },
+    { "id": "d1", "type": "database", "label": "D1 Public Discovery", "sublabel": "état · causes fermées · traceId", "pos": [665, 145], "size": [200, 76] },
+    { "id": "r2", "type": "database", "label": "R2 audit privé", "sublabel": "requête · échanges · résultat · 7 j", "pos": [665, 365], "size": [200, 76] },
+    { "id": "admin", "type": "backend", "label": "Audit opératoire", "sublabel": "scope privé · lecture seule", "pos": [925, 365], "size": [165, 76] }
+  ],
+  "connections": [
+    { "id": "worker-providers", "from": "worker", "to": "providers", "label": "requêtes et réponses", "variant": "emphasis" },
+    { "id": "worker-d1", "from": "worker", "to": "d1", "label": "état + cause + pointeur", "variant": "security" },
+    { "id": "worker-r2", "from": "worker", "to": "r2", "label": "échanges filtrés avant résultat", "variant": "security" },
+    { "id": "d1-admin", "from": "d1", "to": "admin", "label": "clé complète · diagnostics indexés", "variant": "default" },
+    { "id": "r2-admin", "from": "r2", "to": "admin", "label": "UUID exact · lecture privée", "variant": "default", "labelAt": [895, 455] }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Séparation des données", "items": ["D1 ne reçoit ni titres ni corps HTTP", "R2 est dédié et non exposé par une route publique", "Les métadonnées de rétention ne remplacent pas la règle lifecycle"] },
+    { "dot": "amber", "title": "État de livraison", "items": ["Code et règle locale bornée à sept jours", "Activation réelle uniquement par le workflow Cloudflare protégé", "Les échecs historiques sans trace restent inconnus"] }
+  ]
+}

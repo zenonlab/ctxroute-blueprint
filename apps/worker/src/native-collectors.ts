@@ -16,11 +16,13 @@ import {
   type PublicDiscoveryKeyV3,
   type PublicDiscoveryProviderPorts,
   type PublicDiscoveryResultBatch,
+  type PublicDiscoveryTerminalResolution,
   type FavoriteProviderPort,
   type PublicDiscoveryFailureDiagnostic,
 } from '@tobirink/public-discovery';
 import { D1AgendaCollectionAdapter, type AgendaLaneClaim } from './releases/public-release-collectors';
 import { createProviderTransportAdapter, type ProviderTransportBindings } from './provider-transport-adapter';
+import { captureProviderFetch, type ProviderAuditExchange } from './provider-audit-capture';
 import { boundedDuration, emitWorkerCostDiagnostic, queueFailureDiagnostic, workerDiagnosticsLockValue, type WorkerCostDiagnosticEvent, type WorkerCostProvider, type WorkerCostResult } from './diagnostics';
 import { instrumentAgendaR2, instrumentD1, instrumentProviderFetch, instrumentQueueSend, type D1MetricTotals, type ProviderMetricTotals, type ProviderTransportMetricTotals, type R2MetricTotals, type QueueMetricTotals } from './operational-metrics';
 import { z } from 'zod';
@@ -37,8 +39,9 @@ export const nativeCollectorSignalSchema = z.discriminatedUnion('type', [
 ]);
 export type NativeCollectorSignal = z.infer<typeof nativeCollectorSignalSchema>;
 
-export type NativeCollectorBindings = Env & ProviderTransportBindings & {
+export type NativeCollectorBindings = Omit<Env, 'PROVIDER_GATEWAY_ORIGIN' | 'PROVIDER_TRANSPORT_MODE'> & ProviderTransportBindings & {
   readonly PUBLIC_DISCOVERY_QUEUE: Queue<NativeCollectorSignal>;
+  readonly DISCOVERY_AUDIT_BUCKET?: R2Bucket;
   readonly WORKER_VERSION?: WorkerVersionMetadata;
 };
 
@@ -109,6 +112,7 @@ class PublicDiscoveryProcessingError extends Error {
 type NativeCollectorDisposition = 'ack-invalid' | 'ack-success' | 'ack-forwarded' | 'retry' | 'retry-to-dlq';
 const nativeCollectorMaxRetryRequests = 8;
 const publicDiscoveryResolutionTimeoutMilliseconds = 100_000;
+const publicDiscoveryTraceByteLimit = 512 * 1024;
 
 class PublicDiscoveryInvocationBudgetError extends Error {
   constructor() { super('public-discovery-invocation-budget'); this.name = 'PublicDiscoveryInvocationBudgetError'; }
@@ -240,9 +244,17 @@ async function digest(value: string): Promise<string> {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function providerFetch(bindings: NativeCollectorBindings) {
+function providerFetch(bindings: NativeCollectorBindings, onExchange?: (exchange: ProviderAuditExchange) => void) {
   try {
-    return bindProviderTransport(createProviderTransportAdapter(bindings));
+    const transport = createProviderTransportAdapter(bindings);
+    return bindProviderTransport({
+      fetch: async (input, init) => {
+        const entries: ProviderAuditExchange[] = [];
+        const capture = captureProviderFetch((target, request) => transport.fetch(target, request), entries);
+        try { return await capture(input, init); }
+        finally { for (const entry of entries) onExchange?.(entry); }
+      },
+    });
   } catch (error) {
     console.warn('provider-transport-init-failed', providerFailureCode(error instanceof Error ? error : undefined));
     throw error;
@@ -271,7 +283,7 @@ export function providerFailureCode(error: Error | undefined): string {
   if (error.message === 'provider-runtime-state-missing') return 'provider-runtime-state-missing';
   if (error.message === 'invalid-provider-runtime-reservation') return 'provider-runtime-reservation-invalid';
   if (/^D1_[A-Z_]+:/u.test(error.message)) return 'provider-runtime-d1';
-  const incomplete = /^incomplete-provider-search:(deadline|candidate-page-limit|candidate-limit|cursor|page-limit)$/u.exec(error.message)?.[1];
+  const incomplete = /^incomplete-provider-search:(deadline|candidate-page-limit|candidate-limit|cursor|page-limit|projection)$/u.exec(error.message)?.[1];
   if (incomplete !== undefined) return `provider-search-${incomplete}`;
   if (error.message === 'Provider cadence requires a later wake.') return 'provider-cadence-deferred';
   if (error.message === 'Public discovery resolution exceeded its bounded execution window.') return 'provider-resolution-deadline';
@@ -316,6 +328,7 @@ export function discoveryFailureCause(error: Error | undefined): PublicDiscovery
     'provider-search-cursor': 'search-cursor', 'provider-search-deadline': 'search-deadline',
     'provider-search-page-limit': 'search-page-limit', 'provider-search-candidate-limit': 'search-candidate-limit',
     'provider-search-candidate-page-limit': 'search-candidate-page-limit',
+    'provider-search-projection': 'search-projection',
   } satisfies Readonly<Record<string, PublicDiscoveryFailureDiagnostic['cause']['code']>>;
   const classified = Object.entries(precise).find(([label]) => label === code)?.[1] ?? (code.startsWith('provider-response-invalid') ? 'invalid-response'
     : code.startsWith('provider-gateway-') ? 'gateway' : code.startsWith('provider-transport-') ? 'transport' : 'unknown');
@@ -335,7 +348,11 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   const startedAt = Date.now();
   const d1 = instrumentD1(bindings.PUBLIC_DB);
   const queue = instrumentQueueSend(bindings.PUBLIC_DISCOVERY_QUEUE);
-  const providers = instrumentProviderFetch(providerFetch(bindings));
+  let activeProviderExchanges: ProviderAuditExchange[] | undefined;
+  let completedProviderExchanges: ProviderAuditExchange[] = [];
+  const providers = instrumentProviderFetch(providerFetch(bindings, (exchange) => {
+    if (activeProviderExchanges !== undefined && activeProviderExchanges.length < 16) activeProviderExchanges.push(exchange);
+  }));
   let acceptedResults = 0;
   try {
   const port = new D1PublicDiscoveryV3Adapter(d1.database);
@@ -344,6 +361,33 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   let claimedCount = 0;
   const failureContexts = new WeakMap<Error, { provider: keyof PublicDiscoveryProviderPorts; stage: 'search' | 'hydrate' }>();
   const providerFailures = new Map<keyof PublicDiscoveryProviderPorts, PublicDiscoveryFailureDiagnostic['cause']>();
+  const archiveProviderTrace = async (request: PublicDiscoveryClaimedRequest, resolution?: PublicDiscoveryTerminalResolution): Promise<string | undefined> => {
+    if (providerFailures.size === 0 || completedProviderExchanges.length === 0) return undefined;
+    const bucket = bindings.DISCOVERY_AUDIT_BUCKET;
+    if (bucket === undefined) throw new Error('provider-audit-bucket-unavailable');
+    const traceId = crypto.randomUUID();
+    const body = JSON.stringify({
+      schemaVersion: 1,
+      traceId,
+      correlationId,
+      observedAt: new Date().toISOString(),
+      key: request.key,
+      query: request.query,
+      requestDigest: request.requestDigest,
+      attempt: request.attempt,
+      resolution,
+      exchanges: completedProviderExchanges,
+    });
+    if (new TextEncoder().encode(body).byteLength > publicDiscoveryTraceByteLimit) throw new Error('provider-audit-trace-too-large');
+    const stored = await bucket.put(`provider-audit/v1/${traceId}.json`, body, {
+      httpMetadata: { cacheControl: 'private, no-store', contentType: 'application/json' },
+      customMetadata: { expiresAfterDays: '7', schemaVersion: '1' },
+      onlyIf: { etagDoesNotMatch: '*' },
+    });
+    if (stored === null) throw new Error('provider-audit-object-conflict');
+    completedProviderExchanges = [];
+    return traceId;
+  };
   const continuationTokenDigest = continuationToken === undefined ? undefined : await digest(continuationToken);
   const resolver = createBudgetedDiscoveryResolver(createPublicDiscoveryProviders(
     providers.fetch,
@@ -375,6 +419,8 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
         const diagnostic: PublicDiscoveryFailureDiagnostic = {
           schemaVersion: 1, attempt: request.attempt, observedAt: now, cause, decision,
         };
+        const traceId = await archiveProviderTrace(request);
+        if (traceId !== undefined) diagnostic.traceId = traceId;
         if (correlationId !== undefined) diagnostic.correlationId = correlationId;
         if (bindings.WORKER_VERSION !== undefined) diagnostic.workerVersion = bindings.WORKER_VERSION.id;
         if (providerFailures.size > 0) diagnostic.providerFailures = [...providerFailures.values()];
@@ -391,8 +437,11 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     now: () => new Date().toISOString(),
     resolver: {
       resolve: async (request) => {
+        activeProviderExchanges = [];
         try {
           const resolution = await resolver.resolve(request);
+          completedProviderExchanges = activeProviderExchanges;
+          activeProviderExchanges = undefined;
           if (providerFailures.size > 0) {
             const observedFailures = [...providerFailures.values()];
             const now = new Date().toISOString();
@@ -401,6 +450,8 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
               cause: observedFailures[observedFailures.length - 1]!,
               providerFailures: observedFailures, decision: 'resolution-produced',
             };
+            const traceId = await archiveProviderTrace(request, resolution);
+            if (traceId !== undefined) diagnostic.traceId = traceId;
             if (correlationId !== undefined) diagnostic.correlationId = correlationId;
             if (bindings.WORKER_VERSION !== undefined) diagnostic.workerVersion = bindings.WORKER_VERSION.id;
             await port.recordFailure(request, activeTokenDigest, diagnostic);
@@ -409,6 +460,8 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
           return resolution;
         }
         catch (error) {
+          completedProviderExchanges = activeProviderExchanges ?? [];
+          activeProviderExchanges = undefined;
           console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.provider-failed', correlationId,
             attempt: request.attempt, code: providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined) }));
           throw error;

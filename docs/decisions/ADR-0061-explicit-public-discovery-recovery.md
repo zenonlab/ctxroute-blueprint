@@ -7,10 +7,28 @@ scope:
   - apps/extension/runtime/favorite-resolution-runtime.ts
   - apps/worker/src/index.ts
   - apps/worker/src/native-collectors.ts
+  - apps/worker/src/native-collectors.test.ts
   - apps/worker/wrangler.jsonc
+  - apps/worker/worker-configuration.d.ts
+  - apps/worker/r2-discovery-audit-lifecycle.json
+  - apps/worker/src/provider-audit-capture.ts
+  - apps/worker/src/provider-audit-capture.test.ts
+  - apps/worker/src/catalogue/public-discovery-queue.test.ts
+  - scripts/infra/cloudflare-driver.mjs
+  - scripts/infra/cloudflare-driver.test.mjs
+  - scripts/infra/deploy-production-workflow.test.mjs
+  - scripts/infra/discovery-failure-trace.mjs
+  - scripts/infra/discovery-failure-trace.test.mjs
+  - .github/workflows/deploy-production.yml
+  - .project/project-config.json
+  - package.json
+  - docs/architecture/src/discovery-failure-journal.dataflow.json
+  - docs/architecture/src/discovery-provider-evidence.architecture.json
   - apps/worker/migrations/0030_public_discovery_failure_diagnostics.sql
   - packages/public-discovery/src/contracts.ts
   - packages/public-discovery/src/collector.ts
+  - packages/public-discovery/src/provider-kit.ts
+  - packages/public-discovery/src/resolver.ts
   - packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts
   - apps/extension/runtime/use-resolution-status.ts
   - packages/application/src/favorites/public-discovery-resolution.ts
@@ -81,6 +99,42 @@ message brut. Les reports de cadence, de budget et de sonde réussie sans panne
 ne créent pas de diagnostic. Délais, checkpoints et tentatives restent inchangés.
 Ce correctif ne reconstruit aucune observation historique absente et ne prouve
 pas la capture des erreurs d'un fallback finalement résolu avec succès.
+
+Le transport Worker capture uniquement les échanges associés à une invocation
+qui a observé au moins une panne technique. L’allowlist des URL est réutilisée;
+les corps de requête et de réponse sont plafonnés à 8 Kio chacun, seize échanges
+au plus, et seuls `accept`, `content-type`, `origin` et `referer` sont retenus
+parmi les en-têtes, plus le `User-Agent` produit constant. Autorisation, cookies
+et en-têtes inconnus sont exclus. La réponse retient uniquement son statut,
+son type de contenu et les en-têtes de quota, `Retry-After`, identifiant de
+requête et `CF-Ray` ; `Location`, cookies et en-têtes inconnus restent exclus.
+Les échecs de transport sont réduits à `aborted`, `timeout` ou `network-error`,
+sans message ni pile d'erreur. Les redirections refusées conservent leur statut
+et leur corps borné sans suivre la cible. La lecture d'un corps est arrêtée
+après 500 ms et marquée tronquée. Chaque objet reste sous 512 Kio. Le trace
+enregistre la `PublicDiscoveryQuery` validée qui a produit les recherches et,
+si un fallback aboutit après une panne fournisseur, la résolution terminale
+bornée ainsi que les échanges. Cela relie la conversion à son résultat sans
+reconstituer la requête à partir des seuls corps HTTP. Les URLs favorites,
+artefacts parseur et slugs source restent sur l'appareil conformément à
+l'ADR-0031. Une corrélation complète devra les joindre à la trace dans un
+rapport local privé `0600`; cet enrichissement n'est pas encore automatisé.
+Ces valeurs ne sont pas copiées vers R2 par défaut. Le trace JSON est écrit avant le
+diagnostic et avant publication dans le bucket R2 privé
+`tobirink-discovery-audit`, puis D1 conserve uniquement son UUID opaque.
+La règle lifecycle de `provider-audit/v1/` expire les objets après sept jours.
+Une erreur d’écriture R2 empêche la publication du fallback. Les appels réussis
+sans panne ne sont pas archivés. Les corps contiennent les titres de recherche
+et des réponses publiques : accès restreint au Worker et à la lecture opératoire
+scopée, export local en mode `0600`, aucun rendu du payload dans les logs.
+
+`audit:discovery-trace` requiert simultanément le scope privé, l’ordinal, l’ID
+d’événement D1 et le traceId. Il vérifie le pointeur sous l’identité complète,
+lit un seul objet R2 fixe, valide sa clé, son digest et sa forme fermée, puis
+l’écrit dans un répertoire privé. Aucun SQL libre, accès public, admission ou
+réarmement n’est possible. La gate de production provisionne uniquement ce
+bucket dédié et remplace sa règle lifecycle déterministe avant le déploiement
+Worker; le bucket public des archives reste hors de ce plan.
 
 La migration 0031 complète le journal récent par une table backend indépendante
 `public_discovery_failure_events`. Un trigger copie le dernier diagnostic dans
@@ -155,6 +209,17 @@ l'identité ne peut pas être encodée restent bloquantes. Le diagnostic du
 rejetée et une suite annoncée : l'ancien adaptateur supprimait cette suite.
 Ce constat local n'attribue pas rétroactivement cette cause aux autres
 demandes historiques et n'autorise aucun réarmement automatique.
+
+Une page Kitsu contenant une ressource impossible à projeter conserve désormais
+son curseur amont lorsque d'autres pages existent. Le checkpoint porte un
+indicateur borné `projectionIncomplete` à travers les continuations; le résolveur
+ne peut alors ni conclure `NOT_FOUND`, ni accepter une correspondance approximative
+comme `VERIFIED`. Il parcourt la suite et les autres fournisseurs, mais conserve
+l'échec technique `provider-search-projection` au lieu de publier un résultat si
+cette omission rend la lane non exhaustive. Cela évite de recommencer à la
+première page à chaque continuation tout en préservant la prudence d'identité.
+Les pages complètes et les résultats exacts admissibles conservent leur
+comportement antérieur.
 
 ### Libellés fondés sur l'état observé
 

@@ -29,6 +29,10 @@
     {
       "binding": "RELEASE_SNAPSHOTS",
       "bucket_name": "tobirink-public-releases"
+    },
+    {
+      "binding": "DISCOVERY_AUDIT_BUCKET",
+      "bucket_name": "tobirink-discovery-audit"
     }
   ],
   "images": {

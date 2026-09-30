@@ -139,6 +139,20 @@ describe('public discovery queue trigger', () => {
       expect(JSON.parse(row!.diagnostics)[0].providerFailures).toEqual(expect.arrayContaining([
         { code: 'http', httpStatus: status === 200 ? 503 : status, provider: 'anilist', stage: 'search' },
       ]));
+      const savedDiagnostic = JSON.parse(row!.diagnostics)[0];
+      if (status === 200) {
+        expect(savedDiagnostic.traceId).toMatch(/^[0-9a-f-]{36}$/u);
+        const objectKey = `provider-audit/v1/${savedDiagnostic.traceId}.json`;
+        const readAuditObject = env.DISCOVERY_AUDIT_BUCKET.get;
+        const traceObject = await readAuditObject.call(env.DISCOVERY_AUDIT_BUCKET, objectKey);
+        expect(traceObject).not.toBeNull();
+        const trace = await traceObject!.json<{ key: { fingerprint: string }; exchanges: Array<{ responseStatus?: number; target: string; responseBody?: string }> }>();
+        expect(trace.key.fingerprint).toBe(discoveryKey.fingerprint);
+        expect(trace).toMatchObject({ query: { discoveryTitles: ['Synthetic private title'], sourceTitles: ['Synthetic private title'], mediaKind: 'ANIME' }, resolution: { state: 'VERIFIED' } });
+        expect(trace.exchanges).toEqual(expect.arrayContaining([expect.objectContaining({ responseStatus: 503, target: 'https://graphql.anilist.co' })]));
+        expect(JSON.stringify(trace)).toContain('Synthetic private title');
+        await env.DISCOVERY_AUDIT_BUCKET.delete(objectKey);
+      }
       if (status === 200) expect(await adapter.read(discoveryKey, new Date().toISOString())).toMatchObject({ state: 'VERIFIED' });
       if (status === 401) {
         expect(JSON.parse(row!.diagnostics)[0].cause.provider).toBe('kitsu-anime');
@@ -958,7 +972,7 @@ describe('public discovery queue trigger', () => {
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const request = { ...submission('d', 'Cursor checkpoint work'), requestDigest: 'e'.repeat(64) };
     const now = '2026-09-20T13:00:00.000Z';
-    const base = { candidates: [], cursor: '5', provider: 'anilist' as const, titleIndex: 0, version: 1 as const };
+    const base = { candidates: [], cursor: '5', projectionIncomplete: true, provider: 'anilist' as const, titleIndex: 0, version: 1 as const };
     const progress = withFailure ? { ...base, provider: 'kitsu-anime' as const, retryProviders: ['anilist' as const] } : base;
     await adapter.request(request, now);
     const claim = await adapter.claimBatch({ claimToken: 'a'.repeat(48), tokenDigest: 'b'.repeat(64), now, leaseUntil: '2026-09-20T13:15:00.000Z', limit: 1 });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PublicDiscoveryClaimedRequest } from './contracts';
+import type { PublicDiscoveryClaimedRequest, PublicDiscoverySearchProgress } from './contracts';
 import { FavoriteProviderRetryError, type FavoriteProviderPort, type ProviderCandidate, type ResolutionProvider } from './provider-kit';
 import { createPublicDiscoveryResolver, PublicDiscoveryInvocationYieldError, PublicDiscoverySearchContinuationError } from './resolver';
 import type { PublicDiscoveryProviderPorts } from './resolver';
@@ -498,6 +498,32 @@ describe('standalone provider resolver', () => {
     ports.anilist.search.mockResolvedValue({ candidates: [], complete: false, digest: 'partial', nextCursor: '2', provider: 'anilist', truncated: true });
     await expect(createPublicDiscoveryResolver(ports).resolve(request('ANIME'))).rejects.toThrow('incomplete-provider-search:cursor');
     expect(ports.anilist.search).toHaveBeenCalledTimes(2);
+  });
+
+  it('carries incomplete projection through pagination without returning a terminal result', async () => {
+    const ports = providers();
+    ports.mangadex.search.mockImplementation(async ({ cursor }) => {
+      const page = Number(cursor ?? '1');
+      if (page === 1) return { candidates: [], complete: false, digest: 'omitted-row', nextCursor: '2', projectionIncomplete: true, provider: 'mangadex', truncated: true };
+      if (page < 5) return { candidates: [], complete: false, digest: `page-${page}`, nextCursor: String(page + 1), provider: 'mangadex', truncated: true };
+      return { candidates: [], complete: true, digest: 'exhausted', provider: 'mangadex', truncated: false };
+    });
+
+    let continuation: PublicDiscoverySearchProgress | undefined;
+    try {
+      await createPublicDiscoveryResolver(ports).resolve(request('MANGA'));
+      throw new Error('Expected a bounded continuation.');
+    } catch (error) {
+      if (!(error instanceof PublicDiscoverySearchContinuationError)) throw error;
+      continuation = error.searchProgress;
+    }
+    expect(continuation).toMatchObject({ cursor: '5', projectionIncomplete: true, provider: 'mangadex' });
+    if (continuation === undefined) throw new Error('Search continuation was not captured.');
+
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...request('MANGA'), searchProgress: continuation }))
+      .rejects.toThrow('incomplete-provider-search:projection');
+    expect(ports.mangadex.search).toHaveBeenCalledTimes(5);
+    expect(ports.mangaupdates.search).toHaveBeenCalledOnce();
   });
 
   it('does not promote a fuzzy match from an incomplete result', async () => {

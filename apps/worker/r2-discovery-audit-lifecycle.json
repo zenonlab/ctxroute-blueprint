@@ -1,0 +1,12 @@
+{
+  "rules": [
+    {
+      "id": "provider-audit-expire-after-seven-days",
+      "enabled": true,
+      "conditions": { "prefix": "provider-audit/v1/" },
+      "deleteObjectsTransition": {
+        "condition": { "type": "Age", "maxAge": 604800 }
+      }
+    }
+  ]
+}

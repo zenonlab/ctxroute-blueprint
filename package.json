@@ -36,6 +36,7 @@
     "test:infra": "node --experimental-strip-types --test scripts/infra/*.test.mjs",
     "admin:discovery": "node --experimental-strip-types scripts/infra/discovery-admin.mjs",
     "audit:discovery-failures": "node --experimental-strip-types scripts/infra/discovery-failure-audit.mjs",
+    "audit:discovery-trace": "node --experimental-strip-types scripts/infra/discovery-failure-trace.mjs",
     "infra:inspect": "node scripts/infra/tobirink-provider-gate.mjs inspect",
     "infra:plan": "node scripts/infra/tobirink-provider-gate.mjs plan",
     "infra:apply": "node scripts/infra/tobirink-provider-gate.mjs apply",

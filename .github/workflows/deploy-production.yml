@@ -135,9 +135,11 @@ jobs:
             --provider cloudflare \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
             --operation d1-migrate:PUBLIC_DB \
+            --operation r2-bucket-ensure:tobirink-discovery-audit \
+            --operation r2-lifecycle-set:tobirink-discovery-audit \
             --operation worker-deploy \
             --preserve-routes true > .ctxroute-production-plan.json
-          node -e "const fs=require('node:fs'); const plan=JSON.parse(fs.readFileSync('.ctxroute-production-plan.json','utf8')); const expected=new Set(['d1-migrate:d1:tobirink-public','worker-deploy:worker:tobirink-public-api']); const actual=new Set((plan.actions??[]).map(({kind,target})=>kind+':'+target)); if (!plan.digest || actual.size !== expected.size || [...expected].some(action=>!actual.has(action)) || plan.options?.preserveRoutes !== true) process.exit(1);"
+          node -e "const fs=require('node:fs'); const plan=JSON.parse(fs.readFileSync('.ctxroute-production-plan.json','utf8')); const expected=new Set(['d1-migrate:d1:tobirink-public','r2-bucket-ensure:r2-bucket:tobirink-discovery-audit','r2-lifecycle-set:r2-lifecycle:tobirink-discovery-audit/provider-audit/v1/7d','worker-deploy:worker:tobirink-public-api']); const actual=new Set((plan.actions??[]).map(({kind,target})=>kind+':'+target)); if (!plan.digest || actual.size !== expected.size || [...expected].some(action=>!actual.has(action)) || plan.options?.preserveRoutes !== true) process.exit(1);"
 
       - name: Apply only the approved Worker target
         if: ${{ github.ref == 'refs/heads/main' }}
@@ -152,6 +154,8 @@ jobs:
             --approve "$PLAN_DIGEST" \
             --account "$CLOUDFLARE_ACCOUNT_ID" \
             --allow d1:tobirink-public \
+            --allow r2-bucket:tobirink-discovery-audit \
+            --allow r2-lifecycle:tobirink-discovery-audit/provider-audit/v1/7d \
             --allow worker:tobirink-public-api
 
       - name: Verify public production probes

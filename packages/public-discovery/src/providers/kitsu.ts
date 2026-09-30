@@ -170,7 +170,9 @@ export class KitsuFavoriteProviderAdapter implements FavoriteProviderCandidatePo
       const projectionIncomplete = projected.some((item) => item.incomplete);
       const truncated = upstreamTruncated || projectionIncomplete;
       const envelope = { candidates, complete: !truncated, digest: response.digest, provider: this.provider, truncated };
-      return createProviderCandidateEnvelope(upstreamTruncated && !projectionIncomplete ? { ...envelope, nextCursor: String(page + 1) } : envelope);
+      if (projectionIncomplete) Object.assign(envelope, { projectionIncomplete: true });
+      if (upstreamTruncated) Object.assign(envelope, { nextCursor: String(page + 1) });
+      return createProviderCandidateEnvelope(envelope);
     });
   }
 

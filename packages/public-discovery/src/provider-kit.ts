@@ -12,6 +12,7 @@ export interface ProviderCandidateEnvelope {
   readonly complete: boolean;
   readonly digest: string;
   readonly nextCursor?: string;
+  readonly projectionIncomplete?: boolean;
   readonly provider: FavoriteProvider;
   readonly truncated: boolean;
 }

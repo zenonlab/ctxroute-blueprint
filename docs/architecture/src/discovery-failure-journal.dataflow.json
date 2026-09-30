@@ -1,21 +1,21 @@
 {
   "schema_version": 1,
   "diagram_type": "dataflow",
-  "meta": { "title": "Preuves backend des défaillances", "output": "discovery-failure-journal.dataflow.html", "quality_profile": "showcase", "viewBox": [940, 460] },
-  "stages": [{ "label": "Collecte" }, { "label": "Persistance" }, { "label": "Audit" }],
+  "meta": { "title": "Preuves backend des défaillances", "output": "discovery-failure-journal.dataflow.html", "quality_profile": "showcase", "viewBox": [1080, 420] },
+  "stages": [{ "label": "Collecte" }, { "label": "Archive privée" }, { "label": "État indexé" }, { "label": "Audit" }],
   "nodes": [
-    { "id": "failure", "type": "backend", "label": "Collecteur Worker", "sublabel": "pannes · fallback tracé", "stage": 0, "row": 0 },
-    { "id": "recent", "type": "database", "label": "Demande D1", "sublabel": "huit diagnostics récents", "stage": 1, "row": 0 },
-    { "id": "archive", "type": "database", "label": "Journal indépendant", "sublabel": "événements sans payload", "stage": 1, "row": 2, "yOffset": -40 },
-    { "id": "audit", "type": "backend", "label": "Script sans interface", "sublabel": "clé complète · pagination", "stage": 2, "row": 2, "width": 150, "yOffset": -40 }
+    { "id": "failure", "type": "backend", "label": "Worker", "sublabel": "capture filtrée", "stage": 0, "row": 0, "width": 140 },
+    { "id": "trace", "type": "database", "label": "R2 privé", "sublabel": "rétention 7 j", "stage": 1, "row": 0, "width": 140 },
+    { "id": "recent", "type": "database", "label": "D1 Discovery", "sublabel": "causes · pointeur UUID", "stage": 2, "row": 0, "width": 140 },
+    { "id": "audit", "type": "backend", "label": "Audit", "sublabel": "lecture seule", "stage": 3, "row": 0, "width": 140 }
   ],
   "flows": [
-    { "from": "failure", "to": "recent", "label": "claim valide", "classification": "bail · digest · tentative", "variant": "security", "labelDy": 53 },
-    { "from": "recent", "to": "archive", "label": "copie atomique", "classification": "trigger dans la même écriture", "variant": "emphasis", "labelDy": 80 },
-    { "from": "archive", "to": "audit", "label": "lecture indexée", "classification": "JSON privé · aucune admission", "variant": "default", "labelDy": 53 }
+    { "from": "failure", "to": "trace", "label": "trace filtrée", "classification": "requête convertie · échanges · résultat", "variant": "security", "route": "straight", "labelAt": [330, 110] },
+    { "from": "trace", "to": "recent", "label": "pointeur opaque", "classification": "aucun corps HTTP dans D1", "variant": "security", "route": "straight", "labelAt": [650, 110] },
+    { "from": "recent", "to": "audit", "label": "clé + traceId", "classification": "lecture indexée, aucun réarmement", "variant": "default", "route": "straight", "labelAt": [1000, 110] }
   ],
   "cards": [
-    { "dot": "emerald", "title": "Preuves conservées", "items": ["Le journal survit à la rétention des demandes", "Échec de l’archive : aucune écriture partielle", "Aucun serveur admin ni interface utilisateur"] },
-    { "dot": "amber", "title": "Limites explicites", "items": ["Pas de reconstruction des erreurs historiques absentes", "Panne D1 : logs externes encore nécessaires", "Pas de purge automatique ni de réarmement implicite"] }
+    { "dot": "emerald", "title": "Preuves séparées", "items": ["D1 conserve causes fermées et pointeur opaque", "R2 conserve la requête convertie et les échanges sept jours", "Échec d’archivage : aucun résultat publié"] },
+    { "dot": "amber", "title": "Limites explicites", "items": ["URLs favorites et slugs sources restent locaux", "Curseur conservé; une projection incomplète ne devient pas VERIFIED/NOT_FOUND", "Les erreurs historiques sans trace ne sont pas reconstructibles", "Aucun réarmement implicite ni bucket public"] }
   ]
 }

@@ -100,7 +100,7 @@ export const publicDiscoveryTerminalResolutionSchema = z.discriminatedUnion('sta
 ]);
 
 export const publicDiscoveryFailureCauseSchema = z.strictObject({
-  code: z.enum(['http', 'network', 'timeout', 'invalid-response', 'invalid-json', 'identity-mismatch', 'cover-origin', 'invalid-uri', 'invalid-encoding', 'runtime-d1', 'runtime-state', 'runtime-reservation', 'search-cursor', 'search-deadline', 'search-page-limit', 'search-candidate-limit', 'search-candidate-page-limit', 'gateway', 'transport', 'unknown']),
+  code: z.enum(['http', 'network', 'timeout', 'invalid-response', 'invalid-json', 'identity-mismatch', 'cover-origin', 'invalid-uri', 'invalid-encoding', 'runtime-d1', 'runtime-state', 'runtime-reservation', 'search-cursor', 'search-deadline', 'search-page-limit', 'search-candidate-limit', 'search-candidate-page-limit', 'search-projection', 'gateway', 'transport', 'unknown']),
   httpStatus: z.number().int().min(400).max(599).optional(),
   provider: publicDiscoveryProviderSchema.optional(),
   stage: z.enum(['resolve', 'search', 'hydrate', 'publish']),
@@ -113,6 +113,7 @@ export const publicDiscoveryFailureDiagnosticSchema = z.strictObject({
   attempt: z.number().int().min(1).max(8),
   observedAt: z.iso.datetime({ offset: false }),
   correlationId: z.uuid().optional(),
+  traceId: z.uuid().optional(),
   workerVersion: z.uuid().optional(),
   cause: publicDiscoveryFailureCauseSchema,
   providerFailures: z.array(publicDiscoveryFailureCauseSchema).max(5).refine(failures =>
@@ -143,6 +144,7 @@ export const publicDiscoverySearchProgressSchema = z.strictObject({
   }).optional(),
   candidates: z.array(publicDiscoveryCandidateSchema).max(25),
   cursor: z.string().min(1).max(9),
+  projectionIncomplete: z.boolean().optional(),
   provider: publicDiscoveryProviderSchema,
   titleIndex: z.number().int().min(0).max(3),
   version: z.literal(1),

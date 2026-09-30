@@ -25,6 +25,16 @@ type GatewayAdapterInput = {
   readonly secret: string;
 } & ProviderTransportAdapterOptions;
 
+export class ProviderTransportResponseError extends Error {
+  readonly response: Response;
+
+  constructor(response: Response) {
+    super('provider-transport-redirect');
+    this.name = 'ProviderTransportResponseError';
+    this.response = response;
+  }
+}
+
 function bytes(value: string): number {
   return new TextEncoder().encode(value).byteLength;
 }
@@ -91,7 +101,7 @@ function assertGatewaySecret(value: string | undefined): string {
 }
 
 function rejectRedirect(response: Response): Response {
-  if (response.status >= 300 && response.status < 400) throw new Error('provider-transport-redirect');
+  if (response.status >= 300 && response.status < 400) throw new ProviderTransportResponseError(response);
   return response;
 }
 

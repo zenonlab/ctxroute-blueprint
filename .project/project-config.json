@@ -100,11 +100,12 @@
       "docs/architecture/src/durable-catalogue-cost-certification.architecture.json",
       "docs/architecture/src/adaptive-public-refresh-continuation.workflow.json",
       "docs/architecture/src/provider-operations.lifecycle.json",
-      "docs/architecture/src/public-pipeline.architecture.json"
-      ,"docs/architecture/src/favorite-convergence.architecture.json"
-      ,"docs/architecture/src/discovery-recovery.dataflow.json"
-      ,"docs/architecture/src/discovery-failure-journal.dataflow.json"
-      ,"docs/architecture/src/discovery-recovery-deployment.architecture.json"
+      "docs/architecture/src/public-pipeline.architecture.json",
+      "docs/architecture/src/discovery-failure-journal.dataflow.json",
+      "docs/architecture/src/favorite-convergence.architecture.json",
+      "docs/architecture/src/discovery-recovery.dataflow.json",
+      "docs/architecture/src/discovery-provider-evidence.architecture.json",
+      "docs/architecture/src/discovery-recovery-deployment.architecture.json"
     ],
     "internalDocuments": [
       "docs/architecture/src/blueprint.architecture.json",

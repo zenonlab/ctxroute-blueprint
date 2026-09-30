@@ -15,6 +15,7 @@ describe('native collector queue', () => {
     expect(discoveryFailureCause(new FavoriteProviderRetryError('probe deferred', 600_000, new Error('private title https://private.example/secret')))).toEqual({ code: 'unknown', stage: 'resolve' });
     expect(discoveryFailureCause(new Error('Favorite provider request failed with HTTP 403.'))).toEqual({ code: 'http', httpStatus: 403, stage: 'resolve' });
     expect(discoveryFailureCause(new Error('incomplete-provider-search:cursor'))).toEqual({ code: 'search-cursor', stage: 'resolve' });
+    expect(discoveryFailureCause(new Error('incomplete-provider-search:projection'))).toEqual({ code: 'search-projection', stage: 'resolve' });
     expect(discoveryFailureCause(new Error('D1_ERROR: private title'))).toEqual({ code: 'runtime-d1', stage: 'resolve' });
     expect(discoveryFailureCause(new Error('provider-gateway-private https://private.example/secret'))).toEqual({ code: 'gateway', stage: 'resolve' });
     expect(discoveryFailureCause(new Error('private title https://private.example/secret'))).toEqual({ code: 'unknown', stage: 'resolve' });
@@ -29,6 +30,7 @@ describe('native collector queue', () => {
     expect(providerFailureCode(new FavoriteProviderRetryError('Provider cadence requires a later wake.', Date.now() + 1_000))).toBe('provider-cadence-deferred');
     expect(providerFailureCode(new Error('incomplete-provider-search:deadline'))).toBe('provider-search-deadline');
     expect(providerFailureCode(new Error('incomplete-provider-search:page-limit'))).toBe('provider-search-page-limit');
+    expect(providerFailureCode(new Error('incomplete-provider-search:projection'))).toBe('provider-search-projection');
     expect(providerFailureCode(new Error('Favorite provider request failed with HTTP 429.'))).toBe('provider-http-429');
     expect(providerFailureCode(new Error('Public discovery resolution exceeded its bounded execution window.'))).toBe('provider-resolution-deadline');
     expect(providerFailureCode(new Error('fetch failed'))).toBe('provider-network');

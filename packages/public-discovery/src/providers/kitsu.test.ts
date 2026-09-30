@@ -201,7 +201,7 @@ describe('KitsuFavoriteProviderAdapter', () => {
     expect(envelope).not.toHaveProperty('nextCursor');
   });
 
-  it('does not forget a local projection omission behind upstream pagination', async () => {
+  it('keeps the upstream cursor and marks local projection omissions', async () => {
     const wrongType = { ...manga, attributes: { ...manga.attributes, canonicalTitle: 'Wrong lane' } };
     const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({
       data: [wrongType, anime],
@@ -211,8 +211,7 @@ describe('KitsuFavoriteProviderAdapter', () => {
 
     const envelope = await adapter.search({ limit: 2, provider: 'kitsu-anime', titles: ['Frieren'] });
 
-    expect(envelope).toMatchObject({ candidates: [{ externalId: anime.id }], complete: false, truncated: true });
-    expect(envelope).not.toHaveProperty('nextCursor');
+    expect(envelope).toMatchObject({ candidates: [{ externalId: anime.id }], complete: false, truncated: true, nextCursor: '2', projectionIncomplete: true });
   });
 
   it.each(['search', 'hydrate'] as const)('records remaining %s projection failures inside the rate gate', async (operation) => {

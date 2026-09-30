@@ -7,11 +7,18 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { isReleaseArtifactAction, releaseMutationArguments, releaseRevisionFromActions, resolveReleaseAction, validateReleaseJson, validateReleasePair } from './release-snapshot-operation.mjs';
 import { assertApplicablePlan } from './provider-gate-core.mjs';
+import { z } from 'zod';
 
 const execFileAsync = promisify(execFile);
 const DRIVER_ID = 'cloudflare-wrangler';
 const PROVIDER_GATEWAY_SECRET = 'PROVIDER_GATEWAY_HMAC_KEY';
 const extensionArchiveLimit = 5 * 1024 * 1024;
+const r2BucketPageSchema = z.object({
+  success: z.literal(true),
+  result: z.array(z.object({ name: z.string() })),
+  result_info: z.object({ cursor: z.string().nullish() }).optional(),
+});
+const r2BucketCreateSchema = z.object({ success: z.literal(true), result: z.object({ name: z.string() }) });
 
 export function assertExtensionPublicationContext(environment = process.env) {
   if ([undefined, '', 'false'].includes(environment.TOBIRINK_PUBLISH_EXTENSION)) return false;
@@ -164,6 +171,52 @@ function releasePublishOperations(config) {
   });
 }
 
+function auditBucketOperations(config) {
+  const bucket = config.r2.find(resource => resource.binding === 'DISCOVERY_AUDIT_BUCKET');
+  if (!bucket) return [];
+  return [
+    [`r2-bucket-ensure:${bucket.name}`, { bucket: bucket.name, kind: 'r2-bucket-ensure', target: `r2-bucket:${bucket.name}` }],
+    [`r2-lifecycle-set:${bucket.name}`, { bucket: bucket.name, kind: 'r2-lifecycle-set', target: `r2-lifecycle:${bucket.name}/provider-audit/v1/7d` }],
+  ];
+}
+
+async function listAuthenticatedR2Buckets(accountId, fetcher, apiToken) {
+  if (apiToken !== String(apiToken) || apiToken.length === 0) throw new Error('r2-bucket-inventory-token-required');
+  const buckets = [];
+  let cursor;
+  for (let page = 0; page < 100; page += 1) {
+    const url = new URL(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/r2/buckets`);
+    url.searchParams.set('per_page', '100');
+    if (cursor !== undefined) url.searchParams.set('cursor', cursor);
+    let response;
+    try {
+      response = await fetcher(url, { headers: { Authorization: `Bearer ${apiToken}` }, method: 'GET', redirect: 'error', signal: globalThis.AbortSignal.timeout(15_000) });
+    } catch { throw new Error('r2-bucket-inventory-network'); }
+    const payload = r2BucketPageSchema.safeParse(await response.json().catch(() => undefined));
+    if (response.status !== 200 || !payload.success) throw new Error('r2-bucket-inventory-response');
+    buckets.push(...payload.data.result);
+    cursor = payload.data.result_info?.cursor ?? undefined;
+    if (cursor === undefined || cursor.length === 0) return buckets;
+  }
+  throw new Error('r2-bucket-inventory-page-limit');
+}
+
+async function createAuthenticatedR2Bucket(accountId, bucket, fetcher, apiToken) {
+  if (apiToken !== String(apiToken) || apiToken.length === 0) throw new Error('r2-bucket-create-token-required');
+  let response;
+  try {
+    response = await fetcher(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/r2/buckets`, {
+      body: JSON.stringify({ name: bucket, locationHint: 'weur', storage_class: 'Standard' }),
+      headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+      method: 'POST', redirect: 'error', signal: globalThis.AbortSignal.timeout(15_000),
+    });
+  } catch { throw new Error('r2-bucket-create-network'); }
+  const payload = r2BucketCreateSchema.safeParse(await response.json().catch(() => undefined));
+  if (response.status < 200 || response.status >= 300 || !payload.success || payload.data.result.name !== bucket) {
+    throw new Error('r2-bucket-create-response');
+  }
+}
+
 export async function loadCloudflareConfig(path) {
   const parsed = JSON.parse(await readFile(path, 'utf8'));
   const worker = requiredString(parsed.name, 'worker-name');
@@ -190,6 +243,7 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
   validateRetiredQueues(config, retiredQueues);
   const operations = new Map([
     ...releasePublishOperations(config),
+    ...auditBucketOperations(config),
     ...config.queues.map(queue => [`queue-create:${queue.name}`, { kind: 'queue-create', target: `queue:${queue.name}`, queue: queue.name }]),
     ...retiredQueues.map(queue => [`queue-delete:${queue}`, { kind: 'queue-delete', target: `queue:${queue}`, queue }]),
     ['worker-secret-set:PROVIDER_GATEWAY_HMAC_KEY', { kind: 'worker-secret-set', target: `worker-secret:${config.worker}/${PROVIDER_GATEWAY_SECRET}` }],
@@ -238,12 +292,14 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
         ? config.r2
         : config.r2.filter(bucket => requiredBuckets.includes(bucket.name));
       const requiresQueues = config.queues.length > 0 && (requestedActions === undefined || actions.some(action => action.kind === 'worker-deploy' || action.kind === 'queue-create' || action.kind === 'queue-delete'));
-      const [identity, migrations, buckets, queues, releaseObjects] = await Promise.all([
+      const requiresAuditBucketInventory = actions.some(action => action.kind === 'r2-bucket-ensure' || action.kind === 'r2-lifecycle-set');
+      const [identity, migrations, buckets, queues, releaseObjects, auditBucketInventory] = await Promise.all([
         run(['whoami', '--account', accountId, '--json'], { cwd: workerDirectory }),
         requiresD1 ? Promise.all(config.d1.map(database => run(['d1', 'migrations', 'list', database.binding, '--remote'], { cwd: workerDirectory }))) : Promise.resolve([]),
         Promise.all(inspectedBuckets.map(bucket => run(['r2', 'bucket', 'info', bucket.name, '--json'], { cwd: workerDirectory }))),
         requiresQueues ? run(['queues', 'list'], { accountId, cwd: workerDirectory }) : Promise.resolve(''),
         Promise.all(actions.filter(action => action.kind === 'r2-publish').map(action => inspectArchive(action, accountId))),
+        requiresAuditBucketInventory ? listAuthenticatedR2Buckets(accountId, r2Fetch, apiToken) : Promise.resolve([]),
       ]);
       const inspection = {
         driverId: DRIVER_ID,
@@ -253,6 +309,7 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
         buckets: inspectedBuckets.map((bucket, index) => ({ binding: bucket.binding, name: bucket.name, info: parseJson(buckets[index], 'invalid-r2-response') })),
         queues: { configured: requiresQueues ? config.queues.map(queue => queue.name) : [], output: queues.trim() },
         releaseObjects,
+        auditBucketInventory: requiresAuditBucketInventory ? auditBucketInventory.map(({ name }) => name) : [],
       };
       inspectedAccountId = accountId;
       return inspection;
@@ -279,12 +336,26 @@ export function createCloudflareDriver({ config, retiredQueues = [], workerDirec
       const selected = materializeActions(operations, actions, config, releaseDirectory)
         .sort((left, right) => operationPriority(left) - operationPriority(right));
       if (selected.some(action => action.kind === 'r2-publish') && inspectedAccountId === undefined) throw new Error('release-publication-requires-inspection');
+      if (selected.some(action => action.kind === 'r2-bucket-ensure' || action.kind === 'r2-lifecycle-set') && inspectedAccountId === undefined) {
+        throw new Error('r2-audit-infrastructure-requires-inspection');
+      }
       await validatePublication(selected);
       if (selected.some(action => action.kind === 'worker-deploy')) {
         await buildWorkerAssets({ workerDirectory });
       }
       const results = [];
       for (const action of selected) {
+        if (action.kind === 'r2-bucket-ensure') {
+          if (inspectedAccountId === undefined) throw new Error('r2-bucket-ensure-requires-inspection');
+          const bucketNames = await listAuthenticatedR2Buckets(inspectedAccountId, r2Fetch, apiToken);
+          if (bucketNames.some(bucket => bucket.name === action.bucket)) {
+            results.push({ kind: action.kind, target: action.target, output: 'already-exists' });
+            continue;
+          }
+          await createAuthenticatedR2Bucket(inspectedAccountId, action.bucket, r2Fetch, apiToken);
+          results.push({ kind: action.kind, target: action.target, output: 'created' });
+          continue;
+        }
         if (action.kind === 'r2-publish') {
           if (inspectedAccountId === undefined) throw new Error('release-publication-requires-inspection');
           const remote = await inspectArchive(action, inspectedAccountId);
@@ -338,6 +409,7 @@ async function readAuthenticatedArchive(action, accountId, fetcher, apiToken) {
 
 async function mutationArguments(action, workerDirectory, preserveRoutes) {
   if (action.kind === 'queue-create') return ['queues', 'create', action.queue];
+  if (action.kind === 'r2-lifecycle-set') return ['r2', 'bucket', 'lifecycle', 'set', action.bucket, '--file', resolve(workerDirectory, 'r2-discovery-audit-lifecycle.json'), '--force'];
   if (action.kind === 'queue-delete') return ['queues', 'delete', action.queue];
   if (action.kind === 'worker-deploy') return deployArguments(workerDirectory, preserveRoutes, false);
   if (action.kind === 'worker-secret-set') return ['secret', 'put', PROVIDER_GATEWAY_SECRET, '--name', action.target.split('/')[0].slice('worker-secret:'.length)];
@@ -514,8 +586,10 @@ function findAction(operations, expected) {
 }
 
 function operationPriority(action) {
+  if (action.kind === 'r2-bucket-ensure') return 0;
   if (action.kind === 'queue-create') return 0;
   if (action.kind === 'd1-migrate') return 1;
+  if (action.kind === 'r2-lifecycle-set') return 2;
   if (action.kind === 'queue-delete') return 2;
   if (action.kind === 'r2-publish' || action.kind === 'r2-release-snapshot') return 2;
   if (action.kind === 'r2-release-pointer') return 3;

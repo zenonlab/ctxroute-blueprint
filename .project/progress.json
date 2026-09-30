@@ -6345,14 +6345,9 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Chrome1.0.55 CIMtlx poursuivi :1076résolus+54Review+53exclusions+339attentes=1522,868œuvres,0erreurinterne/projectionmanquante. Fenêtre175s329lecturesHTTP,25mutationsbloquées,0admission. Comparaisonprivée ntjHVk :0différence de catégorie entre profils ;33écarts précédents résorbés par réconciliation locale.",
-            "Chrome1.0.55 CIMtlx repris sans réimport :1043résolus+54Review+53exclusions+372attentes=1522 ;868œuvres,0erreurinterne/0projectionmanquante. Fenêtre175s :124lecturesHTTP,36mutationsbloquées,0admission ;redémarrages vérifiés,verdictincomplete. Écart au profil historique339 non expliqué.",
-            "Audit privé provider-evidence-XGSNiK :339sources/287clés,6lecturesD1/287lignes/0écriture.326FAILED dont1tracecorrélée provider-search-cursor;13résultats expirés.325sources sans causehistorique démontrable.",
-            "Chrome154 x2aPZr, vraie liste1522 : version1.0.54 après upgrade et reprise,1076résolus+54Review+53exclusions+339attentes; inventairecomplet,868œuvres,0erreurinterne/0projectionmanquante ; verdictincomplete,2419lecturesHTTP cumulées,0admission.",
-            "Audit privé current-residual-XBzO63 :6requêtesD1 indexées/287lignes/0écriture.339sources=274FAILED(325sources)+12terminauxexpirés(13sources MISS confirmés parlookupHTTP)+1PROCESSING. TroisFAILED déjà réservés,271non réservés; aucune reprise aveugle.",
-            "Profil neuf Chrome154.0.8037.58 5ECSJP, ZIP1.0.51 SHA6f423f9e1bd99f823ee230119311801ba99269858ec77fa4828cee9741e80206,1522favoris Downloads.",
-            "Première fenêtre20min incomplète; fichiers décompressés ensuite retrouvés absents, auteur inconnu. Reçus d’échec conservés; vingt fichiers restaurés du même ZIP, profil non remplacé, aucun réimport. Continuation10min et deux redémarrages vérifiés.",
-            "Final1073résolus+55Review+53exclusions+341attentes,865œuvres,0erreur interne et0projection manquante. Attentes329PROVIDER_UNAVAILABLE+11NETWORK+1ADMISSION_WAIT. Total2080lectures,248mutations bloquées,0POST/refresh; verdictincomplete avant déploiement des sondesKitsu."
+            "Cause racine : ctxroute 2.0.0 appelle process.exit(0) après console.log; les pipes tronquent le JSON volumineux à ~64 Ko. Patch-package remplace l’arrêt immédiat par process.exitCode=0 dans les deux injecteurs, avec régression 100 Ko Codex et sortie Claude valide.",
+            "Tests lifecycle ciblés 2/2; npm run verify complet passe sur l’état isolé, incluant validations, typechecks, toutes les suites workspace, tests infra/couverture, builds Chrome/Firefox, audit (0 vulnérabilité), intégration et génération Archify.",
+            "Diff prêt mais non déployé; sources distantes et preuves utilisateur restent à converger via PR et workflow protégé. Aucune mutation D1/R2/Queue n’a eu lieu."
           ]
         },
         {

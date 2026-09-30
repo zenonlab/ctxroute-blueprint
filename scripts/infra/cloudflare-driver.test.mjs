@@ -189,6 +189,36 @@ function test_derive_operation_targets() {
   ]);
 }
 
+async function test_private_audit_bucket_provisioning_and_retention_are_scoped() {
+  const calls = [];
+  const apiCalls = [];
+  const auditConfig = { ...config, r2: [...config.r2, { binding: 'DISCOVERY_AUDIT_BUCKET', name: 'private-audit' }] };
+  const driver = createCloudflareDriver({
+    config: auditConfig,
+    workerDirectory: '/worker',
+    apiToken: 'test-token',
+    run: async args => { calls.push(args); return args[0] === 'whoami' ? '{"accounts":[]}' : 'lifecycle-set'; },
+    r2Fetch: async (input, init) => {
+      apiCalls.push({ url: String(input), method: init.method });
+      if (init.method === 'POST') return Response.json({ success: true, result: { name: 'private-audit' } });
+      return Response.json({ success: true, result: [{ name: 'public-covers' }, { name: 'private-audit' }] });
+    },
+  });
+  const actions = driver.resolveOperations(['r2-bucket-ensure:private-audit', 'r2-lifecycle-set:private-audit']);
+  assert.deepEqual(actions, [
+    { kind: 'r2-bucket-ensure', target: 'r2-bucket:private-audit' },
+    { kind: 'r2-lifecycle-set', target: 'r2-lifecycle:private-audit/provider-audit/v1/7d' },
+  ]);
+  const inspection = await driver.inspect('account-1', actions);
+  assert.deepEqual(inspection.auditBucketInventory, ['public-covers', 'private-audit']);
+  await driver.apply(actions);
+  assert.deepEqual(apiCalls.map(({ method }) => method), ['GET', 'GET']);
+  assert.deepEqual(calls, [
+    ['whoami', '--account', 'account-1', '--json'],
+    ['r2', 'bucket', 'lifecycle', 'set', 'private-audit', '--file', '/worker/r2-discovery-audit-lifecycle.json', '--force'],
+  ]);
+}
+
 async function test_inspect_read_only_resources() {
   const calls = [];
   const run = async args => {
@@ -575,6 +605,7 @@ async function test_load_checked_in_config() {
     r2: [
       { binding: 'COVER_BUCKET', name: 'tobirink-covers' },
       { binding: 'RELEASE_SNAPSHOTS', name: 'tobirink-public-releases' },
+      { binding: 'DISCOVERY_AUDIT_BUCKET', name: 'tobirink-discovery-audit' },
     ],
     queues: [
       { name: 'tobirink-public-discovery' },
@@ -602,6 +633,7 @@ function test_reject_invalid_r2_identifiers() {
 }
 
 test('the driver derives operation targets from configuration', test_derive_operation_targets);
+test('private audit bucket provisioning and retention are scoped', test_private_audit_bucket_provisioning_and_retention_are_scoped);
 test('inspect uses read-only Wrangler commands and returns normalized resources', test_inspect_read_only_resources);
 test('worker-only inspection excludes unrelated D1, R2 and Queue reads', test_worker_inspection_does_not_require_unrelated_storage_permissions);
 test('worker inspection omits volatile deployment status', test_worker_inspection_omits_volatile_deployment_status);
