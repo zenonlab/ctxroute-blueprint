@@ -124,6 +124,31 @@ Firefox ZIP non signé : 320028 octets, SHA-256
 Ces tests ne certifient pas la convergence distante ni une installation Firefox
 durable. L'archive réelle précédente et ses observations restent conservées.
 
+La PR #183 est intégrée au commit `21df65c`. La CI main `36710218213` est
+verte, déploiement Worker et probes publics compris, sans promotion d'archives.
+Le profil Chrome réel persistant `x2aPZr` conserve les 1522 sources Downloads
+après mise à jour 1.0.53 → 1.0.54, redémarrage du worker et deux cycles de
+redémarrage navigateur après mise à jour. La fenêtre d'upgrade de 180 secondes
+se termine en phase presence ; sa continuation de 300 secondes finit
+l'inventaire sans réimport ni perte de progression. Les reçus précédents sont
+conservés. Dernier état : 1076 sources résolues, 54 Review, 53 exclusions et
+339 attentes ; 868 œuvres, aucune projection manquante ni erreur interne
+comptée. Le verdict reste `incomplete`, pas une certification de convergence.
+
+L'audit privé `current-residual-XBzO63` interroge uniquement les clés des
+attentes : 6 requêtes D1 indexées, 287 lignes lues, zéro écriture. Les 339
+sources restantes correspondent à 287 identités : 274 FAILED/ATTEMPT_LIMIT
+(325 sources), 12 anciens terminaux NOT_FOUND/AMBIGUOUS (13 sources) et une
+PROCESSING. Un lookup HTTP en lecture seule confirme MISS pour les 12 anciens
+terminaux : leur cache négatif est expiré, ils ne sont pas des résultats encore
+disponibles à projeter. Leur voie normale est l'admission, refusée par le
+budget zéro mutation du banc. Parmi les 274 clés FAILED, trois ont déjà une
+réservation durable ; elles ne doivent pas être rejouées aveuglément.
+Le profil cumule 2419 lectures HTTP et zéro admission transmise sur ces
+fenêtres. Les compteurs NETWORK/ADMISSION_WAIT de ce test ne prouvent donc pas
+une panne fournisseur. Ce contrôle ne remplace ni le pilote corrélé autorisé,
+ni la convergence après les admissions effectives, ni Firefox signé durable.
+
 ## Emplacement du banc installé
 
 Les nouveaux profils isolés et leur extension décompressée sont conservés sous
