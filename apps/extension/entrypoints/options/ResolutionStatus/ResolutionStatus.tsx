@@ -36,20 +36,22 @@ function diagnosticCounts(event: ExtensionDiagnosticEvent): string | undefined {
 }
 
 const controllerLabels = {
-  blocked: 'Des tâches ont atteint la limite automatique', complete: 'Bibliothèque à jour', idle: 'Prêt à commencer', inventory: 'Lecture des favoris', paused: 'Analyse en pause', presence: 'Vérification des favoris encore présents', resolving: 'Identification des œuvres', 'waiting-provider': 'Attente avant une nouvelle tentative fournisseur',
+  blocked: 'Des tâches ont atteint la limite automatique', complete: 'Bibliothèque à jour', idle: 'Prêt à commencer', inventory: 'Lecture des favoris', paused: 'Analyse en pause', presence: 'Vérification des favoris encore présents', resolving: 'Identification des œuvres', 'waiting-provider': 'Résolutions en attente',
 } as const;
 
 export function ResolutionStatus({ controller, counts, diagnostics, inventory, onControl, onDiagnosticsToggle, onReconcile, onRefresh, state }: ResolutionStatusProps) {
   const latestDiagnostic = diagnostics?.events.at(-1);
-  const waitingLabel = counts?.admissionWaiting
-    ? 'Mise en file des demandes publiques'
-    : counts?.publicDiscoveryPending
-      ? counts.internalErrors ? 'Attente du cache public et reprise après erreur locale' : 'Attente des résultats du cache public'
-      : counts?.providerPaused || counts?.rateLimited
-        ? 'Attente de la réouverture des fournisseurs'
-        : counts?.networkErrors
-          ? 'Reprise après indisponibilité réseau'
-          : counts?.internalErrors ? 'Reprise après erreur locale' : 'Attente avant une nouvelle tentative';
+  const waitingLabel = counts?.providerPaused
+    ? 'Demandes publiques indisponibles'
+    : counts?.admissionWaiting
+      ? 'Mise en file des demandes publiques'
+      : counts?.publicDiscoveryPending
+        ? counts.internalErrors ? 'Attente du cache public et reprise après erreur locale' : 'Attente des résultats du cache public'
+        : counts?.rateLimited
+          ? 'Limitation temporaire du service'
+          : counts?.networkErrors
+            ? 'Vérification après erreur réseau'
+            : counts?.internalErrors ? 'Reprise après erreur locale' : 'Attente avant une nouvelle tentative';
   const inventoryLabel = inventory?.status === 'complete'
     ? 'Inventaire vérifié'
     : inventory?.status === 'presence'
@@ -74,13 +76,13 @@ export function ResolutionStatus({ controller, counts, diagnostics, inventory, o
       {inventory ? <div className={styles.current} role="status">
         <strong>{controller?.state === 'waiting-provider' ? waitingLabel : controller ? controllerLabels[controller.state] : inventoryLabel}</strong>
         {inventory.status === 'complete' && counts && counts.processing === 0 && counts.retryable === 0 && counts.blocked === 0 ? <span>Votre bibliothèque locale est à jour.</span> : null}
-        {inventory.continuationAt ? <span>Prochaine reprise automatique : <time dateTime={inventory.continuationAt}>{new Date(inventory.continuationAt).toLocaleString('fr-FR')}</time>.</span> : null}
+        {inventory.continuationAt ? <span>Prochaine vérification locale : <time dateTime={inventory.continuationAt}>{new Date(inventory.continuationAt).toLocaleString('fr-FR')}</time>.</span> : null}
       </div> : null}
       {counts ? <dl className={styles.counts}>
         <dt>Favoris observés</dt><dd>{counts.observed}</dd>
         <dt>Préparation</dt><dd>{inventoryLabel}</dd>
         <dt>Traitement en cours</dt><dd>{counts.processing}</dd>
-        <dt>Œuvres identifiées</dt><dd>{counts.resolved}</dd>
+        <dt>Favoris identifiés</dt><dd>{counts.resolved}</dd>
         <dt>Choix à examiner</dt><dd>{counts.review}</dd>
         <dt>Résolutions en attente de reprise</dt><dd>{counts.retryable}</dd>
         {counts.blocked ? <><dt>Bloquées après huit tentatives</dt><dd>{counts.blocked}</dd></> : null}
@@ -88,8 +90,8 @@ export function ResolutionStatus({ controller, counts, diagnostics, inventory, o
         {counts.publicDiscoveryPending ? <><dt>Dont attente du cache public</dt><dd>{counts.publicDiscoveryPending}</dd></> : null}
         {counts.admissionWaiting ? <><dt>En attente d’admission</dt><dd>{counts.admissionWaiting}</dd></> : null}
         {counts.rateLimited ? <><dt>Limitation temporaire du service</dt><dd>{counts.rateLimited}</dd></> : null}
-        {counts.networkErrors ? <><dt>Réseau indisponible, reprise programmée</dt><dd>{counts.networkErrors}</dd></> : null}
-        {counts.providerPaused ? <><dt>Traitement fournisseur indisponible</dt><dd>{counts.providerPaused}</dd></> : null}
+        {counts.networkErrors ? <><dt>Erreurs réseau à revérifier</dt><dd>{counts.networkErrors}</dd></> : null}
+        {counts.providerPaused ? <><dt>Sans résultat public disponible</dt><dd>{counts.providerPaused}</dd></> : null}
         {counts.actionRequired ? <><dt>Erreur de réponse nécessitant une action</dt><dd>{counts.actionRequired}</dd></> : null}
         <dt>Liens non pris en charge</dt><dd>{counts.unsupported}</dd>
       </dl> : null}

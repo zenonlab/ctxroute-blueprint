@@ -6294,9 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR178 fusionnée main38bec9649efccc37157646e11d06094b8f3c98c1; prévol36648162826 et production36648980711 success; Worker fdf771cf-88a9-42dc-9ee7-299656895c2e.",
-            "Candidate1.0.50: secours exact AniList→Kitsu jusqu'à Library; paramètres Kitsu et sonde MangaDex autorisés précisément.262 Discovery,490 application,237 Worker,verify complet,E2E12/1skip,Archify et builds reproductibles verts.",
-            "Trois lectures publiques via transport Worker confirment sonde MangaDex et lien Kitsu recherche/hydratation. Aucun POST historique ni publication d'archive;350 attentes empêchent la certification complète."
+            "Production PR178, Worker fdf771cf-88a9-42dc-9ee7-299656895c2e: secours exact AniList→Kitsu et sonde MangaDex transport corrigés, CI36648980711 verte.",
+            "Candidate1.0.51 locale: libellés distinguent indisponibilité publique, rate limit, erreur réseau et vérification locale; compteur exprimé en favoris.5 régressions rouges puis9 tests verts; preview desktop/390px et clavier vérifiés sans overflow.",
+            "Verify complet,E2E12/1skip,Archify et constructions indépendantes verts. Chrome SHA6f423f9e1bd99f823ee230119311801ba99269858ec77fa4828cee9741e80206; Firefox non signé SHAa3da4e88abb10045665b6b6532b2fd2017e182d4f522f66faf648c09a290b586. Non publié;350 attentes restent à résoudre."
           ]
         },
         {
