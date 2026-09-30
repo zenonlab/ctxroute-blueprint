@@ -2566,6 +2566,14 @@ vingt candidats à l'identique et restitue le curseur 14. `npm run verify`,
 la validation Archify dataflow et `git diff --check` passent. Ce correctif
 local n'est pas encore une preuve de convergence des anciennes demandes.
 
+Livraison : PR #184 fusionnée en `359e4303792357fa0499af27b4c5e2fe472f97b8`,
+CI de branche `36714652375` et CI main `36715704557` vertes. Le Worker
+`8a4b9bbc-b8f3-40a7-ba6f-fd04e4dde53f` est déployé et les sondes publiques
+passent. Les E2E comptent 13 succès et un test ignoré. Les empreintes Chrome
+et Firefox 1.0.54 restent identiques à celles documentées : le correctif est
+côté collecteur Worker. Aucun canari d'admission, réarmement historique ou
+promotion d'archive publique n'a été exécuté. La convergence reste ouverte.
+
 ### Défaut serveur reproduit : perte du curseur du fallback
 
 Le resolver abandonnait `PublicDiscoverySearchContinuationError` lorsqu’un

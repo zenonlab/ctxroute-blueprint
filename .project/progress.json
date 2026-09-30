@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "IN_PROGRESS",
+          "status": "DONE",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,7 +6294,7 @@
             "git diff --check"
           ],
           "evidence": [
-            "Kitsu page 13 reproduite HTTP 200 : couverture rejetée supprimait nextCursor. Dix régressions rouges puis279 testsDiscovery verts ; rejeu exact conserve20candidats etcurseur14 sans réseau. Validationcomplète en cours.",
+            "Kitsu couverture optionnelle :279testsDiscovery,verify complet,Archify verts ; rejeu réel20candidats identiques etcurseur14. PR184/359e430, CIbranche36714652375 etmain36715704557 vertes ; Worker8a4b9bbc déployé,sondesvertes,E2E13succès/1ignoré. ZIP1.0.54 inchangés. Aucun réarmement ni promotion.",
             "Candidate1.0.54 : sync FOUND multi-ID corrigé, 4 régressions rouges puis497 tests application verts ; verify vert, E2E13succès/1ignoré, builds isolés identiques, Archify showcase9/9.",
             "PR183 commit21df65c, CI main36710218213 verte avec déploiement Worker et probes. Archives candidates conservées, aucun téléchargement public avancé.",
             "Candidate1.0.53 : Review saison non corroborée, Accept explicite pour les lecteurs récents ; projection legacy NOT_FOUND/season-unconfirmed uniquement, résultat D1 intact. Aucun état technique transformé, aucun changement de clé ou migration.",
