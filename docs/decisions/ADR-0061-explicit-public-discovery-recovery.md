@@ -22,6 +22,8 @@ scope:
   - packages/public-discovery/src/providers/kitsu.test.ts
   - packages/public-discovery/src/resolver.test.ts
   - scripts/infra/discovery-recovery-batch.mjs
+  - scripts/infra/discovery-admin.mjs
+  - scripts/infra/discovery-admin.test.mjs
   - apps/extension/scripts/installed-review.mjs
   - apps/extension/scripts/installed-review-network.mjs
   - docs/architecture/src/real-favorite-resolution.dataflow.json
@@ -65,6 +67,16 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 ## Décision
 
 ### Diagnostic durable des défaillances techniques
+
+La console opératoire séparée `admin:discovery` inspecte un scope privé de
+clés complètes, sans SQL libre, admission ou réarmement. Un snapshot effectue
+des lectures indexées par groupes de quarante identités, au plus deux mille,
+puis le menu travaille hors ligne. Les favoris et identités sont comptés
+séparément ; la récurrence d'une cause suggère une investigation, jamais une
+exception automatique ni une preuve de défaut d'atomicité. Les rapports
+exclusifs `0600` dans un répertoire `0700` ne contiennent ni titres, ni URLs,
+ni réponses brutes. L'absence de migration ou de diagnostic reste visible.
+Le contrat du journal est réutilisé directement, sans seconde taxonomie.
 
 La migration additive 0030 ajoute un journal JSON nullable sur la demande,
 limité aux huit dernières défaillances et à 16 Kio. Chaque entrée ferme les

@@ -2533,6 +2533,72 @@ expliquer l’historique fournisseur des 307 identités épuisées.
 
 ### Diagnostic durable — préparation locale, migration requise
 
+#### Console admin séparée, sans mutation
+
+`npm run admin:discovery -- help` présente les commandes. Le script utilise
+le contrat TypeScript du produit via le support natif de Node ; les commandes
+npm activent explicitement `--experimental-strip-types` (Node 22.13+).
+Il n'ajoute ni serveur admin public, ni permissions, ni dépendance.
+
+Le scope privé a la forme `{ "schemaVersion": 1, "entries": [{ "key":
+{ "fingerprint": "<SHA-256>", "mediaKind": "MANGA", "parserVersion":
+"<version>", "siteRulesVersion": "<version>" }, "sourceCount": 1 }] }`.
+Chaque clé complète est unique ; `sourceCount` provient du registre local,
+pas d'une déduction D1. Il ne peut donc pas représenter un nombre d'utilisateurs.
+La console accepte jusqu'à 2 000 identités et 50 000 sources déclarées.
+
+```bash
+npm run admin:discovery -- snapshot --scope build/admin/scope-prive.json --local-oauth true
+npm run admin:discovery -- menu --report build/admin/discovery-XXXXXX/snapshot.json
+npm run admin:discovery -- report --report build/admin/discovery-XXXXXX/snapshot.json --view causes
+npm run admin:discovery -- report --report build/admin/discovery-XXXXXX/snapshot.json --request 1
+```
+
+Seul `snapshot` interroge D1 : une lecture du schéma, puis des lectures
+indexées par quarante clés, sans scan global des demandes. Plafonds :
+51 requêtes, `4 × identités + 128` lignes D1 lues, 45 secondes par requête.
+Le script refuse les métadonnées de coût absentes et toute écriture signalée.
+Il ne réessaie pas une commande échouée. Les autres commandes sont hors ligne.
+Chaque snapshot crée un nouveau répertoire `0700` et un fichier `0600`, sans
+écraser un précédent. Les données restent sous `build/admin/`, ignoré par Git.
+
+Le menu expose sept vues : synthèse sources/identités, états et échéances,
+causes FAILED, fournisseurs observés, versions Worker/parseur/règles,
+demande détaillée, limites des preuves. Le numéro d'une demande correspond
+à sa position dans le scope privé ; les clés, titres, URLs et réponses brutes
+ne sont pas recopiés dans le rapport. Les UUID corrélés permettent de
+compléter l'analyse avec les logs Worker accessibles à l'opérateur.
+Les causes regroupent le dernier diagnostic retenu de chaque FAILED ; la
+fiche conserve toutes ses entrées disponibles. Les fournisseurs comptent les
+événements retenus, sans compter deux fois cause principale et fallback du
+même événement. Ces chiffres ne mesurent pas leur disponibilité actuelle.
+
+Le menu distingue accès fournisseur, contrat de réponse, cohérence d'identité,
+recherche/pagination/budget, infrastructure et cause inconnue. Les pistes
+proposées sont des investigations, pas des diagnostics causaux supplémentaires.
+Un problème répété demande une régression de pipeline ; une exception par
+titre ne peut pas être déduite de `FAILED`. Une erreur de publication ne
+prouve pas une transaction partielle. La console ne certifie pas l'atomicité
+et ses lectures successives ne forment pas un snapshot transactionnel.
+
+Limites explicites : migration absente, journal absent ou invalide, maximum
+huit diagnostics, rétention liée à la demande, pas de réponses brutes, pas de
+traces du parseur local et pas d'archivage continu. Conserver les snapshots
+permet de préserver les preuves observées, mais ne garantit pas la capture
+des erreurs survenues entre deux snapshots. Aucune donnée historique
+manquante n'est reconstituée. La console ne contient ni SQL libre, ni commande
+de réarmement, ni appel fournisseur, ni ajout d'exception.
+
+Vérification réelle du 30 septembre : le scope privé des 339 sources contient
+287 identités ; neuf lectures D1, 601 lignes lues et zéro écriture confirment
+275 identités FAILED portant 326 sources, et douze résultats négatifs expirés
+portant treize sources. La migration 0030 est absente : les 275 FAILED n'ont
+donc aucun journal durable lisible. Ce compteur ne nie pas la preuve Kitsu
+conservée séparément dans les logs/audits ; la console ne les importe pas.
+Le menu terminal et les vues hors ligne ont été exercés sur ce snapshot.
+Les dix tests admin, les 170 tests infra et `npm run verify` passent ; les
+vues Archify architecture et discovery-recovery sont validées en showcase.
+
 La candidate associée porte la version 1.0.55 : les contrats partagés changent
 les bundles de l'extension. Les archives 1.0.54 sont conservées ; aucun
 téléchargement public n'est remplacé par cette préparation.
