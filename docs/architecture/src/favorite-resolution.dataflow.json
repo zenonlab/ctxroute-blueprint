@@ -364,7 +364,7 @@
       "from": "syncedIds",
       "to": "sourceEvidence",
       "label": "snapshot validé → références",
-      "classification": "reconstruction prioritaire",
+      "classification": "une identité · plusieurs IDs liés",
       "variant": "dashed",
       "labelAt": [
         208,

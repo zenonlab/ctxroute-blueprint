@@ -25,7 +25,7 @@ revised: true
 
 - Status: accepted
 - Date: 2026-09-12
-- Revised: 2026-09-12
+- Revised: 2026-09-30
 - Supersedes: les restrictions de l’ADR-0038 qui interdisaient toute métadonnée publique dans D1 et le snapshot sans associations de l’ADR-0037
 
 ## Contexte
@@ -42,6 +42,16 @@ reconstruire efficacement `FavoriteSource → Work`. Le catalogue D1 ne réduit
 aucune requête tant qu’aucun chemin validé ne l’alimente.
 
 ## Décision
+
+La préparation Public Discovery consomme aussi une association `FOUND` portant
+plusieurs références de la même œuvre. Le sélecteur existant privilégie AniList
+pour l'anime et MangaUpdates pour les bandes dessinées, indépendamment de
+l'ordre des références. Plusieurs IDs liés ne constituent pas plusieurs
+identités : seules les réponses `AMBIGUOUS` portent des identités concurrentes.
+Le fingerprint, le média et tous les fournisseurs doivent rester compatibles ;
+un doublon fournisseur ou une enveloppe invalide reste ignoré. La référence
+explicite de la source prime toujours. Prélecture, admission et reprise utilisent
+la même clé référencée, sans créer une œuvre avant vérification publique.
 
 La reconstruction applique cet ordre : inventaire navigateur et projection
 locale, associations `storage.sync`, cache public D1, puis recherche fournisseur.
