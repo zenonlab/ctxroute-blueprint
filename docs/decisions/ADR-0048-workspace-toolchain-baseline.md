@@ -6,6 +6,7 @@ scope:
   - packages/*/package.json
   - .github/workflows/validate.yml
 review: on-change
+revised: true
 ---
 
 # ADR-0048 — Baseline d’outillage commune aux workspaces
@@ -25,6 +26,12 @@ l’intégrité de l’arbre npm, ni le gate complet sur l’environnement Linux
 référence.
 
 ## Décision
+
+Le correctif de sécurité du 30 septembre 2026 épingle Next.js `16.3.8` dans
+le workspace Web et son lockfile pour sortir de la plage vulnérable de
+GHSA-vcvr-r3jv-pc5j. React reste inchangé. Le rendu statique et les frontières
+WebBridge sont conservés ; audit, build et E2E doivent passer avant livraison.
+Le contrôle `npm audit` n'est ni désactivé ni abaissé.
 
 Le manifeste racine fournit TypeScript `7.0.2` aux scripts partagés et tous les
 workspaces qui le déclarent directement utilisent exactement cette version.
