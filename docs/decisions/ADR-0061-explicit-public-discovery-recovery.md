@@ -144,6 +144,24 @@ La candidate extension 1.0.50 doit précéder l'usage de ces résultats dans un
 profil certifié ; une ancienne extension peut refuser ce nouveau secours.
 Le rollback ne supprime pas les résultats D1 ni les données privées déjà produits.
 
+La publication d'un secours lié conserve aussi l'identité canonique déjà
+publiée. Le défaut est reproduit sur AniList→Kitsu et MangaUpdates→MangaDex :
+le resolver dérive un nouvel identifiant du fournisseur de secours, puis la
+garde de propriété D1 refuse pourtant le lien exact. Lorsque cet identifiant
+n'a pas de métadonnées, une lecture indexée des cinq références maximum
+cherche leur propriétaire unique. La réutilisation exige des métadonnées
+valides, le même média, et soit la même identité fournisseur, soit le lien
+exact supporté présent dans le candidat et sa fiche, dans un sens ou l'autre.
+Deux propriétaires, une cible déjà créée, une preuve manquante ou divergente
+restent des conflits : aucune fusion ni réaffectation de référence.
+Une actualisation ne peut jamais changer l'identifiant canonique de sa ligne.
+Le retour du fournisseur principal et le rejeu idempotent conservent cette
+identité ; les liens du candidat précédent ne sont pas attribués au nouveau.
+Les gardes atomiques de publication restent en place contre les courses.
+Cette correction n'effectue aucun réarmement historique et ne modifie aucun
+schéma. Le rollback garde les profils et références publiés ; retirer le
+correctif peut de nouveau bloquer un changement de fournisseur principal.
+
 Le transport Worker autorise ces deux paramètres Kitsu uniquement pour anime,
 avec `include=mappings` et `fields[mappings]=externalSite,externalId` uniques.
 La sonde MangaDex autorise exclusivement l'UUID vide et `limit=1`, sans autre

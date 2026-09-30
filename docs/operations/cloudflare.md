@@ -1,5 +1,30 @@
 # Cloudflare operations gate
 
+## Identité canonique lors d'un secours lié
+
+La publication D1 doit conserver l'identifiant de l'œuvre déjà connue,
+y compris lorsque le resolver retourne un fournisseur de secours. La
+régression locale reproduit `stale-public-discovery-result` après une
+hydratation liée valide pour AniList→Kitsu et MangaUpdates→MangaDex.
+La correction recherche un propriétaire unique par références indexées,
+vérifie les preuves et le média, et conserve les gardes atomiques. Elle
+ne fusionne pas deux œuvres et ne réarme aucune demande historique.
+Les tests couvrent les deux ordres d'arrivée des fournisseurs, leur retour,
+le rejeu et les preuves invalides. Une actualisation ne change jamais le
+`workId` publié. La validation locale ne prouve pas la convergence du backlog.
+Validation : 247 tests Worker, dont dix régressions nouvelles ; 50 tests
+ciblés de publication/coût, `npm run verify`, typechecks, E2E Web
+12 réussis / 1 ignoré et Archify showcase 9/9 passent. Les seuils D1
+restent 300 lignes lues par scénario et moins de 50 appels par publication
+avec claim dans les fixtures ; la garde indexée est vérifiée par EXPLAIN.
+
+La livraison précédente, PR 179, est déployée : merge
+`191429e86ad47a1291761071c9c7c9da6cfe72d5`, prévol `36651013360` et CI main
+`36651751390` verts, Worker `3317dee2-9fd7-444a-aaf7-9d3485aa79de`.
+La candidate 1.0.51 distingue indisponibilité publique, limite temporaire
+et erreur réseau ; sa prochaine vérification locale n'annonce pas un
+réarmement automatique. Les archives publiques restent inchangées.
+
 ## Secours exact AniList via Kitsu
 
 La candidate 1.0.50 consomme les mappings `anilist/anime` inclus et liés au
