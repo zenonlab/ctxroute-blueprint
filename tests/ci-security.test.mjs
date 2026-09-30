@@ -58,7 +58,9 @@ test('locked runtime patches are applied after scripts-disabled installation', (
   const verify = workflow.indexOf('- name: Verify repository');
   assert.ok(install >= 0 && patches > install && verify > patches);
   assert.match(workflow.slice(install, patches), /npm ci --ignore-scripts/u);
-  assert.match(workflow.slice(patches, verify), /npx patch-package ctxroute --error-on-fail/u);
+  const patchStep = workflow.slice(patches, verify);
+  assert.match(patchStep, /cp patches\/ctxroute\+2\.0\.0\.patch/u);
+  assert.match(patchStep, /npx patch-package --patch-dir "\$patch_dir" --error-on-fail/u);
 });
 
 test('fresh production canaries require bounded provider observation', () => {
