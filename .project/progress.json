@@ -6345,9 +6345,10 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Cause racine : ctxroute 2.0.0 appelle process.exit(0) après console.log; les pipes tronquent le JSON volumineux à ~64 Ko. Patch-package remplace l’arrêt immédiat par process.exitCode=0 dans les deux injecteurs, avec régression 100 Ko Codex et sortie Claude valide.",
-            "Tests lifecycle ciblés 2/2; npm run verify complet passe sur l’état isolé, incluant validations, typechecks, toutes les suites workspace, tests infra/couverture, builds Chrome/Firefox, audit (0 vulnérabilité), intégration et génération Archify.",
-            "Diff prêt mais non déployé; sources distantes et preuves utilisateur restent à converger via PR et workflow protégé. Aucune mutation D1/R2/Queue n’a eu lieu."
+            "Cause initiale reproductible: CTXRoute 2.0.0 appelle process.exit(0) après console.log; pipe stdout tronqué à environ 64 Ko. Patch-package corrige les deux injecteurs; tests lifecycle 2/2, régression 100 Ko et sortie Claude valide.",
+            "npm run verify local passe: validation/coverage, typechecks, toutes les suites workspace, tests infra, builds Chrome/Firefox, npm audit sans vulnérabilité, intégration et Archify.",
+            "CI branche 36770620595: le correctif CTXRoute manquait car npm ci --ignore-scripts saute les scripts; correction versionnée avec étape explicite. Run 36772261520 révèle un patch Miniflare périmé ciblant 5.20260903.0-alpha alors que le lockfile installe 5.20260926.1-alpha; l’étape est ensuite bornée au seul patch CTXRoute requis.",
+            "CI branche 36773062837 sur SHA 352f7ee: patches, builds isolés, E2E et npm run verify passent; validation du jeton et diagnostics D1 réussissent. Plan Cloudflare échoue avant application avec r2-bucket-inventory-response; Apply, probes, canaris et publication sont skipped. Aucune mutation distante D1/R2/Queue n’a eu lieu."
           ]
         },
         {
