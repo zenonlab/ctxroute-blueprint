@@ -6294,9 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "PR179 déployée: CI36651751390 verte, Worker3317dee2-9fd7-444a-aaf7-9d3485aa79de; version1.0.51 et pointeur public inchangé.",
-            "Deux pannes locales de publication liées reproduites puis corrigées: AniList→Kitsu et MangaUpdates→MangaDex conservent un propriétaire canonique unique sans fusion; retour du principal, nouvelle demande et rejeu testés; six preuves invalides refusées.",
-            "247 tests Worker et50 tests ciblés coût/atomicité verts; verify complet, typechecks, WebE2E12pass/1skip et Archify9/9 verts. Correctif prêt pour CI; aucun POST historique. Dernier profil réel:350 attentes, non certifié."
+            "PR180 fusionnée c6f023eb81f0521ae5c01278c608202c94f49b3e; prévol36653710370 et production36654388236 verts. Worker37cfd8ef-eba6-4a91-8749-ac1731bbd51e, sondes publiques vertes; archives publiques inchangées.",
+            "Publication canonique corrigée après deux pannes reproduites: secours AniList→Kitsu et MangaUpdates→MangaDex, retour du principal, nouvelle demande et rejeu conservent la même œuvre; six variantes invalides refusées sans fusion.",
+            "247 tests Worker,50 tests ciblés coût/atomicité, verify complet,typechecks,E2E12pass/1skip et Archify9/9 verts. Aucun POST historique; dernier profil réel1064résolues+55Review+53exclusions+350attentes, certification finale non acquise."
           ]
         },
         {

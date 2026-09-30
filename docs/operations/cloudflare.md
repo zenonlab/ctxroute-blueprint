@@ -18,6 +18,13 @@ ciblés de publication/coût, `npm run verify`, typechecks, E2E Web
 restent 300 lignes lues par scénario et moins de 50 appels par publication
 avec claim dans les fixtures ; la garde indexée est vérifiée par EXPLAIN.
 
+PR 180 fusionnée en `c6f023eb81f0521ae5c01278c608202c94f49b3e` :
+prévol `36653710370` et CI production `36654388236` verts. Le Worker déployé
+est `37cfd8ef-eba6-4a91-8749-ac1731bbd51e` et les sondes publiques passent.
+Les canaris mutateurs et la publication des archives sont restés désactivés.
+Cette preuve de déploiement ne remplace ni le pilote de reprise ni le test
+complet de convergence des 1 522 sources ; aucun compteur privé n'est réécrit.
+
 La livraison précédente, PR 179, est déployée : merge
 `191429e86ad47a1291761071c9c7c9da6cfe72d5`, prévol `36651013360` et CI main
 `36651751390` verts, Worker `3317dee2-9fd7-444a-aaf7-9d3485aa79de`.
