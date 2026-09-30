@@ -2626,6 +2626,11 @@ le test Worker vérifie également la copie exacte du diagnostic dans l'archive
 D1, et le test du script relit et compare l'événement JSON complet sur disque.
 Ces réponses HTTP sont simulées : cette preuve locale ne remplace pas une
 observation fournisseur en production et n'explique pas les anciens FAILED.
+La PR 187 a intégré ce correctif, mais sa CI main 36742827051 s'est arrêtée
+avant déploiement sur `npm audit` : Next.js 16.3.4 est concerné par
+GHSA-vcvr-r3jv-pc5j. La correction épingle Next.js 16.3.8 sans changer React,
+le rendu statique ni le contrôle de sécurité. Revalider build, E2E, audit et
+CI avant livraison ; aucune migration ni admission historique n'est ajoutée.
 Les échecs avant claim et pendant une indisponibilité D1 exigent encore les
 logs Worker. Les événements ne sont pas le statut courant de la demande.
 Aucune purge automatique n'est ajoutée : suivre le volume D1 ; une politique
