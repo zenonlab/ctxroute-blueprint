@@ -1,5 +1,30 @@
 # Cloudflare operations gate
 
+## Contrôle Chrome 1.0.51 conservé
+
+Le profil neuf Google Chrome headless `5ECSJP` importe les 1 522 favoris
+Downloads avec le ZIP 1.0.51, SHA-256
+`6f423f9e1bd99f823ee230119311801ba99269858ec77fa4828cee9741e80206`.
+La première fenêtre de vingt minutes finit sans relevé final complet.
+À la reprise, les fichiers de l'extension décompressée sont absents du
+répertoire temporaire ; le processus qui les a retirés n'est pas identifié.
+Les deux reçus d'échec sont conservés. Seuls les vingt fichiers du ZIP
+scellé sont réextraits, avec horodatage local rafraîchi, sans remplacer
+le profil ni réimporter les favoris. Les octets de l'archive restent intacts.
+
+La continuation de dix minutes du même profil produit un relevé final à
+595 secondes : 1 073 résolus, 55 Review, 53 exclusions et 341 attentes,
+865 œuvres, zéro erreur interne et zéro œuvre résolue manquante dans Library.
+Les deux redémarrages sont vérifiés. Les attentes locales sont 329
+`PROVIDER_UNAVAILABLE`, 11 `NETWORK` et 1 `ADMISSION_WAIT` ; elles ne prouvent
+pas une panne actuelle des fournisseurs. Le banc bloque les admissions
+normales autant que les reprises historiques. Sur les deux fenêtres :
+2 080 lectures, 248 mutations bloquées, zéro POST/refresh transmis et
+aucun accès fournisseur depuis Chrome. Les dix-huit soumissions capturées
+restent privées. Le verdict est `incomplete`, pas une certification durable.
+Ce contrôle précède le déploiement du correctif des sondes Kitsu ; le gain
+sur les anciens profils ne constitue pas une preuve de réarmement D1.
+
 ## Sondes Kitsu et négociation JSON API
 
 Le contrôle réel du 30 septembre a donné 200 pour les petites sondes
@@ -19,6 +44,15 @@ Deux régressions locales reproduisent 406 puis passent avec les bons en-têtes.
 Validation : 264 tests Discovery, 247 Worker, `npm run verify`, E2E Web
 12 réussis / 1 ignoré et Archify showcase passent. Les deux sondes réelles
 corrigées sont conservées dans un reçu privé ; zéro mutation D1.
+
+PR 181 fusionnée en `64ee81c354e91e22211fb5cb50c8a7b3ca9829c7` : prévol
+`36657699600` et CI production `36658421236` verts, Worker
+`9f049850-ffe1-40fa-aabd-ff1532ba602b`. Les sondes publiques passent ; les
+canaris mutateurs et la publication des archives restent désactivés.
+Après déploiement, le prévol du scope privé des neuf clés restantes confirme
+neuf candidates, cinq runtimes `READY`, dix-neuf lectures et zéro écriture.
+Aucune de ces neuf clés n'est réservée. La confirmation immédiate de reprise
+reste nécessaire ; aucune admission n'est déduite de ces vérifications.
 
 ## Identité canonique lors d'un secours lié
 
