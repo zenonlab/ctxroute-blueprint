@@ -648,16 +648,40 @@ describe('standalone provider resolver', () => {
     expect(ports.anilist.search).not.toHaveBeenCalled();
   });
 
-  it('does not launch fallback searches for an exact provider cadence deferral', async () => {
-    const exact = { provider: 'mangaupdates' as const, externalId: '12345' };
+  it.each(['ANIME', 'UNKNOWN'] as const)('recovers an exact AniList identity through linked Kitsu evidence for %s', async (mediaKind) => {
+    const exact = { provider: 'anilist' as const, externalId: '154587' };
+    const linked = { ...candidate('kitsu-anime', 'ANIME', '46474', 'Target'), linkedReferences: [exact] };
+    const ports = providers({ 'kitsu-anime': linked });
+    ports.anilist.hydrate.mockRejectedValueOnce(new Error('HTTP 503'));
+    const input = request(mediaKind);
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, explicitProviderReference: exact } }))
+      .resolves.toMatchObject({ state: 'VERIFIED', profile: { candidate: linked, references: expect.arrayContaining([exact]) } });
+    expect(ports['kitsu-anime'].search).toHaveBeenCalledOnce();
+    expect(ports.mangadex.search).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing', 'different', 'lost-on-hydration', 'wrong-title', 'wrong-media'] as const)('rejects %s exact AniList fallback evidence', async (mode) => {
+    const exact = { provider: 'anilist' as const, externalId: '154587' };
+    const linked = { ...candidate('kitsu-anime', mode === 'wrong-media' ? 'MANGA' : 'ANIME', '46474', mode === 'wrong-title' ? 'Other work' : 'Target'), linkedReferences: mode === 'missing' ? [] : [{ ...exact, externalId: mode === 'different' ? '999' : exact.externalId }] };
+    const ports = providers({ 'kitsu-anime': linked });
+    const failure = new Error('HTTP 503');
+    ports.anilist.hydrate.mockRejectedValueOnce(failure);
+    if (mode === 'lost-on-hydration') ports['kitsu-anime'].hydrate.mockResolvedValueOnce({ ...linked, linkedReferences: [] });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, explicitProviderReference: exact } })).rejects.toBe(failure);
+  });
+
+  it.each(['mangaupdates', 'anilist'] as const)('does not launch fallback searches for an exact %s cadence deferral', async (provider) => {
+    const exact = { provider, externalId: '12345' };
     const ports = providers();
     const deferred = new FavoriteProviderRetryError('cadence', Date.now() + 60_000);
-    ports.mangaupdates.hydrate.mockRejectedValueOnce(deferred);
-    const input = request('MANGA');
+    ports[provider].hydrate.mockRejectedValueOnce(deferred);
+    const input = request(provider === 'anilist' ? 'ANIME' : 'MANGA');
     await expect(createPublicDiscoveryResolver(ports).resolve({
       ...input, query: { ...input.query, explicitProviderReference: exact },
     })).rejects.toBe(deferred);
     expect(ports.mangadex.search).not.toHaveBeenCalled();
+    expect(ports['kitsu-anime'].search).not.toHaveBeenCalled();
   });
 
   it('preserves exact same-work references without relation exploration', async () => {

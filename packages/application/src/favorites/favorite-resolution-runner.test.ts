@@ -57,19 +57,21 @@ async function fixture(input = favorite, adapters: Parameters<typeof importFavor
 }
 
 describe('runFavoriteResolutionSlice', () => {
-  it.each(['linked', 'direct', 'missing-link', 'wrong-link', 'missing-reference', 'wrong-direct', 'wrong-provider'] as const)('projects resolver identity evidence into Library: %s', async (mode) => {
-    const exact = { provider: 'mangaupdates' as const, externalId: '12345' };
-    const manga = { ...exact, mediaKind: 'MANGA' as const, preSerialization: false, titles: ['Target'] };
-    const linked = { ...manga, provider: 'mangadex' as const, externalId: '12345678-1234-4234-8234-123456789abc', linkedReferences: [exact] };
-    const { storage, outbox } = await fixture({ ...favorite, folderPath: ['Manga'], title: 'Target', url: 'https://www.mangaupdates.com/series/12345' }, [{
-      id: 'test-mangaupdates', origins: ['https://www.mangaupdates.com'],
-      analyze: (input, url) => createSourceEvidence({ aliases: [], diagnostics: [], explicitProviderReference: exact, key: input.sourceKey, mediaKind: 'MANGA', origin: url.origin, path: url.pathname, proofs: ['CATEGORY_PATH'], sourceAdapter: 'test-mangaupdates', strategy: 'exact-origin', title: input.title }),
+  it.each((['MANGA', 'ANIME'] as const).flatMap(mediaKind => (['linked', 'direct', 'missing-link', 'wrong-link', 'missing-reference', 'wrong-direct', 'wrong-provider'] as const).map(mode => ({ mediaKind, mode }))))('projects resolver identity evidence into Library: $mediaKind $mode', async ({ mediaKind, mode }) => {
+    const exact = { provider: mediaKind === 'ANIME' ? 'anilist' as const : 'mangaupdates' as const, externalId: '12345' };
+    const manga = { ...exact, mediaKind, preSerialization: false, titles: ['Target'] };
+    const linked = { ...manga, provider: mediaKind === 'ANIME' ? 'kitsu-anime' as const : 'mangadex' as const, externalId: mediaKind === 'ANIME' ? '46474' : '12345678-1234-4234-8234-123456789abc', linkedReferences: [exact] };
+    const origin = mediaKind === 'ANIME' ? 'https://anilist.co' : 'https://www.mangaupdates.com';
+    const { storage, outbox } = await fixture({ ...favorite, folderPath: [mediaKind], title: 'Target', url: `${origin}/series/12345` }, [{
+      id: 'test-linked', origins: [origin],
+      analyze: (input, url) => createSourceEvidence({ aliases: [], diagnostics: [], explicitProviderReference: exact, key: input.sourceKey, mediaKind, origin: url.origin, path: url.pathname, proofs: ['CATEGORY_PATH'], sourceAdapter: 'test-linked', strategy: 'exact-origin', title: input.title }),
     }]);
     const serverHydrate = vi.fn(async () => { if (mode === 'direct') return manga; throw new Error('HTTP 503'); });
     const resolver = createPublicDiscoveryResolver({
       anilist: { ...unusedSearch, ...unusedHydration }, 'kitsu-anime': { ...unusedSearch, ...unusedHydration }, 'kitsu-manga': { ...unusedSearch, ...unusedHydration },
-      mangaupdates: { ...unusedSearch, hydrate: serverHydrate },
-      mangadex: { hydrate: async () => linked, search: async () => ({ candidates: [linked], complete: true, digest: 'linked-fixture', provider: 'mangadex', truncated: false }) },
+      mangaupdates: { ...unusedSearch, ...unusedHydration }, mangadex: { ...unusedSearch, ...unusedHydration },
+      [exact.provider]: { ...unusedSearch, hydrate: serverHydrate },
+      [linked.provider]: { hydrate: async () => linked, search: async () => ({ candidates: [linked], complete: true, digest: 'linked-fixture', provider: linked.provider, truncated: false }) },
     });
     const browserSearch = vi.fn(unusedSearch.search);
     const browserHydrate = vi.fn(unusedHydration.hydrate);

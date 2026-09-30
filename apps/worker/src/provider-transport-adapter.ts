@@ -48,12 +48,21 @@ export function isAllowedProviderTarget(target: string, method: ProviderMethod):
     return method === 'GET' && /^\/v1\/series\/[1-9]\d{0,18}$/u.test(url.pathname) && url.search === '';
   }
   if (url.origin === 'https://api.mangadex.org' && method === 'GET') {
+    if (url.searchParams.has('ids[]')) return url.pathname === '/manga' && url.searchParams.size === 2
+      && url.searchParams.get('limit') === '1' && url.searchParams.get('ids[]') === '00000000-0000-4000-8000-000000000000';
     const pathAllowed = url.pathname === '/manga' || /^\/manga\/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(url.pathname);
     return pathAllowed && onlyQueryKeys(url, new Set(['title', 'limit', 'offset', 'includes[]']));
   }
   if (url.origin === 'https://kitsu.io' && method === 'GET') {
     const path = /^\/api\/edge\/(anime|manga)(\/\d+)?$/u.exec(url.pathname);
-    return path !== null && onlyQueryKeys(url, new Set(['filter[text]', 'page[limit]', 'page[offset]', `fields[${path[1]}]`]));
+    if (path === null) return false;
+    const allowed = new Set(['filter[text]', 'page[limit]', 'page[offset]', `fields[${path[1]}]`]);
+    if (url.searchParams.has('include') || url.searchParams.has('fields[mappings]')) {
+      if (path[1] !== 'anime' || url.searchParams.getAll('include').length !== 1 || url.searchParams.get('include') !== 'mappings'
+        || url.searchParams.getAll('fields[mappings]').length !== 1 || url.searchParams.get('fields[mappings]') !== 'externalSite,externalId') return false;
+      allowed.add('include'); allowed.add('fields[mappings]');
+    }
+    return onlyQueryKeys(url, allowed);
   }
   return false;
 }

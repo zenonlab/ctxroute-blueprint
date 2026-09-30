@@ -6294,9 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
-            "Régression locale vingt pages manga (2000 résultats) : 308 lectures avant, 253 après claim direct sur clé complète; résultats, jeton, baux et limite300 inchangés. 221 tests Worker passent, typecheck réparé puis vert; verify finale en cours.",
-            "Banc installé distingue désormais Chrome stable et Chromium, conserve le canal de session et trace les versions réelles. Tests packaging 15 réussis; aucun changement d’archive.",
-            "PR176 reste la production actuelle. Optimisation du claim pas encore déployée; aucune reprise historique ni admission nouvelle effectuée."
+            "Candidate1.0.50 locale: mappings Kitsu anime liés par relationship; secours exact AniList jusqu'à Library, double preuve exigée. Trois régressions rouges puis vertes (adaptateur,resolver,projection).",
+            "Sonde MangaDex refusée par transport reproduite puis corrigée; cinq sondes passent le transport, paramètres hors scope refusés.262 Discovery,490 application,237 Worker,verify complet,E2E12/1skip,Archify verts.",
+            "Archives indépendantes reproductibles Chrome bd88a511 et Firefox non signé c1256a0b; deux GET publics Kitsu confirment même ID en recherche/hydratation. Aucun déploiement de ce correctif ni publication d'archive;362 attentes non débloquées."
           ]
         },
         {
@@ -6315,9 +6315,9 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Lot008 : six Library et quatre Review terminales vérifiées; anciens dépassements de coût conservés, pas de certification rétroactive.",
-            "Lot009 ck71Of : un POST, 329 lectures D1, 18 appels, arrêt observateur; neuf clés non soumises, aucun rejeu.",
-            "Lecture lookup indexée du 30 septembre : première clé NOT_FOUND, zéro admission. Reçu privé build/recovery/batch009-first-readonly-20260930.json; pas de nouvelle preuve Library ni de coût conforme."
+            "Lot008 terminal6Library+4Review, anciennes preuves de dépassement conservées. Lot009: première clé consommée NOT_FOUND, neuf clés intactes.",
+            "Scope privé restant batch-009-remaining-20260930.json scellé9dc1b7709e6bd7758a8a4f084dd23b978588fb55bfdcad52ec51a59250fb2a10;5MANGA,1ANIME,3MANHWA.",
+            "Prévol19 lectures D1,0écriture,9FAILED éligibles,cinq runtimesREADY. Confirmation immédiate demandée; aucun POST ni réservation nouvelle."
           ]
         },
         {
@@ -6336,10 +6336,9 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Fresh Chrome headless ScAMsw,1196s,Downloads1522 sources,ZIP1.0.49 SHA25653db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b.",
-            "Measured1052 resolved+54 Review+53 excluded+363 waiting,865 works;zero internal errors,zero missing projected works;both restarts preserved.",
-            "Compared qBDa7Q:7 more resolved,4 more Review,11 fewer waiting. No extrapolation from batch identities to duplicate sources.",
-            "1642 HTTP reads,0 forwarded POST/refresh/browser provider calls;142 blocked mutations,18 captured submissions. Read-only test does not prove remaining historical recovery;verdict incomplete."
+            "Google Chrome headless 154.0.8037.58, profil neuf hqYS4D, ZIP1.0.49 SHA25653db8adcc3189077b0f3f22ee1a74a7b953eaf953ea7d991aa45332f0474410b; Downloads1522 sources.",
+            "Final1195s:1052 résolues+55 Review+53 exclusions+362 attentes,865 œuvres; zéro erreur interne ou projection manquante; redémarrages navigateur/SW vérifiés.",
+            "1640 lectures, zéro admission transmise,142 mutations bloquées; verdict incomplete. Déploiement Worker concurrent: aucune preuve de reprise ni de coût extrapolée."
           ]
         },
         {

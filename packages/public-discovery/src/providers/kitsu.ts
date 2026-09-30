@@ -24,13 +24,18 @@ const attributesSchema = z.object({
   posterImage: posterImageSchema.nullable().optional(),
   titles: z.record(z.string(), z.string().trim().nullable()).refine((value) => Object.keys(value).length <= 16),
 }).strict();
-const resourceSchema = z.object({ attributes: attributesSchema, id: nonEmptyString, type: z.enum(['anime', 'manga']) }).passthrough();
+const resourceSchema = z.object({ attributes: attributesSchema, id: nonEmptyString, type: z.enum(['anime', 'manga']),
+  relationships: z.object({ mappings: z.object({ data: z.array(z.object({ id: nonEmptyString, type: z.literal('mappings') })).max(32).optional() }).passthrough().optional() }).passthrough().optional(),
+}).passthrough();
+const includedMappingsSchema = z.array(z.unknown()).max(640).optional();
+const animeMappingSchema = z.object({ id: nonEmptyString, type: z.literal('mappings'), attributes: z.object({ externalSite: z.literal('anilist/anime'), externalId: z.string().regex(/^[1-9]\d{0,19}$/u) }) });
 const searchSchema = z.object({
   data: z.array(resourceSchema).max(20),
+  included: includedMappingsSchema,
   links: z.object({ next: z.url().nullable().optional() }).passthrough(),
   meta: z.object({ count: z.number().int().nonnegative() }).passthrough(),
 }).passthrough();
-const hydrationSchema = z.object({ data: resourceSchema }).passthrough();
+const hydrationSchema = z.object({ data: resourceSchema, included: includedMappingsSchema }).passthrough();
 type KitsuResource = z.infer<typeof resourceSchema>;
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 interface SearchProjection { readonly candidate?: ProviderCandidate; readonly incomplete: boolean }
@@ -78,7 +83,7 @@ function posterImage(attributes: KitsuResource['attributes']): PosterImageProjec
   return selected === undefined ? { incomplete } : { incomplete, url: selected };
 }
 
-function candidate(resource: KitsuResource, provider: KitsuProvider): SearchProjection {
+function candidate(resource: KitsuResource, provider: KitsuProvider, included: readonly unknown[] = []): SearchProjection {
   const expectedType = kind(provider);
   if (resource.type !== expectedType) return { incomplete: true };
   let encodedId: string; let encodedSlug: string;
@@ -102,6 +107,15 @@ function candidate(resource: KitsuResource, provider: KitsuProvider): SearchProj
     displayTitle: resource.attributes.titles.fr_fr || resource.attributes.titles.en || resource.attributes.canonicalTitle,
     titleVariants: [{ title: resource.attributes.canonicalTitle }, ...translatedTitles.map(([language, title]) => ({ language: language.replace('_', '-'), title })), ...resource.attributes.abbreviatedTitles.map((title) => ({ title }))].slice(0, 16),
   };
+  if (provider === 'kitsu-anime') {
+    const related = new Set(resource.relationships?.mappings?.data?.map(mapping => mapping.id) ?? []);
+    const identities = new Set(included.flatMap(value => {
+      const parsed = animeMappingSchema.safeParse(value);
+      return parsed.success && related.has(parsed.data.id) ? [parsed.data.attributes.externalId] : [];
+    }));
+    const identity = [...identities][0];
+    if (identities.size === 1 && identity !== undefined) result.linkedReferences = [{ provider: 'anilist', externalId: identity }];
+  }
   const cover = posterImage(resource.attributes);
   if (cover.url !== undefined) result.cover = { attribution: 'Kitsu', url: cover.url };
   if (resource.attributes.subtype !== null) result.format = resource.attributes.subtype;
@@ -120,8 +134,20 @@ function candidate(resource: KitsuResource, provider: KitsuProvider): SearchProj
 
 function endpoint(provider: KitsuProvider, id?: string): string {
   const media = kind(provider);
-  if (id !== undefined) return `${kitsuApiOrigin}/${media}/${encodeURIComponent(id)}?fields[${media}]=${sparseFields(provider)}`;
+  if (id !== undefined) {
+    const url = new URL(`${kitsuApiOrigin}/${media}/${encodeURIComponent(id)}`);
+    setProjectionFields(url, provider);
+    return url.href;
+  }
   return `${kitsuApiOrigin}/${media}`;
+}
+
+function setProjectionFields(url: URL, provider: KitsuProvider): void {
+  url.searchParams.set(`fields[${kind(provider)}]`, sparseFields(provider) + (provider === 'kitsu-anime' ? ',mappings' : ''));
+  if (provider === 'kitsu-anime') {
+    url.searchParams.set('include', 'mappings');
+    url.searchParams.set('fields[mappings]', 'externalSite,externalId');
+  }
 }
 
 export class KitsuFavoriteProviderAdapter implements FavoriteProviderCandidatePort, FavoriteProviderHydrationPort {
@@ -134,16 +160,15 @@ export class KitsuFavoriteProviderAdapter implements FavoriteProviderCandidatePo
   async search(input: FavoriteProviderSearchQuery) {
     const query = assertFavoriteProviderSearchQuery(input);
     if (query.provider !== this.provider) throw new TypeError(`Kitsu adapter requires provider ${this.provider}.`);
-    const media = kind(this.provider);
     const page = favoriteProviderPage(query.cursor);
     const url = new URL(endpoint(this.provider));
     url.searchParams.set('filter[text]', query.titles[0] ?? '');
     url.searchParams.set('page[limit]', String(query.limit));
     url.searchParams.set('page[offset]', String((page - 1) * query.limit));
-    url.searchParams.set(`fields[${media}]`, sparseFields(this.provider));
+    setProjectionFields(url, this.provider);
     return this.gate.run(favoriteProviderPolicy[this.provider].minimumIntervalMs, async () => {
       const response = await readFavoriteProviderJson(this.fetcher, url.href, { headers: { Accept: 'application/vnd.api+json' }, method: 'GET' }, searchSchema);
-      const projected = response.value.data.map((resource) => candidate(resource, this.provider));
+      const projected = response.value.data.map((resource) => candidate(resource, this.provider, response.value.included));
       const candidates = projected.flatMap((item) => item.candidate === undefined ? [] : [item.candidate]);
       const upstreamTruncated = response.value.links.next != null || response.value.meta.count > (page - 1) * query.limit + response.value.data.length;
       const projectionIncomplete = projected.some((item) => item.incomplete);
@@ -158,7 +183,7 @@ export class KitsuFavoriteProviderAdapter implements FavoriteProviderCandidatePo
     return this.gate.run(favoriteProviderPolicy[this.provider].minimumIntervalMs, async () => {
       const response = await readFavoriteProviderIdentityJson(this.fetcher, endpoint(this.provider, reference.externalId), { headers: { Accept: 'application/vnd.api+json' }, method: 'GET' }, hydrationSchema);
       if (response === undefined) return undefined;
-      const hydrated = candidate(response.value.data, this.provider).candidate;
+      const hydrated = candidate(response.value.data, this.provider, response.value.included).candidate;
       if (hydrated === undefined || hydrated.externalId !== reference.externalId) throw new Error('Kitsu hydration returned a different media identity.');
       return hydrated;
     });

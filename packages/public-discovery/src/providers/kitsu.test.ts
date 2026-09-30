@@ -10,6 +10,32 @@ const anime = {
   id: '46474',
   type: 'anime',
 };
+
+const animeMapping = { id: 'mapping-1', type: 'mappings', attributes: { externalSite: 'anilist/anime', externalId: '154587' } };
+
+describe('Kitsu exact cross-provider evidence', () => {
+  it.each(['search', 'hydrate'] as const)('retains only the mapping related to the %s resource', async (operation) => {
+    const resource = { ...anime, relationships: { mappings: { data: [{ id: animeMapping.id, type: 'mappings' }] } } };
+    const fetcher = vi.fn(async (_url: string) => Response.json(operation === 'search'
+      ? { data: [resource], included: [animeMapping], links: { next: null }, meta: { count: 1 } }
+      : { data: resource, included: [animeMapping] }));
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', fetcher);
+    const result = operation === 'search' ? (await adapter.search({ limit: 20, provider: 'kitsu-anime', titles: ['Frieren'] })).candidates[0]
+      : await adapter.hydrate({ provider: 'kitsu-anime', externalId: anime.id });
+    expect(result?.linkedReferences).toEqual([{ provider: 'anilist', externalId: '154587' }]);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(new URL(fetcher.mock.calls[0]![0]).searchParams.get('include')).toBe('mappings');
+  });
+
+  it.each(['detached', 'wrong-kind', 'invalid-id', 'conflicting'] as const)('does not trust a %s mapping', async (mode) => {
+    const mapping = mode === 'wrong-kind' ? { ...animeMapping, attributes: { ...animeMapping.attributes, externalSite: 'anilist/manga' } }
+      : mode === 'invalid-id' ? { ...animeMapping, attributes: { ...animeMapping.attributes, externalId: '../154587' } } : animeMapping;
+    const included = mode === 'conflicting' ? [mapping, { ...mapping, id: 'mapping-2', attributes: { ...mapping.attributes, externalId: '999' } }] : [mapping];
+    const resource = { ...anime, relationships: { mappings: { data: mode === 'detached' ? [] : included.map(item => ({ id: item.id, type: item.type })) } } };
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', async () => Response.json({ data: resource, included }));
+    expect((await adapter.hydrate({ provider: 'kitsu-anime', externalId: anime.id }))?.linkedReferences).toBeUndefined();
+  });
+});
 const manga = {
   attributes: {
     abbreviatedTitles: ['Genius of the Unique Lineage'], ageRating: null,

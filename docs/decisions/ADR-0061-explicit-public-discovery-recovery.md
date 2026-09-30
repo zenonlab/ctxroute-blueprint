@@ -114,14 +114,33 @@ champ n’est pas un rollback compatible. Aucun checkpoint n’est effacé pour
 contourner cette contrainte. Le média UNKNOWN garde son refus de conclure si
 la lane anime demeure indisponible; cette correction ne supprime pas cette garde.
 
-La projection locale d’un résultat `VERIFIED` accepte le secours MangaUpdates
-vers MangaDex uniquement si l’identifiant MangaUpdates demandé apparaît à la
+La projection locale d’un résultat `VERIFIED` accepte les secours MangaUpdates
+vers MangaDex et AniList vers Kitsu anime uniquement si l’identifiant demandé apparaît à la
 fois dans les `linkedReferences` du candidat hydraté et dans les références de
 la fiche publique. Le changement de fournisseur principal n’est alors pas un
 `HYDRATION_REFERENCE_MISMATCH`. Sans cette double preuve exacte, le rejet
 technique reste inchangé. Un test intégré du resolver jusqu’à Work et Library
 couvre le secours, l’identité directe et les preuves absentes ou divergentes,
 sans accès fournisseur depuis le navigateur ni conversion artificielle en Review.
+
+Le secours exact AniList lit les mappings Kitsu inclus dans la recherche et
+l'hydratation existantes : aucun appel additionnel par candidat. Seuls les
+objets `mappings` rattachés par leur identifiant à la relation du média sont
+éligibles. `anilist/anime`, identifiant décimal positif et cible unique sont
+exigés ; un mapping détaché, manga ou contradictoire ne produit aucun lien.
+Une panne transitoire consommée d'AniList peut alors utiliser Kitsu, avec
+correspondance du titre et nouvelle vérification du lien à l'hydratation.
+Cadence, 429, identité absente et erreurs d'invariant gardent leur traitement.
+La candidate extension 1.0.50 doit précéder l'usage de ces résultats dans un
+profil certifié ; une ancienne extension peut refuser ce nouveau secours.
+Le rollback ne supprime pas les résultats D1 ni les données privées déjà produits.
+
+Le transport Worker autorise ces deux paramètres Kitsu uniquement pour anime,
+avec `include=mappings` et `fields[mappings]=externalSite,externalId` uniques.
+La sonde MangaDex autorise exclusivement l'UUID vide et `limit=1`, sans autre
+paramètre. Son rejet initial par le transport est reproduit par une régression
+qui fait passer les cinq sondes dans le véritable adaptateur réseau Worker.
+Tester les sondes par `fetch` direct seul ne valide pas cette frontière.
 
 Après admission, `PENDING` est observé sans second POST, y compris après
 expiration de `retryAt` ou redémarrage. Une échéance passée est bornée à une

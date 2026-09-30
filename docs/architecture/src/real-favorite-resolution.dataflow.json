@@ -17,7 +17,7 @@
         "id": "public-resolution",
         "label": "Résolution publique",
         "focus": ["sourceEvidence", "privateStore", "publicWorker", "publicD1", "providerQueue"],
-        "note": "Une clé versionnée et 4 titres découverte + 4 titres source au plus quittent l’extension; le serveur résout."
+        "note": "Secours AniList→Kitsu et MangaUpdates→MangaDex : liens contrôlés dans Library; mappings et sondes bornés par le transport."
       },
       {
         "id": "retry-and-review",
