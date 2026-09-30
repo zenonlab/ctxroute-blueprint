@@ -22,6 +22,20 @@ describe('shared recovery probes', () => {
     await expect(probeFavoriteProvider('anilist', async () => Response.json(payload))).rejects.toThrow();
   });
 
+  it.each(['kitsu-anime', 'kitsu-manga'] as const)('uses the JSON API media type for the %s health probe', async (provider) => {
+    const media = provider === 'kitsu-anime' ? 'anime' : 'manga';
+    const fetcher = vi.fn(async (_url: string, init: RequestInit) => {
+      const headers = new Headers(init.headers);
+      if (headers.get('Accept') !== 'application/vnd.api+json') return new Response(null, { status: 406 });
+      if (headers.has('Content-Type')) return new Response(null, { status: 415 });
+      return Response.json({ data: [{ id: '1', type: media, attributes: { slug: 'synthetic' } }] }, { headers: { 'Content-Type': 'application/vnd.api+json' } });
+    });
+    await expect(probeFavoriteProvider(provider, fetcher)).resolves.toBeUndefined();
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher.mock.calls[0]![1].method).toBe('GET');
+    expect(fetcher.mock.calls[0]![1].body).toBeUndefined();
+  });
+
   it('preserves a provider Retry-After instead of probing sooner', async () => {
     vi.useFakeTimers({ now: 10_000 });
     try {

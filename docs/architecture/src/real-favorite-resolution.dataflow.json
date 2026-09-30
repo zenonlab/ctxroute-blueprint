@@ -17,7 +17,7 @@
         "id": "public-resolution",
         "label": "Résolution publique",
         "focus": ["sourceEvidence", "privateStore", "publicWorker", "publicD1", "providerQueue"],
-        "note": "Secours liés : conserver l’identité canonique D1 existante sans fusion; liens contrôlés avant publication et dans Library."
+        "note": "Secours liés : identité canonique D1 conservée sans fusion; sondes Kitsu JSON:API bornées pour reprendre après panne."
       },
       {
         "id": "retry-and-review",

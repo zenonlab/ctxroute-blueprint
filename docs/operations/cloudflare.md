@@ -1,5 +1,25 @@
 # Cloudflare operations gate
 
+## Sondes Kitsu et négociation JSON API
+
+Le contrôle réel du 30 septembre a donné 200 pour les petites sondes
+AniList, MangaUpdates et MangaDex, mais 406 pour les deux sondes Kitsu.
+Les cinq runtimes D1 étaient `READY` : ce statut de réservation ne prouve
+donc pas que chaque appel HTTP fonctionne. Les sondes Kitsu utilisaient
+`Accept: application/json`, contrairement à la recherche/hydratation Kitsu.
+Les mêmes deux sondes passent en 200 avec `Accept: application/vnd.api+json`
+et sans `Content-Type` sur leur GET sans corps. Après correction, les appels
+réels via `DirectProviderTransportAdapter` passent également, sans injection
+d'en-tête dans le banc. Il s'agit de l'egress local, pas d'une certification
+du réseau Cloudflare ; aucun favori privé ni mutation D1 n'est transmis.
+Les bornes restent huit secondes, 8 Kio, un slug et une réservation partagée
+par fournisseur, avec dix minutes entre sondes de panne. Retirer le correctif
+peut rétablir le faux échec Kitsu ; aucune donnée n'est supprimée au rollback.
+Deux régressions locales reproduisent 406 puis passent avec les bons en-têtes.
+Validation : 264 tests Discovery, 247 Worker, `npm run verify`, E2E Web
+12 réussis / 1 ignoré et Archify showcase passent. Les deux sondes réelles
+corrigées sont conservées dans un reçu privé ; zéro mutation D1.
+
 ## Identité canonique lors d'un secours lié
 
 La publication D1 doit conserver l'identifiant de l'œuvre déjà connue,
@@ -17,6 +37,13 @@ ciblés de publication/coût, `npm run verify`, typechecks, E2E Web
 12 réussis / 1 ignoré et Archify showcase 9/9 passent. Les seuils D1
 restent 300 lignes lues par scénario et moins de 50 appels par publication
 avec claim dans les fixtures ; la garde indexée est vérifiée par EXPLAIN.
+
+PR 180 fusionnée en `c6f023eb81f0521ae5c01278c608202c94f49b3e` :
+prévol `36653710370` et CI production `36654388236` verts. Le Worker déployé
+est `37cfd8ef-eba6-4a91-8749-ac1731bbd51e` et les sondes publiques passent.
+Les canaris mutateurs et la publication des archives sont restés désactivés.
+Cette preuve de déploiement ne remplace ni le pilote de reprise ni le test
+complet de convergence des 1 522 sources ; aucun compteur privé n'est réécrit.
 
 La livraison précédente, PR 179, est déployée : merge
 `191429e86ad47a1291761071c9c7c9da6cfe72d5`, prévol `36651013360` et CI main
