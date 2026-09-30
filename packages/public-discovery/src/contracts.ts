@@ -99,6 +99,29 @@ export const publicDiscoveryTerminalResolutionSchema = z.discriminatedUnion('sta
     : result.candidates.length >= 2, 'ambiguity-requires-comparable-identities'),
 ]);
 
+export const publicDiscoveryFailureCauseSchema = z.strictObject({
+  code: z.enum(['http', 'network', 'timeout', 'invalid-response', 'invalid-json', 'identity-mismatch', 'cover-origin', 'invalid-uri', 'invalid-encoding', 'runtime-d1', 'runtime-state', 'runtime-reservation', 'search-cursor', 'search-deadline', 'search-page-limit', 'search-candidate-limit', 'search-candidate-page-limit', 'gateway', 'transport', 'unknown']),
+  httpStatus: z.number().int().min(400).max(599).optional(),
+  provider: publicDiscoveryProviderSchema.optional(),
+  stage: z.enum(['resolve', 'search', 'hydrate', 'publish']),
+  field: z.enum(['titles', 'abbreviatedTitles', 'posterImage', 'canonicalTitle', 'slug', 'subtype', 'ageRating', 'status', 'startDate', 'endDate', 'userCount', 'chapterCount', 'volumeCount', 'episodeCount', 'nsfw', 'title', 'altTitles', 'contentRating', 'originalLanguage', 'tags', 'relationships', 'fileName', 'links', 'limit', 'offset', 'total', 'series_id', 'total_hits', 'associated', 'categories', 'genres', 'image', 'type', 'url', 'unknown']).optional(),
+  validation: z.enum(['invalid_type', 'too_big', 'too_small', 'invalid_format', 'invalid_value', 'invalid_union', 'unrecognized_keys', 'custom', 'unknown']).optional(),
+}).refine(cause => (cause.code === 'http') === (cause.httpStatus !== undefined), 'failure-http-status-required');
+
+export const publicDiscoveryFailureDiagnosticSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  attempt: z.number().int().min(1).max(8),
+  observedAt: z.iso.datetime({ offset: false }),
+  correlationId: z.uuid().optional(),
+  workerVersion: z.uuid().optional(),
+  cause: publicDiscoveryFailureCauseSchema,
+  providerFailures: z.array(publicDiscoveryFailureCauseSchema).max(5).refine(failures =>
+    failures.every(failure => failure.provider !== undefined) && new Set(failures.map(failure => failure.provider)).size === failures.length,
+  'failure-provider-required-and-unique').optional(),
+  decision: z.enum(['retry-requested', 'attempt-failed', 'publication-failed']),
+});
+export type PublicDiscoveryFailureDiagnostic = z.output<typeof publicDiscoveryFailureDiagnosticSchema>;
+
 export function isPublicDiscoverySearchCursor(provider: string, cursor: string): boolean {
   return /^[1-9]\d{0,4}$/u.test(cursor)
     || provider === 'mangaupdates' && /^mu2:[1-9]\d{0,4}$/u.test(cursor);

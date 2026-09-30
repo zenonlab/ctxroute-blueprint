@@ -19,6 +19,7 @@ export interface PublicDiscoveryGatewayPort {
   claim(limit: number): Promise<PublicDiscoveryClaimBatch>;
   defer(request: PublicDiscoveryClaimedRequest, retryAt: string, now: string, searchProgress?: PublicDiscoverySearchProgress): Promise<void>;
   retryTransient?(request: PublicDiscoveryClaimedRequest, now: string): Promise<void>;
+  recordFailure?(request: PublicDiscoveryClaimedRequest, error: Error | undefined, decision: 'retry-requested' | 'attempt-failed' | 'publication-failed', now: string): Promise<void>;
   publish(batch: PublicDiscoveryResultBatch): Promise<PublicDiscoveryReceipt>;
 }
 export interface PublicDiscoveryResolverPort {
@@ -47,6 +48,10 @@ export async function runPublicDiscoveryBatch(input: PublicDiscoveryBatchInput):
     try {
       resolution = publicDiscoveryTerminalResolutionSchema.parse(await input.resolver.resolve(request));
     } catch (error) {
+      if (!(error instanceof FavoriteProviderRetryError)) {
+        const decision = input.gateway.retryTransient !== undefined && error instanceof Error && isAutomaticProviderRetry(error) ? 'retry-requested' : 'attempt-failed';
+        await input.gateway.recordFailure?.(request, error instanceof Error ? error : undefined, decision, input.now());
+      }
       if (error instanceof FavoriteProviderRetryError && Number.isFinite(error.retryAt)) {
         const now = input.now();
         const retryAt = new Date(Math.max(error.retryAt, Date.parse(now) + 1_000)).toISOString();
@@ -61,7 +66,12 @@ export async function runPublicDiscoveryBatch(input: PublicDiscoveryBatchInput):
     }
     const result: PublicDiscoveryResult = { key: request.key, requestDigest: request.requestDigest, resolution };
     const resultBatch = publicDiscoveryResultBatchSchema.parse({ claimToken: batch.claimToken, nonce: input.nonce(), results: [result], schemaVersion: 3, verifiedAt: input.now() });
-    const receipt = publicDiscoveryReceiptSchema.parse(await input.gateway.publish(resultBatch));
+    let receipt: PublicDiscoveryReceipt;
+    try { receipt = publicDiscoveryReceiptSchema.parse(await input.gateway.publish(resultBatch)); }
+    catch (error) {
+      await input.gateway.recordFailure?.(request, error instanceof Error ? error : undefined, 'publication-failed', input.now());
+      throw error;
+    }
     published += receipt.published;
     replayed += receipt.replayed;
   }

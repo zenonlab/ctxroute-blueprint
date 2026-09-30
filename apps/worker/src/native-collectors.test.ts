@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FavoriteProviderRetryError, PublicDiscoverySearchContinuationError, type FavoriteProviderPort, type PublicDiscoveryProviderPorts } from '@tobirink/public-discovery';
 import { z } from 'zod';
+import { discoveryFailureCause } from './native-collectors';
 import { AgendaCollectionRetryError, agendaCollectionFailureCode, collectorCost, createBudgetedDiscoveryResolver, handleNativeCollectorQueue, providerFailureCode, resolveWithDeadline, type NativeCollectorSignal } from './native-collectors';
 import { instrumentProviderFetch } from './operational-metrics';
 
@@ -9,6 +10,15 @@ function message(body: NativeCollectorSignal | null, attempts = 1) {
 }
 
 describe('native collector queue', () => {
+  it('classifies durable failures without preserving arbitrary exception text', () => {
+    expect(discoveryFailureCause(new Error('Favorite provider request failed with HTTP 403.'))).toEqual({ code: 'http', httpStatus: 403, stage: 'resolve' });
+    expect(discoveryFailureCause(new Error('incomplete-provider-search:cursor'))).toEqual({ code: 'search-cursor', stage: 'resolve' });
+    expect(discoveryFailureCause(new Error('D1_ERROR: private title'))).toEqual({ code: 'runtime-d1', stage: 'resolve' });
+    expect(discoveryFailureCause(new Error('provider-gateway-private https://private.example/secret'))).toEqual({ code: 'gateway', stage: 'resolve' });
+    expect(discoveryFailureCause(new Error('private title https://private.example/secret'))).toEqual({ code: 'unknown', stage: 'resolve' });
+    expect(discoveryFailureCause(undefined)).toEqual({ code: 'unknown', stage: 'resolve' });
+    expect(discoveryFailureCause(new z.ZodError([{ code: 'invalid_type', expected: 'string', path: ['data', 0, 'titles', 'private-title'], message: 'private-payload' }]))).toEqual({ code: 'invalid-response', stage: 'resolve', field: 'titles', validation: 'invalid_type' });
+  });
   afterEach(() => vi.restoreAllMocks());
 
   it('emits bounded provider failure codes without error payloads', () => {

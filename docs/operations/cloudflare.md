@@ -2531,6 +2531,124 @@ connexion, le contrôle unitaire (une ligne) et EXPLAIN sont distincts des
 public n’a été effectué. Le défaut de projection corrigé ne suffit pas à
 expliquer l’historique fournisseur des 307 identités épuisées.
 
+### Diagnostic durable — préparation locale, migration requise
+
+#### Console admin séparée, sans mutation
+
+`npm run admin:discovery -- help` présente les commandes. Le script utilise
+le contrat TypeScript du produit via le support natif de Node ; les commandes
+npm activent explicitement `--experimental-strip-types` (Node 22.13+).
+Il n'ajoute ni serveur admin public, ni permissions, ni dépendance.
+
+Le scope privé a la forme `{ "schemaVersion": 1, "entries": [{ "key":
+{ "fingerprint": "<SHA-256>", "mediaKind": "MANGA", "parserVersion":
+"<version>", "siteRulesVersion": "<version>" }, "sourceCount": 1 }] }`.
+Chaque clé complète est unique ; `sourceCount` provient du registre local,
+pas d'une déduction D1. Il ne peut donc pas représenter un nombre d'utilisateurs.
+La console accepte jusqu'à 2 000 identités et 50 000 sources déclarées.
+
+```bash
+npm run admin:discovery -- snapshot --scope build/admin/scope-prive.json --local-oauth true
+npm run admin:discovery -- menu --report build/admin/discovery-XXXXXX/snapshot.json
+npm run admin:discovery -- report --report build/admin/discovery-XXXXXX/snapshot.json --view causes
+npm run admin:discovery -- report --report build/admin/discovery-XXXXXX/snapshot.json --request 1
+```
+
+Seul `snapshot` interroge D1 : une lecture du schéma, puis des lectures
+indexées par quarante clés, sans scan global des demandes. Plafonds :
+51 requêtes, `4 × identités + 128` lignes D1 lues, 45 secondes par requête.
+Le script refuse les métadonnées de coût absentes et toute écriture signalée.
+Il ne réessaie pas une commande échouée. Les autres commandes sont hors ligne.
+Chaque snapshot crée un nouveau répertoire `0700` et un fichier `0600`, sans
+écraser un précédent. Les données restent sous `build/admin/`, ignoré par Git.
+
+Le menu expose sept vues : synthèse sources/identités, états et échéances,
+causes FAILED, fournisseurs observés, versions Worker/parseur/règles,
+demande détaillée, limites des preuves. Le numéro d'une demande correspond
+à sa position dans le scope privé ; les clés, titres, URLs et réponses brutes
+ne sont pas recopiés dans le rapport. Les UUID corrélés permettent de
+compléter l'analyse avec les logs Worker accessibles à l'opérateur.
+Les causes regroupent le dernier diagnostic retenu de chaque FAILED ; la
+fiche conserve toutes ses entrées disponibles. Les fournisseurs comptent les
+événements retenus, sans compter deux fois cause principale et fallback du
+même événement. Ces chiffres ne mesurent pas leur disponibilité actuelle.
+
+Le menu distingue accès fournisseur, contrat de réponse, cohérence d'identité,
+recherche/pagination/budget, infrastructure et cause inconnue. Les pistes
+proposées sont des investigations, pas des diagnostics causaux supplémentaires.
+Un problème répété demande une régression de pipeline ; une exception par
+titre ne peut pas être déduite de `FAILED`. Une erreur de publication ne
+prouve pas une transaction partielle. La console ne certifie pas l'atomicité
+et ses lectures successives ne forment pas un snapshot transactionnel.
+
+Limites explicites : migration absente, journal absent ou invalide, maximum
+huit diagnostics, rétention liée à la demande, pas de réponses brutes, pas de
+traces du parseur local et pas d'archivage continu. Conserver les snapshots
+permet de préserver les preuves observées, mais ne garantit pas la capture
+des erreurs survenues entre deux snapshots. Aucune donnée historique
+manquante n'est reconstituée. La console ne contient ni SQL libre, ni commande
+de réarmement, ni appel fournisseur, ni ajout d'exception.
+
+Vérification réelle du 30 septembre : le scope privé des 339 sources contient
+287 identités ; neuf lectures D1, 601 lignes lues et zéro écriture confirment
+275 identités FAILED portant 326 sources, et douze résultats négatifs expirés
+portant treize sources. La migration 0030 est absente : les 275 FAILED n'ont
+donc aucun journal durable lisible. Ce compteur ne nie pas la preuve Kitsu
+conservée séparément dans les logs/audits ; la console ne les importe pas.
+Le menu terminal et les vues hors ligne ont été exercés sur ce snapshot.
+Les dix tests admin, les 170 tests infra et `npm run verify` passent ; les
+vues Archify architecture et discovery-recovery sont validées en showcase.
+
+La candidate associée porte la version 1.0.55 : les contrats partagés changent
+les bundles de l'extension. Les archives 1.0.54 sont conservées ; aucun
+téléchargement public n'est remplacé par cette préparation.
+
+La migration additive `0030_public_discovery_failure_diagnostics.sql` ajoute
+`failure_diagnostics_json` aux demandes Discovery. Le journal conserve les
+huit dernières défaillances, bornées à 16 Kio. Il décrit la cause terminale
+et les dernières erreurs des fournisseurs effectivement observées, avec
+statut HTTP éventuel, étape search/hydrate/resolve/publish, champ de schéma
+autorisé, tentative, date, corrélation et version Worker si disponible.
+Une cause inconnue reste `unknown`. Aucun titre, slug, URL, ID fournisseur,
+message libre ou corps de réponse n'est conservé dans ce diagnostic.
+
+`D1PublicDiscoveryV3Adapter.readFailureDiagnostics(key)` lit une seule clé
+complète par l'index primaire et valide le journal. `undefined` signifie
+absence de preuve, pas absence d'erreur. Cette lecture opératoire n'est pas
+exposée sur les routes publiques. Grouper les journaux obtenus pour un scope
+privé par code, fournisseur et version permet de catégoriser ses échecs sans
+scanner globalement la table. Les diagnostics suivent la rétention des
+demandes ; ils ne reconstruisent pas les réponses historiques disparues.
+
+Le collecteur écrit sous garde du claim avant de demander une reprise ou
+d'abandonner une tentative. `retry-requested` n'est pas une confirmation de
+reprise réussie. Les reports normaux de cadence et de budget ne remplissent
+pas le journal. Un échec de persistance est propagé ; une panne D1 totale
+ne peut pas être diagnostiquée durablement dans cette même D1. Les logs
+Worker restent donc complémentaires. Les erreurs du parseur local avant
+admission et les échecs de claim sans demande acquise sont hors de ce journal.
+
+Ne pas fusionner ni déployer ce code avant validation du plan de migration
+D1 ciblé. Le workflow existant `deploy-production.yml` inclut déjà
+`d1-migrate:PUBLIC_DB` puis `worker-deploy`, avec les deux cibles explicitement
+autorisées par sa gate. L'affirmation précédente selon laquelle la CI
+n'appliquait pas la colonne était incorrecte. La branche vérifie et prépare
+le plan sans l'appliquer ; seul `main` l'applique, migration avant Worker.
+Le prévol doit montrer uniquement 0030 comme migration restante et le diff
+doit rester additif, sans réarmement ou transformation des demandes.
+Le rollback remet l'ancien Worker sans retirer la colonne ni ses preuves.
+La préparation et les tests locaux ne déclenchent aucune mutation distante ;
+le déploiement passe par ce workflow protégé existant, jamais par une commande
+D1 directe. Il n'autorise aucun réarmement historique et ne certifie pas les
+339 favoris.
+
+Validation locale de 1.0.55 : `npm run verify` réussi, dont 256 tests Worker
+et 283 Public Discovery ; deux builds isolés identiques ; E2E Web/extension
+13 réussites et un test ignoré. Archify architecture et dataflow passent en
+showcase sans erreur ni avertissement. Le prévol distant en lecture seule
+confirme que seule la migration 0030 reste à appliquer ; aucune migration
+n'a été exécutée et aucune archive publique n'a été promue.
+
 ### Audit du 30 septembre : couverture optionnelle et curseur Kitsu
 
 Les 339 sources restantes correspondent à 287 identités. Six lectures D1
@@ -2565,6 +2683,14 @@ les identités reçues. Le rejeu hors réseau du corps HTTP réel conserve les
 vingt candidats à l'identique et restitue le curseur 14. `npm run verify`,
 la validation Archify dataflow et `git diff --check` passent. Ce correctif
 local n'est pas encore une preuve de convergence des anciennes demandes.
+
+Livraison : PR #184 fusionnée en `359e4303792357fa0499af27b4c5e2fe472f97b8`,
+CI de branche `36714652375` et CI main `36715704557` vertes. Le Worker
+`8a4b9bbc-b8f3-40a7-ba6f-fd04e4dde53f` est déployé et les sondes publiques
+passent. Les E2E comptent 13 succès et un test ignoré. Les empreintes Chrome
+et Firefox 1.0.54 restent identiques à celles documentées : le correctif est
+côté collecteur Worker. Aucun canari d'admission, réarmement historique ou
+promotion d'archive publique n'a été exécuté. La convergence reste ouverte.
 
 ### Défaut serveur reproduit : perte du curseur du fallback
 

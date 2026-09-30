@@ -16,7 +16,7 @@
   ],
   "nodes": [
     { "id": "snapshot", "type": "database", "label": "Export D1 frais", "sublabel": "OAuth local · SHA-256", "stage": 0, "row": 0, "tag": "lecture seule" },
-    { "id": "inventory", "type": "backend", "label": "Inventaire agrégé", "sublabel": "FAILED/ATTEMPT_LIMIT", "stage": 0, "row": 2, "tag": "sans titres ni clés" },
+    { "id": "inventory", "type": "backend", "label": "Console admin", "sublabel": "causes · sources · identités", "stage": 0, "row": 2, "width": 150, "tag": "snapshot privé · sans mutation" },
     { "id": "canaries", "type": "backend", "label": "Preuve corrélée", "sublabel": "admission · pages · résultat", "stage": 1, "row": 0, "width": 150, "tag": "300 lectures par clé" },
     { "id": "approval", "type": "security", "label": "Confirmation ciblée", "sublabel": "lot · seuils · arrêt", "stage": 1, "row": 2, "tag": "avant écriture" },
     { "id": "rearm", "type": "backend", "label": "Lot scellé v3", "sublabel": "1–10 identités · média connu", "stage": 2, "row": 2, "width": 150, "tag": "un POST par clé" },
@@ -26,8 +26,9 @@
     { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "Review · capacité client", "stage": 4, "row": 1, "width": 150, "tag": "Review connue · inconnu bloquant" }
   ],
   "flows": [
+    { "from": "snapshot", "to": "inventory", "label": "diagnostics bornés", "classification": "clés indexées · preuves absentes explicites", "variant": "default", "labelDy": 60 },
     { "from": "snapshot", "to": "canaries", "label": "base de comparaison", "classification": "lecture seule", "variant": "default", "labelDy": 53 },
-    { "from": "inventory", "to": "approval", "label": "cibles éligibles", "classification": "comptes agrégés", "variant": "security" },
+    { "from": "inventory", "to": "approval", "label": "cibles éligibles", "classification": "comptes agrégés", "variant": "security", "labelDy": 53 },
     { "from": "canaries", "to": "approval", "label": "preuve bout en bout corrélée", "classification": "appels réels · D1 cumulé ≤ 300", "variant": "security", "labelDx": 100, "labelDy": 24 },
     { "from": "approval", "to": "rearm", "label": "prépare le lot exact", "classification": "sceau vérifié · runtimes manga présents", "variant": "security", "labelDy": 53 },
     { "from": "rearm", "to": "d1", "label": "reçu avant admission", "classification": "digest identique · arrêt 429/Queue/sans fournisseur/D1 > 300", "variant": "emphasis", "labelDy": -23 },
