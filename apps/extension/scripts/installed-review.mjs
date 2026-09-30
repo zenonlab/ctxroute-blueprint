@@ -148,7 +148,7 @@ export function summarizeInstalledDiagnosticFailures(diagnostics) {
   return { windowLimit: 100, sampledEvents: events.length, failures };
 }
 
-async function capture(page) {
+export async function capture(page) {
   const snapshot = await page.evaluate(async (fields) => {
     const status = await globalThis.chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 });
     if (!status.ok) throw new Error('status-unavailable');
@@ -175,7 +175,7 @@ async function capture(page) {
     const libraryIds = new Set(libraries.flatMap((entry) => entry.workIds));
     const reasons = {};
     const media = { ANIME: 0, MANGA: 0, MANHWA: 0, MANHUA: 0, UNKNOWN: 0 };
-    const reasonNames = new Set(['RESOLVED', 'AMBIGUOUS', 'NOT_FOUND', 'IDENTITY_MISSING', 'DETACHED', 'BLOCKED_CONTENT_TAXONOMY', 'PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'PUBLIC_DISCOVERY_PENDING', 'ADMISSION_WAIT', 'RATE_LIMITED', 'NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE', 'CONTRACT_CONFLICT', 'INVALID_RESPONSE']);
+    const reasonNames = new Set(['RESOLVED', 'AMBIGUOUS', 'UNCONFIRMED_SEASON', 'NOT_FOUND', 'IDENTITY_MISSING', 'DETACHED', 'BLOCKED_CONTENT_TAXONOMY', 'PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'PUBLIC_DISCOVERY_PENDING', 'ADMISSION_WAIT', 'RATE_LIMITED', 'NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE', 'CONTRACT_CONFLICT', 'INVALID_RESPONSE']);
     let unresolved = 0;
     let missingProjectedWorks = 0;
     for (const source of sources) {

@@ -9,6 +9,36 @@ import { createInstalledRecoveryObservation, createInstalledReviewNetworkGuard, 
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
 import { assertInstalledReviewProfileRoot, createInstalledReviewProfileRoot, drainInstalledReviewReads, prepareInstalledRecoveryRestart, reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
 import { reserveRecoveryPost } from '../../../scripts/infra/discovery-recovery-batch.mjs';
+import { capture, installedConverged } from './installed-review.mjs';
+
+describe('installed Review reason accounting', () => {
+  it.each(['UNCONFIRMED_SEASON', 'UNDECLARED_REASON'])('counts only declared Review reasons as explained: %s', async (reason) => {
+    const records = {
+      favoriteSources: [{ id: 'source_one', presence: 'observed', resolution: { kind: 'REVIEW_REQUIRED', reason } }],
+      favoriteArtifacts: [{ sourceId: 'source_one', artifact: { mediaKind: 'ANIME' } }],
+      works: [], libraries: [], progress: [], reviews: [{ status: 'pending', reason }],
+    };
+    const requestFor = (result) => {
+      const request = { result, onsuccess: undefined };
+      globalThis.queueMicrotask(() => request.onsuccess?.());
+      return request;
+    };
+    vi.stubGlobal('indexedDB', { open: () => requestFor({
+      close() {},
+      transaction: () => ({ objectStore: (name) => ({ getAll: () => requestFor(records[name]) }) }),
+    }) });
+    vi.stubGlobal('chrome', { runtime: { sendMessage: async (message) => message.type === 'favorite.status.read'
+      ? { ok: true, counts: { observed: 1, review: 1 }, inventory: { status: 'complete' } }
+      : { ok: true, snapshot: { statistics: { completed: 0, inProgress: 0, knownMetadata: 0, notStarted: 0, total: 0 } } } } });
+    try {
+      const snapshot = await capture({ evaluate: (evaluate, fields) => evaluate(fields) });
+      const recognized = reason === 'UNCONFIRMED_SEASON';
+      expect(snapshot.aggregate.reasons).toEqual({ [recognized ? reason : 'UNRESOLVED']: 1 });
+      expect(snapshot.aggregate.unresolved).toBe(recognized ? 0 : 1);
+      expect(installedConverged(snapshot.aggregate, 1)).toBe(recognized);
+    } finally { vi.unstubAllGlobals(); }
+  });
+});
 
 describe('persistent installed review profiles', () => {
   const persistentRoot = fileURLToPath(new URL('../../../build/installed-review/profiles/', import.meta.url));

@@ -86,6 +86,15 @@ inconnus et paramètres supplémentaires. Les 73 tests du banc passent.
 Un nouveau profil est nécessaire pour ce contrôle ; ce n'est ni une reprise
 du pilote mutateur ni un effacement de ses erreurs. Le ZIP 1.0.53 ne change pas.
 
+Le comptage installé reconnaît aussi `UNCONFIRMED_SEASON` comme motif Review
+expliqué. Une régression reproduit son classement erroné en `UNRESOLVED`
+avant correction ; un motif non déclaré reste bloquant après correction.
+Les 75 tests du banc passent, sans changer les archives ni les limites réseau.
+Un contrôle de l'archive Chrome 1.0.51 reçoit la projection ancienne simulée :
+une source en Review, aucune œuvre créée, données conservées après deux
+redémarrages du navigateur réel. Ce contrôle ne contacte aucun fournisseur
+et ne vaut pas preuve d'une résolution en production.
+
 ## Emplacement du banc installé
 
 Les nouveaux profils isolés et leur extension décompressée sont conservés sous
