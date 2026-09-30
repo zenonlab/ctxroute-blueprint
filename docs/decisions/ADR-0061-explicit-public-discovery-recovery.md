@@ -14,6 +14,9 @@ scope:
   - packages/application/src/use-cases/import-favorite-sources.ts
   - packages/application/src/public-discovery/public-discovery-contract.ts
   - packages/adapters-browser/src/catalogue/http-public-discovery-adapter.ts
+  - packages/public-discovery/src/providers/kitsu.ts
+  - packages/public-discovery/src/providers/kitsu.test.ts
+  - packages/public-discovery/src/resolver.test.ts
   - scripts/infra/discovery-recovery-batch.mjs
   - apps/extension/scripts/installed-review.mjs
   - apps/extension/scripts/installed-review-network.mjs
@@ -56,6 +59,17 @@ pas une recherche valide trop large. Le rollback porte sur le code uniquement.
 Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspondant à des demandes Public Discovery déjà arrivées à `FAILED/ATTEMPT_LIMIT`. Une reprise automatique depuis chaque lecture de statut pourrait réactiver une charge fournisseur sans contrôle et masquer la frontière entre attente, échec transitoire et mutation de production.
 
 ## Décision
+
+### Pagination et métadonnées optionnelles
+
+Une couverture Kitsu rejetée ne constitue pas une identité perdue. Elle reste
+omise selon l'allowlist existante, mais ne rend plus la recherche incomplète
+et ne supprime plus son curseur. Les ressources du mauvais média ou dont
+l'identité ne peut pas être encodée restent bloquantes. Le diagnostic du
+30 septembre reproduit une page HTTP 200 avec vingt identités, une couverture
+rejetée et une suite annoncée : l'ancien adaptateur supprimait cette suite.
+Ce constat local n'attribue pas rétroactivement cette cause aux autres
+demandes historiques et n'autorise aucun réarmement automatique.
 
 ### Libellés fondés sur l'état observé
 

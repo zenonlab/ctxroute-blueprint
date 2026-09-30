@@ -6294,6 +6294,9 @@
             "git diff --check"
           ],
           "evidence": [
+            "Kitsu page 13 reproduite HTTP 200 : couverture rejetée supprimait nextCursor. Dix régressions rouges puis279 testsDiscovery verts ; rejeu exact conserve20candidats etcurseur14 sans réseau. Validationcomplète en cours.",
+            "Candidate1.0.54 : sync FOUND multi-ID corrigé, 4 régressions rouges puis497 tests application verts ; verify vert, E2E13succès/1ignoré, builds isolés identiques, Archify showcase9/9.",
+            "PR183 commit21df65c, CI main36710218213 verte avec déploiement Worker et probes. Archives candidates conservées, aucun téléchargement public avancé.",
             "Candidate1.0.53 : Review saison non corroborée, Accept explicite pour les lecteurs récents ; projection legacy NOT_FOUND/season-unconfirmed uniquement, résultat D1 intact. Aucun état technique transformé, aucun changement de clé ou migration.",
             "Validation locale : verify vert,253testsWorker,493application,276Discovery,117adaptateurs navigateur ; infra160/160 ; audit0vulnérabilité ; Archify architecture/dataflow showcase9/9 ; E2E archive13succès/1ignoré ; diff-check vert.",
             "ChromeZIP319981octets SHA5b26d35372b362cfd1d8305b86e1aa8135cc365a66bdb70ebf17c4a8c9c8f7df ; FirefoxZIPnon signé320022octets SHA0ed8b6dd190e208e2ca92ab993c473517ad911b6932700738b544d9f11a05ca1. CIprotégée à exécuter ; ni téléchargement public ni réarmement supplémentaire.",
@@ -6340,6 +6343,9 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
+            "Audit privé provider-evidence-XGSNiK :339sources/287clés,6lecturesD1/287lignes/0écriture.326FAILED dont1tracecorrélée provider-search-cursor;13résultats expirés.325sources sans causehistorique démontrable.",
+            "Chrome154 x2aPZr, vraie liste1522 : version1.0.54 après upgrade et reprise,1076résolus+54Review+53exclusions+339attentes; inventairecomplet,868œuvres,0erreurinterne/0projectionmanquante ; verdictincomplete,2419lecturesHTTP cumulées,0admission.",
+            "Audit privé current-residual-XBzO63 :6requêtesD1 indexées/287lignes/0écriture.339sources=274FAILED(325sources)+12terminauxexpirés(13sources MISS confirmés parlookupHTTP)+1PROCESSING. TroisFAILED déjà réservés,271non réservés; aucune reprise aveugle.",
             "Profil neuf Chrome154.0.8037.58 5ECSJP, ZIP1.0.51 SHA6f423f9e1bd99f823ee230119311801ba99269858ec77fa4828cee9741e80206,1522favoris Downloads.",
             "Première fenêtre20min incomplète; fichiers décompressés ensuite retrouvés absents, auteur inconnu. Reçus d’échec conservés; vingt fichiers restaurés du même ZIP, profil non remplacé, aucun réimport. Continuation10min et deux redémarrages vérifiés.",
             "Final1073résolus+55Review+53exclusions+341attentes,865œuvres,0erreur interne et0projection manquante. Attentes329PROVIDER_UNAVAILABLE+11NETWORK+1ADMISSION_WAIT. Total2080lectures,248mutations bloquées,0POST/refresh; verdictincomplete avant déploiement des sondesKitsu."
@@ -6361,6 +6367,10 @@
             "npm run package:extension"
           ],
           "evidence": [
+            "Chrome1.0.54 exact(20fichiers duZIP contrôlés) : roundtrip privé1522sources/868œuvres avec publicDiscovery, phrase incorrecte refusée sansmutation, bibliothèqueoffline et2redémarrages vérifiés ; preuveprivée private-roundtrip-exact-154-4gEGqi. Originalintact,0admission.",
+            "FirefoxZIP1.0.54 : lintMozilla0erreur/4warnings(Zod/React), modewarnings-as-errors échoué conservé. Firefox156.0.1 installé ; signatureinaccessible (aucunWEB_EXT secret local/repo/CIproduction,CDP9222absent). AucunXPIsigné.",
+            "ZIPChrome1.0.54 SHA58867826da4f578029e4575b1afbcfb19bcf7bec16f64411e9465da1510421ab : upgrade1.0.53→54 dans mêmeprofilx2aPZr, sources/œuvres/progressions conservées, worker et deux cycles navigateur aprèsupdate vérifiés; pas certification de convergence.",
+            "AncienZIP1.0.51 : projection legacy saison testée horsréseau,1Review/0Work préservé après2redémarrages. Firefox1.0.54 ZIP non signé, aucune preuveXPI durable ni promotionpublique.",
             "Banc persistant d6c2e6a poussé; 101 tests ciblés runtime/continuation/banc verts et Archify architecture/dataflow verts. Aucun contrat produit modifié dans cette vérification.",
             "Chrome154 Z8GbJc, même corpus synthétique1532 et même profil: fenêtres précédentes incomplètes conservées. Reprise finale offline-regression-passed à271s:1400retryable+132exclusions,0processing/erreur interne/projection manquante; deux redémarrages et redémarrage worker vérifiés,0requête distante transmise. Les reprises consomment plusieurs fenêtres, pas une certification de vitesse ni de résolution en ligne.",
             "Dernière mesure réelle5ECSJP inchangée:1073résolus+55Review+53exclusions+341attentes. Aucun POST historique ni promotion publique; Firefox signé durable non certifié."

@@ -39,7 +39,6 @@ const hydrationSchema = z.object({ data: resourceSchema, included: includedMappi
 type KitsuResource = z.infer<typeof resourceSchema>;
 type MutableCandidate = { -readonly [Key in keyof ProviderCandidate]: ProviderCandidate[Key] };
 interface SearchProjection { readonly candidate?: ProviderCandidate; readonly incomplete: boolean }
-interface PosterImageProjection { readonly incomplete: boolean; readonly url?: string }
 const documentedNonAdultAgeRatings = new Set(['G', 'PG', 'R']);
 const posterImageOrder = ['large', 'medium', 'original', 'small', 'tiny'] as const;
 
@@ -59,28 +58,25 @@ function sparseFields(provider: KitsuProvider): string {
   return [...common, ...(provider === 'kitsu-anime' ? ['nsfw', 'episodeCount'] : ['chapterCount', 'volumeCount'])].join(',');
 }
 
-function posterImage(attributes: KitsuResource['attributes']): PosterImageProjection {
+function posterImage(attributes: KitsuResource['attributes']): string | undefined {
   const images = attributes.posterImage;
-  if (images == null) return { incomplete: false };
-  let incomplete = false;
+  if (images == null) return undefined;
   let selected: string | undefined;
   for (const variant of posterImageOrder) {
     const value = images[variant];
     if (value == null) continue;
     if (value.length === 0 || value.length > 2048) {
-      incomplete = true;
       continue;
     }
     try {
       const parsed = new URL(value);
       const exactOrigin = parsed.protocol === 'https:' && parsed.username === '' && parsed.password === '' && parsed.origin === 'https://media.kitsu.app';
       if (exactOrigin) selected ??= value;
-      else incomplete = true;
     } catch {
-      incomplete = true;
+      continue;
     }
   }
-  return selected === undefined ? { incomplete } : { incomplete, url: selected };
+  return selected;
 }
 
 function candidate(resource: KitsuResource, provider: KitsuProvider, included: readonly unknown[] = []): SearchProjection {
@@ -117,7 +113,7 @@ function candidate(resource: KitsuResource, provider: KitsuProvider, included: r
     if (identities.size === 1 && identity !== undefined) result.linkedReferences = [{ provider: 'anilist', externalId: identity }];
   }
   const cover = posterImage(resource.attributes);
-  if (cover.url !== undefined) result.cover = { attribution: 'Kitsu', url: cover.url };
+  if (cover !== undefined) result.cover = { attribution: 'Kitsu', url: cover };
   if (resource.attributes.subtype !== null) result.format = resource.attributes.subtype;
   if (resource.attributes.nsfw || resource.attributes.ageRating === 'R18') result.categories = ['Adult'];
   const status = resource.attributes.status?.toLocaleLowerCase();
@@ -129,7 +125,7 @@ function candidate(resource: KitsuResource, provider: KitsuProvider, included: r
   if (resource.attributes.chapterCount != null) result.chapterCount = resource.attributes.chapterCount;
   if (resource.attributes.volumeCount != null) result.volumeCount = resource.attributes.volumeCount;
   if (resource.attributes.userCount != null) result.popularity = { kind: 'MEMBERS', value: resource.attributes.userCount };
-  return { candidate: createProviderCandidate(result, provider), incomplete: cover.incomplete };
+  return { candidate: createProviderCandidate(result, provider), incomplete: false };
 }
 
 function endpoint(provider: KitsuProvider, id?: string): string {

@@ -33,7 +33,7 @@
     { "from": "rearm", "to": "d1", "label": "reçu avant admission", "classification": "digest identique · arrêt 429/Queue/sans fournisseur/D1 > 300", "variant": "emphasis", "labelDy": -23 },
     { "from": "d1", "to": "queue", "label": "activation bornée", "classification": "terminal ou continuation confirmée", "variant": "emphasis", "labelDy": -53 },
     { "from": "queue", "to": "collector", "label": "claim exact borné", "classification": "clé ciblée · aucun scan global", "variant": "emphasis", "labelDy": 24 },
-    { "from": "collector", "to": "result", "label": "publication atomique", "classification": "garde unique · catalogue · clôture du jeton", "variant": "emphasis", "labelDx": 100 }
+    { "from": "collector", "to": "result", "label": "publication atomique", "classification": "identités complètes · image optionnelle", "variant": "emphasis", "labelDx": 100 }
   ],
   "cards": [
     { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Réservation durable commune au pilote et au CLI", "Pilote séquentiel : terminal + coût D1 ≤ 300 + reçu avant la clé suivante", "Arrêt au premier échec : aucun POST en attente transféré", "HTTP et Queue : ordre libre, preuve complète du même UUID requise", "Échec Queue : coût corrélé à l’admission, sans payload brut", "MangaUpdates en panne : secours MangaDex par ID lié hydraté", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Deux recherches réussies puis curseur et continuation", "UNKNOWN : deux lanes reprises ; CLI exige reparse", "AMBIGUOUS rejoint Review, pas une boucle interne"] },

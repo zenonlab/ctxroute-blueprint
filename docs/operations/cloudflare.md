@@ -124,6 +124,52 @@ Firefox ZIP non signé : 320028 octets, SHA-256
 Ces tests ne certifient pas la convergence distante ni une installation Firefox
 durable. L'archive réelle précédente et ses observations restent conservées.
 
+La PR #183 est intégrée au commit `21df65c`. La CI main `36710218213` est
+verte, déploiement Worker et probes publics compris, sans promotion d'archives.
+Le profil Chrome réel persistant `x2aPZr` conserve les 1522 sources Downloads
+après mise à jour 1.0.53 → 1.0.54, redémarrage du worker et deux cycles de
+redémarrage navigateur après mise à jour. La fenêtre d'upgrade de 180 secondes
+se termine en phase presence ; sa continuation de 300 secondes finit
+l'inventaire sans réimport ni perte de progression. Les reçus précédents sont
+conservés. Dernier état : 1076 sources résolues, 54 Review, 53 exclusions et
+339 attentes ; 868 œuvres, aucune projection manquante ni erreur interne
+comptée. Le verdict reste `incomplete`, pas une certification de convergence.
+
+L'audit privé `current-residual-XBzO63` interroge uniquement les clés des
+attentes : 6 requêtes D1 indexées, 287 lignes lues, zéro écriture. Les 339
+sources restantes correspondent à 287 identités : 274 FAILED/ATTEMPT_LIMIT
+(325 sources), 12 anciens terminaux NOT_FOUND/AMBIGUOUS (13 sources) et une
+PROCESSING. Un lookup HTTP en lecture seule confirme MISS pour les 12 anciens
+terminaux : leur cache négatif est expiré, ils ne sont pas des résultats encore
+disponibles à projeter. Leur voie normale est l'admission, refusée par le
+budget zéro mutation du banc. Parmi les 274 clés FAILED, trois ont déjà une
+réservation durable ; elles ne doivent pas être rejouées aveuglément.
+Le profil cumule 2419 lectures HTTP et zéro admission transmise sur ces
+fenêtres. Les compteurs NETWORK/ADMISSION_WAIT de ce test ne prouvent donc pas
+une panne fournisseur. Ce contrôle ne remplace ni le pilote corrélé autorisé,
+ni la convergence après les admissions effectives, ni Firefox signé durable.
+
+Le contrôle privé `private-roundtrip-exact-154-4gEGqi` vérifie les vingt fichiers
+installés contre le ZIP Chrome 1.0.54 avant d'utiliser une copie du profil.
+L'export chiffré conserve exactement 1522 sources et 868 œuvres, toutes avec
+leur hydratation publique. Une phrase erronée est refusée sans mutation ;
+restauration puis deux redémarrages restituent exactement le même snapshot.
+La bibliothèque reste lisible hors ligne. Le proxy refusant toute sortie et
+le mode offline empêchent les admissions ; le profil original reste intact.
+La preuve teste les handlers réels depuis Options, pas un clic automatisé sur
+chaque contrôle de formulaire. Elle ne certifie pas la convergence réseau.
+
+Le lint Mozilla du ZIP Firefox 1.0.54 extrait sans modification trouve zéro
+erreur et quatre avertissements : deux sondes `Function('')` de Zod et deux
+branches `dangerouslySetInnerHTML` de React. Les sources applicatives examinées
+n'utilisent pas ces assignations HTML directement. L'exécution stricte
+`--warnings-as-errors` échoue et son rapport est conservé ; aucun avertissement
+n'est supprimé, aucune CSP n'est assouplie. Cela ne vaut pas validation AMO.
+Firefox 156.0.1 est installé, mais aucun couple WEB_EXT_API_KEY/WEB_EXT_API_SECRET
+n'est accessible dans cet environnement, aucun secret Mozilla correspondant
+n'est déclaré dans le dépôt ou l'environnement CI production, et le port CDP
+9222 ne répond pas lors du contrôle. Aucun XPI signé n'a été produit.
+
 ## Emplacement du banc installé
 
 Les nouveaux profils isolés et leur extension décompressée sont conservés sous
@@ -2484,6 +2530,41 @@ connexion, le contrôle unitaire (une ligne) et EXPLAIN sont distincts des
 318 lectures de campagne. Aucun réarmement, déploiement ou téléchargement
 public n’a été effectué. Le défaut de projection corrigé ne suffit pas à
 expliquer l’historique fournisseur des 307 identités épuisées.
+
+### Audit du 30 septembre : couverture optionnelle et curseur Kitsu
+
+Les 339 sources restantes correspondent à 287 identités. Six lectures D1
+indexées, 287 lignes lues et zéro écriture établissent 326 sources FAILED
+(275 identités) et 13 sources avec résultat négatif expiré (12 identités).
+La dernière demande anime est passée de PROCESSING à FAILED pendant l'audit.
+Pour cette demande, les traces corrélées conservées montrent 26 appels sans
+erreur HTTP ni réseau, puis `provider-search-cursor` aux tentatives 1 à 5.
+Les événements ultérieurs sans corrélation ne constituent pas une attribution
+individuelle. Les causes fournisseur historiques des 325 autres sources
+FAILED ne sont pas démontrées par les preuves retrouvées.
+
+Un diagnostic local ultérieur lit uniquement les pages Kitsu 12 et 13 via
+l'adaptateur du projet : deux HTTP 200, sans admission ni écriture D1.
+La page 13 contient vingt identités et annonce une suite, mais une couverture
+optionnelle rejetée rendait la projection incomplète et supprimait le curseur.
+Cette observation actuelle reproduit le mécanisme ; elle ne reconstitue pas
+les corps des anciennes réponses Worker. Les preuves restent privées.
+
+La correction sépare absence de métadonnée optionnelle et perte d'identité :
+une couverture étrangère, malformée ou trop longue reste omise, sans supprimer
+la pagination ni empêcher une page terminale complète. Le mauvais média et
+les identités impossibles à encoder restent incomplets et bloquants.
+Cette règle remplace la précédente règle « toute omission marque la page
+incomplète » pour les couvertures seulement. Aucun réarmement historique,
+assouplissement d'allowlist ou faux résultat Library n'est ajouté.
+
+Validation : dix assertions de régression échouent avant correction, puis
+les 279 tests Discovery passent, y compris deux parcours adaptateur→resolver
+qui dépassent l'image rejetée et terminent en VERIFIED ou NOT_FOUND selon
+les identités reçues. Le rejeu hors réseau du corps HTTP réel conserve les
+vingt candidats à l'identique et restitue le curseur 14. `npm run verify`,
+la validation Archify dataflow et `git diff --check` passent. Ce correctif
+local n'est pas encore une preuve de convergence des anciennes demandes.
 
 ### Défaut serveur reproduit : perte du curseur du fallback
 
