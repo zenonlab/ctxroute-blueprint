@@ -6365,6 +6365,8 @@
             "npm run package:extension"
           ],
           "evidence": [
+            "Chrome1.0.54 exact(20fichiers duZIP contrôlés) : roundtrip privé1522sources/868œuvres avec publicDiscovery, phrase incorrecte refusée sansmutation, bibliothèqueoffline et2redémarrages vérifiés ; preuveprivée private-roundtrip-exact-154-4gEGqi. Originalintact,0admission.",
+            "FirefoxZIP1.0.54 : lintMozilla0erreur/4warnings(Zod/React), modewarnings-as-errors échoué conservé. Firefox156.0.1 installé ; signatureinaccessible (aucunWEB_EXT secret local/repo/CIproduction,CDP9222absent). AucunXPIsigné.",
             "ZIPChrome1.0.54 SHA58867826da4f578029e4575b1afbcfb19bcf7bec16f64411e9465da1510421ab : upgrade1.0.53→54 dans mêmeprofilx2aPZr, sources/œuvres/progressions conservées, worker et deux cycles navigateur aprèsupdate vérifiés; pas certification de convergence.",
             "AncienZIP1.0.51 : projection legacy saison testée horsréseau,1Review/0Work préservé après2redémarrages. Firefox1.0.54 ZIP non signé, aucune preuveXPI durable ni promotionpublique.",
             "Banc persistant d6c2e6a poussé; 101 tests ciblés runtime/continuation/banc verts et Archify architecture/dataflow verts. Aucun contrat produit modifié dans cette vérification.",

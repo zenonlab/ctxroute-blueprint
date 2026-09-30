@@ -149,6 +149,27 @@ fenêtres. Les compteurs NETWORK/ADMISSION_WAIT de ce test ne prouvent donc pas
 une panne fournisseur. Ce contrôle ne remplace ni le pilote corrélé autorisé,
 ni la convergence après les admissions effectives, ni Firefox signé durable.
 
+Le contrôle privé `private-roundtrip-exact-154-4gEGqi` vérifie les vingt fichiers
+installés contre le ZIP Chrome 1.0.54 avant d'utiliser une copie du profil.
+L'export chiffré conserve exactement 1522 sources et 868 œuvres, toutes avec
+leur hydratation publique. Une phrase erronée est refusée sans mutation ;
+restauration puis deux redémarrages restituent exactement le même snapshot.
+La bibliothèque reste lisible hors ligne. Le proxy refusant toute sortie et
+le mode offline empêchent les admissions ; le profil original reste intact.
+La preuve teste les handlers réels depuis Options, pas un clic automatisé sur
+chaque contrôle de formulaire. Elle ne certifie pas la convergence réseau.
+
+Le lint Mozilla du ZIP Firefox 1.0.54 extrait sans modification trouve zéro
+erreur et quatre avertissements : deux sondes `Function('')` de Zod et deux
+branches `dangerouslySetInnerHTML` de React. Les sources applicatives examinées
+n'utilisent pas ces assignations HTML directement. L'exécution stricte
+`--warnings-as-errors` échoue et son rapport est conservé ; aucun avertissement
+n'est supprimé, aucune CSP n'est assouplie. Cela ne vaut pas validation AMO.
+Firefox 156.0.1 est installé, mais aucun couple WEB_EXT_API_KEY/WEB_EXT_API_SECRET
+n'est accessible dans cet environnement, aucun secret Mozilla correspondant
+n'est déclaré dans le dépôt ou l'environnement CI production, et le port CDP
+9222 ne répond pas lors du contrôle. Aucun XPI signé n'a été produit.
+
 ## Emplacement du banc installé
 
 Les nouveaux profils isolés et leur extension décompressée sont conservés sous
