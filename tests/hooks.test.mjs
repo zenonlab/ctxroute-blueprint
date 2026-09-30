@@ -678,6 +678,39 @@ test('CTXRoute wiring validates and injects a matching project rule', () => {
   assert.doesNotMatch(repeated.stdout, /Project governance/u);
 });
 
+test('CTXRoute flushes large JSON hook output before exiting', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'ctxroute-large-output-'));
+  const docs = join(directory, 'hooks');
+  const state = join(directory, 'state');
+  mkdirSync(docs, { recursive: true });
+  mkdirSync(state, { recursive: true });
+  writeFileSync(join(docs, 'large-context.md'), `---\nmatch: [package.json]\nmode: once\n---\n${'x'.repeat(100_000)}`);
+  const environment = {
+    ...process.env,
+    CTXROUTE_CONFIG_PATH: join(root, 'ctxroute-config.json'),
+    CTXROUTE_FILEDOCS_DIR: docs,
+    CTXROUTE_FLEET_HOOKS_DIR: docs,
+    CTXROUTE_DOCS_DIR: join(directory, 'mcp-docs'),
+    CTXROUTE_SESSIONDOCS_DIR: join(directory, 'session-docs'),
+    CTXROUTE_STATE_DIR: state,
+  };
+  for (const hook of [
+    { name: 'codex-doc-inject.js', minimumContextLength: 100_000 },
+    { name: 'doc-inject.js', minimumContextLength: 1 },
+  ]) {
+    const result = spawnSync(process.execPath, [join(root, 'node_modules/ctxroute/src/hooks', hook.name), '--budget', '0'], {
+      cwd: root,
+      env: environment,
+      input: JSON.stringify({ session_id: `large-${hook.name}-${process.pid}-${Date.now()}`, cwd: root, tool_name: 'Read', tool_input: { file_path: 'package.json' } }),
+      encoding: 'utf8',
+      maxBuffer: 1024 * 1024,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.ok(output.hookSpecificOutput.additionalContext.length >= hook.minimumContextLength);
+  }
+});
+
 test('CTXRoute injects Progress guidance across significant repository roots', () => {
   for (const filePath of ['tests/example.test.mjs', '.githooks/example.mjs', 'docs/example.md', 'src/example.ts']) {
     const session = `progress-guidance-${filePath}-${process.pid}-${Date.now()}`;

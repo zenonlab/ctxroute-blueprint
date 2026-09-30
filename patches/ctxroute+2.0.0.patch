@@ -1,0 +1,28 @@
+diff --git a/node_modules/ctxroute/src/hooks/codex-doc-inject.js b/node_modules/ctxroute/src/hooks/codex-doc-inject.js
+index 54af1a7..3343b41 100755
+--- a/node_modules/ctxroute/src/hooks/codex-doc-inject.js
++++ b/node_modules/ctxroute/src/hooks/codex-doc-inject.js
+@@ -62,4 +62,4 @@ function emit(decision, fullDoc, systemMessage) {
+   //    format untestable without spawning a process.
+   console.log(JSON.stringify(output(decision, fullDoc, systemMessage)));
+-  process.exit(0);
++  process.exitCode = 0;
+ }
+@@ -84,7 +84,7 @@ if (require.main === module) {
+       //    there is nothing to emit — it no longer kills the process (layer leak,
+       //    same family as ⑩). When it emits, `emit` exits before this line.
+       run(data, emit, { budget: lib.declaredBudget(process.argv) });
+-      process.exit(0);
++      process.exitCode = 0;
+     },
+     () => process.exit(0)
+   );
+diff --git a/node_modules/ctxroute/src/hooks/doc-inject.js b/node_modules/ctxroute/src/hooks/doc-inject.js
+index 09b42b1..33135ab 100755
+--- a/node_modules/ctxroute/src/hooks/doc-inject.js
++++ b/node_modules/ctxroute/src/hooks/doc-inject.js
+@@ -104,3 +104,3 @@ function emitJson(json) {
+   console.log(JSON.stringify(json));
+-  process.exit(0);
++  process.exitCode = 0;
+ }
