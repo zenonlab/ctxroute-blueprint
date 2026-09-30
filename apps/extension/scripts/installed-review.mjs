@@ -13,7 +13,18 @@ import { loadSourceScope, validateSourceScope } from '../../../scripts/infra/dis
 export { createInstalledReviewNetworkGuard } from './installed-review-network.mjs';
 
 const descriptorRoot = fileURLToPath(new URL('../../../build/installed-review/', import.meta.url));
+const profileRoot = join(descriptorRoot, 'profiles');
 const countNames = ['observed', 'processing', 'resolved', 'review', 'retryable', 'blocked', 'unsupported', 'internalErrors', 'publicDiscoveryPending', 'admissionWaiting', 'rateLimited', 'networkErrors', 'actionRequired', 'providerPaused'];
+
+export async function createInstalledReviewProfileRoot() {
+  await mkdir(profileRoot, { recursive: true, mode: 0o700 });
+  return mkdtemp(join(profileRoot, 'tobirink-installed-review-'));
+}
+
+export function assertInstalledReviewProfileRoot(root, token) {
+  assert.match(token, /^tobirink-installed-review-[A-Za-z0-9]{6,32}$/u, 'Invalid installed-review session token.');
+  assert.ok(root === join(profileRoot, token) || root === join(tmpdir(), token), 'Resume must use the generated profile.');
+}
 const wait = (milliseconds) => new Promise((done) => { setTimeout(done, milliseconds); });
 
 function integer(value, fallback, minimum, maximum) {
@@ -137,7 +148,7 @@ export function summarizeInstalledDiagnosticFailures(diagnostics) {
   return { windowLimit: 100, sampledEvents: events.length, failures };
 }
 
-async function capture(page) {
+export async function capture(page) {
   const snapshot = await page.evaluate(async (fields) => {
     const status = await globalThis.chrome.runtime.sendMessage({ type: 'favorite.status.read', version: 1 });
     if (!status.ok) throw new Error('status-unavailable');
@@ -164,7 +175,7 @@ async function capture(page) {
     const libraryIds = new Set(libraries.flatMap((entry) => entry.workIds));
     const reasons = {};
     const media = { ANIME: 0, MANGA: 0, MANHWA: 0, MANHUA: 0, UNKNOWN: 0 };
-    const reasonNames = new Set(['RESOLVED', 'AMBIGUOUS', 'NOT_FOUND', 'IDENTITY_MISSING', 'DETACHED', 'BLOCKED_CONTENT_TAXONOMY', 'PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'PUBLIC_DISCOVERY_PENDING', 'ADMISSION_WAIT', 'RATE_LIMITED', 'NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE', 'CONTRACT_CONFLICT', 'INVALID_RESPONSE']);
+    const reasonNames = new Set(['RESOLVED', 'AMBIGUOUS', 'UNCONFIRMED_SEASON', 'NOT_FOUND', 'IDENTITY_MISSING', 'DETACHED', 'BLOCKED_CONTENT_TAXONOMY', 'PROVIDER_UNAVAILABLE', 'INCOMPLETE_CANDIDATE_SET', 'AUTOMATIC_ATTEMPT_LIMIT', 'INTERNAL_FAILURE', 'PUBLIC_DISCOVERY_PENDING', 'ADMISSION_WAIT', 'RATE_LIMITED', 'NETWORK', 'TIMEOUT', 'SERVICE_UNAVAILABLE', 'CONTRACT_CONFLICT', 'INVALID_RESPONSE']);
     let unresolved = 0;
     let missingProjectedWorks = 0;
     for (const source of sources) {
@@ -325,7 +336,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       session = JSON.parse(await readFile(join(descriptorRoot, config.session + '.json'), 'utf8'));
       assert.equal(session.schemaVersion, 3, 'Sessions created before the exact corpus and network guard cannot be resumed.');
       assert.equal(session.token, config.session);
-      assert.equal(session.root, join(tmpdir(), session.token), 'Resume must use the generated temporary profile.');
+      assertInstalledReviewProfileRoot(session.root, session.token);
       assert.equal(session.online, config.online, 'Resume must preserve the configured network mode.');
       assert.equal(session.browserChannel ?? 'chromium', config.browserChannel, 'Resume must preserve the browser channel.');
       assert.deepEqual(session.network, network, 'Resume must preserve the configured network budgets.');
@@ -334,7 +345,7 @@ export async function runInstalledReview(argv = process.argv.slice(2), env = pro
       assert.equal(session.corpusDigest, corpusDigest, 'Resume must preserve the exact private source corpus.');
       assert.equal(previousArchive, undefined, 'A resumed session must not be reseeded or downgraded.');
     } else {
-      const root = await mkdtemp(join(tmpdir(), 'tobirink-installed-review-'));
+      const root = await createInstalledReviewProfileRoot();
       session = { schemaVersion: 3, token: basename(root), root, browserChannel: config.browserChannel, corpusDigest, expected: bookmarks.length, network, online: config.online, source: dataOrigin.source, seeded: false };
       await mkdir(join(root, 'extension'), { mode: 0o700 });
       if (archive !== undefined) extractArchive(previousArchive ?? archive, join(root, 'extension'));

@@ -7,7 +7,7 @@ export interface Review {
   availableAt?: string;
   id: ReviewId;
   matchedWorkId?: WorkId;
-  reason?: 'AMBIGUOUS' | 'NOT_FOUND';
+  reason?: 'AMBIGUOUS' | 'NOT_FOUND' | 'UNCONFIRMED_SEASON';
   decisionOrigin?: 'human' | 'automatic';
   sourceLabel: string;
   status: ReviewStatus;
@@ -16,7 +16,7 @@ export interface Review {
 
 export function createReview(input: Review): Review {
   if (input.availableAt !== undefined) canonicalDateTime(input.availableAt, 'review.availableAt');
-  invariant(input.reason === undefined || input.reason === 'AMBIGUOUS' || input.reason === 'NOT_FOUND', 'invalid-review-resolution', 'Review reason must be actionable.');
+  invariant(input.reason === undefined || input.reason === 'AMBIGUOUS' || input.reason === 'NOT_FOUND' || input.reason === 'UNCONFIRMED_SEASON', 'invalid-review-resolution', 'Review reason must be actionable.');
   invariant(input.decisionOrigin === undefined || input.decisionOrigin === 'human' || input.decisionOrigin === 'automatic', 'invalid-review-resolution', 'Review decision origin must be human or automatic.');
   const resolved = input.status === 'resolved';
   invariant(resolved === (input.matchedWorkId !== undefined), 'invalid-review-resolution', 'Only a resolved Review has a matched work.');

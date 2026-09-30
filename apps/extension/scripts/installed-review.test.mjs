@@ -1,14 +1,77 @@
 import { mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createInstalledRecoveryObservation, createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
-import { drainInstalledReviewReads, prepareInstalledRecoveryRestart, reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
+import { assertInstalledReviewProfileRoot, createInstalledReviewProfileRoot, drainInstalledReviewReads, prepareInstalledRecoveryRestart, reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
 import { reserveRecoveryPost } from '../../../scripts/infra/discovery-recovery-batch.mjs';
+import { capture, installedConverged } from './installed-review.mjs';
+
+describe('installed Review reason accounting', () => {
+  it.each(['UNCONFIRMED_SEASON', 'UNDECLARED_REASON'])('counts only declared Review reasons as explained: %s', async (reason) => {
+    const records = {
+      favoriteSources: [{ id: 'source_one', presence: 'observed', resolution: { kind: 'REVIEW_REQUIRED', reason } }],
+      favoriteArtifacts: [{ sourceId: 'source_one', artifact: { mediaKind: 'ANIME' } }],
+      works: [], libraries: [], progress: [], reviews: [{ status: 'pending', reason }],
+    };
+    const requestFor = (result) => {
+      const request = { result, onsuccess: undefined };
+      globalThis.queueMicrotask(() => request.onsuccess?.());
+      return request;
+    };
+    vi.stubGlobal('indexedDB', { open: () => requestFor({
+      close() {},
+      transaction: () => ({ objectStore: (name) => ({ getAll: () => requestFor(records[name]) }) }),
+    }) });
+    vi.stubGlobal('chrome', { runtime: { sendMessage: async (message) => message.type === 'favorite.status.read'
+      ? { ok: true, counts: { observed: 1, review: 1 }, inventory: { status: 'complete' } }
+      : { ok: true, snapshot: { statistics: { completed: 0, inProgress: 0, knownMetadata: 0, notStarted: 0, total: 0 } } } } });
+    try {
+      const snapshot = await capture({ evaluate: (evaluate, fields) => evaluate(fields) });
+      const recognized = reason === 'UNCONFIRMED_SEASON';
+      expect(snapshot.aggregate.reasons).toEqual({ [recognized ? reason : 'UNRESOLVED']: 1 });
+      expect(snapshot.aggregate.unresolved).toBe(recognized ? 0 : 1);
+      expect(installedConverged(snapshot.aggregate, 1)).toBe(recognized);
+    } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+describe('persistent installed review profiles', () => {
+  const persistentRoot = fileURLToPath(new URL('../../../build/installed-review/profiles/', import.meta.url));
+  const token = 'tobirink-installed-review-Abc123';
+
+  it('creates private stable profiles without replacing an existing profile', async () => {
+    const first = await createInstalledReviewProfileRoot();
+    await writeFile(join(first, 'preserved-fixture.json'), '{"preserved":true}', { mode: 0o600 });
+    const second = await createInstalledReviewProfileRoot();
+    expect(dirname(first)).toBe(dirname(join(persistentRoot, token)));
+    expect(dirname(second)).toBe(dirname(join(persistentRoot, token)));
+    expect(first).not.toBe(second);
+    expect((await stat(first)).mode & 0o077).toBe(0);
+    expect((await stat(second)).mode & 0o077).toBe(0);
+    expect((await stat(persistentRoot)).mode & 0o077).toBe(0);
+    expect(await readFile(join(first, 'preserved-fixture.json'), 'utf8')).toBe('{"preserved":true}');
+    expect(() => assertInstalledReviewProfileRoot(first, basename(first))).not.toThrow();
+  });
+
+  it('accepts the stable path and legacy temporary path without moving either', () => {
+    expect(() => assertInstalledReviewProfileRoot(join(persistentRoot, token), token)).not.toThrow();
+    expect(() => assertInstalledReviewProfileRoot(join(tmpdir(), token), token)).not.toThrow();
+  });
+
+  it.each([
+    [join(persistentRoot, 'foreign'), token],
+    [join(tmpdir(), 'foreign', token), token],
+    [join(persistentRoot, token), '../' + token],
+    [join(persistentRoot, token), 'tobirink-installed-review-../Abc123'],
+  ])('rejects foreign profile paths or unsafe tokens', (root, sessionToken) => {
+    expect(() => assertInstalledReviewProfileRoot(root, sessionToken)).toThrow();
+  });
+});
 
 describe('installed recovery restart preparation', () => {
   it('waits for correlation before pausing and draining live routes', async () => {
@@ -585,6 +648,28 @@ describe('installed review network guard', () => {
       expect(onFailure).toHaveBeenCalledOnce();
       expect(() => instance.throwIfFailed()).toThrow(/failed closed/);
     }
+  });
+
+  it.each(['application/json', 'application/json; profile=tobirink-season-review-v1'])('accepts only declared discovery capabilities on GET and lookup: %s', async (accept) => {
+    const { instance } = await guard({ online: true, readBudget: 2 });
+    const read = fakeRoute({ headers: { accept, 'user-agent': 'Chromium/153 installed-review' }, url: discoveryUrl() });
+    const lookup = fakeRoute({
+      body: { keys: [key()], schemaVersion: 3 }, method: 'POST', url: 'https://tobirink.com/v3/catalogue/discoveries/lookup',
+      headers: { accept, 'content-type': 'application/json', origin: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'user-agent': 'Chromium/153 installed-review' },
+    });
+    await instance.handle(read);
+    await instance.handle(lookup);
+    expect(read.fetch).toHaveBeenCalledOnce();
+    expect(lookup.fetch).toHaveBeenCalledOnce();
+    expect(instance.snapshot()).toMatchObject({ forwardedReads: 2, forwardedRequests: 0 });
+  });
+
+  it.each(['application/json; profile=unknown', 'application/json; profile=tobirink-season-review-v1; extra=1'])('rejects unrecognized discovery Accept values: %s', async (accept) => {
+    const { instance } = await guard({ online: true, readBudget: 1 });
+    const read = fakeRoute({ headers: { accept, 'user-agent': 'Chromium/153 installed-review' }, url: discoveryUrl() });
+    await instance.handle(read);
+    expect(read.fetch).not.toHaveBeenCalled();
+    expect(instance.snapshot().failure).toBe('discovery-read-rejected');
   });
 
   it('rejects undeclared payload fields, POST queries and private headers', async () => {

@@ -39,6 +39,69 @@ function providers(values: Partial<Record<ResolutionProvider, ProviderCandidate>
 }
 
 describe('standalone provider resolver', () => {
+  it('reaches Kitsu when AniList returns an exact ID but cannot corroborate the requested season', async () => {
+    const ports = providers({
+      anilist: { ...candidate('anilist', 'ANIME', '123', 'Target'), format: 'TV' },
+      'kitsu-anime': { ...candidate('kitsu-anime', 'ANIME', '42', 'Target'), format: 'TV' },
+    });
+    const input = request('ANIME');
+    const result = await createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 1, sourceFormat: 'NON_OVA', discoveryTitles: ['Target', 'Broad variant'] } });
+    expect(ports.anilist.search).toHaveBeenCalledTimes(2);
+    expect(ports.anilist.hydrate).not.toHaveBeenCalled();
+    expect(ports['kitsu-anime'].search).toHaveBeenCalledOnce();
+    expect(ports['kitsu-anime'].hydrate).not.toHaveBeenCalled();
+    expect(result).toEqual({ state: 'AMBIGUOUS', reason: 'season-unconfirmed', candidates: [{ provider: 'kitsu-anime', externalId: '42' }] });
+  });
+
+  it('offers an exact unseasoned identity for human review only after the primary search', async () => {
+    const ports = providers({ 'kitsu-anime': { ...candidate('kitsu-anime', 'ANIME', '42', 'Target'), format: 'TV' } });
+    const input = request('ANIME');
+    const result = await createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 1, sourceFormat: 'NON_OVA', discoveryTitles: ['Target', 'Broad variant'] } });
+    expect(result).toEqual({ state: 'AMBIGUOUS', reason: 'season-unconfirmed', candidates: [{ provider: 'kitsu-anime', externalId: '42' }] });
+    expect(ports.anilist.search).toHaveBeenCalledTimes(2);
+    expect(ports['kitsu-anime'].search).toHaveBeenCalledOnce();
+    expect(ports['kitsu-anime'].hydrate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { titles: ['Target Season 2'] },
+    { season: 2 },
+    { titles: ['Targat'] },
+    { format: 'OVA' },
+    { preSerialization: true },
+  ])('does not disguise contradictory or approximate evidence as a season review: %j', async (change) => {
+    const ports = providers({ 'kitsu-anime': { ...candidate('kitsu-anime', 'ANIME', '42', 'Target'), format: 'TV', ...change } });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 1, sourceFormat: 'NON_OVA', preSerialization: false } })).resolves.toMatchObject({ state: 'NOT_FOUND' });
+  });
+
+  it('does not convert primary provider failure into a season review', async () => {
+    const ports = providers({ 'kitsu-anime': candidate('kitsu-anime', 'ANIME', '42', 'Target') });
+    ports.anilist.search.mockRejectedValue(new Error('network unavailable'));
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 1 } })).rejects.toThrow('network unavailable');
+  });
+
+  it('does not conclude a season review from an incomplete fallback page', async () => {
+    const ports = providers();
+    ports['kitsu-anime'].search.mockResolvedValue({ candidates: [candidate('kitsu-anime', 'ANIME', '42', 'Target')], complete: false, digest: 'incomplete', provider: 'kitsu-anime', truncated: true });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 1 } })).rejects.toThrow('incomplete-provider-search');
+  });
+
+  it('keeps an unknown-media request outside the anime-only season Review contract', async () => {
+    const ports = providers({ 'kitsu-anime': candidate('kitsu-anime', 'ANIME', '42', 'Target') });
+    const input = request('UNKNOWN');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 1 } })).resolves.toMatchObject({ state: 'NOT_FOUND' });
+  });
+
+  it('still verifies a corroborated fallback season instead of requiring human review', async () => {
+    const ports = providers({ 'kitsu-anime': { ...candidate('kitsu-anime', 'ANIME', '42', 'Target'), season: 1 } });
+    const input = request('ANIME');
+    await expect(createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 1 } })).resolves.toMatchObject({ state: 'VERIFIED' });
+    expect(ports['kitsu-anime'].hydrate).toHaveBeenCalledOnce();
+  });
+
   it.each([
     ['NON_OVA', 'OVA'],
     ['OVA', 'TV'],

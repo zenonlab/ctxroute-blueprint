@@ -3,6 +3,7 @@ import { favoriteIdentityKey, importFavoriteSources, requestPublicFavoriteDiscov
 import { MemoryStoragePort } from '@tobirink/contracts';
 import type { PublicDiscoveryKey } from '@tobirink/application';
 import { HttpPublicDiscoveryAdapter } from './http-public-discovery-adapter';
+import { publicDiscoverySeasonReviewAccept } from '@tobirink/public-discovery';
 
 const key: PublicDiscoveryKey = {
   fingerprint: 'a'.repeat(64), mediaKind: 'ANIME', parserVersion: '5', siteRulesVersion: '3',
@@ -10,6 +11,25 @@ const key: PublicDiscoveryKey = {
 const query = { discoveryTitles: ['Frieren'], mediaKind: 'ANIME' as const, sourceTitles: ['Sousou no Frieren'] };
 
 describe('HttpPublicDiscoveryAdapter', () => {
+  it('announces season Review support on reads, admissions, recovery and grouped lookup', async () => {
+    const pending = { state: 'PENDING', retryAt: new Date(Date.now() + 60_000).toISOString() };
+    const fetcher = vi.fn(async (_input: string, init: RequestInit) => Response.json(init.method === 'GET' ? { state: 'MISS' } : pending));
+    await new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher).resolveOrRequest(key, query);
+    await new HttpPublicDiscoveryAdapter('https://tobirink.com', fetcher).requestRecovery(key, query);
+    const grouped = vi.fn(async () => Response.json([{ key, state: pending }]));
+    await new HttpPublicDiscoveryAdapter('https://tobirink.com', grouped).lookup([key]);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    for (const [, init] of fetcher.mock.calls) expect(new Headers(init.headers).get('Accept')).toBe(publicDiscoverySeasonReviewAccept);
+    expect(grouped).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ headers: { Accept: publicDiscoverySeasonReviewAccept, 'Content-Type': 'application/json' } }));
+  });
+
+  it.each(['season-unconfirmed', 'multiple-identities'])('validates a single Review reference against its reason: %s', async (reason) => {
+    const state = { state: 'AMBIGUOUS', reason, candidates: [{ provider: 'kitsu-anime', externalId: '42' }], verifiedAt: '2026-09-30T12:00:00.000Z' };
+    const adapter = new HttpPublicDiscoveryAdapter('https://tobirink.com', async () => Response.json(state));
+    if (reason === 'season-unconfirmed') await expect(adapter.resolveOrRequest(key, query)).resolves.toMatchObject(state);
+    else await expect(adapter.resolveOrRequest(key, query)).rejects.toThrow();
+  });
+
   afterEach(() => vi.useRealTimers());
   it('preserves the real adapter receiver through the application recovery use case', async () => {
     const storage = new MemoryStoragePort();

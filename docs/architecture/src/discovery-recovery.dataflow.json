@@ -23,7 +23,7 @@
     { "id": "d1", "type": "database", "label": "D1 Discovery v3", "sublabel": "état · curseur · bail", "stage": 2, "row": 0, "tag": "clé directe · jeton indexé" },
     { "id": "queue", "type": "backend", "label": "Entrée Worker", "sublabel": "direct 45 s · Queue", "stage": 3, "row": 0, "tag": "claim(1) · expiration ciblée" },
     { "id": "collector", "type": "backend", "label": "Collecteur Worker", "sublabel": "sonde partagée · 10 min", "stage": 3, "row": 2, "tag": "bail D1 · curseur conservé" },
-    { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "VERIFIED · ID lié contrôlé", "stage": 4, "row": 1, "width": 150, "tag": "Library exige deux liens exacts" }
+    { "id": "result", "type": "backend", "label": "Résultat public audité", "sublabel": "Review · capacité client", "stage": 4, "row": 1, "width": 150, "tag": "Review connue · inconnu bloquant" }
   ],
   "flows": [
     { "from": "snapshot", "to": "canaries", "label": "base de comparaison", "classification": "lecture seule", "variant": "default", "labelDy": 53 },
@@ -37,6 +37,6 @@
   ],
   "cards": [
     { "dot": "amber", "title": "Arrêt sans réarmement", "items": ["Réservation durable commune au pilote et au CLI", "Pilote séquentiel : terminal + coût D1 ≤ 300 + reçu avant la clé suivante", "Arrêt au premier échec : aucun POST en attente transféré", "HTTP et Queue : ordre libre, preuve complète du même UUID requise", "Échec Queue : coût corrélé à l’admission, sans payload brut", "MangaUpdates en panne : secours MangaDex par ID lié hydraté", "Le bail atomique fournisseur du Worker reste l’autorité en cas de course", "Deux recherches réussies puis curseur et continuation", "UNKNOWN : deux lanes reprises ; CLI exige reparse", "AMBIGUOUS rejoint Review, pas une boucle interne"] },
-    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Jeton protégé du claim générique pendant 15 min sans progrès", "Réveil vide corrélé compté, sans preuve finale", "Tail Wrangler OAuth local ou WebSocket Cloudflare, prêt ≤ 75 s", "Coûts et cause Queue fermée · zéro 429/Queue · D1 cumulé ≤ 300", "Dépassement : compteurs privés agrégés · aucune identité ni titre", "Coûts scellés · lectures closes et drainées · redémarrage local"] }
+    { "dot": "emerald", "title": "Certificat exigé", "items": ["Un POST maximum par clé puis terminal", "Jeton protégé du claim générique pendant 15 min sans progrès", "Réveil vide corrélé compté, sans preuve finale", "Tail Wrangler OAuth local ou WebSocket Cloudflare, prêt ≤ 75 s", "Coûts et cause Queue fermée · zéro 429/Queue · D1 cumulé ≤ 300", "Dépassement : compteurs privés agrégés · aucune identité ni titre", "Coûts scellés · lectures closes et drainées · redémarrage local", "Profils privés persistants · anciens profils conservés"] }
   ]
 }

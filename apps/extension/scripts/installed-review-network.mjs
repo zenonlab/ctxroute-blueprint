@@ -91,7 +91,7 @@ const releaseModelQuerySchema = releaseQuerySchema.extend({ representation: z.li
 const okRead = new Set([200]);
 const okAgenda = new Set([200, 304]);
 const okMutation = new Set([202]);
-const jsonAccept = new Set(['application/json']);
+const jsonAccept = new Set(['application/json', 'application/json; profile=tobirink-season-review-v1']);
 const agendaAccept = new Set(['*/*', 'application/json']);
 const extensionOriginSchema = z.string().regex(/^chrome-extension:\/\/[a-p]{32}$/u);
 const userAgentSchema = z.string().min(1).max(512).regex(/^[\x20-\x7e]+$/u);

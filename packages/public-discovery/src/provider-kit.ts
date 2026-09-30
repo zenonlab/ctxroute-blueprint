@@ -126,6 +126,14 @@ function corroboratesSeason(candidate: ProviderCandidate, season: number): boole
   return seasons.size === 1 && seasons.has(season);
 }
 
+export function inspectUnconfirmedSeasonCandidates(query: FavoriteTitleMatchQuery, candidates: readonly ProviderCandidate[]): readonly FavoriteProviderReference[] {
+  const { explicitSeason, ...withoutSeason } = query;
+  if (explicitSeason === undefined) return [];
+  const unknown = candidates.filter(candidate => candidate.season === undefined && candidate.titles.every(title => titleSeason(title) === undefined));
+  const evidence = inspectFavoriteTitleCandidates(withoutSeason, unknown);
+  return evidence.level === 'ordered-exact' ? evidence.candidateReferences : [];
+}
+
 export function isFavoriteMediaKindCompatible(mediaKind: FavoriteMediaKind | undefined, candidateKind: ProviderCandidate['mediaKind']): boolean {
   return mediaKind === undefined || mediaKind === 'UNKNOWN' || mediaKind === candidateKind
     || mediaKind !== 'ANIME' && candidateKind !== 'ANIME';

@@ -57,6 +57,28 @@ async function fixture(input = favorite, adapters: Parameters<typeof importFavor
 }
 
 describe('runFavoriteResolutionSlice', () => {
+  it.each([true, false])('requires local season evidence before projecting a single season-review reference: %s', async (withSeason) => {
+    const { storage, outbox, task } = await fixture({ ...favorite, title: withSeason ? 'Frieren Saison 1' : 'Frieren' });
+    const references = [{ provider: 'kitsu-anime' as const, externalId: '42' }];
+    const result = await runFavoriteResolutionSlice({
+      storage, outbox, candidates: candidatePorts(unusedSearch), hydration: hydrationPorts(unusedHydration),
+      libraryId: libraryId('library_primary'), now: () => now, token: () => 'season-review',
+      publicDiscovery: { resolveOrRequest: async () => ({ state: 'AMBIGUOUS', candidates: references, reason: 'season-unconfirmed', verifiedAt: now }) },
+    });
+    const [source] = await storage.listFavoriteSources({ limit: 1 });
+    if (withSeason) {
+      expect(result).toMatchObject({ completed: 1, retried: 0, blocked: 0 });
+      expect(source?.resolution).toEqual({ kind: 'REVIEW_REQUIRED', reason: 'UNCONFIRMED_SEASON' });
+      expect(source?.reviewId && await storage.getFavoriteReviewCandidateSet(source.reviewId)).toMatchObject({ references, totalCandidates: 1 });
+      expect(await storage.getFavoriteResolutionTask(task.id)).toMatchObject({ state: 'COMMITTED' });
+      expect(await storage.listReviews({ limit: 100, status: 'pending' })).toMatchObject([{ reason: 'UNCONFIRMED_SEASON' }]);
+    } else {
+      expect(await storage.listReviews({ limit: 100, status: 'pending' })).toEqual([]);
+      expect(source?.resolution).toMatchObject({ kind: 'RETRYABLE', reason: 'INTERNAL_FAILURE' });
+    }
+    expect(await storage.listWorks({ limit: 100 })).toEqual([]);
+  });
+
   it.each((['MANGA', 'ANIME'] as const).flatMap(mediaKind => (['linked', 'direct', 'missing-link', 'wrong-link', 'missing-reference', 'wrong-direct', 'wrong-provider'] as const).map(mode => ({ mediaKind, mode }))))('projects resolver identity evidence into Library: $mediaKind $mode', async ({ mediaKind, mode }) => {
     const exact = { provider: mediaKind === 'ANIME' ? 'anilist' as const : 'mangaupdates' as const, externalId: '12345' };
     const manga = { ...exact, mediaKind, preSerialization: false, titles: ['Target'] };

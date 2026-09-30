@@ -44,6 +44,16 @@ describe('private recovery', () => {
     }
   });
 
+  it('round-trips an unconfirmed season Review and its source resolution', async () => {
+    const review = createReview({ id: reviewId('review_season'), reason: 'UNCONFIRMED_SEASON', sourceLabel: 'Synthetic source', status: 'pending', title: 'Synthetic season' });
+    const source = createFavoriteSource({ bookmarkId: 'season-bookmark', folderPath: [], id: favoriteSourceId('source_season'), importedAt: '2026-09-04T09:00:00.000Z', order: 0, reviewId: review.id, title: 'Synthetic season', url: 'https://reader.example/season', resolution: { kind: 'REVIEW_REQUIRED', reason: 'UNCONFIRMED_SEASON' } });
+    const snapshot = { ...empty, reviews: [review], favoriteSources: [source] };
+    const exported = await createPrivateExport(new MemoryRecoveryStore(snapshot), '2026-09-30T12:00:00.000Z');
+    const restored = new MemoryRecoveryStore(empty);
+    await importPrivateExport(JSON.stringify(exported), restored, 'replace-private-state');
+    expect(await restored.readSnapshot()).toEqual(snapshot);
+  });
+
   it('round-trips all 32 provider metadata values and title indexes', async () => {
     const titles = Array.from({ length: 32 }, (_, index) => `Title ${index}`);
     const candidate = {

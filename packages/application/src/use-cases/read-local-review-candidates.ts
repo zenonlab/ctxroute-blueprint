@@ -15,7 +15,7 @@ export interface LocalReviewCandidate {
 
 export interface LocalReviewCandidateSnapshot {
   providerReferences?: readonly FavoritePublicReference[] | undefined;
-  reason?: 'AMBIGUOUS' | 'NOT_FOUND' | undefined;
+  reason?: 'AMBIGUOUS' | 'NOT_FOUND' | 'UNCONFIRMED_SEASON' | undefined;
   matchLevel?: string | undefined;
   provenance?: string | undefined;
   totalCandidates?: number | undefined;

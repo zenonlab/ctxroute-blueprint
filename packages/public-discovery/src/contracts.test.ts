@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { publicDiscoveryCandidateSchema, publicDiscoveryLookupSubmissionSchema, publicDiscoveryQuerySchema, publicDiscoveryRefreshSubmissionSchema, publicDiscoverySearchProgressSchema, publicDiscoverySubmissionSchema } from '.';
+import { publicDiscoveryCandidateSchema, publicDiscoveryLookupSubmissionSchema, publicDiscoveryQuerySchema, publicDiscoveryRefreshSubmissionSchema, publicDiscoverySearchProgressSchema, publicDiscoverySubmissionSchema, publicDiscoveryTerminalResolutionSchema } from '.';
 
 const query = {
   discoveryTitles: ['One'],
@@ -8,6 +8,13 @@ const query = {
 };
 
 describe('public discovery request minimization', () => {
+  it('requires an explicit unconfirmed-season reason for a single review reference', () => {
+    const candidates = [{ provider: 'kitsu-anime', externalId: '42' }];
+    expect(publicDiscoveryTerminalResolutionSchema.safeParse({ state: 'AMBIGUOUS', candidates, reason: 'season-unconfirmed' }).success).toBe(true);
+    expect(publicDiscoveryTerminalResolutionSchema.safeParse({ state: 'AMBIGUOUS', candidates, reason: 'multiple-identities' }).success).toBe(false);
+    expect(publicDiscoveryTerminalResolutionSchema.safeParse({ state: 'AMBIGUOUS', candidates: [], reason: 'season-unconfirmed' }).success).toBe(false);
+  });
+
   it('accepts bounded selective cursors only for MangaUpdates', () => {
     const base = { candidates: [], cursor: 'mu2:2', provider: 'mangaupdates', titleIndex: 0, version: 1 };
     expect(publicDiscoverySearchProgressSchema.parse(base)).toEqual(base);

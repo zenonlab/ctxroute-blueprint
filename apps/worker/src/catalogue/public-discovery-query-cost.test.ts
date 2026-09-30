@@ -54,6 +54,53 @@ async function claimedPublication(id: number, titles: string[]) {
 }
 
 describe('public discovery indexed query cost', () => {
+  it('publishes an unconfirmed season Review before scanning unrelated fallback aliases', async () => {
+    const runtimeBefore = await env.PUBLIC_DB.prepare("SELECT provider, next_allowed_at, active_until, consecutive_failures, circuit_open_until, updated_at FROM public_discovery_provider_runtime WHERE provider IN ('anilist', 'kitsu-anime')")
+      .all<{ provider: string; next_allowed_at: number; active_until: number; consecutive_failures: number; circuit_open_until: number; updated_at: string }>();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-12-11T12:00:00.000Z'));
+    const measured = instrumentD1(env.PUBLIC_DB);
+    const adapter = new D1PublicDiscoveryV3Adapter(measured.database);
+    const key = { fingerprint: fingerprint(200081), mediaKind: 'ANIME' as const, parserVersion: '5', siteRulesVersion: '3' };
+    const signals: Extract<NativeCollectorSignal, { type: 'public-discovery-ready' }>[] = [];
+    const metrics = { backlogBytes: 0, backlogCount: 0 };
+    const queue = { metrics: async () => metrics, sendBatch: vi.fn(async () => ({ metadata: { metrics } })), send: vi.fn(async (signal: NativeCollectorSignal) => {
+      if (signal.type !== 'public-discovery-ready') throw new Error('unexpected-test-signal');
+      signals.push(signal);
+      return { metadata: { metrics } };
+    }) };
+    let fallbackCalls = 0;
+    const provider = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      vi.setSystemTime(Date.now() + 10_000);
+      const url = new URL(String(input));
+      if (url.hostname === 'graphql.anilist.co') return Response.json({ data: { Page: { media: [], pageInfo: { hasNextPage: false } } } });
+      if (url.hostname !== 'kitsu.io') throw new Error('unexpected-test-provider');
+      fallbackCalls += 1;
+      expect(url.searchParams.get('filter[text]')).toBe('Synthetic seasonal target');
+      return Response.json({ data: [{ id: '4242', type: 'anime', attributes: {
+        abbreviatedTitles: [], canonicalTitle: 'Synthetic seasonal target', slug: 'synthetic-seasonal-target', subtype: 'TV', titles: { en: 'Synthetic seasonal target' },
+      } }], links: { next: null }, meta: { count: 1 } });
+    });
+    try {
+      await adapter.request({ key, query: { discoveryTitles: ['Synthetic seasonal target', 'Broad alternative', 'Another alternative', 'Fourth alternative'], sourceTitles: ['Synthetic seasonal target'], mediaKind: 'ANIME', season: 1 }, requestDigest: 'e'.repeat(64), schemaVersion: 3 }, new Date().toISOString());
+      for (let invocation = 0; invocation < 5; invocation += 1) {
+        const report = await processPublicDiscoveryQueue({ ...env, PUBLIC_DB: measured.database, PROVIDER_TRANSPORT_MODE: 'direct', PUBLIC_DISCOVERY_QUEUE: queue }, key, true, undefined, signals.at(-1)?.continuationToken);
+        expect(report.failed).toBe(0);
+        if (report.published === 1) break;
+        expect(report.deferred).toBe(1);
+        vi.setSystemTime(Date.now() + 60_000);
+      }
+      expect(fallbackCalls).toBe(1);
+      expect(measured.snapshot().rowsRead).toBeLessThanOrEqual(300);
+      console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'unconfirmed-season', ...measured.snapshot() }));
+      await expect(adapter.read(key, new Date().toISOString())).resolves.toMatchObject({ state: 'AMBIGUOUS', reason: 'season-unconfirmed', candidates: [{ provider: 'kitsu-anime', externalId: '4242' }] });
+    } finally {
+      provider.mockRestore(); vi.useRealTimers();
+      await env.PUBLIC_DB.batch(runtimeBefore.results.map(row => env.PUBLIC_DB.prepare('UPDATE public_discovery_provider_runtime SET next_allowed_at = ?2, active_until = ?3, consecutive_failures = ?4, circuit_open_until = ?5, updated_at = ?6 WHERE provider = ?1')
+        .bind(row.provider, row.next_allowed_at, row.active_until, row.consecutive_failures, row.circuit_open_until, row.updated_at)));
+    }
+  });
+
   it('keeps a twenty-page manga search within the cumulative read budget', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-12-10T12:00:00.000Z'));

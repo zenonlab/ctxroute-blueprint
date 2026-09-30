@@ -28,7 +28,7 @@ export const reviewQueueResponseSchema = z.discriminatedUnion('ok', [
 ]);
 export const reviewCandidatesResponseSchema = z.discriminatedUnion('ok', [
   z.strictObject({ ok: z.literal(true), snapshot: z.strictObject({
-    reason: z.enum(['AMBIGUOUS', 'NOT_FOUND']).optional(),
+    reason: z.enum(['AMBIGUOUS', 'NOT_FOUND', 'UNCONFIRMED_SEASON']).optional(),
     providerReferences: webReviewSnapshotSchema.shape.providerReferences,
     matchLevel: z.string().min(1).max(100).optional(),
     provenance: z.string().min(1).max(100).optional(),

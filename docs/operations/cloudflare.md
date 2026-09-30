@@ -1,5 +1,139 @@
 # Cloudflare operations gate
 
+## Pilote des neuf reprises du 30 septembre et candidate 1.0.52
+
+Après confirmation du scope privé scellé, le profil Chrome `qxl4zA` a envoyé
+quatre POST avec réservation préalable : trois résultats sont projetés dans
+Library, puis l'observateur s'arrête au premier dépassement technique. La
+quatrième corrélation totalise 318 lectures D1 (20 admission, 298 collecte),
+103 écritures et 18 appels fournisseur sur neuf événements de collecte,
+sans résultat accepté au moment de l'arrêt. Les cinq autres clés ne sont
+pas envoyées. Les quatre réservations restent consommées ; cet arrêt ne
+prouve pas l'annulation du traitement serveur et n'autorise aucun rejeu.
+
+La lecture ciblée après arrêt observe la recherche Kitsu anime à l'alias 2,
+page 12. Le diagnostic fournisseur local reçoit HTTP 200 : un alias élargi
+retourne 276 résultats, tandis que le premier alias contient un titre exact
+sans preuve de saison. Le contrôle strict avec saison demandée le rejette.
+Ce défaut est une recherche trop longue sans conclusion métier adaptée,
+pas la preuve d'une panne actuelle de tous les fournisseurs.
+
+Le diagnostic primaire ultérieur effectue quatre recherches AniList en lecture
+seule avec l'adaptateur du projet, depuis la machine locale. Les quatre réponses
+sont HTTP 200 et complètes. La première contient deux candidats : le comparateur
+retient une correspondance `ordered-exact` sans contrainte de saison, mais zéro
+avec la saison 1 demandée. Les trois autres alias ne retournent aucun candidat.
+L'ID AniList est donc présent dans le résultat ; il est écarté avant hydratation
+par le contrôle de saison. Les candidats TV n'ont ni champ saison ni alias avec
+une saison reconnue. Le favori porte explicitement saison 1 dans son titre et
+son URL, qui n'est pas une URL fournisseur. Le parseur n'a pas inventé cette
+contrainte. Cette reproduction explique le passage au fallback sans panne,
+mais ne reconstitue pas les réponses historiques de l'egress Worker.
+Le reçu privé `anilist-before-kitsu-evidence.json` est conservé en mode `0600`.
+Une régression couvre ce cas avec AniList répondant un ID exact, et non plus
+seulement un fournisseur primaire vide. Le correctif de Review ne prouve pas
+que cette identité corresponde effectivement à la saison demandée.
+
+La candidate 1.0.52 propose une Review `UNCONFIRMED_SEASON` uniquement sur
+preuve exacte et page complète du dernier fallback anime, après la recherche
+principale, sans panne antérieure. Aucun Work n'est créé automatiquement.
+Les régressions couvrent les saisons contradictoires, pages incomplètes,
+pannes, média inconnu, restauration privée et association humaine après
+redémarrage. La fixture Worker reste sous 300 lectures cumulées ; elle
+n'est pas une nouvelle preuve de production. Les E2E de l'archive passent
+avec 13 succès et un test ignoré, sur réponses fournisseur simulées.
+
+Cette candidate n'est ni déployée ni promue : les anciennes extensions
+refusent le nouveau résultat à référence unique. Une distribution manuelle
+du nouveau client seule ne corrige pas cette incompatibilité. Résoudre et
+tester ce contrat avant fusion sur `main`, puis obtenir une nouvelle preuve
+réelle sans réutiliser les clés consommées. Les archives publiques et
+résultats D1 précédents restent conservés.
+
+## Candidate 1.0.53 — lecture négociée des saisons non corroborées
+
+Le Worker conserve le résultat complet en D1. L'extension 1.0.53 annonce
+`Accept: application/json; profile=tobirink-season-review-v1` pour recevoir
+le candidat et le motif de Review. Les anciens clients reçoivent le contrat
+`NOT_FOUND` avec le motif `season-unconfirmed` : aucune identité saisonnière
+confirmée, ce qui conserve leur parcours de décision humaine existant.
+Cette projection n'est pas utilisée pour une panne, une attente ou une
+ambiguïté ordinaire. Elle ne déclare pas l'œuvre inexistante et ne modifie
+ni les clés, ni les preuves stockées, ni les états D1. Les réponses restent
+`no-store` et varient sur `Accept` ; GET, lookup et admission partagent la
+même projection. Une capacité inconnue reste sur le contrat ancien.
+
+Les tests ciblés valident 42 scénarios de routes Worker et 27 de client HTTP.
+Le test historique de migration doit rester premier dans sa suite : les
+nouvelles fixtures ne doivent pas appliquer les migrations avant lui.
+Les archives 1.0.52 et leurs preuves restent conservées ; 1.0.53 est une
+candidate distincte, pas une réécriture du fichier précédemment testé.
+Le rollback conserve la projection HTTP et les lecteurs D1 du nouveau motif
+tant que des résultats l'utilisent. Il ne supprime ni Review ni favori.
+Validation locale : `npm run verify` vert, 253 tests Worker, 493 application,
+276 Discovery, 160 infra, audit npm sans vulnérabilité. Les E2E de l'archive
+1.0.53 passent avec 13 succès et un test ignoré, sur réponses simulées.
+Archify architecture et dataflow passent en showcase 9/9. Ces résultats ne
+certifient ni le backlog réel ni Firefox signé. La CI protégée et la preuve
+installée en production restent des étapes séparées.
+
+Le premier profil réel 1.0.53 `Pmkmwx` s'arrête à l'installation avec
+`discovery-read-rejected`, avant toute lecture ou admission transmise : le
+garde du banc n'autorisait que `Accept: application/json`. Son échec scellé
+et son profil sont conservés, sans réinitialisation du garde. Le banc accepte
+maintenant également la capacité exacte ci-dessus, mais refuse les profils
+inconnus et paramètres supplémentaires. Les 73 tests du banc passent.
+Un nouveau profil est nécessaire pour ce contrôle ; ce n'est ni une reprise
+du pilote mutateur ni un effacement de ses erreurs. Le ZIP 1.0.53 ne change pas.
+
+Le comptage installé reconnaît aussi `UNCONFIRMED_SEASON` comme motif Review
+expliqué. Une régression reproduit son classement erroné en `UNRESOLVED`
+avant correction ; un motif non déclaré reste bloquant après correction.
+Les 75 tests du banc passent, sans changer les archives ni les limites réseau.
+Un contrôle de l'archive Chrome 1.0.51 reçoit la projection ancienne simulée :
+une source en Review, aucune œuvre créée, données conservées après deux
+redémarrages du navigateur réel. Ce contrôle ne contacte aucun fournisseur
+et ne vaut pas preuve d'une résolution en production.
+
+## Emplacement du banc installé
+
+Les nouveaux profils isolés et leur extension décompressée sont conservés sous
+`build/installed-review/profiles/`, dans des répertoires privés `0700` ignorés
+par Git. Les reçus restent sous `build/installed-review/` en `0600`.
+`TOBIRINK_INSTALLED_SESSION` reprend le jeton indiqué dans le reçu ; ne pas
+modifier le chemin de son descripteur. Le banc accepte également les anciens
+profils temporaires à leur emplacement exact, sans migration ni suppression.
+Changer le corpus, les budgets ou le canal reste refusé. Un profil persistant
+n'est pas une preuve de convergence ni une installation Firefox signée.
+La disparition des fichiers de `5ECSJP` demeure un incident conservé, dont
+l'auteur n'est pas établi ; le nouvel emplacement évite de dépendre de la
+conservation des archives décompressées par le temporaire système.
+
+## Contrôle Chrome 1.0.51 conservé
+
+Le profil neuf Google Chrome headless `5ECSJP` importe les 1 522 favoris
+Downloads avec le ZIP 1.0.51, SHA-256
+`6f423f9e1bd99f823ee230119311801ba99269858ec77fa4828cee9741e80206`.
+La première fenêtre de vingt minutes finit sans relevé final complet.
+À la reprise, les fichiers de l'extension décompressée sont absents du
+répertoire temporaire ; le processus qui les a retirés n'est pas identifié.
+Les deux reçus d'échec sont conservés. Seuls les vingt fichiers du ZIP
+scellé sont réextraits, avec horodatage local rafraîchi, sans remplacer
+le profil ni réimporter les favoris. Les octets de l'archive restent intacts.
+
+La continuation de dix minutes du même profil produit un relevé final à
+595 secondes : 1 073 résolus, 55 Review, 53 exclusions et 341 attentes,
+865 œuvres, zéro erreur interne et zéro œuvre résolue manquante dans Library.
+Les deux redémarrages sont vérifiés. Les attentes locales sont 329
+`PROVIDER_UNAVAILABLE`, 11 `NETWORK` et 1 `ADMISSION_WAIT` ; elles ne prouvent
+pas une panne actuelle des fournisseurs. Le banc bloque les admissions
+normales autant que les reprises historiques. Sur les deux fenêtres :
+2 080 lectures, 248 mutations bloquées, zéro POST/refresh transmis et
+aucun accès fournisseur depuis Chrome. Les dix-huit soumissions capturées
+restent privées. Le verdict est `incomplete`, pas une certification durable.
+Ce contrôle précède le déploiement du correctif des sondes Kitsu ; le gain
+sur les anciens profils ne constitue pas une preuve de réarmement D1.
+
 ## Sondes Kitsu et négociation JSON API
 
 Le contrôle réel du 30 septembre a donné 200 pour les petites sondes
@@ -19,6 +153,15 @@ Deux régressions locales reproduisent 406 puis passent avec les bons en-têtes.
 Validation : 264 tests Discovery, 247 Worker, `npm run verify`, E2E Web
 12 réussis / 1 ignoré et Archify showcase passent. Les deux sondes réelles
 corrigées sont conservées dans un reçu privé ; zéro mutation D1.
+
+PR 181 fusionnée en `64ee81c354e91e22211fb5cb50c8a7b3ca9829c7` : prévol
+`36657699600` et CI production `36658421236` verts, Worker
+`9f049850-ffe1-40fa-aabd-ff1532ba602b`. Les sondes publiques passent ; les
+canaris mutateurs et la publication des archives restent désactivés.
+Après déploiement, le prévol du scope privé des neuf clés restantes confirme
+neuf candidates, cinq runtimes `READY`, dix-neuf lectures et zéro écriture.
+Aucune de ces neuf clés n'est réservée. La confirmation immédiate de reprise
+reste nécessaire ; aucune admission n'est déduite de ces vérifications.
 
 ## Identité canonique lors d'un secours lié
 

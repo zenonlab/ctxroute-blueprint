@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const publicDiscoverySeasonReviewAccept = 'application/json; profile=tobirink-season-review-v1';
+
 const fingerprintSchema = z.string().regex(/^[a-f0-9]{64}$/u);
 const identifierSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/u);
 const titleSchema = z.string().trim().min(1).max(200);
@@ -89,10 +91,12 @@ export const publicDiscoveryTerminalResolutionSchema = z.discriminatedUnion('sta
   z.strictObject({ profile: publicDiscoveryVerifiedProfileSchema, state: z.literal('VERIFIED') }),
   z.strictObject({ reason: z.string().trim().min(1).max(200), state: z.literal('NOT_FOUND') }),
   z.strictObject({
-    candidates: z.array(publicDiscoveryReferenceV3Schema).min(2).max(10),
+    candidates: z.array(publicDiscoveryReferenceV3Schema).min(1).max(10),
     reason: z.string().trim().min(1).max(200),
     state: z.literal('AMBIGUOUS'),
-  }),
+  }).refine(result => result.reason === 'season-unconfirmed'
+    ? result.candidates.every(candidate => candidate.provider === 'anilist' || candidate.provider === 'kitsu-anime')
+    : result.candidates.length >= 2, 'ambiguity-requires-comparable-identities'),
 ]);
 
 export function isPublicDiscoverySearchCursor(provider: string, cursor: string): boolean {

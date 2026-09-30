@@ -157,6 +157,7 @@ export function ReviewResolver({
       {pending ? <Status live="polite" tone="accent">Vérification en cours · réessayez dans quelques instants</Status> : null}
       {state === 'partial' && item.reason === undefined ? <Status tone="accent">Une source est indisponible · décision conservée</Status> : null}
       {item.reason === 'NOT_FOUND' ? <Status tone="accent">Aucune identité trouvée après recherche complète</Status> : null}
+      {item.reason === 'UNCONFIRMED_SEASON' ? <Status tone="accent">Titre trouvé · saison à confirmer avant association</Status> : null}
       {state === 'offline' ? <Status tone="warning">Hors ligne · les détails seront complétés à la reconnexion</Status> : null}
 
       <section aria-label="Contexte du favori" className={styles.sourceContext}>
