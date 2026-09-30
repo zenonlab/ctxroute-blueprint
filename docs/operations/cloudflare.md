@@ -1,5 +1,19 @@
 # Cloudflare operations gate
 
+## Emplacement du banc installé
+
+Les nouveaux profils isolés et leur extension décompressée sont conservés sous
+`build/installed-review/profiles/`, dans des répertoires privés `0700` ignorés
+par Git. Les reçus restent sous `build/installed-review/` en `0600`.
+`TOBIRINK_INSTALLED_SESSION` reprend le jeton indiqué dans le reçu ; ne pas
+modifier le chemin de son descripteur. Le banc accepte également les anciens
+profils temporaires à leur emplacement exact, sans migration ni suppression.
+Changer le corpus, les budgets ou le canal reste refusé. Un profil persistant
+n'est pas une preuve de convergence ni une installation Firefox signée.
+La disparition des fichiers de `5ECSJP` demeure un incident conservé, dont
+l'auteur n'est pas établi ; le nouvel emplacement évite de dépendre de la
+conservation des archives décompressées par le temporaire système.
+
 ## Contrôle Chrome 1.0.51 conservé
 
 Le profil neuf Google Chrome headless `5ECSJP` importe les 1 522 favoris

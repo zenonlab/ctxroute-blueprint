@@ -6344,7 +6344,7 @@
         {
           "id": "certify",
           "title": "Certifier Chrome et Firefox durablement",
-          "status": "BLOCKED",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "ZIP exact et XPI signé testés, conservation après mise à jour et deux redémarrages"
           ],
@@ -6357,9 +6357,9 @@
             "npm run package:extension"
           ],
           "evidence": [
-            "ZIPChrome1.0.50 SHA256bd88a511d8b474d0d751b489328c21a3e2898e2a929543e692da12c617fba8db; mise à jour réelle1.0.49→1.0.50 et deux redémarrages surChrome154 vérifiés;350attentes empêchent la certification finale.",
-            "ZIPFirefox1.0.50 SHA256c1256a0b5855256e11f56f592e5c2ab88cf8b88e7f6c72923300c24f70deeddb reproductible mais non signé, non publié.",
-            "external: aucune session Mozilla de signature confirmée; ancien contrôle Developer Hub redirigeait vers connexion. Aucun XPI durable signé disponible."
+            "Banc installé: nouveaux profils privés persistants, anciens temporaires conservés. Deux régressions rouges puis 69 tests verts; npm run verify et Archify architecture/dataflow verts, diff sans erreur.",
+            "Chrome154 Z8GbJc, corpus synthétique1532 hors ligne: deux redémarrages vérifiés, zéro requête transmise, première fenêtre240s incomplete. Reprise du même profil:1532 sources retrouvées sans réimport, fenêtre120s expirée en inventaire; pas de certification. Profils0700, reçus0600 et manifest préservés.",
+            "Dernier profil réel5ECSJP:1073résolus+55Review+53exclusions+341attentes; aucune nouvelle admission. Firefox signé durable indisponible; aucune promotion publique."
           ]
         },
         {

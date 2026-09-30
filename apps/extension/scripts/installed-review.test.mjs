@@ -1,14 +1,47 @@
 import { mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createInstalledRecoveryObservation, createInstalledReviewNetworkGuard, installInstalledReviewNetworkRoutes, readInstalledReviewSubmissions } from './installed-review-network.mjs';
 import { assertInstalledReviewExtensionSurface } from './installed-review-surface.mjs';
-import { drainInstalledReviewReads, prepareInstalledRecoveryRestart, reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
+import { assertInstalledReviewProfileRoot, createInstalledReviewProfileRoot, drainInstalledReviewReads, prepareInstalledRecoveryRestart, reloadInstalledReviewExtension, restartInstalledReviewWorker, summarizeInstalledDiagnosticFailures } from './installed-review.mjs';
 import { reserveRecoveryPost } from '../../../scripts/infra/discovery-recovery-batch.mjs';
+
+describe('persistent installed review profiles', () => {
+  const persistentRoot = fileURLToPath(new URL('../../../build/installed-review/profiles/', import.meta.url));
+  const token = 'tobirink-installed-review-Abc123';
+
+  it('creates private stable profiles without replacing an existing profile', async () => {
+    const first = await createInstalledReviewProfileRoot();
+    await writeFile(join(first, 'preserved-fixture.json'), '{"preserved":true}', { mode: 0o600 });
+    const second = await createInstalledReviewProfileRoot();
+    expect(dirname(first)).toBe(dirname(join(persistentRoot, token)));
+    expect(dirname(second)).toBe(dirname(join(persistentRoot, token)));
+    expect(first).not.toBe(second);
+    expect((await stat(first)).mode & 0o077).toBe(0);
+    expect((await stat(second)).mode & 0o077).toBe(0);
+    expect((await stat(persistentRoot)).mode & 0o077).toBe(0);
+    expect(await readFile(join(first, 'preserved-fixture.json'), 'utf8')).toBe('{"preserved":true}');
+    expect(() => assertInstalledReviewProfileRoot(first, basename(first))).not.toThrow();
+  });
+
+  it('accepts the stable path and legacy temporary path without moving either', () => {
+    expect(() => assertInstalledReviewProfileRoot(join(persistentRoot, token), token)).not.toThrow();
+    expect(() => assertInstalledReviewProfileRoot(join(tmpdir(), token), token)).not.toThrow();
+  });
+
+  it.each([
+    [join(persistentRoot, 'foreign'), token],
+    [join(tmpdir(), 'foreign', token), token],
+    [join(persistentRoot, token), '../' + token],
+    [join(persistentRoot, token), 'tobirink-installed-review-../Abc123'],
+  ])('rejects foreign profile paths or unsafe tokens', (root, sessionToken) => {
+    expect(() => assertInstalledReviewProfileRoot(root, sessionToken)).toThrow();
+  });
+});
 
 describe('installed recovery restart preparation', () => {
   it('waits for correlation before pausing and draining live routes', async () => {

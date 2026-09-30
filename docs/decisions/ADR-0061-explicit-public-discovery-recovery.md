@@ -460,6 +460,17 @@ La récupération est observable et réversible au niveau applicatif : désactiv
 
 ## Validation
 
+Les nouveaux profils du banc installé résident sous
+`build/installed-review/profiles/`, hors du temporaire système et hors Git.
+Le répertoire parent et chaque profil sont créés en mode `0700`. La reprise
+accepte uniquement le chemin généré sous cette racine ou l'ancien chemin
+temporaire exact, avec le même jeton validé. Les anciens profils ne sont ni
+déplacés ni supprimés. Corpus, version de session, canal navigateur et budgets
+réseau conservent leurs gardes indépendantes. Cette mesure répond à la perte
+constatée des fichiers décompressés du profil `5ECSJP`, sans prétendre avoir
+identifié le processus responsable. Le rollback conserve les nouveaux profils
+sur disque, mais un ancien banc doit être remis à niveau pour les reprendre.
+
 La validation de la candidate conserve l'audit des dépendances bloquant.
 L'alerte Undici apparue dans le run `36631395616` est corrigée par un
 passage à Vitest Cloudflare 1.3.2 et Wrangler 4.143.1, épinglant Miniflare
