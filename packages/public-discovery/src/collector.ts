@@ -48,8 +48,8 @@ export async function runPublicDiscoveryBatch(input: PublicDiscoveryBatchInput):
     try {
       resolution = publicDiscoveryTerminalResolutionSchema.parse(await input.resolver.resolve(request));
     } catch (error) {
-      if (!(error instanceof FavoriteProviderRetryError)) {
-        const decision = input.gateway.retryTransient !== undefined && error instanceof Error && isAutomaticProviderRetry(error) ? 'retry-requested' : 'attempt-failed';
+      if (!(error instanceof FavoriteProviderRetryError) || error.failure !== undefined) {
+        const decision = error instanceof FavoriteProviderRetryError || (input.gateway.retryTransient !== undefined && error instanceof Error && isAutomaticProviderRetry(error)) ? 'retry-requested' : 'attempt-failed';
         await input.gateway.recordFailure?.(request, error instanceof Error ? error : undefined, decision, input.now());
       }
       if (error instanceof FavoriteProviderRetryError && Number.isFinite(error.retryAt)) {

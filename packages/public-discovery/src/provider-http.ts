@@ -55,7 +55,8 @@ export class FavoriteProviderRateGate {
           const retryAt = Math.max(this.clock() + favoriteProviderProbeIntervalMs,
             error instanceof FavoriteProviderRetryError ? error.retryAt : 0);
           await this.controls?.recordFailure(this.provider, this.clock(), retryAt);
-          throw new FavoriteProviderRetryError('Provider recovery probe requires a later wake.', retryAt);
+          const failure = error instanceof FavoriteProviderRetryError ? error.failure ?? error : error instanceof Error ? error : new Error('Provider recovery probe failed.');
+          throw new FavoriteProviderRetryError('Provider recovery probe requires a later wake.', retryAt, failure);
         }
         await this.controls?.recordSuccess(this.provider, this.clock());
         throw new FavoriteProviderRetryError('Provider recovered; resume the checkpoint on the next wake.', this.clock() + minimumIntervalMs);
@@ -83,7 +84,7 @@ export async function readFavoriteProviderJson<TValue>(fetcher: FavoriteProvider
       const header = response.headers.get('retry-after') ?? '';
       const delay = /^\d+$/u.test(header) ? Number(header) * 1_000 : Date.parse(header) - Date.now();
       const retryAt = Date.now() + (Number.isFinite(delay) && delay > 0 && delay < 8_000_000_000_000_000 ? delay : 60_000);
-      throw new FavoriteProviderRetryError('Favorite provider request failed with HTTP 429.', retryAt);
+      throw new FavoriteProviderRetryError('Favorite provider request failed with HTTP 429.', retryAt, new FavoriteProviderHttpError(429));
     }
     if (!response.ok) throw new FavoriteProviderHttpError(response.status);
     const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();

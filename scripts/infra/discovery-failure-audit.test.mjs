@@ -106,7 +106,9 @@ test('headless audit writes a private page and emits aggregates only', async () 
     assert.equal((await stat(receipt.file)).mode & 0o777, 0o600);
     assert.equal((await stat(join(receipt.file, '..'))).mode & 0o777, 0o700);
     assert.equal(output[0].includes('mangaupdates'), false);
-    assert.equal(JSON.parse(await readFile(receipt.file, 'utf8')).events[0].diagnostic.cause.httpStatus, 503);
+    assert.deepEqual(JSON.parse(await readFile(receipt.file, 'utf8')).events[0], {
+      eventId: 1, requestDigest: 'b'.repeat(64), diagnostic,
+    });
     await assert.rejects(runFailureAudit(['--menu', 'true']));
     await assert.rejects(runFailureAudit(['--scope', path, '--request', '1', '--request', '2']));
   } finally { database.close(); }

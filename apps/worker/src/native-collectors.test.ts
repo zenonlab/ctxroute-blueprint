@@ -11,6 +11,8 @@ function message(body: NativeCollectorSignal | null, attempts = 1) {
 
 describe('native collector queue', () => {
   it('classifies durable failures without preserving arbitrary exception text', () => {
+    expect(discoveryFailureCause(new FavoriteProviderRetryError('probe deferred', 600_000, new Error('Favorite provider request failed with HTTP 429.')))).toEqual({ code: 'http', httpStatus: 429, stage: 'resolve' });
+    expect(discoveryFailureCause(new FavoriteProviderRetryError('probe deferred', 600_000, new Error('private title https://private.example/secret')))).toEqual({ code: 'unknown', stage: 'resolve' });
     expect(discoveryFailureCause(new Error('Favorite provider request failed with HTTP 403.'))).toEqual({ code: 'http', httpStatus: 403, stage: 'resolve' });
     expect(discoveryFailureCause(new Error('incomplete-provider-search:cursor'))).toEqual({ code: 'search-cursor', stage: 'resolve' });
     expect(discoveryFailureCause(new Error('D1_ERROR: private title'))).toEqual({ code: 'runtime-d1', stage: 'resolve' });

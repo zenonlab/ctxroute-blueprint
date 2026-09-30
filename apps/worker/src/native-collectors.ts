@@ -296,6 +296,7 @@ function collectorFailureCode(error: Error | undefined): string {
 }
 
 export function discoveryFailureCause(error: Error | undefined): PublicDiscoveryFailureDiagnostic['cause'] {
+  if (error instanceof FavoriteProviderRetryError && error.failure !== undefined) error = error.failure;
   if (error instanceof z.ZodError) {
     const issue = error.issues[0];
     const field = issue?.path.map(segment => publicDiscoveryFailureCauseSchema.shape.field.unwrap().safeParse(segment))
@@ -350,7 +351,7 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   ), d1.calls, () => claimedCount, publicDiscoveryResolutionTimeoutMilliseconds, correlationId,
     (provider, stage, error) => {
       failureContexts.set(error, { provider, stage });
-      if (!(error instanceof FavoriteProviderRetryError)) providerFailures.set(provider, { ...discoveryFailureCause(error), provider, stage });
+      if (!(error instanceof FavoriteProviderRetryError) || error.failure !== undefined) providerFailures.set(provider, { ...discoveryFailureCause(error), provider, stage });
     });
   const report = await runPublicDiscoveryBatch({
     gateway: {
