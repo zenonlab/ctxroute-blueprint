@@ -479,12 +479,20 @@ pas. Le transport public conserve `AMBIGUOUS`, avec le motif fermé
 exigent toujours deux identités distinctes. Le stockage local distingue ce
 motif de l'ambiguïté entre œuvres et conserve le candidat pour la décision humaine.
 
-Cette évolution nécessite une nouvelle candidate extension avant toute
-activation Worker. Les anciens lecteurs stricts ne lisent pas ce nouveau motif.
-La simple publication de la candidate 1.0.52 ne suffit donc pas : la
-distribution manuelle ne met pas à jour tous les clients installés. Tant que
-la compatibilité du transport avec ces clients n'est pas établie et testée,
-cette modification reste hors du déploiement automatique de `main`.
+La candidate suivante annonce explicitement sa capacité par
+`Accept: application/json; profile=tobirink-season-review-v1`. Les lectures
+unitaires, groupées et réponses d'admission conservent alors le résultat complet.
+Sans cette valeur exacte, le Worker projette seulement `season-unconfirmed`
+en `NOT_FOUND` avec ce même motif et la date du résultat : aucune identité
+confirmée pour la saison demandée, pas une affirmation d'inexistence de l'œuvre.
+L'ancien client utilise sa Review manuelle existante, sans recevoir un schéma
+illisible ; seul le nouveau client expose directement le candidat et le motif.
+Les pannes et autres états ne sont jamais modifiés par cette projection.
+Le résultat D1 et ses candidats restent intacts. `no-store` et `Vary: Accept`
+empêchent le partage d'une projection entre versions. Aucun nouveau fingerprint,
+réarmement ou champ de requête persistant n'est nécessaire. Un rollback du
+client conserve cette projection serveur ; un rollback serveur doit conserver
+les lecteurs du motif déjà stocké.
 Les exports v1 à v5 existants restent lisibles ; un export contenant le nouveau
 motif exige le nouveau lecteur. Aucun déploiement ni réarmement ne découle de
 cette préparation. Le rollback doit conserver les lecteurs du nouveau motif

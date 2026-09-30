@@ -5,7 +5,9 @@ import {
   publicDiscoveryRefreshSubmissionSchema,
   publicDiscoveryResultBatchSchema,
   publicDiscoverySubmissionSchema,
+  publicDiscoverySeasonReviewAccept,
   type PublicDiscoveryKeyV3,
+  type PublicDiscoveryReadState,
 } from '@tobirink/public-discovery';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -55,9 +57,16 @@ function v3Port(services: DiscoveryServices): PublicDiscoveryV3Port {
 }
 
 function noStore<TBody>(body: TBody, status = 200): Response {
-  const headers = new Headers({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+  const headers = new Headers({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', Vary: 'Accept' });
   if (status === 429) headers.set('Retry-After', '60');
   return Response.json(body, { headers, status });
+}
+
+function clientReadState(state: PublicDiscoveryReadState, accept: string | undefined): PublicDiscoveryReadState {
+  if (state.state === 'AMBIGUOUS' && state.reason === 'season-unconfirmed' && accept !== publicDiscoverySeasonReviewAccept) {
+    return { state: 'NOT_FOUND', reason: state.reason, verifiedAt: state.verifiedAt };
+  }
+  return state;
 }
 
 function retiredV2(): Response {
@@ -180,7 +189,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
     const state = await v3Port(services).read(key.data, new Date().toISOString());
     const miss = state.state === 'MISS' ? 1 : 0;
     emitPublicCost(context.env, services, before, 'discovery-lookup', 'unchanged', startedAt, { d1Hits: 1 - miss, d1Misses: miss });
-    return noStore(state);
+    return noStore(clientReadState(state, context.req.header('Accept')));
   });
 
   app.post('/v3/catalogue/discoveries/lookup', limitedBody, async (context) => {
@@ -197,7 +206,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
       : await port.readMany(parsed.data.keys, now);
     const misses = states.filter(({ state }) => state.state === 'MISS').length;
     emitPublicCost(context.env, services, before, 'discovery-lookup', 'unchanged', startedAt, { d1Hits: states.length - misses, d1Misses: misses });
-    return noStore(states);
+    return noStore(states.map(({ key, state }) => ({ key, state: clientReadState(state, context.req.header('Accept')) })));
   });
 
   app.post('/v3/catalogue/discoveries/requests', limitedBody, async (context) => {
@@ -224,7 +233,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
         return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }
       emitPublicCost(context.env, services, before, 'discovery-admission', admission.outcome === 'created' ? 'changed' : 'deduplicated', startedAt, admission.outcome === 'existing' ? { deduplicated: 1 } : {});
-      return noStore(admission.state, 202);
+      return noStore(clientReadState(admission.state, context.req.header('Accept')), 202);
     } catch (error) {
       emitPublicCost(context.env, services, before, 'discovery-admission', 'failed', startedAt);
       return error instanceof Error && error.message === 'public-discovery-request-conflict'
@@ -251,7 +260,7 @@ export function createPublicDiscoveryApp(injected?: DiscoveryServices, retiredCo
         return noStore({ error: 'discovery-queue-unavailable' }, 503);
       }
       emitPublicCost(context.env, services, before, 'discovery-refresh', admission.outcome === 'created' ? 'changed' : 'deduplicated', startedAt, admission.outcome === 'created' ? { rehydrations: 1 } : { deduplicated: 1 });
-      return noStore(admission.state, 202);
+      return noStore(clientReadState(admission.state, context.req.header('Accept')), 202);
     } catch {
       emitPublicCost(context.env, services, before, 'discovery-refresh', 'failed', startedAt);
       return noStore({ error: 'refresh-unavailable' }, 409);

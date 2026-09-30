@@ -6294,10 +6294,10 @@
             "git diff --check"
           ],
           "evidence": [
-            "Candidate locale 1.0.52 : Review explicite UNCONFIRMED_SEASON uniquement sur titre exact compatible, saison absente, dernier fallback anime complet sans panne antérieure ; association humaine et export/restauration couverts.",
-            "npm run verify vert : 248 tests Worker, 493 application, 275 Discovery ; infra160/160 ; E2E Web13 succès/1 ignoré ; audit npm0 vulnérabilité après brace-expansion5.0.12 ; Archify architecture et dataflow showcase9/9, diff-check vert.",
-            "Aucun déploiement/promotion : ancienne extension refuse le résultat à référence unique. La distribution manuelle du nouveau client ne suffit pas ; compatibilité de transport à résoudre avant fusion main.",
-            "Pilote qxl4zA conservé : quatre POST réservés, trois résultats Library, arrêt quatrième à318lectures. Les quatre clés ne sont pas rejouées ; cinq autres non envoyées."
+            "Candidate1.0.53 : Review saison non corroborée, Accept explicite pour les lecteurs récents ; projection legacy NOT_FOUND/season-unconfirmed uniquement, résultat D1 intact. Aucun état technique transformé, aucun changement de clé ou migration.",
+            "Validation locale : verify vert,253testsWorker,493application,276Discovery,117adaptateurs navigateur ; infra160/160 ; audit0vulnérabilité ; Archify architecture/dataflow showcase9/9 ; E2E archive13succès/1ignoré ; diff-check vert.",
+            "ChromeZIP319981octets SHA5b26d35372b362cfd1d8305b86e1aa8135cc365a66bdb70ebf17c4a8c9c8f7df ; FirefoxZIPnon signé320022octets SHA0ed8b6dd190e208e2ca92ab993c473517ad911b6932700738b544d9f11a05ca1. CIprotégée à exécuter ; ni téléchargement public ni réarmement supplémentaire.",
+            "Diagnostic AniList privé : quatreHTTP200, titre exact et ID présents, rejet par saison1 non corroborée. La saison est explicite dans titre/URL. Les réponses actuelles locales ne remplacent pas l'historique Worker."
           ]
         },
         {

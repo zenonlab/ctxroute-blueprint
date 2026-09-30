@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const publicDiscoverySeasonReviewAccept = 'application/json; profile=tobirink-season-review-v1';
+
 const fingerprintSchema = z.string().regex(/^[a-f0-9]{64}$/u);
 const identifierSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9._:-]+$/u);
 const titleSchema = z.string().trim().min(1).max(200);

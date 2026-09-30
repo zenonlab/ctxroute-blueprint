@@ -50,6 +50,33 @@ tester ce contrat avant fusion sur `main`, puis obtenir une nouvelle preuve
 réelle sans réutiliser les clés consommées. Les archives publiques et
 résultats D1 précédents restent conservés.
 
+## Candidate 1.0.53 — lecture négociée des saisons non corroborées
+
+Le Worker conserve le résultat complet en D1. L'extension 1.0.53 annonce
+`Accept: application/json; profile=tobirink-season-review-v1` pour recevoir
+le candidat et le motif de Review. Les anciens clients reçoivent le contrat
+`NOT_FOUND` avec le motif `season-unconfirmed` : aucune identité saisonnière
+confirmée, ce qui conserve leur parcours de décision humaine existant.
+Cette projection n'est pas utilisée pour une panne, une attente ou une
+ambiguïté ordinaire. Elle ne déclare pas l'œuvre inexistante et ne modifie
+ni les clés, ni les preuves stockées, ni les états D1. Les réponses restent
+`no-store` et varient sur `Accept` ; GET, lookup et admission partagent la
+même projection. Une capacité inconnue reste sur le contrat ancien.
+
+Les tests ciblés valident 42 scénarios de routes Worker et 27 de client HTTP.
+Le test historique de migration doit rester premier dans sa suite : les
+nouvelles fixtures ne doivent pas appliquer les migrations avant lui.
+Les archives 1.0.52 et leurs preuves restent conservées ; 1.0.53 est une
+candidate distincte, pas une réécriture du fichier précédemment testé.
+Le rollback conserve la projection HTTP et les lecteurs D1 du nouveau motif
+tant que des résultats l'utilisent. Il ne supprime ni Review ni favori.
+Validation locale : `npm run verify` vert, 253 tests Worker, 493 application,
+276 Discovery, 160 infra, audit npm sans vulnérabilité. Les E2E de l'archive
+1.0.53 passent avec 13 succès et un test ignoré, sur réponses simulées.
+Archify architecture et dataflow passent en showcase 9/9. Ces résultats ne
+certifient ni le backlog réel ni Firefox signé. La CI protégée et la preuve
+installée en production restent des étapes séparées.
+
 ## Emplacement du banc installé
 
 Les nouveaux profils isolés et leur extension décompressée sont conservés sous

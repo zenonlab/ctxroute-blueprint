@@ -1,6 +1,7 @@
 import { applyD1Migrations, env, SELF } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
 import type { PublicDiscoveryCandidate, PublicDiscoveryVerifiedProfile } from '@tobirink/public-discovery';
+import { publicDiscoverySeasonReviewAccept } from '@tobirink/public-discovery';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { instrumentD1 } from '../operational-metrics';
@@ -54,6 +55,7 @@ beforeEach(async (context) => {
 });
 
 describe('verified public discovery cache', () => {
+
   it('preserves active requests and redacts historical terminal requests during migration', async () => {
     const v3AlignmentIndex = env.TEST_MIGRATIONS.findIndex(({ name }) => name === '0015_public_discovery_v3_alignment.sql');
     const minimizationIndex = env.TEST_MIGRATIONS.findIndex(({ name }) => name === '0016_public_discovery_terminal_minimization.sql');
@@ -164,6 +166,57 @@ describe('verified public discovery cache', () => {
       expect(JSON.stringify(events)).not.toContain(key.fingerprint);
     } finally {
       info.mockRestore();
+    }
+  });
+
+  it.each([undefined, 'application/json', publicDiscoverySeasonReviewAccept, 'application/json; profile=unknown'])('negotiates season Review without changing stored evidence: %s', async (accept) => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const key = discoveryKey('b');
+    const state = Object.freeze({ state: 'AMBIGUOUS' as const, reason: 'season-unconfirmed', verifiedAt: '2026-09-30T12:00:00.000Z', candidates: [{ provider: 'kitsu-anime' as const, externalId: '42' }] });
+    vi.spyOn(adapter, 'read').mockResolvedValue(state);
+    vi.spyOn(adapter, 'readMany').mockResolvedValue([{ key, state }]);
+    vi.spyOn(adapter, 'request').mockResolvedValue({ outcome: 'existing', state });
+    const send = vi.fn();
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter, queue: { send } });
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (accept !== undefined) headers.set('Accept', accept);
+    const expected = accept === publicDiscoverySeasonReviewAccept ? state : { state: 'NOT_FOUND', reason: 'season-unconfirmed', verifiedAt: state.verifiedAt };
+    const single = await app.request(`https://tobirink.test/v3/catalogue/discoveries?${new URLSearchParams(key)}`, { headers });
+    const grouped = await app.request('https://tobirink.test/v3/catalogue/discoveries/lookup', { headers, method: 'POST', body: JSON.stringify({ schemaVersion: 3, keys: [key] }) });
+    const admission = await app.request('https://tobirink.test/v3/catalogue/discoveries/requests', { headers, method: 'POST', body: JSON.stringify({ schemaVersion: 3, key, query: { mediaKind: 'ANIME', sourceTitles: ['Synthetic'], discoveryTitles: ['Synthetic'] } }) });
+    expect([single.status, grouped.status, admission.status]).toEqual([200, 200, 202]);
+    const singleBody = await single.json();
+    expect(singleBody).toEqual(expected);
+    await expect(grouped.json()).resolves.toEqual([{ key, state: expected }]);
+    await expect(admission.json()).resolves.toEqual(expected);
+    if (accept !== publicDiscoverySeasonReviewAccept) expect(z.strictObject({ state: z.literal('NOT_FOUND'), reason: z.string().min(1).max(200), verifiedAt: z.iso.datetime({ offset: false }) }).safeParse(singleBody).success).toBe(true);
+    for (const response of [single, grouped, admission]) {
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(response.headers.get('Vary')).toBe('Accept');
+    }
+    expect(state.state).toBe('AMBIGUOUS');
+    expect(state.candidates).toHaveLength(1);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('never projects a technical failure or ordinary ambiguity into a season Review', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const key = discoveryKey('c');
+    const states = [
+      { state: 'MISS' as const },
+      { state: 'PENDING' as const, retryAt: '2026-09-30T12:00:00.000Z' },
+      { state: 'UNAVAILABLE' as const, reason: 'ATTEMPT_LIMIT' as const },
+      { state: 'NOT_FOUND' as const, reason: 'all-provider-lanes-exhausted', verifiedAt: '2026-09-30T12:00:00.000Z' },
+      { state: 'AMBIGUOUS' as const, reason: 'multiple-credible-provider-identities', verifiedAt: '2026-09-30T12:00:00.000Z', candidates: [{ provider: 'anilist' as const, externalId: '1' }, { provider: 'anilist' as const, externalId: '2' }] },
+    ];
+    const read = vi.spyOn(adapter, 'read');
+    const app = createPublicDiscoveryApp({ publicDiscoveryV3: adapter });
+    for (const state of states) {
+      read.mockResolvedValue(state);
+      for (const accept of ['application/json', publicDiscoverySeasonReviewAccept]) {
+        const response = await app.request(`https://tobirink.test/v3/catalogue/discoveries?${new URLSearchParams(key)}`, { headers: { Accept: accept } });
+        await expect(response.json()).resolves.toEqual(state);
+      }
     }
   });
 

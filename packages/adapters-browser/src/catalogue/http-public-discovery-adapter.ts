@@ -8,6 +8,7 @@ import {
   publicDiscoveryLookupSubmissionSchema,
   publicDiscoveryQuerySchema,
   publicDiscoveryTerminalResolutionSchema,
+  publicDiscoverySeasonReviewAccept,
   type PublicDiscoveryQuery,
   type PublicDiscoveryReadState,
 } from '@tobirink/public-discovery';
@@ -123,14 +124,14 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
   private async read(key: PublicDiscoveryKey): Promise<PublicDiscoveryReadState> {
     const url = new URL('/v3/catalogue/discoveries', this.origin);
     for (const [name, value] of Object.entries(key)) url.searchParams.set(name, value);
-    return this.exchange(url.toString(), { cache: 'no-store', credentials: 'omit', headers: { Accept: 'application/json' }, method: 'GET', redirect: 'error', referrerPolicy: 'no-referrer' }, stateSchema);
+    return this.exchange(url.toString(), { cache: 'no-store', credentials: 'omit', headers: { Accept: publicDiscoverySeasonReviewAccept }, method: 'GET', redirect: 'error', referrerPolicy: 'no-referrer' }, stateSchema);
   }
 
   async lookup(input: readonly PublicDiscoveryKey[]) {
     const body = publicDiscoveryLookupSubmissionSchema.parse({ keys: input, schemaVersion: 3 });
     const results = await this.exchange(new URL('/v3/catalogue/discoveries/lookup', this.origin).toString(), {
       body: JSON.stringify(body), cache: 'no-store', credentials: 'omit',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
+      headers: { Accept: publicDiscoverySeasonReviewAccept, 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
     }, lookupResultSchema, 512 * 1024);
     const requested = new Set(body.keys.map((key) => JSON.stringify(key)));
     if (results.length !== requested.size || new Set(results.map(({ key }) => JSON.stringify(key))).size !== results.length
@@ -144,7 +145,7 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     await this.reserveAdmission(false);
     const state = await this.exchange(new URL('/v3/catalogue/discoveries/refreshes', this.origin).toString(), {
       body: JSON.stringify({ key, schemaVersion: 3 }), cache: 'no-store', credentials: 'omit',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
+      headers: { Accept: publicDiscoverySeasonReviewAccept, 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
     }, stateSchema);
     if (state.state !== 'VERIFIED') throw new PublicDiscoveryError('INVALID_RESPONSE');
     this.cache.set(JSON.stringify(key), { expiresAt: Date.now() + 25_000, state });
@@ -162,7 +163,7 @@ export class HttpPublicDiscoveryAdapter implements PublicDiscoveryRequestClientP
     await this.reserveAdmission(true, pendingClock);
     const admitted = await this.exchange(new URL('/v3/catalogue/discoveries/requests', this.origin).toString(), {
       body: JSON.stringify({ key, query, schemaVersion: 3 }), cache: 'no-store', credentials: 'omit',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
+      headers: { Accept: publicDiscoverySeasonReviewAccept, 'Content-Type': 'application/json' }, method: 'POST', redirect: 'error', referrerPolicy: 'no-referrer',
     }, stateSchema, undefined, 45_000);
     if (admitted.state === 'PENDING') {
       const next = Math.max(Date.now() + 60_000, Date.parse(admitted.retryAt));
