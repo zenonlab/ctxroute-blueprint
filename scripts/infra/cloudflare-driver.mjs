@@ -15,7 +15,7 @@ const PROVIDER_GATEWAY_SECRET = 'PROVIDER_GATEWAY_HMAC_KEY';
 const extensionArchiveLimit = 5 * 1024 * 1024;
 const r2BucketPageSchema = z.object({
   success: z.literal(true),
-  result: z.array(z.object({ name: z.string() })),
+  result: z.object({ buckets: z.array(z.object({ name: z.string() })) }),
   result_info: z.object({ cursor: z.string().nullish() }).optional(),
 });
 const r2BucketCreateSchema = z.object({ success: z.literal(true), result: z.object({ name: z.string() }) });
@@ -198,9 +198,18 @@ async function listAuthenticatedR2Buckets(accountId, fetcher, apiToken) {
       const codes = Array.isArray(body?.errors)
         ? body.errors.map(error => error?.code).filter(Number.isSafeInteger).slice(0, 3)
         : [];
-      throw new Error(`r2-bucket-inventory-response:${response.status}:${codes.join(',') || 'none'}`);
+      const schemaIssues = payload.success ? [] : payload.error.issues.slice(0, 3).map(issue => {
+        const issueCode = /^[a-z_]+$/u.test(issue.code) ? issue.code : 'schema';
+        const path = issue.path.slice(0, 4).map(part => {
+          const segment = String(part);
+          if (['success', 'result', 'result_info', 'buckets', 'cursor', 'name'].includes(segment)) return segment;
+          return /^\d{1,3}$/u.test(segment) ? segment : 'field';
+        }).join('.') || 'root';
+        return `${issueCode}:${path}`;
+      });
+      throw new Error(`r2-bucket-inventory-response:${response.status}:codes=${codes.join(',') || 'none'}:schema=${schemaIssues.join(',') || 'valid'}`);
     }
-    buckets.push(...payload.data.result);
+    buckets.push(...payload.data.result.buckets);
     cursor = payload.data.result_info?.cursor ?? undefined;
     if (cursor === undefined || cursor.length === 0) return buckets;
   }
