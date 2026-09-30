@@ -39,6 +39,20 @@ function providers(values: Partial<Record<ResolutionProvider, ProviderCandidate>
 }
 
 describe('standalone provider resolver', () => {
+  it('reaches Kitsu when AniList returns an exact ID but cannot corroborate the requested season', async () => {
+    const ports = providers({
+      anilist: { ...candidate('anilist', 'ANIME', '123', 'Target'), format: 'TV' },
+      'kitsu-anime': { ...candidate('kitsu-anime', 'ANIME', '42', 'Target'), format: 'TV' },
+    });
+    const input = request('ANIME');
+    const result = await createPublicDiscoveryResolver(ports).resolve({ ...input, query: { ...input.query, season: 1, sourceFormat: 'NON_OVA', discoveryTitles: ['Target', 'Broad variant'] } });
+    expect(ports.anilist.search).toHaveBeenCalledTimes(2);
+    expect(ports.anilist.hydrate).not.toHaveBeenCalled();
+    expect(ports['kitsu-anime'].search).toHaveBeenCalledOnce();
+    expect(ports['kitsu-anime'].hydrate).not.toHaveBeenCalled();
+    expect(result).toEqual({ state: 'AMBIGUOUS', reason: 'season-unconfirmed', candidates: [{ provider: 'kitsu-anime', externalId: '42' }] });
+  });
+
   it('offers an exact unseasoned identity for human review only after the primary search', async () => {
     const ports = providers({ 'kitsu-anime': { ...candidate('kitsu-anime', 'ANIME', '42', 'Target'), format: 'TV' } });
     const input = request('ANIME');

@@ -462,6 +462,13 @@ La récupération est observable et réversible au niveau applicatif : désactiv
 
 ### Candidate : saison non corroborée
 
+Le cas reproduit inclut un résultat AniList exact portant un ID valide, rejeté
+avant hydratation faute de saison corroborée. Passer au fallback n'implique
+donc pas un fournisseur en panne ni un ID absent. La saison demandée est ici
+explicite dans le favori. Les réponses locales actuelles ne remplacent pas les
+preuves historiques Worker ; elles justifient la régression de cette branche,
+pas une association automatique ni la convergence du reste du corpus.
+
 Une saison demandée n'est jamais déduite de l'absence de saison chez le
 fournisseur. Après les recherches principales, la dernière lane anime peut
 terminer en Review `UNCONFIRMED_SEASON` si une page complète contient un titre

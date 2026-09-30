@@ -18,6 +18,22 @@ sans preuve de saison. Le contrôle strict avec saison demandée le rejette.
 Ce défaut est une recherche trop longue sans conclusion métier adaptée,
 pas la preuve d'une panne actuelle de tous les fournisseurs.
 
+Le diagnostic primaire ultérieur effectue quatre recherches AniList en lecture
+seule avec l'adaptateur du projet, depuis la machine locale. Les quatre réponses
+sont HTTP 200 et complètes. La première contient deux candidats : le comparateur
+retient une correspondance `ordered-exact` sans contrainte de saison, mais zéro
+avec la saison 1 demandée. Les trois autres alias ne retournent aucun candidat.
+L'ID AniList est donc présent dans le résultat ; il est écarté avant hydratation
+par le contrôle de saison. Les candidats TV n'ont ni champ saison ni alias avec
+une saison reconnue. Le favori porte explicitement saison 1 dans son titre et
+son URL, qui n'est pas une URL fournisseur. Le parseur n'a pas inventé cette
+contrainte. Cette reproduction explique le passage au fallback sans panne,
+mais ne reconstitue pas les réponses historiques de l'egress Worker.
+Le reçu privé `anilist-before-kitsu-evidence.json` est conservé en mode `0600`.
+Une régression couvre ce cas avec AniList répondant un ID exact, et non plus
+seulement un fournisseur primaire vide. Le correctif de Review ne prouve pas
+que cette identité corresponde effectivement à la saison demandée.
+
 La candidate 1.0.52 propose une Review `UNCONFIRMED_SEASON` uniquement sur
 preuve exacte et page complète du dernier fallback anime, après la recherche
 principale, sans panne antérieure. Aucun Work n'est créé automatiquement.
