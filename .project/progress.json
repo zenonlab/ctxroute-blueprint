@@ -6302,7 +6302,7 @@
         {
           "id": "pilot",
           "title": "Prouver dix reprises depuis le bouton",
-          "status": "IN_PROGRESS",
+          "status": "BLOCKED",
           "acceptance": [
             "Confirmation immédiate du lot exact avant reprise",
             "Chaîne bouton à Library corrélée et coût certifié"
@@ -6315,11 +6315,8 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "Après déploiement archive0031 :prévol cinqclés batch-009-unsubmitted, sceauddea4d8c,3MANHWA/2MANGA,3runtimesREADY,0réservation,11lecturesD1/0écriture. Confirmation immédiate demandée,non reçue ;aucunPOST. Les quatre clés consommées restent exclues.",
-            "Scope neuf confirmé immédiatement, prévol19lectures0écriture et0réservation; vrai bouton Chrome154 ZIP1.0.51 dans profil persistantqxl4zA, observateur prêt avant envoi.",
-            "Arrêt technique après4POST:3Library vérifiées, coûts corrélés148/85/89lecturesD1,6/2/2appels fournisseurs,1résultat accepté chacun; quatrième demande318lecturesD1(20admission+298collector),18appels,9continuations,0résultat accepté. Cinq clés non envoyées,4réservations conservées,aucun rejeu.",
-            "Deux lectures D1 indexées après arrêt:1ligne chacune,0écriture; quatrième PROCESSING tentative1, progressionKitsu-anime titre1 curseur12. Diagnostic local fournisseur:HTTP200,276résultats sur cet alias; première variante5candidats,match exact unique sans contrainte saison mais0avec saison1 faute de preuve. Aucune règle d'identité affaiblie,aucun résultat transformé artificiellement enReview.",
-            "Les deux réponses d'autorisation concernent le même lot, pas deux exécutions. Autorisation arrêtée au premier échec; aucun élargissement ni réemploi des quatre clés. Le pilote n'est pas certifié."
+            "external: Playwright est installé mais connectOverCDP(\"http://127.0.0.1:9222\") échoue sur HTTP 404 à /json/version; le port ne fournit pas l’API CDP du profil Choukky, donc aucun clic ni POST de reprise n’a été exécuté dans cette session.",
+            "L’autorisation batch-009 précédente a déjà consommé quatre POST puis s’est arrêtée sur le premier échec technique; les clés réservées ne seront pas rejouées. Reprise impossible tant qu’un endpoint CDP valide n’expose pas le profil."
           ]
         },
         {
