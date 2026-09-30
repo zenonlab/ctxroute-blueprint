@@ -77,6 +77,15 @@ Archify architecture et dataflow passent en showcase 9/9. Ces résultats ne
 certifient ni le backlog réel ni Firefox signé. La CI protégée et la preuve
 installée en production restent des étapes séparées.
 
+Le premier profil réel 1.0.53 `Pmkmwx` s'arrête à l'installation avec
+`discovery-read-rejected`, avant toute lecture ou admission transmise : le
+garde du banc n'autorisait que `Accept: application/json`. Son échec scellé
+et son profil sont conservés, sans réinitialisation du garde. Le banc accepte
+maintenant également la capacité exacte ci-dessus, mais refuse les profils
+inconnus et paramètres supplémentaires. Les 73 tests du banc passent.
+Un nouveau profil est nécessaire pour ce contrôle ; ce n'est ni une reprise
+du pilote mutateur ni un effacement de ses erreurs. Le ZIP 1.0.53 ne change pas.
+
 ## Emplacement du banc installé
 
 Les nouveaux profils isolés et leur extension décompressée sont conservés sous

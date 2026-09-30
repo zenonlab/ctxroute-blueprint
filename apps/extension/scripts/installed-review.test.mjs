@@ -620,6 +620,28 @@ describe('installed review network guard', () => {
     }
   });
 
+  it.each(['application/json', 'application/json; profile=tobirink-season-review-v1'])('accepts only declared discovery capabilities on GET and lookup: %s', async (accept) => {
+    const { instance } = await guard({ online: true, readBudget: 2 });
+    const read = fakeRoute({ headers: { accept, 'user-agent': 'Chromium/153 installed-review' }, url: discoveryUrl() });
+    const lookup = fakeRoute({
+      body: { keys: [key()], schemaVersion: 3 }, method: 'POST', url: 'https://tobirink.com/v3/catalogue/discoveries/lookup',
+      headers: { accept, 'content-type': 'application/json', origin: 'chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'user-agent': 'Chromium/153 installed-review' },
+    });
+    await instance.handle(read);
+    await instance.handle(lookup);
+    expect(read.fetch).toHaveBeenCalledOnce();
+    expect(lookup.fetch).toHaveBeenCalledOnce();
+    expect(instance.snapshot()).toMatchObject({ forwardedReads: 2, forwardedRequests: 0 });
+  });
+
+  it.each(['application/json; profile=unknown', 'application/json; profile=tobirink-season-review-v1; extra=1'])('rejects unrecognized discovery Accept values: %s', async (accept) => {
+    const { instance } = await guard({ online: true, readBudget: 1 });
+    const read = fakeRoute({ headers: { accept, 'user-agent': 'Chromium/153 installed-review' }, url: discoveryUrl() });
+    await instance.handle(read);
+    expect(read.fetch).not.toHaveBeenCalled();
+    expect(instance.snapshot().failure).toBe('discovery-read-rejected');
+  });
+
   it('rejects undeclared payload fields, POST queries and private headers', async () => {
     const extraFieldGuard = await guard({ mutationBudget: 1, online: true, readBudget: 1 });
     const extraField = fakeRoute({
