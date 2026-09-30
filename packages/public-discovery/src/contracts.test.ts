@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { publicDiscoveryFailureDiagnosticSchema } from '.';
 import { publicDiscoveryCandidateSchema, publicDiscoveryLookupSubmissionSchema, publicDiscoveryQuerySchema, publicDiscoveryRefreshSubmissionSchema, publicDiscoverySearchProgressSchema, publicDiscoverySubmissionSchema, publicDiscoveryTerminalResolutionSchema } from '.';
 
 const query = {
@@ -8,6 +9,21 @@ const query = {
 };
 
 describe('public discovery request minimization', () => {
+  it('closes durable failure diagnostics over safe fields and valid HTTP evidence', () => {
+    const diagnostic = { schemaVersion: 1, attempt: 8, observedAt: '2026-09-30T12:00:00.000Z', decision: 'attempt-failed', cause: { code: 'http', httpStatus: 403, provider: 'anilist', stage: 'search' } };
+    expect(publicDiscoveryFailureDiagnosticSchema.parse(diagnostic)).toEqual(diagnostic);
+    expect(publicDiscoveryFailureDiagnosticSchema.safeParse({ ...diagnostic, providerFailures: [diagnostic.cause] }).success).toBe(true);
+    expect(publicDiscoveryFailureDiagnosticSchema.safeParse({ ...diagnostic, providerFailures: [diagnostic.cause, diagnostic.cause] }).success).toBe(false);
+    expect(publicDiscoveryFailureDiagnosticSchema.safeParse({ ...diagnostic, providerFailures: [{ code: 'unknown', stage: 'resolve' }] }).success).toBe(false);
+    for (const field of ['title', 'url', 'payload', 'message', 'fingerprint', 'externalId']) {
+      expect(publicDiscoveryFailureDiagnosticSchema.safeParse({ ...diagnostic, [field]: 'private' }).success).toBe(false);
+      expect(publicDiscoveryFailureDiagnosticSchema.safeParse({ ...diagnostic, cause: { ...diagnostic.cause, [field]: 'private' } }).success).toBe(false);
+    }
+    expect(publicDiscoveryFailureDiagnosticSchema.safeParse({ ...diagnostic, attempt: 9 }).success).toBe(false);
+    expect(publicDiscoveryFailureDiagnosticSchema.safeParse({ ...diagnostic, cause: { code: 'http', stage: 'search' } }).success).toBe(false);
+    expect(publicDiscoveryFailureDiagnosticSchema.safeParse({ ...diagnostic, cause: { code: 'unknown', stage: 'resolve', httpStatus: 503 } }).success).toBe(false);
+    expect(publicDiscoveryFailureDiagnosticSchema.safeParse({ ...diagnostic, cause: { code: 'private-title', stage: 'resolve' } }).success).toBe(false);
+  });
   it('requires an explicit unconfirmed-season reason for a single review reference', () => {
     const candidates = [{ provider: 'kitsu-anime', externalId: '42' }];
     expect(publicDiscoveryTerminalResolutionSchema.safeParse({ state: 'AMBIGUOUS', candidates, reason: 'season-unconfirmed' }).success).toBe(true);

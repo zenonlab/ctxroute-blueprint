@@ -2531,6 +2531,50 @@ connexion, le contrôle unitaire (une ligne) et EXPLAIN sont distincts des
 public n’a été effectué. Le défaut de projection corrigé ne suffit pas à
 expliquer l’historique fournisseur des 307 identités épuisées.
 
+### Diagnostic durable — préparation locale, migration requise
+
+La candidate associée porte la version 1.0.55 : les contrats partagés changent
+les bundles de l'extension. Les archives 1.0.54 sont conservées ; aucun
+téléchargement public n'est remplacé par cette préparation.
+
+La migration additive `0030_public_discovery_failure_diagnostics.sql` ajoute
+`failure_diagnostics_json` aux demandes Discovery. Le journal conserve les
+huit dernières défaillances, bornées à 16 Kio. Il décrit la cause terminale
+et les dernières erreurs des fournisseurs effectivement observées, avec
+statut HTTP éventuel, étape search/hydrate/resolve/publish, champ de schéma
+autorisé, tentative, date, corrélation et version Worker si disponible.
+Une cause inconnue reste `unknown`. Aucun titre, slug, URL, ID fournisseur,
+message libre ou corps de réponse n'est conservé dans ce diagnostic.
+
+`D1PublicDiscoveryV3Adapter.readFailureDiagnostics(key)` lit une seule clé
+complète par l'index primaire et valide le journal. `undefined` signifie
+absence de preuve, pas absence d'erreur. Cette lecture opératoire n'est pas
+exposée sur les routes publiques. Grouper les journaux obtenus pour un scope
+privé par code, fournisseur et version permet de catégoriser ses échecs sans
+scanner globalement la table. Les diagnostics suivent la rétention des
+demandes ; ils ne reconstruisent pas les réponses historiques disparues.
+
+Le collecteur écrit sous garde du claim avant de demander une reprise ou
+d'abandonner une tentative. `retry-requested` n'est pas une confirmation de
+reprise réussie. Les reports normaux de cadence et de budget ne remplissent
+pas le journal. Un échec de persistance est propagé ; une panne D1 totale
+ne peut pas être diagnostiquée durablement dans cette même D1. Les logs
+Worker restent donc complémentaires. Les erreurs du parseur local avant
+admission et les échecs de claim sans demande acquise sont hors de ce journal.
+
+Ne pas fusionner ni déployer ce code avant validation du plan de migration
+D1 ciblé : la CI Worker ordinaire n'applique pas cette nouvelle colonne.
+Le rollback remet l'ancien Worker sans retirer la colonne ni ses preuves.
+La préparation et les tests locaux n'autorisent aucune migration distante,
+aucun réarmement historique, et ne certifient pas les 339 favoris.
+
+Validation locale de 1.0.55 : `npm run verify` réussi, dont 256 tests Worker
+et 283 Public Discovery ; deux builds isolés identiques ; E2E Web/extension
+13 réussites et un test ignoré. Archify architecture et dataflow passent en
+showcase sans erreur ni avertissement. Le prévol distant en lecture seule
+confirme que seule la migration 0030 reste à appliquer ; aucune migration
+n'a été exécutée et aucune archive publique n'a été promue.
+
 ### Audit du 30 septembre : couverture optionnelle et curseur Kitsu
 
 Les 339 sources restantes correspondent à 287 identités. Six lectures D1

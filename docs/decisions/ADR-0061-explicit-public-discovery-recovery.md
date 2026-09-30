@@ -8,6 +8,10 @@ scope:
   - apps/worker/src/index.ts
   - apps/worker/src/native-collectors.ts
   - apps/worker/wrangler.jsonc
+  - apps/worker/migrations/0030_public_discovery_failure_diagnostics.sql
+  - packages/public-discovery/src/contracts.ts
+  - packages/public-discovery/src/collector.ts
+  - packages/adapters-cloudflare/src/catalogue/d1-public-discovery-v3-adapter.ts
   - apps/extension/runtime/use-resolution-status.ts
   - packages/application/src/favorites/public-discovery-resolution.ts
   - packages/application/src/favorites/favorite-resolution-runner.ts
@@ -59,6 +63,36 @@ pas une recherche valide trop large. Le rollback porte sur le code uniquement.
 Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspondant à des demandes Public Discovery déjà arrivées à `FAILED/ATTEMPT_LIMIT`. Une reprise automatique depuis chaque lecture de statut pourrait réactiver une charge fournisseur sans contrôle et masquer la frontière entre attente, échec transitoire et mutation de production.
 
 ## Décision
+
+### Diagnostic durable des défaillances techniques
+
+La migration additive 0030 ajoute un journal JSON nullable sur la demande,
+limité aux huit dernières défaillances et à 16 Kio. Chaque entrée ferme les
+codes, étapes et décisions ; elle conserve date, tentative et corrélation
+éventuelle, jamais titre, URL, payload ou message libre. L'écriture exige la
+clé complète, le digest, le jeton, la tentative et un bail actif. Les lectures
+publiques n'exposent pas ce journal. Une absence historique reste inconnue.
+Les erreurs de schéma conservent seulement le champ et le type d'échec
+autorisés. Chaque entrée peut également conserver la dernière erreur observée
+de chacun des cinq fournisseurs ; ce n'est pas une archive de leurs réponses.
+Un fournisseur absent du diagnostic signifie attribution inconnue, pas panne
+de tous les fournisseurs. Les erreurs locales de parsing avant admission
+restent hors de ce journal serveur ; leur classification locale est distincte.
+
+La décision `retry-requested` précède la réservation de reprise : elle ne
+prétend pas que cette réservation a réussi. Les reports ordinaires de cadence
+et de budget ne sont pas des défaillances. Les erreurs de publication restent
+propagées. Si D1 est indisponible, aucune persistance n'est garantie ; l'échec
+d'écriture remonte au traitement Queue plutôt que de prétendre avoir enregistré
+un diagnostic. Le journal suit la rétention de sa demande et ne constitue pas
+un historique illimité. Il ne remplace pas les métriques agrégées ADR-0053.
+Le binding natif `WORKER_VERSION` fournit l'UUID de version Worker ; son
+absence locale reste explicite plutôt que d'inventer un commit. Un réveil
+sans corrélation en crée une, ensuite propagée aux continuations du même
+traitement. Un réveil générique ultérieur peut avoir une autre corrélation,
+mais chaque diagnostic conserve celle de son traitement.
+Le déploiement du code exige la migration préalable ; ce travail local ne
+l'applique pas à la production. Le rollback conserve la colonne et les preuves.
 
 ### Pagination et métadonnées optionnelles
 

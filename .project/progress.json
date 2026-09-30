@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "DONE",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,6 +6294,7 @@
             "git diff --check"
           ],
           "evidence": [
+            "Candidate1.0.55 diagnostic durable : verify vert (256Worker/283Discovery), builds isolés identiques, E2E13succès/1ignoré, Archify architecture/dataflow showcase9/9, diff-check vert. Migration0030 seule restante au prévol distant, non appliquée ; aucune reprise ni promotion.",
             "Kitsu couverture optionnelle :279testsDiscovery,verify complet,Archify verts ; rejeu réel20candidats identiques etcurseur14. PR184/359e430, CIbranche36714652375 etmain36715704557 vertes ; Worker8a4b9bbc déployé,sondesvertes,E2E13succès/1ignoré. ZIP1.0.54 inchangés. Aucun réarmement ni promotion.",
             "Candidate1.0.54 : sync FOUND multi-ID corrigé, 4 régressions rouges puis497 tests application verts ; verify vert, E2E13succès/1ignoré, builds isolés identiques, Archify showcase9/9.",
             "PR183 commit21df65c, CI main36710218213 verte avec déploiement Worker et probes. Archives candidates conservées, aucun téléchargement public avancé.",

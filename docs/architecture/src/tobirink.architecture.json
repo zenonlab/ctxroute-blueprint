@@ -98,7 +98,7 @@
       "id": "d1",
       "type": "database",
       "label": "D1 SQL",
-      "sublabel": "MISS / PENDING / VERIFIED",
+      "sublabel": "états · causes bornées · version",
       "pos": [
         1140,
         350

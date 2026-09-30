@@ -4,6 +4,8 @@ import {
   publicDiscoveryRequestSchema,
   publicDiscoveryResultBatchSchema,
   publicDiscoverySearchProgressSchema,
+  publicDiscoveryFailureDiagnosticSchema,
+  type PublicDiscoveryFailureDiagnostic,
   publicDiscoveryTerminalResolutionSchema,
   publicDiscoveryVerifiedProfileSchema,
   type PublicDiscoveryClaimBatch,
@@ -538,6 +540,32 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       });
     });
     return { claimToken: input.claimToken, requests, schemaVersion: 3 };
+  }
+
+  async readFailureDiagnostics(key: PublicDiscoveryKeyV3): Promise<readonly PublicDiscoveryFailureDiagnostic[] | undefined> {
+    const parsed = publicDiscoveryKeyV3Schema.parse(key);
+    const row = await this.database.prepare(`SELECT failure_diagnostics_json AS diagnostics FROM public_discovery_requests_v3
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4 LIMIT 1`)
+      .bind(...keyValues(parsed)).first<{ diagnostics: string | null }>();
+    if (row?.diagnostics == null) return undefined;
+    return publicDiscoveryFailureDiagnosticSchema.array().max(8).parse(JSON.parse(row.diagnostics));
+  }
+
+  async recordFailure(request: PublicDiscoveryClaimedRequest, tokenDigest: string, diagnostic: PublicDiscoveryFailureDiagnostic): Promise<void> {
+    const parsed = publicDiscoveryFailureDiagnosticSchema.parse(diagnostic);
+    if (parsed.attempt !== request.attempt) throw new Error('public-discovery-diagnostic-attempt-mismatch');
+    const result = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
+      failure_diagnostics_json = json_insert(
+        CASE WHEN json_array_length(COALESCE(failure_diagnostics_json, '[]')) >= 8
+          THEN json_remove(failure_diagnostics_json, '$[0]') ELSE COALESCE(failure_diagnostics_json, '[]') END,
+        '$[#]', json(?9))
+      WHERE fingerprint = ?1 AND media_kind = ?2 AND parser_version = ?3 AND rules_version = ?4
+        AND request_digest = ?5 AND claim_token_hash = ?6 AND lease_until > ?8
+        AND ((state = 'PROCESSING' AND attempt_count = ?7)
+          OR (state = 'VERIFIED' AND refresh_state = 'PROCESSING' AND refresh_attempt_count = ?7))
+      RETURNING fingerprint`).bind(...keyValues(request.key), request.requestDigest, tokenDigest, request.attempt,
+        parsed.observedAt, JSON.stringify(parsed)).first();
+    if (!result) throw new Error('public-discovery-diagnostic-claim-lost');
   }
 
   async deferClaim(request: PublicDiscoveryClaimedRequest, tokenDigest: string, retryAt: string, now: string, searchProgress?: PublicDiscoverySearchProgress): Promise<void> {

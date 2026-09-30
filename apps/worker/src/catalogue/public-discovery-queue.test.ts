@@ -74,6 +74,66 @@ async function preserveProviderRuntime() {
 }
 
 describe('public discovery queue trigger', () => {
+  it('bounds durable diagnostics and retains them after lease exhaustion', async () => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const discoveryKey = { ...key('d'), fingerprint: 'd1a6'.padStart(64, '0') };
+    const now = '2026-09-30T12:00:00.000Z';
+    await adapter.request({ ...submission('d', 'Synthetic diagnostics'), key: discoveryKey, requestDigest: 'f'.repeat(64) }, now);
+    const token = 'c'.repeat(43);
+    const digest = await tokenDigest(token);
+    const claimed = await adapter.claimBatch({ key: discoveryKey, claimToken: token, tokenDigest: digest, limit: 1, now, leaseUntil: '2026-09-30T12:15:00.000Z' });
+    const request = claimed.requests[0]!;
+    expect(await adapter.readFailureDiagnostics(discoveryKey)).toBeUndefined();
+    const diagnostic = { schemaVersion: 1 as const, attempt: request.attempt, observedAt: now,
+      cause: { code: 'http' as const, httpStatus: 403, stage: 'search' as const, provider: 'anilist' as const }, decision: 'attempt-failed' as const };
+    await expect(adapter.recordFailure(request, 'b'.repeat(64), diagnostic)).rejects.toThrow('diagnostic-claim-lost');
+    await expect(adapter.recordFailure({ ...request, requestDigest: 'a'.repeat(64) }, digest, diagnostic)).rejects.toThrow('diagnostic-claim-lost');
+    await expect(adapter.recordFailure({ ...request, key: { ...request.key, fingerprint: 'e'.repeat(64) } }, digest, diagnostic)).rejects.toThrow('diagnostic-claim-lost');
+    await expect(adapter.recordFailure(request, digest, { ...diagnostic, attempt: 2 })).rejects.toThrow('diagnostic-attempt-mismatch');
+    for (let index = 0; index < 9; index += 1) {
+      await adapter.recordFailure(request, digest, { ...diagnostic, observedAt: new Date(Date.parse(now) + index * 1000).toISOString() });
+    }
+    await env.PUBLIC_DB.prepare('UPDATE public_discovery_requests_v3 SET attempt_count = 8 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).run();
+    await expect(adapter.read(discoveryKey, '2026-09-30T12:16:00.000Z')).resolves.toEqual({ state: 'UNAVAILABLE', reason: 'ATTEMPT_LIMIT' });
+    const row = await env.PUBLIC_DB.prepare('SELECT state, failure_diagnostics_json AS diagnostics FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).first<{ state: string; diagnostics: string }>();
+    const saved = JSON.parse(row!.diagnostics);
+    expect(await adapter.readFailureDiagnostics(discoveryKey)).toEqual(saved);
+    expect(saved).toHaveLength(8);
+    expect(saved[0].observedAt).toBe('2026-09-30T12:00:01.000Z');
+    expect(saved.at(-1).cause).toEqual(diagnostic.cause);
+    expect(row!.state).toBe('FAILED');
+    await expect(adapter.recordFailure(request, digest, { ...diagnostic, observedAt: '2026-09-30T12:16:00.000Z' })).rejects.toThrow('diagnostic-claim-lost');
+    expect(row!.diagnostics).not.toContain('Synthetic');
+  });
+
+  it('persists a real adapter HTTP failure with its provider and operation', async () => {
+    const restoreRuntime = await preserveProviderRuntime();
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const discoveryKey = { ...key('d'), fingerprint: 'd1a7'.padStart(64, '0') };
+    await adapter.request({ ...submission('d', 'Synthetic private title'), key: discoveryKey, requestDigest: 'e'.repeat(64) }, new Date().toISOString());
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 401 }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    try {
+      const correlationId = '00000000-0000-4000-8000-000000000099';
+      const workerVersion = '00000000-0000-4000-8000-000000000098';
+      await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct', WORKER_VERSION: { id: workerVersion, tag: '', timestamp: new Date().toISOString() } }, discoveryKey, false, correlationId);
+      const row = await env.PUBLIC_DB.prepare('SELECT failure_diagnostics_json AS diagnostics FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).first<{ diagnostics: string }>();
+      expect(JSON.parse(row!.diagnostics)).toEqual([expect.objectContaining({ correlationId, workerVersion, decision: 'attempt-failed',
+        cause: { code: 'http', httpStatus: 401, provider: 'kitsu-anime', stage: 'search' } })]);
+      expect(row!.diagnostics).not.toContain('Synthetic');
+      expect(JSON.parse(row!.diagnostics)[0].providerFailures).toEqual(expect.arrayContaining([
+        { code: 'http', httpStatus: 401, provider: 'anilist', stage: 'search' },
+        { code: 'http', httpStatus: 401, provider: 'kitsu-anime', stage: 'search' },
+      ]));
+    } finally {
+      fetcher.mockRestore(); warn.mockRestore(); info.mockRestore();
+      await env.PUBLIC_DB.prepare("UPDATE public_discovery_requests_v3 SET attempt_count = 8, lease_until = '2000-01-01T00:00:00.000Z' WHERE fingerprint = ?1").bind(discoveryKey.fingerprint).run();
+      await adapter.read(discoveryKey, new Date().toISOString());
+      await restoreRuntime();
+    }
+  });
+
   it('retains the sanitized cause and correlated cost when a direct claim fails', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2100-01-01T00:00:00.000Z'));

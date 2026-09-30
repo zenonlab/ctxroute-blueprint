@@ -5,6 +5,7 @@ import {
   PublicAgendaProviderError,
   bindProviderTransport,
   FavoriteProviderRetryError,
+  publicDiscoveryFailureCauseSchema,
   createPublicDiscoveryProviders,
   createPublicDiscoveryResolver,
   PublicDiscoveryInvocationYieldError,
@@ -16,6 +17,7 @@ import {
   type PublicDiscoveryProviderPorts,
   type PublicDiscoveryResultBatch,
   type FavoriteProviderPort,
+  type PublicDiscoveryFailureDiagnostic,
 } from '@tobirink/public-discovery';
 import { D1AgendaCollectionAdapter, type AgendaLaneClaim } from './releases/public-release-collectors';
 import { createProviderTransportAdapter, type ProviderTransportBindings } from './provider-transport-adapter';
@@ -37,6 +39,7 @@ export type NativeCollectorSignal = z.infer<typeof nativeCollectorSignalSchema>;
 
 export type NativeCollectorBindings = Env & ProviderTransportBindings & {
   readonly PUBLIC_DISCOVERY_QUEUE: Queue<NativeCollectorSignal>;
+  readonly WORKER_VERSION?: WorkerVersionMetadata;
 };
 
 interface QueueMessagePort {
@@ -150,6 +153,7 @@ export function createBudgetedDiscoveryResolver(
   claimedCount: () => number,
   timeoutMilliseconds = publicDiscoveryResolutionTimeoutMilliseconds,
   correlationId?: string,
+  observeFailure?: (provider: keyof PublicDiscoveryProviderPorts, operation: 'search' | 'hydrate', error: Error) => void,
 ) {
   let completed = 0;
   let outstanding = 0;
@@ -164,11 +168,11 @@ export function createBudgetedDiscoveryResolver(
       let completedSearches = 0;
       const operation = async <T>(action: 'search' | 'hydrate', run: () => Promise<T>): Promise<T> => {
         if (scope.closed) throw new Error('public-discovery-resolution-closed');
-        // Publication (7) also covers this claim's alternative defer (2).
+        // Publication and failure diagnostic (8) also cover this claim's alternative defer (2).
         // Reserve two for each OTHER claim, plus nextPendingAt (1).
         const otherClaims = Math.max(0, claimedCount() - completed - 1);
         if (exhausted || (action === 'search' && completedSearches >= 2)
-          || usedCalls() + outstanding + 4 + (action === 'search' ? 4 : 0) + 7 + 2 * otherClaims + 1 > 50) {
+          || usedCalls() + outstanding + 4 + (action === 'search' ? 4 : 0) + 8 + 2 * otherClaims + 1 > 50) {
           scope.exceeded = true;
           exhausted = true;
           throw completedProviderCalls === 0 ? new PublicDiscoveryInvocationBudgetError() : new PublicDiscoveryInvocationYieldError();
@@ -185,6 +189,7 @@ export function createBudgetedDiscoveryResolver(
       const observe = async <T>(providerName: keyof PublicDiscoveryProviderPorts, action: 'search' | 'hydrate', run: () => Promise<T>): Promise<T> => {
         try { return await run(); }
         catch (error) {
+          if (error instanceof Error) observeFailure?.(providerName, action, error);
           const code = providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined);
           if (!diagnosed.has(providerName) && (code.startsWith('provider-response-invalid') || code.startsWith('provider-runtime-') || code === 'provider-timeout' || code === 'provider-unavailable')) {
             diagnosed.add(providerName);
@@ -290,6 +295,32 @@ function collectorFailureCode(error: Error | undefined): string {
   return 'collector-internal';
 }
 
+export function discoveryFailureCause(error: Error | undefined): PublicDiscoveryFailureDiagnostic['cause'] {
+  if (error instanceof z.ZodError) {
+    const issue = error.issues[0];
+    const field = issue?.path.map(segment => publicDiscoveryFailureCauseSchema.shape.field.unwrap().safeParse(segment))
+      .find(parsed => parsed.success)?.data ?? 'unknown';
+    const validation = publicDiscoveryFailureCauseSchema.shape.validation.unwrap().safeParse(issue?.code);
+    return { code: 'invalid-response', stage: 'resolve', field, validation: validation.success ? validation.data : 'unknown' };
+  }
+  const code = providerFailureCode(error);
+  const httpStatus = code.match(/^provider-http-([45]\d{2})$/u)?.[1];
+  if (httpStatus !== undefined) return { code: 'http', httpStatus: Number(httpStatus), stage: 'resolve' };
+  const precise = {
+    'provider-network': 'network', 'provider-timeout': 'timeout',
+    'provider-response-invalid-json': 'invalid-json', 'provider-response-invalid-kitsu-identity': 'identity-mismatch',
+    'provider-response-invalid-cover-origin': 'cover-origin', 'provider-response-invalid-uri': 'invalid-uri',
+    'provider-response-invalid-encoding': 'invalid-encoding', 'provider-runtime-d1': 'runtime-d1',
+    'provider-runtime-state-missing': 'runtime-state', 'provider-runtime-reservation-invalid': 'runtime-reservation',
+    'provider-search-cursor': 'search-cursor', 'provider-search-deadline': 'search-deadline',
+    'provider-search-page-limit': 'search-page-limit', 'provider-search-candidate-limit': 'search-candidate-limit',
+    'provider-search-candidate-page-limit': 'search-candidate-page-limit',
+  } satisfies Readonly<Record<string, PublicDiscoveryFailureDiagnostic['cause']['code']>>;
+  const classified = Object.entries(precise).find(([label]) => label === code)?.[1] ?? (code.startsWith('provider-response-invalid') ? 'invalid-response'
+    : code.startsWith('provider-gateway-') ? 'gateway' : code.startsWith('provider-transport-') ? 'transport' : 'unknown');
+  return { code: classified, stage: 'resolve' };
+}
+
 export function agendaCollectionFailureCode(failures: readonly string[]): string {
   const providers = new Set(failures.map((failure) => failure.split(':', 1)[0]).filter((provider) => provider === 'anilist' || provider === 'mangaupdates'));
   if (providers.has('anilist') && providers.has('mangaupdates')) return 'agenda-anilist-mangaupdates-unavailable';
@@ -299,6 +330,7 @@ export function agendaCollectionFailureCode(failures: readonly string[]): string
 }
 
 export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindings, key?: PublicDiscoveryKeyV3, scheduleContinuation = true, correlationId?: string, continuationToken?: string, continueGlobalWhenEmpty = false): Promise<DiscoveryProcessingReport> {
+  correlationId ??= crypto.randomUUID();
   const startedAt = Date.now();
   const d1 = instrumentD1(bindings.PUBLIC_DB);
   const queue = instrumentQueueSend(bindings.PUBLIC_DISCOVERY_QUEUE);
@@ -309,11 +341,17 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
   let activeToken = '';
   let activeTokenDigest = '';
   let claimedCount = 0;
+  const failureContexts = new WeakMap<Error, { provider: keyof PublicDiscoveryProviderPorts; stage: 'search' | 'hydrate' }>();
+  const providerFailures = new Map<keyof PublicDiscoveryProviderPorts, PublicDiscoveryFailureDiagnostic['cause']>();
   const continuationTokenDigest = continuationToken === undefined ? undefined : await digest(continuationToken);
   const resolver = createBudgetedDiscoveryResolver(createPublicDiscoveryProviders(
     providers.fetch,
     new D1ProviderRuntimeControl(d1.database),
-  ), d1.calls, () => claimedCount, publicDiscoveryResolutionTimeoutMilliseconds, correlationId);
+  ), d1.calls, () => claimedCount, publicDiscoveryResolutionTimeoutMilliseconds, correlationId,
+    (provider, stage, error) => {
+      failureContexts.set(error, { provider, stage });
+      if (!(error instanceof FavoriteProviderRetryError)) providerFailures.set(provider, { ...discoveryFailureCause(error), provider, stage });
+    });
   const report = await runPublicDiscoveryBatch({
     gateway: {
       claim: async (limit) => {
@@ -329,6 +367,18 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
       },
       defer: (request, retryAt, now, searchProgress) => port.deferClaim(request, activeTokenDigest, retryAt, now, searchProgress ?? request.searchProgress),
       retryTransient: (request, now) => port.retryTransientClaim(request, activeTokenDigest, now),
+      recordFailure: async (request, error, decision, now) => {
+        const context = error === undefined ? undefined : failureContexts.get(error);
+        const cause = { ...discoveryFailureCause(error), ...context };
+        if (decision === 'publication-failed') cause.stage = 'publish';
+        const diagnostic: PublicDiscoveryFailureDiagnostic = {
+          schemaVersion: 1, attempt: request.attempt, observedAt: now, cause, decision,
+        };
+        if (correlationId !== undefined) diagnostic.correlationId = correlationId;
+        if (bindings.WORKER_VERSION !== undefined) diagnostic.workerVersion = bindings.WORKER_VERSION.id;
+        if (providerFailures.size > 0) diagnostic.providerFailures = [...providerFailures.values()];
+        await port.recordFailure(request, activeTokenDigest, diagnostic);
+      },
       publish: async (batch: PublicDiscoveryResultBatch) => {
         const receipt = await port.publishBatch(batch, await digest(activeToken), await digest(JSON.stringify(batch.results)), new Date().toISOString());
         acceptedResults += receipt.published;
