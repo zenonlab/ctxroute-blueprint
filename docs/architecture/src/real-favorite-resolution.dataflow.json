@@ -17,7 +17,7 @@
         "id": "public-resolution",
         "label": "Résolution publique",
         "focus": ["sourceEvidence", "privateStore", "publicWorker", "publicD1", "providerQueue"],
-        "note": "Secours AniList→Kitsu et MangaUpdates→MangaDex : liens contrôlés dans Library; mappings et sondes bornés par le transport."
+        "note": "Secours liés : conserver l’identité canonique D1 existante sans fusion; liens contrôlés avant publication et dans Library."
       },
       {
         "id": "retry-and-review",

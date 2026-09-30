@@ -1,6 +1,6 @@
 import { applyD1Migrations, env, SELF } from 'cloudflare:test';
 import { D1ProviderRuntimeControl, D1PublicDiscoveryV3Adapter } from '@tobirink/adapters-cloudflare';
-import type { PublicDiscoveryCandidate } from '@tobirink/public-discovery';
+import type { PublicDiscoveryCandidate, PublicDiscoveryVerifiedProfile } from '@tobirink/public-discovery';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { instrumentD1 } from '../operational-metrics';
@@ -759,6 +759,94 @@ describe('verified public discovery cache', () => {
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_external_references WHERE external_id = ?1').bind(`lease_${marker}`).first()).toEqual({ count: 0 });
     expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_revisions WHERE revision = ?1').bind(Date.parse(verifiedAt)).first()).toEqual({ count: 0 });
     expect(await env.PUBLIC_DB.prepare('SELECT state FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(key.fingerprint).first()).toEqual({ state: 'PROCESSING' });
+  });
+
+  it.each([
+    ['anilist', false], ['mangaupdates', false], ['anilist', true], ['mangaupdates', true],
+  ] as const)('preserves the canonical work through linked %s fallback and recovery (fallback first: %s)', async (primary, fallbackFirst) => {
+    const metrics = instrumentD1(env.PUBLIC_DB);
+    const adapter = new D1PublicDiscoveryV3Adapter(metrics.database);
+    const mediaKind = primary === 'anilist' ? 'ANIME' as const : 'MANGA' as const;
+    const marker = `${primary === 'anilist' ? '1' : '2'}${fallbackFirst ? '1' : '0'}`;
+    const primaryReference = { provider: primary, externalId: `905041${marker}` };
+    const fallbackReference = { provider: primary === 'anilist' ? 'kitsu-anime' as const : 'mangadex' as const, externalId: `905042${marker}` };
+    const workId = `work_linked_${marker}`;
+    const title = `Synthetic linked ${primary}`;
+    const initial: PublicDiscoveryVerifiedProfile = {
+      workId, candidate: { ...primaryReference, mediaKind, titles: [title], preSerialization: false }, references: [primaryReference],
+    };
+    const fallback: PublicDiscoveryVerifiedProfile = {
+      workId: `work_fallback_${marker}`, candidate: { ...fallbackReference, mediaKind, titles: [title], preSerialization: false, linkedReferences: [primaryReference] },
+      references: [fallbackReference, primaryReference],
+    };
+    const key = { ...discoveryKey('7'), fingerprint: `cf41${marker}`.padStart(64, '0'), mediaKind };
+    const requestDigest = 'a'.repeat(64);
+    const initialAt = '2026-09-01T00:00:00.000Z';
+    await adapter.request({ key, requestDigest, query: { discoveryTitles: [title], sourceTitles: [title], mediaKind }, schemaVersion: 3 }, initialAt);
+    const publish = async (profile: PublicDiscoveryVerifiedProfile, now: string, publicationKey = key) => {
+      const before = metrics.calls();
+      const rowsBefore = metrics.snapshot().rowsRead;
+      const claim = await adapter.claimBatch({ key: publicationKey, claimToken: 'b'.repeat(48), tokenDigest: 'c'.repeat(64), limit: 1, now, leaseUntil: new Date(Date.parse(now) + 900_000).toISOString() });
+      expect(claim.requests).toHaveLength(1);
+      const batch = { claimToken: claim.claimToken, nonce: crypto.randomUUID(), results: [{ key: publicationKey, requestDigest, resolution: { state: 'VERIFIED' as const, profile } }], schemaVersion: 3 as const, verifiedAt: now };
+      await expect(adapter.publishBatch(batch, 'c'.repeat(64), 'd'.repeat(64), now)).resolves.toEqual({ published: 1, replayed: 0 });
+      expect(metrics.calls() - before).toBeLessThan(50);
+      expect(metrics.snapshot().rowsRead - rowsBefore).toBeLessThanOrEqual(300);
+      await expect(adapter.publishBatch(batch, 'c'.repeat(64), 'd'.repeat(64), now)).resolves.toEqual({ published: 0, replayed: 1 });
+    };
+    const profiles = fallbackFirst ? [fallback, initial, fallback] : [initial, fallback, initial];
+    const canonicalWorkId = profiles[0]!.workId;
+    for (const [index, profile] of profiles.entries()) {
+      const now = new Date(Date.parse(initialAt) + index * 9 * 86_400_000).toISOString();
+      if (index > 0) await adapter.requestRefresh(key, now);
+      await publish(profile, now);
+      await expect(adapter.read(key, now)).resolves.toMatchObject({ state: 'VERIFIED', profile: { workId: canonicalWorkId, candidate: profile.candidate } });
+    }
+    expect(await env.PUBLIC_DB.prepare('SELECT work_id AS workId FROM catalogue_external_references WHERE provider = ?1 AND external_id = ?2')
+      .bind(fallbackReference.provider, fallbackReference.externalId).first()).toEqual({ workId: canonicalWorkId });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_works WHERE work_id = ?1').bind(fallbackFirst ? initial.workId : fallback.workId).first()).toEqual({ count: 0 });
+    await expect(adapter.read(key, '2026-09-20T00:00:00.000Z')).resolves.toMatchObject({ state: 'VERIFIED', profile: { workId: canonicalWorkId, references: expect.arrayContaining([primaryReference, fallbackReference]) } });
+    const newKey = { ...key, fingerprint: `cf43${marker}`.padStart(64, '0') };
+    const newAt = '2026-09-21T00:00:00.000Z';
+    await adapter.request({ key: newKey, requestDigest, query: { discoveryTitles: [title], sourceTitles: [title], mediaKind }, schemaVersion: 3 }, newAt);
+    await publish(profiles[1]!, newAt, newKey);
+    await expect(adapter.read(newKey, newAt)).resolves.toMatchObject({ state: 'VERIFIED', profile: { workId: canonicalWorkId } });
+  });
+
+  it.each(['candidate-link', 'profile-link', 'wrong-link', 'media', 'split-owner', 'existing-target'] as const)('rejects unsafe canonical reuse: %s', async (scenario) => {
+    const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
+    const marker = ['candidate-link', 'profile-link', 'wrong-link', 'media', 'split-owner', 'existing-target'].indexOf(scenario);
+    const key = { ...discoveryKey('8'), fingerprint: `cf42${marker}`.padStart(64, '0') };
+    const requestDigest = 'a'.repeat(64);
+    const primaryReference = { provider: 'anilist' as const, externalId: `905051${marker}` };
+    const fallbackReference = { provider: 'kitsu-anime' as const, externalId: `905052${marker}` };
+    const profile: PublicDiscoveryVerifiedProfile = {
+      workId: `work_canonical_guard_${marker}`, candidate: { ...primaryReference, mediaKind: 'ANIME', titles: ['Synthetic guard'], preSerialization: false }, references: [primaryReference],
+    };
+    const now = '2026-09-01T00:00:00.000Z';
+    await adapter.request({ key, requestDigest, query: { discoveryTitles: ['Synthetic guard'], sourceTitles: ['Synthetic guard'], mediaKind: 'ANIME' }, schemaVersion: 3 }, now);
+    const claim = await adapter.claimBatch({ key, claimToken: 'b'.repeat(48), tokenDigest: 'c'.repeat(64), limit: 1, now, leaseUntil: '2026-09-01T00:15:00.000Z' });
+    await adapter.publishBatch({ claimToken: claim.claimToken, nonce: crypto.randomUUID(), results: [{ key, requestDigest, resolution: { state: 'VERIFIED', profile } }], schemaVersion: 3, verifiedAt: now }, 'c'.repeat(64), 'd'.repeat(64), now);
+    const incoming: PublicDiscoveryVerifiedProfile = {
+      workId: `work_incoming_guard_${marker}`, candidate: { ...fallbackReference, mediaKind: scenario === 'media' ? 'MANGA' : 'ANIME', titles: ['Synthetic guard'], preSerialization: false,
+        linkedReferences: scenario === 'candidate-link' ? [] : [{ ...primaryReference, externalId: scenario === 'wrong-link' ? '905059' : primaryReference.externalId }] },
+      references: scenario === 'profile-link' ? [fallbackReference] : [fallbackReference, primaryReference],
+    };
+    if (scenario === 'split-owner' || scenario === 'existing-target') {
+      await env.PUBLIC_DB.prepare('INSERT INTO catalogue_works(work_id, media_kind, preferred_title, revision) VALUES (?1, ?2, ?3, ?4)')
+        .bind(scenario === 'existing-target' ? incoming.workId : `work_other_guard_${marker}`, 'anime', 'Synthetic other', Date.parse(now)).run();
+      if (scenario !== 'existing-target') await env.PUBLIC_DB.prepare('INSERT INTO catalogue_external_references(provider, external_id, work_id) VALUES (?1, ?2, ?3)')
+        .bind(fallbackReference.provider, fallbackReference.externalId, `work_other_guard_${marker}`).run();
+    }
+    const refreshAt = '2026-09-10T00:00:00.000Z';
+    const revisionsBefore = await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_revisions WHERE revision = ?1').bind(Date.parse(refreshAt)).first();
+    await adapter.requestRefresh(key, refreshAt);
+    const refresh = await adapter.claimBatch({ key, claimToken: 'b'.repeat(48), tokenDigest: 'c'.repeat(64), limit: 1, now: refreshAt, leaseUntil: '2026-09-10T00:15:00.000Z' });
+    await expect(adapter.publishBatch({ claimToken: refresh.claimToken, nonce: crypto.randomUUID(), results: [{ key, requestDigest, resolution: { state: 'VERIFIED', profile: incoming } }], schemaVersion: 3, verifiedAt: refreshAt }, 'c'.repeat(64), 'e'.repeat(64), refreshAt)).rejects.toThrow();
+    await expect(adapter.read(key, refreshAt)).resolves.toMatchObject({ state: 'VERIFIED', profile });
+    expect(await env.PUBLIC_DB.prepare('SELECT work_id AS workId FROM catalogue_external_references WHERE provider = ?1 AND external_id = ?2')
+      .bind(primaryReference.provider, primaryReference.externalId).first()).toEqual({ workId: profile.workId });
+    expect(await env.PUBLIC_DB.prepare('SELECT COUNT(*) AS count FROM catalogue_revisions WHERE revision = ?1').bind(Date.parse(refreshAt)).first()).toEqual(revisionsBefore);
   });
 
   it('rejects a provider reference conflict without partial catalogue or terminal writes', async () => {

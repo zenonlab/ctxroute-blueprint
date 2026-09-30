@@ -356,7 +356,18 @@ describe('public discovery indexed query cost', () => {
     expect(replay.rowsWritten).toBe(0);
     const externalReferenceGuards = statements.mock.calls.map(([sql]) => sql)
       .filter(sql => sql.includes('CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1'));
-    expect(externalReferenceGuards).toHaveLength(1);
+    expect(externalReferenceGuards).toHaveLength(2);
+    const ownerSql = externalReferenceGuards.find(sql => sql.startsWith('SELECT DISTINCT existing.work_id'));
+    if (ownerSql === undefined) throw new Error('Canonical owner lookup must be exercised.');
+    const ownerPlan = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN SELECT DISTINCT existing.work_id AS workId,
+      EXISTS (SELECT 1 FROM catalogue_works WHERE work_id = ?2) AS incomingExists
+      FROM json_each(?1) AS proposed
+      CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
+        ON existing.provider = json_extract(proposed.value, '$.provider')
+        AND existing.external_id = json_extract(proposed.value, '$.externalId') LIMIT 5`)
+      .bind(JSON.stringify(batch.results[0]!.resolution.profile.references), batch.results[0]!.resolution.profile.workId).all<{ detail: string }>();
+    expect(ownerPlan.results.some(({ detail }) => detail.includes('sqlite_autoindex_catalogue_external_references_1 (provider=? AND external_id=?)'))).toBe(true);
+    expect(ownerPlan.results.some(({ detail }) => detail.includes('SCAN existing'))).toBe(false);
     expect(statements.mock.calls.map(([sql]) => sql).join('\n')).not.toContain('FROM catalogue_external_references AS existing');
     const externalGuardPlan = await env.PUBLIC_DB.prepare(`EXPLAIN QUERY PLAN SELECT 1 WHERE NOT EXISTS (
       SELECT 1 FROM json_each(?1) AS proposed
@@ -407,7 +418,7 @@ describe('public discovery indexed query cost', () => {
     batch.results[0]!.resolution.profile.references = [{ provider: 'anilist', externalId: 'work_cost_1' }];
     const measured = instrumentD1(env.PUBLIC_DB);
     await expect(new D1PublicDiscoveryV3Adapter(measured.database).publishBatch(batch, 'c'.repeat(64), 'e'.repeat(64), now))
-      .rejects.toThrow('stale-public-discovery-result');
+      .rejects.toThrow('public-discovery-metadata-identity-conflict');
     const cost = measured.snapshot();
     console.info(JSON.stringify({ type: 'local-discovery-query-cost', scenario: 'publication-conflict', catalogueWorks: 582, canonicalTitles: 2328, ...cost }));
     expect(cost.rowsWritten).toBe(0);

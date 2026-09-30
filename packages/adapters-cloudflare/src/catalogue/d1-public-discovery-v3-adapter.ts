@@ -121,8 +121,19 @@ function mergeProfile(current: PublicDiscoveryVerifiedProfile | undefined, incom
   }
   const references = [...new Map([...current.references, ...incoming.references]
     .map((reference) => [`${reference.provider}:${reference.externalId}`, reference])).values()];
-  const candidate: PublicDiscoveryCandidate = { ...current.candidate, ...Object.fromEntries(Object.entries(incoming.candidate).filter(([, value]) => value !== undefined)) };
+  const candidate: PublicDiscoveryCandidate = { ...current.candidate, ...Object.fromEntries(Object.entries(incoming.candidate).filter(([, value]) => value !== undefined)), linkedReferences: incoming.candidate.linkedReferences };
   return publicDiscoveryVerifiedProfileSchema.parse({ candidate, references, workId: incoming.workId });
+}
+
+function hasLinkedIdentity(profile: PublicDiscoveryVerifiedProfile, target: PublicDiscoveryVerifiedProfile): boolean {
+  const candidate = profile.candidate;
+  return (candidate.linkedReferences ?? []).some(reference => {
+    const supported = candidate.provider === 'mangadex' && reference.provider === 'mangaupdates'
+      || candidate.provider === 'kitsu-anime' && candidate.mediaKind === 'ANIME' && reference.provider === 'anilist';
+    return supported && profile.references.some(item => item.provider === reference.provider && item.externalId === reference.externalId)
+      && target.candidate.provider === reference.provider && target.candidate.externalId === reference.externalId
+      && target.references.some(item => item.provider === reference.provider && item.externalId === reference.externalId);
+  });
 }
 
 export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
@@ -158,6 +169,30 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
       chapterCount: row.chapterCount ?? undefined, volumeCount: row.volumeCount ?? undefined, ...profile.candidate };
     if (candidate.cover === undefined && row.coverUrl != null && row.coverAttribution != null) candidate.cover = { url: row.coverUrl, attribution: row.coverAttribution };
     return publicDiscoveryVerifiedProfileSchema.parse({ ...profile, candidate });
+  }
+
+  private async publicationProfile(value: PublicDiscoveryVerifiedProfile): Promise<PublicDiscoveryVerifiedProfile> {
+    const incoming = publicDiscoveryVerifiedProfileSchema.parse(value);
+    const current = await this.metadataProfile(incoming.workId);
+    if (current !== undefined) return mergeProfile(current, incoming);
+    const owners = await this.database.prepare(`SELECT DISTINCT existing.work_id AS workId,
+      EXISTS (SELECT 1 FROM catalogue_works WHERE work_id = ?2) AS incomingExists
+      FROM json_each(?1) AS proposed
+      CROSS JOIN catalogue_external_references AS existing INDEXED BY sqlite_autoindex_catalogue_external_references_1
+        ON existing.provider = json_extract(proposed.value, '$.provider')
+        AND existing.external_id = json_extract(proposed.value, '$.externalId') LIMIT 5`)
+      .bind(JSON.stringify(incoming.references), incoming.workId).all<{ workId: string; incomingExists: number }>();
+    if (owners.results.length === 0 || owners.results.length === 1 && owners.results[0]!.workId === incoming.workId) return incoming;
+    const owner = owners.results[0]!;
+    if (owners.results.length !== 1 || owner.incomingExists !== 0) throw new Error('public-discovery-metadata-identity-conflict');
+    const canonical = await this.metadataProfile(owner.workId);
+    if (canonical === undefined || canonical.candidate.mediaKind !== incoming.candidate.mediaKind
+      || !incoming.references.some(reference => reference.provider === incoming.candidate.provider && reference.externalId === incoming.candidate.externalId)
+      || !(canonical.candidate.provider === incoming.candidate.provider && canonical.candidate.externalId === incoming.candidate.externalId
+        || hasLinkedIdentity(incoming, canonical) || hasLinkedIdentity(canonical, incoming))) {
+      throw new Error('public-discovery-metadata-identity-conflict');
+    }
+    return mergeProfile(canonical, { ...incoming, workId: owner.workId });
   }
 
   async readMany(keys: readonly PublicDiscoveryKeyV3[], now: string) {
@@ -724,12 +759,16 @@ export class D1PublicDiscoveryV3Adapter implements PublicDiscoveryV3Port {
   private async publishOne(result: PublicDiscoveryResult, tokenDigest: string, verifiedAt: string, now: string): Promise<'published' | 'replayed'> {
     const row = await this.row(result.key);
     const profile = result.resolution.state === 'VERIFIED'
-      ? mergeProfile(await this.metadataProfile(result.resolution.profile.workId), publicDiscoveryVerifiedProfileSchema.parse(result.resolution.profile))
+      ? await this.publicationProfile(result.resolution.profile)
       : undefined;
     const resolution = profile === undefined ? result.resolution : { profile, state: 'VERIFIED' as const };
     const resultJson = JSON.stringify(resolution);
     const refreshing = row?.state === 'VERIFIED' && row.refreshState === 'PROCESSING';
     if (refreshing && result.resolution.state !== 'VERIFIED') throw new Error('public-discovery-refresh-not-verified');
+    if (refreshing && row.resultJson !== null) {
+      const previous = publicDiscoveryTerminalResolutionSchema.parse(JSON.parse(row.resultJson));
+      if (previous.state !== 'VERIFIED' || previous.profile.workId !== profile?.workId) throw new Error('public-discovery-metadata-identity-conflict');
+    }
     if (refreshing && row.resultJson === resultJson && row.claimTokenHash === tokenDigest && row.requestDigest === result.requestDigest) {
       const completed = await this.database.prepare(`UPDATE public_discovery_requests_v3 SET
         verified_at = ?5, next_refresh_at = ?6, refresh_state = 'IDLE', refresh_attempt_count = 0,
