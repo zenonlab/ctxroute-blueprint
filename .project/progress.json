@@ -6335,9 +6335,10 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Snapshot production D1 strictement en lecture seule : scope 287 identités/339 sources; 275 identités FAILED à attempt 8 couvrent 326 sources, sans diagnostic D1 conservé; états NOT_FOUND/AMBIGUOUS expirés : 12 identités/13 sources.",
-            "Journal append-only contrôlé sur les 275 identités FAILED : 275 requêtes indexées, 275 lignes lues, 0 événement, 0 écriture; aucun motif historique fournisseur ne peut être attribué. Répartition outbox actuelle FAILED : SENT 200 identités/245 sources, UNSENT 75/81; tous attempt 8, donc UNSENT seul ne prouve pas l’absence d’appels antérieurs. Une identité porte un checkpoint.",
-            "Le seul indice fournisseur précédemment corrélé est un curseur de recherche Kitsu incomplet; la reproduction de code existe, mais son lien avec le corps HTTP historique reste non prouvé. Le Worker et le bucket R2 privés sont maintenant déployés; ils capturent les prochains échecs, pas les anciens."
+            "Snapshot D1 production read-only : 287 identités/339 sources; 275 identités FAILED à attempt 8 couvrent 326 sources, sans diagnostic D1 conservé. Les 12 autres identités couvrent 13 sources à résultats NOT_FOUND/AMBIGUOUS expirés.",
+            "Journal append-only : 275 requêtes indexées sur les échecs, 275 lignes lues, 0 événement, 0 écriture. Outbox actuelle : SENT 200 identités/245 sources, UNSENT 75/81; tous à attempt 8, donc le signal actuel ne prouve pas l’historique d’appels. Une identité garde un checkpoint.",
+            "Rapport local privé ignoré Git build/audits/source-trace-correlation-20261001/real-list-339.json, mode 0600 : jointure exacte 339/339 favoris et 287/287 identités par clé complète, titre/URL, parse, slugs raw/stable et état D1; zéro trace R2 jointe. Slug présent sur 292 sources; 47 absents (41 UNKNOWN, 6 autres médias). Aucun contenu favori envoyé à Cloudflare.",
+            "Défaut Kitsu du curseur incomplet est couvert par le code actuel; tests packages/public-discovery/src/providers/kitsu.test.ts réussis 30/30. Cause historique toujours non prouvable, car le journal n’a aucun événement et les réponses anciennes n’ont pas été stockées."
           ]
         },
         {
