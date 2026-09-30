@@ -6271,7 +6271,7 @@
         {
           "id": "candidate",
           "title": "Réparer et vérifier la candidate complète",
-          "status": "DONE",
+          "status": "IN_PROGRESS",
           "acceptance": [
             "Aller-retour publicDiscovery et anciens formats vérifiés",
             "Admissions scellées disjointes, réservation commune et lots partiels testés",
@@ -6294,6 +6294,7 @@
             "git diff --check"
           ],
           "evidence": [
+            "Kitsu page 13 reproduite HTTP 200 : couverture rejetée supprimait nextCursor. Dix régressions rouges puis279 testsDiscovery verts ; rejeu exact conserve20candidats etcurseur14 sans réseau. Validationcomplète en cours.",
             "Candidate1.0.54 : sync FOUND multi-ID corrigé, 4 régressions rouges puis497 tests application verts ; verify vert, E2E13succès/1ignoré, builds isolés identiques, Archify showcase9/9.",
             "PR183 commit21df65c, CI main36710218213 verte avec déploiement Worker et probes. Archives candidates conservées, aucun téléchargement public avancé.",
             "Candidate1.0.53 : Review saison non corroborée, Accept explicite pour les lecteurs récents ; projection legacy NOT_FOUND/season-unconfirmed uniquement, résultat D1 intact. Aucun état technique transformé, aucun changement de clé ou migration.",
@@ -6342,6 +6343,7 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
+            "Audit privé provider-evidence-XGSNiK :339sources/287clés,6lecturesD1/287lignes/0écriture.326FAILED dont1tracecorrélée provider-search-cursor;13résultats expirés.325sources sans causehistorique démontrable.",
             "Chrome154 x2aPZr, vraie liste1522 : version1.0.54 après upgrade et reprise,1076résolus+54Review+53exclusions+339attentes; inventairecomplet,868œuvres,0erreurinterne/0projectionmanquante ; verdictincomplete,2419lecturesHTTP cumulées,0admission.",
             "Audit privé current-residual-XBzO63 :6requêtesD1 indexées/287lignes/0écriture.339sources=274FAILED(325sources)+12terminauxexpirés(13sources MISS confirmés parlookupHTTP)+1PROCESSING. TroisFAILED déjà réservés,271non réservés; aucune reprise aveugle.",
             "Profil neuf Chrome154.0.8037.58 5ECSJP, ZIP1.0.51 SHA6f423f9e1bd99f823ee230119311801ba99269858ec77fa4828cee9741e80206,1522favoris Downloads.",

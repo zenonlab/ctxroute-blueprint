@@ -2531,6 +2531,41 @@ connexion, le contrôle unitaire (une ligne) et EXPLAIN sont distincts des
 public n’a été effectué. Le défaut de projection corrigé ne suffit pas à
 expliquer l’historique fournisseur des 307 identités épuisées.
 
+### Audit du 30 septembre : couverture optionnelle et curseur Kitsu
+
+Les 339 sources restantes correspondent à 287 identités. Six lectures D1
+indexées, 287 lignes lues et zéro écriture établissent 326 sources FAILED
+(275 identités) et 13 sources avec résultat négatif expiré (12 identités).
+La dernière demande anime est passée de PROCESSING à FAILED pendant l'audit.
+Pour cette demande, les traces corrélées conservées montrent 26 appels sans
+erreur HTTP ni réseau, puis `provider-search-cursor` aux tentatives 1 à 5.
+Les événements ultérieurs sans corrélation ne constituent pas une attribution
+individuelle. Les causes fournisseur historiques des 325 autres sources
+FAILED ne sont pas démontrées par les preuves retrouvées.
+
+Un diagnostic local ultérieur lit uniquement les pages Kitsu 12 et 13 via
+l'adaptateur du projet : deux HTTP 200, sans admission ni écriture D1.
+La page 13 contient vingt identités et annonce une suite, mais une couverture
+optionnelle rejetée rendait la projection incomplète et supprimait le curseur.
+Cette observation actuelle reproduit le mécanisme ; elle ne reconstitue pas
+les corps des anciennes réponses Worker. Les preuves restent privées.
+
+La correction sépare absence de métadonnée optionnelle et perte d'identité :
+une couverture étrangère, malformée ou trop longue reste omise, sans supprimer
+la pagination ni empêcher une page terminale complète. Le mauvais média et
+les identités impossibles à encoder restent incomplets et bloquants.
+Cette règle remplace la précédente règle « toute omission marque la page
+incomplète » pour les couvertures seulement. Aucun réarmement historique,
+assouplissement d'allowlist ou faux résultat Library n'est ajouté.
+
+Validation : dix assertions de régression échouent avant correction, puis
+les 279 tests Discovery passent, y compris deux parcours adaptateur→resolver
+qui dépassent l'image rejetée et terminent en VERIFIED ou NOT_FOUND selon
+les identités reçues. Le rejeu hors réseau du corps HTTP réel conserve les
+vingt candidats à l'identique et restitue le curseur 14. `npm run verify`,
+la validation Archify dataflow et `git diff --check` passent. Ce correctif
+local n'est pas encore une preuve de convergence des anciennes demandes.
+
 ### Défaut serveur reproduit : perte du curseur du fallback
 
 Le resolver abandonnait `PublicDiscoverySearchContinuationError` lorsqu’un

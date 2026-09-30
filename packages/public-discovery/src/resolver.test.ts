@@ -5,6 +5,7 @@ import { createPublicDiscoveryResolver, PublicDiscoveryInvocationYieldError, Pub
 import type { PublicDiscoveryProviderPorts } from './resolver';
 import { FavoriteProviderRateGate } from './provider-http';
 import { MangaUpdatesFavoriteProviderAdapter } from './providers/mangaupdates';
+import { KitsuFavoriteProviderAdapter } from './providers/kitsu';
 import { runPublicDiscoveryBatch } from './collector';
 
 function candidate(provider: ResolutionProvider, mediaKind: ProviderCandidate['mediaKind'], externalId: string, title: string): ProviderCandidate {
@@ -39,6 +40,33 @@ function providers(values: Partial<Record<ResolutionProvider, ProviderCandidate>
 }
 
 describe('standalone provider resolver', () => {
+  it.each(['verified', 'not-found'] as const)('continues past a rejected optional cover to a %s terminal result', async (outcome) => {
+    const resource = (title: string) => ({
+      id: title === 'Target' ? '42' : '41', type: 'anime', attributes: {
+        abbreviatedTitles: [], canonicalTitle: title, slug: 'synthetic-title', subtype: 'TV', titles: {},
+        posterImage: { large: 'https://images.example.test/cover.jpeg' },
+      },
+    });
+    const offsets: string[] = [];
+    const fetcher = vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname.endsWith('/42')) return Response.json({ data: resource('Target') });
+      const offset = url.searchParams.get('page[offset]')!;
+      offsets.push(offset);
+      return Response.json(offset === '240'
+        ? { data: [resource('Unrelated title')], links: { next: 'https://kitsu.io/api/edge/anime?page%5Boffset%5D=260' }, meta: { count: 261 } }
+        : { data: outcome === 'verified' ? [resource('Target')] : [], links: { next: null }, meta: { count: outcome === 'verified' ? 261 : 260 } });
+    });
+    const adapter = new KitsuFavoriteProviderAdapter('kitsu-anime', fetcher,
+      new FavoriteProviderRateGate('kitsu-anime', undefined, () => 10_000, async () => undefined));
+    const input = { ...request('ANIME'), searchProgress: { candidates: [], cursor: '13', provider: 'kitsu-anime' as const, titleIndex: 0, version: 1 as const } };
+    const result = await createPublicDiscoveryResolver({ ...providers(), 'kitsu-anime': adapter }).resolve(input);
+    expect(offsets).toEqual(['240', '260']);
+    expect(result.state).toBe(outcome === 'verified' ? 'VERIFIED' : 'NOT_FOUND');
+    if (result.state === 'VERIFIED') expect(result.profile.candidate).not.toHaveProperty('cover');
+    expect(fetcher).toHaveBeenCalledTimes(outcome === 'verified' ? 3 : 2);
+  });
+
   it('reaches Kitsu when AniList returns an exact ID but cannot corroborate the requested season', async () => {
     const ports = providers({
       anilist: { ...candidate('anilist', 'ANIME', '123', 'Target'), format: 'TV' },
