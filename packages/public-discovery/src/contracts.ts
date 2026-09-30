@@ -118,7 +118,7 @@ export const publicDiscoveryFailureDiagnosticSchema = z.strictObject({
   providerFailures: z.array(publicDiscoveryFailureCauseSchema).max(5).refine(failures =>
     failures.every(failure => failure.provider !== undefined) && new Set(failures.map(failure => failure.provider)).size === failures.length,
   'failure-provider-required-and-unique').optional(),
-  decision: z.enum(['retry-requested', 'attempt-failed', 'publication-failed']),
+  decision: z.enum(['retry-requested', 'attempt-failed', 'publication-failed', 'resolution-produced']),
 });
 export type PublicDiscoveryFailureDiagnostic = z.output<typeof publicDiscoveryFailureDiagnosticSchema>;
 

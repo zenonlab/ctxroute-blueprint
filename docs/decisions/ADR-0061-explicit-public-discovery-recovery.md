@@ -68,6 +68,12 @@ Le profil réel a montré des lignes `RETRYABLE/PROVIDER_UNAVAILABLE` correspond
 
 ### Diagnostic durable des défaillances techniques
 
+Lorsqu'un résultat est produit après une panne fournisseur dans la même
+invocation, `resolution-produced` conserve les causes avant publication, sous
+le bail actif. Cette décision n'atteste pas la publication, qui peut encore
+échouer. Les causes restent bornées à la dernière observation par fournisseur,
+sans payload privé ; ce journal ne remplace pas une capture temporaire d'audit.
+
 Les reports après HTTP 429 et sonde de réouverture échouée conservent la cause
 technique dans l'erreur interne. Le collecteur journalise cette cause fermée
 avant le report, avec la décision `retry-requested` ; il ne persiste pas le

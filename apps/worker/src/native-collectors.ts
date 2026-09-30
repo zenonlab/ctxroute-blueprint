@@ -391,7 +391,23 @@ export async function processPublicDiscoveryQueue(bindings: NativeCollectorBindi
     now: () => new Date().toISOString(),
     resolver: {
       resolve: async (request) => {
-        try { return await resolver.resolve(request); }
+        try {
+          const resolution = await resolver.resolve(request);
+          if (providerFailures.size > 0) {
+            const observedFailures = [...providerFailures.values()];
+            const now = new Date().toISOString();
+            const diagnostic: PublicDiscoveryFailureDiagnostic = {
+              schemaVersion: 1, attempt: request.attempt, observedAt: now,
+              cause: observedFailures[observedFailures.length - 1]!,
+              providerFailures: observedFailures, decision: 'resolution-produced',
+            };
+            if (correlationId !== undefined) diagnostic.correlationId = correlationId;
+            if (bindings.WORKER_VERSION !== undefined) diagnostic.workerVersion = bindings.WORKER_VERSION.id;
+            await port.recordFailure(request, activeTokenDigest, diagnostic);
+            providerFailures.clear();
+          }
+          return resolution;
+        }
         catch (error) {
           console.warn(JSON.stringify({ schemaVersion: 1, type: 'native-collector.provider-failed', correlationId,
             attempt: request.attempt, code: providerFailureCode(error instanceof z.ZodError || error instanceof Error ? error : undefined) }));

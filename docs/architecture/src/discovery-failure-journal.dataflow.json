@@ -4,7 +4,7 @@
   "meta": { "title": "Preuves backend des défaillances", "output": "discovery-failure-journal.dataflow.html", "quality_profile": "showcase", "viewBox": [940, 460] },
   "stages": [{ "label": "Collecte" }, { "label": "Persistance" }, { "label": "Audit" }],
   "nodes": [
-    { "id": "failure", "type": "backend", "label": "Collecteur Worker", "sublabel": "cause réelle · report tracé", "stage": 0, "row": 0 },
+    { "id": "failure", "type": "backend", "label": "Collecteur Worker", "sublabel": "pannes · fallback tracé", "stage": 0, "row": 0 },
     { "id": "recent", "type": "database", "label": "Demande D1", "sublabel": "huit diagnostics récents", "stage": 1, "row": 0 },
     { "id": "archive", "type": "database", "label": "Journal indépendant", "sublabel": "événements sans payload", "stage": 1, "row": 2, "yOffset": -40 },
     { "id": "audit", "type": "backend", "label": "Script sans interface", "sublabel": "clé complète · pagination", "stage": 2, "row": 2, "width": 150, "yOffset": -40 }

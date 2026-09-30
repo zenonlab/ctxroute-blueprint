@@ -114,12 +114,18 @@ describe('public discovery queue trigger', () => {
       .bind(discoveryKey.fingerprint).all()).results).toHaveLength(9);
   });
 
-  it.each([401, 429])('persists an adapter HTTP %s failure with its provider and operation', async (status) => {
+  it.each([401, 429, 200])('persists an adapter HTTP %s failure with its provider and operation', async (status) => {
     const restoreRuntime = await preserveProviderRuntime();
     const adapter = new D1PublicDiscoveryV3Adapter(env.PUBLIC_DB);
     const discoveryKey = { ...key('d'), fingerprint: `d1a7${status}`.padStart(64, '0') };
     await adapter.request({ ...submission('d', 'Synthetic private title'), key: discoveryKey, requestDigest: 'e'.repeat(64) }, new Date().toISOString());
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status }));
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      if (status !== 200) return new Response('', { status });
+      const url = new URL(String(input));
+      if (url.hostname === 'graphql.anilist.co') return new Response('', { status: 503 });
+      const candidate = { id: '907171', type: 'anime', attributes: { canonicalTitle: 'Synthetic private title', titles: { en: 'Synthetic private title' }, abbreviatedTitles: [], slug: 'synthetic-private-title', subtype: 'TV' } };
+      return Response.json({ data: url.pathname.endsWith('/907171') ? candidate : [candidate], links: { next: null }, meta: { count: 1 } });
+    });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     try {
@@ -127,12 +133,13 @@ describe('public discovery queue trigger', () => {
       const workerVersion = '00000000-0000-4000-8000-000000000098';
       await processPublicDiscoveryQueue({ ...env, PROVIDER_TRANSPORT_MODE: 'direct', WORKER_VERSION: { id: workerVersion, tag: '', timestamp: new Date().toISOString() } }, discoveryKey, false, correlationId);
       const row = await env.PUBLIC_DB.prepare('SELECT failure_diagnostics_json AS diagnostics FROM public_discovery_requests_v3 WHERE fingerprint = ?1').bind(discoveryKey.fingerprint).first<{ diagnostics: string }>();
-      expect(JSON.parse(row!.diagnostics)).toEqual([expect.objectContaining({ correlationId, workerVersion, decision: status === 429 ? 'retry-requested' : 'attempt-failed',
-        cause: expect.objectContaining({ code: 'http', httpStatus: status, stage: 'search' }) })]);
+      expect(JSON.parse(row!.diagnostics)).toEqual([expect.objectContaining({ correlationId, workerVersion, decision: status === 200 ? 'resolution-produced' : status === 429 ? 'retry-requested' : 'attempt-failed',
+        cause: expect.objectContaining({ code: 'http', httpStatus: status === 200 ? 503 : status, stage: 'search' }) })]);
       expect(row!.diagnostics).not.toContain('Synthetic');
       expect(JSON.parse(row!.diagnostics)[0].providerFailures).toEqual(expect.arrayContaining([
-        { code: 'http', httpStatus: status, provider: 'anilist', stage: 'search' },
+        { code: 'http', httpStatus: status === 200 ? 503 : status, provider: 'anilist', stage: 'search' },
       ]));
+      if (status === 200) expect(await adapter.read(discoveryKey, new Date().toISOString())).toMatchObject({ state: 'VERIFIED' });
       if (status === 401) {
         expect(JSON.parse(row!.diagnostics)[0].cause.provider).toBe('kitsu-anime');
         expect(JSON.parse(row!.diagnostics)[0].providerFailures).toContainEqual({ code: 'http', httpStatus: 401, provider: 'kitsu-anime', stage: 'search' });
@@ -141,7 +148,7 @@ describe('public discovery queue trigger', () => {
       expect(archive.results.map(event => JSON.parse(event.diagnostic))).toEqual(JSON.parse(row!.diagnostics));
     } finally {
       fetcher.mockRestore(); warn.mockRestore(); info.mockRestore();
-      await env.PUBLIC_DB.prepare("UPDATE public_discovery_requests_v3 SET state = 'PROCESSING', attempt_count = 8, lease_until = '2000-01-01T00:00:00.000Z' WHERE fingerprint = ?1").bind(discoveryKey.fingerprint).run();
+      await env.PUBLIC_DB.prepare("UPDATE public_discovery_requests_v3 SET state = 'PROCESSING', attempt_count = 8, lease_until = '2000-01-01T00:00:00.000Z' WHERE fingerprint = ?1 AND result_json IS NULL").bind(discoveryKey.fingerprint).run();
       await adapter.read(discoveryKey, new Date().toISOString());
       await restoreRuntime();
     }
