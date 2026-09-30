@@ -103,6 +103,7 @@
       "docs/architecture/src/public-pipeline.architecture.json"
       ,"docs/architecture/src/favorite-convergence.architecture.json"
       ,"docs/architecture/src/discovery-recovery.dataflow.json"
+      ,"docs/architecture/src/discovery-failure-journal.dataflow.json"
       ,"docs/architecture/src/discovery-recovery-deployment.architecture.json"
     ],
     "internalDocuments": [
