@@ -6315,8 +6315,11 @@
             "node apps/extension/scripts/installed-review.mjs"
           ],
           "evidence": [
-            "external: Playwright est installé mais connectOverCDP(\"http://127.0.0.1:9222\") échoue sur HTTP 404 à /json/version; le port ne fournit pas l’API CDP du profil Choukky, donc aucun clic ni POST de reprise n’a été exécuté dans cette session.",
-            "L’autorisation batch-009 précédente a déjà consommé quatre POST puis s’est arrêtée sur le premier échec technique; les clés réservées ne seront pas rejouées. Reprise impossible tant qu’un endpoint CDP valide n’expose pas le profil."
+            "external: Les deux onglets Tobirink inspectés dans Chrome (profils Vegeta et T) affichent « Extension requise » et 0 correspondance en attente; aucun bouton de reprise ni lot de dix n’est disponible.",
+            "Playwright connectOverCDP(http://127.0.0.1:9222) renvoie HTTP 404 à /json/version; aucun clic ni POST de reprise n’a été exécuté.",
+            "L’autorisation batch-009 précédente a consommé quatre POST puis s’est arrêtée sur le premier échec technique; les clés réservées ne seront pas rejouées.",
+            "Prévol MCP read-only du scope local exact : dix digests concordent, mais seul 1 est encore FAILED; 5 sont VERIFIED et 4 NOT_FOUND. Le scope ne peut pas servir de lot de dix reprises.",
+            "Aucune reprise n’a été exécutée : nouveau scope exact et session Chrome détectant l’extension nécessaires; confirmation du lot exact requise avant toute tentative mutante."
           ]
         },
         {
@@ -6335,16 +6338,18 @@
             "node scripts/infra/discovery-recovery-batch.mjs preflight"
           ],
           "evidence": [
-            "Snapshot D1 production read-only : 287 identités/339 sources; 275 identités FAILED à attempt 8 couvrent 326 sources, sans diagnostic D1 conservé. Les 12 autres identités couvrent 13 sources à résultats NOT_FOUND/AMBIGUOUS expirés.",
-            "Journal append-only : 275 requêtes indexées sur les échecs, 275 lignes lues, 0 événement, 0 écriture. Outbox actuelle : SENT 200 identités/245 sources, UNSENT 75/81; tous à attempt 8, donc le signal actuel ne prouve pas l’historique d’appels. Une identité garde un checkpoint.",
-            "Rapport local privé ignoré Git build/audits/source-trace-correlation-20261001/real-list-339.json, mode 0600 : jointure exacte 339/339 favoris et 287/287 identités par clé complète, titre/URL, parse, slugs raw/stable et état D1; zéro trace R2 jointe. Slug présent sur 292 sources; 47 absents (41 UNKNOWN, 6 autres médias). Aucun contenu favori envoyé à Cloudflare.",
-            "Défaut Kitsu du curseur incomplet est couvert par le code actuel; tests packages/public-discovery/src/providers/kitsu.test.ts réussis 30/30. Cause historique toujours non prouvable, car le journal n’a aucun événement et les réponses anciennes n’ont pas été stockées."
+            "Audit historique privé : 287 identités / 339 favoris ; 275 identités FAILED à attempt 8 couvrent 326 favoris sans diagnostic ni trace R2. Ces causes passées ne sont pas reconstructibles.",
+            "Lecture Cloudflare API MCP du 2026-10-01 : D1 `tobirink-public` fait 12 390 400 octets; 38 tables applicatives et 28 index. Agrégat requests : 1 023 VERIFIED, 416 FAILED (tous attempt 8), 55 NOT_FOUND, 24 AMBIGUOUS; 3 036 lignes lues, 0 écriture, changes=0.",
+            "L’état actuel confirme zéro `failure_diagnostics_json` non vide sur les 1 518 demandes, zéro événement dans `public_discovery_failure_events` et zéro objet dans le préfixe privé R2 `provider-audit/v1/`. Les traces des nouvelles défaillances restent à observer.",
+            "Le Worker actif est version 303 à 100 %; son bundle expose le marqueur de diagnostic D1, le traceId et le chemin `provider-audit/v1/`. Cela prouve que le mécanisme est actif, pas qu’une reprise future a déjà été tracée.",
+            "Le scope exact local de dix identités demeure intègre, mais sa relecture en production donne 1 FAILED, 5 VERIFIED et 4 NOT_FOUND; le digest correspond 10/10, avec 20 lectures D1, 0 écriture et 0 changement. Ce scope n’est plus un lot de dix échecs.",
+            "Wrangler CLI reste refusé depuis l’IP actuelle (9109), mais la lecture D1 est possible via Cloudflare MCP; aucune admission, tentative ou mutation n’a été faite. Archify real-list-convergence.dataflow passe 9/9 sans diagnostic; git diff --check passe."
           ]
         },
         {
           "id": "certify",
           "title": "Certifier Chrome et Firefox durablement",
-          "status": "IN_PROGRESS",
+          "status": "BLOCKED",
           "acceptance": [
             "ZIP exact et XPI signé testés, conservation après mise à jour et deux redémarrages"
           ],
@@ -6357,14 +6362,10 @@
             "npm run package:extension"
           ],
           "evidence": [
-            "Chrome1.0.55 ZIP286b9da2 : roundtrip privé1522sources/868œuvres/publicDiscovery exact, refus mauvaise phrase atomique, offline et2redémarrages vérifiés; preuve private-roundtrip-exact-155-r0C26f. Aucun XPI signé ni promotion.",
-            "Chrome1.0.54 exact(20fichiers duZIP contrôlés) : roundtrip privé1522sources/868œuvres avec publicDiscovery, phrase incorrecte refusée sansmutation, bibliothèqueoffline et2redémarrages vérifiés ; preuveprivée private-roundtrip-exact-154-4gEGqi. Originalintact,0admission.",
-            "FirefoxZIP1.0.54 : lintMozilla0erreur/4warnings(Zod/React), modewarnings-as-errors échoué conservé. Firefox156.0.1 installé ; signatureinaccessible (aucunWEB_EXT secret local/repo/CIproduction,CDP9222absent). AucunXPIsigné.",
-            "ZIPChrome1.0.54 SHA58867826da4f578029e4575b1afbcfb19bcf7bec16f64411e9465da1510421ab : upgrade1.0.53→54 dans mêmeprofilx2aPZr, sources/œuvres/progressions conservées, worker et deux cycles navigateur aprèsupdate vérifiés; pas certification de convergence.",
-            "AncienZIP1.0.51 : projection legacy saison testée horsréseau,1Review/0Work préservé après2redémarrages. Firefox1.0.54 ZIP non signé, aucune preuveXPI durable ni promotionpublique.",
-            "Banc persistant d6c2e6a poussé; 101 tests ciblés runtime/continuation/banc verts et Archify architecture/dataflow verts. Aucun contrat produit modifié dans cette vérification.",
-            "Chrome154 Z8GbJc, même corpus synthétique1532 et même profil: fenêtres précédentes incomplètes conservées. Reprise finale offline-regression-passed à271s:1400retryable+132exclusions,0processing/erreur interne/projection manquante; deux redémarrages et redémarrage worker vérifiés,0requête distante transmise. Les reprises consomment plusieurs fenêtres, pas une certification de vitesse ni de résolution en ligne.",
-            "Dernière mesure réelle5ECSJP inchangée:1073résolus+55Review+53exclusions+341attentes. Aucun POST historique ni promotion publique; Firefox signé durable non certifié."
+            "Chrome 1.0.55 ZIP : import/export privé exact (1522 sources/868 œuvres/publicDiscovery), mauvais passphrase refusé atomiquement, Library hors ligne et conservation sur deux redémarrages vérifiées; aucune promotion publique.",
+            "Firefox 1.0.54 : ZIP compilé, lint Mozilla avec 0 erreur et 4 avertissements; aucun XPI signé. La signature AMO requiert une session/clé API Mozilla absente de l’environnement.",
+            "external: aucun secret WEB_EXT API ni session Developer Hub disponible; Chrome CDP sur 127.0.0.1:9222 renvoie HTTP 404. Sans ces accès, signature XPI et certification Firefox durable ne peuvent pas être exécutées.",
+            "Vérification AMO par session navigateur authentifiée: Developer Hub indique 0 add-on. La signature durable nécessiterait d’enregistrer un add-on et d’envoyer le XPI; aucun contrat n’a été accepté ni artefact envoyé."
           ]
         },
         {
