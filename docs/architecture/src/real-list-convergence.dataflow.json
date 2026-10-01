@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Convergence privée des sources Tobirink",
+    "output": "real-list-convergence.dataflow.html",
+    "quality_profile": "showcase",
+    "viewBox": [1080, 760]
+  },
+  "stages": [
+    { "label": "Sources" },
+    { "label": "État distant" },
+    { "label": "Jointure privée" },
+    { "label": "Rapport local" }
+  ],
+  "nodes": [
+    { "id": "favorites", "type": "database", "label": "Favoris locaux", "sublabel": "IndexedDB · titre · URL · slugs", "stage": 0, "row": 2, "width": 150 },
+    { "id": "discovery", "type": "database", "label": "Public Discovery D1", "sublabel": "état · causes · traceId", "stage": 1, "row": 0, "width": 170 },
+    { "id": "trace", "type": "database", "label": "R2 privé", "sublabel": "traces filtrées · rétention 7 j", "stage": 1, "row": 3, "width": 170 },
+    { "id": "join", "type": "backend", "label": "Jointure locale", "sublabel": "clé complète · aucune donnée envoyée", "stage": 2, "row": 2, "width": 190 },
+    { "id": "report", "type": "database", "label": "Rapport privé", "sublabel": "preuves locales · accès restreint", "stage": 3, "row": 2, "width": 170 }
+  ],
+  "flows": [
+    { "from": "favorites", "to": "join", "label": "source locale", "classification": "données privées · jamais transmises", "variant": "security" },
+    { "from": "discovery", "to": "join", "label": "états D1", "classification": "lecture indexée en production", "variant": "default" },
+    { "from": "trace", "to": "join", "label": "traces disponibles", "classification": "lecture privée · fenêtres de rétention", "variant": "security" },
+    { "from": "join", "to": "report", "label": "corrélation exacte", "classification": "rapport local restreint", "variant": "emphasis", "labelAt": [643, 428] }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Frontière de confidentialité",
+      "items": [
+        "Titres, URLs, slugs et correspondances restent dans IndexedDB.",
+        "D1 conserve l’état Discovery ; R2 ne reçoit que les nouvelles traces filtrées.",
+        "La corrélation entre favoris, états et traces est produite localement."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Limites de convergence",
+      "items": [
+        "Les échecs historiques sans trace R2 ne sont pas reconstructibles.",
+        "Les données distantes sont lues sans réarmement ni appel fournisseur.",
+        "Aucune purge ni réinitialisation ne fait partie du flux."
+      ]
+    }
+  ]
+}

@@ -102,6 +102,7 @@
       "docs/architecture/src/provider-operations.lifecycle.json",
       "docs/architecture/src/public-pipeline.architecture.json",
       "docs/architecture/src/discovery-failure-journal.dataflow.json",
+      "docs/architecture/src/real-list-convergence.dataflow.json",
       "docs/architecture/src/favorite-convergence.architecture.json",
       "docs/architecture/src/discovery-recovery.dataflow.json",
       "docs/architecture/src/discovery-provider-evidence.architecture.json",
