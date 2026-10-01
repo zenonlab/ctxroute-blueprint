@@ -332,14 +332,14 @@ fn resolve_effect(
             spin_direction_probability: extra
                 .filter(|shape| shape.flags & 0x0100_0000 != 0)
                 .map_or(1.0, |shape| shape.rotate_direction),
-            shape: if matches!(emitter.base_shape.shape_type, 3 | 4 | 5 | 6 | 9) {
-                4
-            } else {
-                3
-            },
-            projection: match emitter.base_shape.shape_type {
-                5 | 6 => "surface-stripe",
-                3 | 4 | 9 => "directional-billboard",
+            // Preserve the JPA shape discriminator. In particular, JPA
+            // Stripe is shape 5; the surface-stripe projection is an
+            // additional canonical capability, not a lossy shape rewrite.
+            shape: emitter.base_shape.shape_type,
+            projection: match (emitter.base_shape.shape_type, kind) {
+                (5, "point") => "anchored-ribbon",
+                (5 | 6, _) => "surface-stripe",
+                (3 | 4 | 9, _) => "directional-billboard",
                 _ => "billboard",
             },
         },
@@ -435,7 +435,17 @@ fn volume(dynamics: &JpcDynamics) -> Result<(&'static str, [f32; 6])> {
     let sweep = (dynamics.volume_sweep * std::f32::consts::TAU).clamp(0.0, std::f32::consts::TAU);
     let minimum = (dynamics.volume_min_radius * radius).clamp(0.0, radius);
     match dynamics.volume_type {
-        4 => Ok(("point", [0.0; 6])),
+        4 => Ok((
+            "point",
+            [
+                f32::from(dynamics.volume_size),
+                f32::from(dynamics.division_count),
+                f32::from(dynamics.volume_min_radius),
+                f32::from(dynamics.volume_sweep),
+                0.0,
+                0.0,
+            ],
+        )),
         // JPA's line volume emits one complete cross-section per division
         // step. Keep that cardinality in the portable volume contract; the
         // track callback consumes the resulting particles in fixed groups.
