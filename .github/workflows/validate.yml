@@ -90,7 +90,7 @@ jobs:
 
       - name: Upload unexpected Sensor diagnostics to code scanning
         if: runner.os == 'Linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
           sarif_file: sensor.sarif
           category: blueprint-sensor
